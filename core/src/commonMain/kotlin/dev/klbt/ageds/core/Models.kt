@@ -80,7 +80,8 @@ data class AnnotationCreate(
 
 /**
  * Deliberately deterministic. This is a scheduling heuristic, not an epistemic judgment.
- * Human priority dominates; duration and evidence hints only break ties.
+ * Human priority is lexicographically dominant; derived hints only order items
+ * inside the same manual-priority bucket.
  */
 data class PrioritySignals(
     val manualPriority: Int = 0,
@@ -91,8 +92,10 @@ data class PrioritySignals(
 )
 
 object TranscriptionPriority {
+    private const val MANUAL_STRIDE = 10_000
+
     fun score(s: PrioritySignals): Int {
-        var score = s.manualPriority.coerceIn(0, 100) * 100
+        var score = s.manualPriority.coerceIn(0, 100) * MANUAL_STRIDE
         if (s.taggedLegal) score += 600
         if (s.hasConflict) score += 400
         if (s.hasKnownCounterparty) score += 100

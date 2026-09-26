@@ -58,11 +58,7 @@ class CorpusVm(application: Application) : AndroidViewModel(application) {
         manualPhones.clear(); excludedPhones.clear()
     }
     fun clearSelection() { selectedPresetIds.clear(); manualPhones.clear(); excludedPhones.clear() }
-    fun togglePreset(id: String) { if (id in selectedPresetIds) selectedPresetIds.clear(); selectedPresetIds.addAll(defaultPresetIds)
-        manualPhones.clear(); excludedPhones.clear()
-    }
-    fun clearSelection() { selectedPresetIds.clear(); manualPhones.clear(); excludedPhones.clear() }
-    fun togglePreset(id: String) { if (id in selectedPresetIds) selectedPresetIds.clear(); selectedPresetIds.addAll(defaultPresetIds) }
+    fun togglePreset(id: String) { if (id in selectedPresetIds) selectedPresetIds.remove(id) else selectedPresetIds.add(id) }
 
     private fun activePresets() = corpus.value?.presets.orEmpty().filter { it.id in selectedPresetIds }
     private fun presetPhones() = activePresets().flatMap { it.phones }.toSet()
@@ -96,7 +92,7 @@ class CorpusVm(application: Application) : AndroidViewModel(application) {
     fun selectedEmails(): List<EmailIdentity> {
         val seed = corpus.value ?: return emptyList(); val ps = activePresets()
         val explicit = ps.flatMap { it.emails }.map { it.lowercase() }.toSet(); val groups = ps.flatMap { it.emailGroups }.toSet(); val domains = ps.flatMap { it.emailDomains }.map { it.lowercase() }.toSet()
-        return seed.emailIdentities.filter { e -> e.email.lowercase() in explicit || e.group in groups || domains.any { d -> e.email.lowercase().endsWith("@d") } }.distinctBy { it.email.lowercase() }.sortedBy { it.email }
+        return seed.emailIdentities.filter { e -> e.email.lowercase() in explicit || e.group in groups || domains.any { d -> e.email.lowercase().endsWith("@$d") } }.distinctBy { it.email.lowercase() }.sortedBy { it.email }
     }
     fun emailDomains() = activePresets().flatMap { it.emailDomains }.toSet()
     fun labelFor(phone: String?) = corpus.value?.contacts?.firstOrNull { it.phone == phone }?.label ?: phone ?: "Nieznany"

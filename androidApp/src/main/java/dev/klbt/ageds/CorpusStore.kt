@@ -6,10 +6,19 @@ import androidx.documentfile.provider.DocumentFile
 import dev.klbt.ageds.core.CorpusSeed
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.util.ArrayDeque
+
+data class RecordingScan(
+    val found: Map<String, Uri>,
+    val scannedFiles: Int,
+    val scannedDirectories: Int,
+    val sampleNames: List<String>,
+)
 
 class CorpusStore(private val context: Context) {
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
     private val cacheFile = File(context.filesDir, "ageds-corpus-seed.json")
+    private val prefs = context.getSharedPreferences("ageds-corpus", Context.MODE_PRIVATE)
 
     fun loadCached(): CorpusSeed? = runCatching {
         if (!cacheFile.exists()) null else json.decodeFromString<CorpusSeed>(cacheFile.readText())
@@ -24,18 +33,37 @@ class CorpusStore(private val context: Context) {
         return seed
     }
 
-    fun indexRecordingTree(treeUri: Uri, expectedNames: Set<String>): Map<String, Uri> {
-        val root = DocumentFile.fromTreeUri(context, treeUri) ?: error("Nie mogę otworzyć folderu nagrań")
+    fun saveRecordingTree(uri: Uri) {
+        prefs.edit().putString("recordingTree", uri.toString()).apply()
+    }
+
+    fun savedRecordingTree(): Uri? = prefs.getString("recordingTree", null)?.let(Uri::parse)
+
+    fun indexRecordingTree(treeUri: Uri, expectedNames: Set<String>): RecordingScan {
+        val root = DocumentFile.fromTreeUri(context, treeUri) ?: error("Nie mogę otworzyć wskazanego folderu")
         val found = LinkedHashMap<String, Uri>()
-        fun walk(node: DocumentFile) {
+        val samples = ArrayList<String>()
+        val queue = ArrayDeque<DocumentFile>()
+        queue.add(root)
+        var scannedFiles = 0
+        var scannedDirectories = 0
+
+        while (queue.isNotEmpty()) {
+            val node = queue.removeFirst()
             if (node.isDirectory) {
-                node.listFiles().forEach(::walk)
-                return
+                scannedDirectories++
+                val children = runCatching { node.listFiles().toList() }
+                    .getOrElse { throw IllegalStateException("Nie mogę odczytać folderu ${node.name ?: node.uri}: ${it.message}", it) }
+                children.forEach(queue::addLast)
+                continue
             }
-            val name = node.name ?: return
+            scannedFiles++
+            val name = node.name ?: continue
+            if (samples.size < 12) samples += name
             if (name in expectedNames && name !in found) found[name] = node.uri
         }
-        walk(root)
-        return found
+
+        saveRecordingTree(treeUri)
+        return RecordingScan(found, scannedFiles, scannedDirectories, samples)
     }
 }

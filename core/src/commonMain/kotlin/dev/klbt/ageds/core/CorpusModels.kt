@@ -1,6 +1,7 @@
 package dev.klbt.ageds.core
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.json.JsonObject
 
 @Serializable
@@ -16,10 +17,10 @@ data class CorpusPreset(
     val description: String = "",
     val phones: List<String> = emptyList(),
     val emails: List<String> = emptyList(),
-    val emailGroups: List<String> = emptyList(),
-    val emailDomains: List<String> = emptyList(),
-    val labelKeywords: List<String> = emptyList(),
-    val shortSenders: List<String> = emptyList(),
+    @SerialName("email_groups") val emailGroups: List<String> = emptyList(),
+    @SerialName("email_domains") val emailDomains: List<String> = emptyList(),
+    @SerialName("label_keywords") val labelKeywords: List<String> = emptyList(),
+    @SerialName("short_senders") val shortSenders: List<String> = emptyList(),
 )
 
 @Serializable

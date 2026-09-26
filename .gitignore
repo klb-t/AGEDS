@@ -1,0 +1,12 @@
+.gradle/
+.idea/
+local.properties
+**/build/
+*.iml
+.DS_Store
+server/.env
+server/.venv/
+server/data/*
+!server/data/.gitkeep
+
+.pytest_cache/

@@ -1,0 +1,11 @@
+services:
+  api:
+    build: ./server
+    ports: ["8080:8080"]
+    volumes:
+      - ./server/data:/app/data
+  worker:
+    build: ./server
+    command: python -m app.worker
+    volumes:
+      - ./server/data:/app/data

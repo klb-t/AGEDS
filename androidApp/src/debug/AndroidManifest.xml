@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Development-only: permits a phone/emulator to reach a local Evidence Workbench over HTTP.
+         Release builds do not include this manifest and should use HTTPS. -->
+    <application android:usesCleartextTraffic="true" />
+</manifest>

@@ -7,7 +7,7 @@ plugins {
 kotlin {
     androidLibrary {
         namespace = "dev.klbt.ageds.core"
-        compileSdk = 36
+        compileSdk = 37
         minSdk = 26
     }
     jvm("desktop")

@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "dev.klbt.ageds"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "dev.klbt.ageds"

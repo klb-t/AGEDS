@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.net.Uri
 import android.provider.OpenableColumns
 import dev.klbt.ageds.core.*
+import dev.klbt.ageds.core.Annotation as EvidenceAnnotation
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.okhttp.*
@@ -25,12 +26,12 @@ class EvidenceApi(private var baseUrl: String) {
 
     suspend fun artifacts(): List<ArtifactSummary> = client.get("$baseUrl/api/artifacts").body()
     suspend fun transcript(artifactId: Long): Transcript? = client.get("$baseUrl/api/artifacts/$artifactId/transcript").body()
-    suspend fun annotations(artifactId: Long): List<Annotation> = client.get("$baseUrl/api/artifacts/$artifactId/annotations").body()
+    suspend fun annotations(artifactId: Long): List<EvidenceAnnotation> = client.get("$baseUrl/api/artifacts/$artifactId/annotations").body()
 
     suspend fun queueTranscription(artifactId: Long, priority: Int): QueueResult =
         client.post("$baseUrl/api/artifacts/$artifactId/transcribe") { parameter("priority", priority) }.body()
 
-    suspend fun annotate(artifactId: Long, annotation: AnnotationCreate): Annotation =
+    suspend fun annotate(artifactId: Long, annotation: AnnotationCreate ): EvidenceAnnotation =
         client.post("$baseUrl/api/artifacts/$artifactId/annotations") {
             contentType(ContentType.Application.Json)
             setBody(annotation)

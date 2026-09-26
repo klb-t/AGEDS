@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.klbt.ageds.core.*
+import dev.klbt.ageds.core.Annotation as EvidenceAnnotation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -36,7 +37,7 @@ class EvidenceVm : ViewModel() {
     val error = mutableStateOf<String?>(null)
     val selected = mutableStateOf<ArtifactSummary?>(null)
     val transcript = mutableStateOf<Transcript?>(null)
-    val annotations = mutableStateListOf<Annotation>()
+    val annotations = mutableStateListOf<EvidenceAnnotation>()
     private val api get() = EvidenceApi(serverUrl.value)
 
     suspend fun refresh() {
@@ -74,6 +75,7 @@ class EvidenceVm : ViewModel() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EvidenceApp(vm: EvidenceVm = viewModel()) {
     val scope = rememberCoroutineScope()
@@ -123,10 +125,10 @@ private fun ArtifactList(items: List<ArtifactSummary>, onOpen: (ArtifactSummary)
 }
 
 @Composable
-private fun TranscriptPane(
+private fun ColumnScope.TranscriptPane(
     artifact: ArtifactSummary,
     transcript: Transcript?,
-    annotations: List<Annotation>,
+    annotations: List<EvidenceAnnotation>,
     onBack: () -> Unit,
     onNote: (String) -> Unit,
 ) {

@@ -10,3 +10,6 @@ server/data/*
 !server/data/.gitkeep
 
 .pytest_cache/
+__pycache__/
+*.py[cod]
+/data/

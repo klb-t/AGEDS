@@ -1,0 +1,425 @@
+{
+  "schema_version": 1,
+  "project": "AGEDS",
+  "state_id": "AGEDS-STATE-20260930-001",
+  "updated_at": "2026-09-30T17:24:28.416504+00:00",
+  "based_on_remote_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0",
+  "local_branch": "codex/ageds-foundation-20260930",
+  "changes_published": false,
+  "published_commit": null,
+  "status_summary": "Backend zintegrowany i odebrany: 123 testy oraz 84 podtesty. Android source review ukończony; rzeczywisty build w toku. Publikacja zdalna czeka na potwierdzenie.",
+  "coordination": {
+    "transport": "repository_commits_and_stable_ids",
+    "history_search_role": "context_recall_only_not_delivery_or_order_guarantee",
+    "management_thread": "requested_not_created_or_verified",
+    "execution_lifecycle": "active_execution_only_no_background_promise",
+    "this_session_max_concurrent_processes": 7,
+    "coordinator_processes": 1,
+    "worker_slots": 6,
+    "management_roles_rotate_within_worker_slots": true,
+    "other_threads_limit": "unknown_not_an_assumed_limit_bypass",
+    "management_responsibilities": [
+      "product_priorities",
+      "architecture_contracts",
+      "assignment_and_integration",
+      "independent_acceptance",
+      "requirements_provenance",
+      "criticism_and_experiments"
+    ],
+    "state_editor": "coordinator",
+    "delivery_requires": [
+      "recipient_read_commit",
+      "explicit_task_acknowledgement"
+    ],
+    "completion_requires": [
+      "result_record",
+      "validation_evidence",
+      "coordinator_acceptance"
+    ]
+  },
+  "authority": {
+    "routine_decisions": "autonomous_reversible_implementation_and_validation",
+    "user_involvement": [
+      "strategic_goal_or_scope_change_beyond_authorization",
+      "irreversible_action_not_already_authorized",
+      "new_material_cost_not_authorized",
+      "external_commitment_not_authorized"
+    ],
+    "source_refs": [
+      "U1",
+      "U2",
+      "H1",
+      "H2",
+      "H3",
+      "E1",
+      "P1",
+      "C1"
+    ],
+    "source_registry": "docs/ARCHITECTURE_RULES.md",
+    "labels": [
+      "explicit",
+      "constraint",
+      "brainstorm",
+      "inferred",
+      "proposed",
+      "unresolved"
+    ]
+  },
+  "tasks": [
+    {
+      "id": "AGEDS-TASK-20260930-001",
+      "title": "Integralność pozyskań i addytywna migracja",
+      "status": "accepted",
+      "owner": "foundation_integrity",
+      "scope": [
+        "server/app/db.py",
+        "server/app/evidence.py",
+        "server/tests/test_integrity.py"
+      ],
+      "acceptance": [
+        "Stara baza migruje bez utraty rekordów",
+        "Ten sam hash zachowuje odrębne pozyskania",
+        "Uszkodzona kopia nie zostaje uznana za integralną"
+      ],
+      "depends_on": [],
+      "authority": "inferred",
+      "source_refs": [
+        "H1",
+        "H3",
+        "A01",
+        "A02"
+      ],
+      "result_id": "AGEDS-RESULT-20260930-001",
+      "integration_status": "integrated_and_accepted_locally",
+      "based_on_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0"
+    },
+    {
+      "id": "AGEDS-TASK-20260930-002",
+      "title": "Trwała kolejka, runy i fenced publikacja",
+      "status": "accepted",
+      "owner": "foundation_jobs",
+      "scope": [
+        "server/app/jobs.py",
+        "server/app/transcription.py",
+        "server/app/worker.py",
+        "server/tests/test_jobs.py"
+      ],
+      "acceptance": [
+        "Dwa workery nie claimują tej samej aktywnej pracy",
+        "Spóźniony worker nie publikuje ani nie psuje replacement run",
+        "Requeue aktualizuje jawny priorytet, bulk go zachowuje",
+        "Każda próba ma własny run i jawne unknown"
+      ],
+      "depends_on": [
+        "AGEDS-TASK-20260930-001"
+      ],
+      "authority": "inferred",
+      "source_refs": [
+        "H1",
+        "A04",
+        "A05"
+      ],
+      "result_id": "AGEDS-RESULT-20260930-002",
+      "integration_status": "integrated_and_accepted_locally",
+      "based_on_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0"
+    },
+    {
+      "id": "AGEDS-TASK-20260930-003",
+      "title": "Idempotentne importy komunikacji i niejednoznaczny czas",
+      "status": "accepted",
+      "owner": "foundation_parsers",
+      "scope": [
+        "server/app/importers/sms_backup.py",
+        "server/app/importers/whatsapp.py",
+        "server/tests/test_importers.py"
+      ],
+      "acceptance": [
+        "Ponowny import nie mnoży zdarzeń",
+        "Surowe wartości i błędy pozostają dostępne",
+        "AM/PM i brak timezone nie dają pozornej pewności"
+      ],
+      "depends_on": [
+        "AGEDS-TASK-20260930-001"
+      ],
+      "authority": "inferred",
+      "source_refs": [
+        "H3",
+        "A01",
+        "A02",
+        "A11"
+      ],
+      "result_id": "AGEDS-RESULT-20260930-003",
+      "integration_status": "integrated_and_accepted_locally",
+      "based_on_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0"
+    },
+    {
+      "id": "AGEDS-TASK-20260930-004",
+      "title": "Serwerowy skan CSV/XLS/XLSX i sprzecznych metadanych",
+      "status": "accepted",
+      "owner": "foundation_scanner",
+      "scope": [
+        "server/app/scanner.py",
+        "server/app/cli.py",
+        "server/requirements-scanner.txt",
+        "server/tests/test_scanner.py",
+        "server/tests/test_cli.py"
+      ],
+      "acceptance": [
+        "Źródła nie są zmieniane",
+        "Manifest zapisuje zakres i pominięcia",
+        "Kolizje nazw i sprzeczne numery pozostają konfliktem",
+        "Scan observations nie udają pozyskania do store"
+      ],
+      "depends_on": [],
+      "authority": "explicit",
+      "source_refs": [
+        "H3",
+        "A01",
+        "A03"
+      ],
+      "result_id": "AGEDS-RESULT-20260930-004",
+      "integration_status": "integrated_and_accepted_locally",
+      "based_on_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0"
+    },
+    {
+      "id": "AGEDS-TASK-20260930-005",
+      "title": "Cytaty przypięte do segmentu i pakiet metadanych",
+      "status": "accepted",
+      "owner": "coordinator",
+      "contributors": [
+        "foundation_integrity",
+        "foundation_parsers"
+      ],
+      "scope": [
+        "server/app/main.py",
+        "server/app/citations.py",
+        "server/app/packages.py",
+        "server/tests/test_citations.py",
+        "server/tests/test_packages.py",
+        "core/src/commonMain/kotlin/dev/klbt/ageds/core/Models.kt",
+        "androidApp/src/main/java/dev/klbt/ageds/Api.kt"
+      ],
+      "acceptance": [
+        "Cytat wskazuje konkretny derived_text_id i zakres",
+        "Niezgodna wersja/quote są odrzucane",
+        "Pakiet deklaruje wyłączenia i nie obiecuje replay/podpisu/restore"
+      ],
+      "depends_on": [
+        "AGEDS-TASK-20260930-001",
+        "AGEDS-TASK-20260930-002"
+      ],
+      "authority": "inferred",
+      "source_refs": [
+        "H1",
+        "A06",
+        "A07"
+      ],
+      "result_id": "AGEDS-RESULT-20260930-005",
+      "integration_status": "integrated_and_accepted_locally",
+      "based_on_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0"
+    },
+    {
+      "id": "AGEDS-TASK-20260930-006",
+      "title": "Android: seed chooser, kolizje nazw i przejście do klienta",
+      "status": "done",
+      "owner": "foundation_android",
+      "scope": [
+        "androidApp/src/main/java/dev/klbt/ageds/CorpusStore.kt",
+        "androidApp/src/main/java/dev/klbt/ageds/CorpusVm.kt",
+        "androidApp/src/main/java/dev/klbt/ageds/CorpusUi.kt",
+        "androidApp/src/main/java/dev/klbt/ageds/PendingRecordings.kt",
+        "androidApp/src/main/java/dev/klbt/ageds/MainActivity.kt"
+      ],
+      "acceptance": [
+        "Dwa różne pliki o tej samej nazwie nie znikają",
+        "Wybrane nagranie trafia do klienta serwerowego",
+        "UI nie deklaruje działającego skanu bez seed"
+      ],
+      "depends_on": [],
+      "authority": "inferred",
+      "source_refs": [
+        "H3",
+        "A01",
+        "A10"
+      ],
+      "result_id": "AGEDS-RESULT-20260930-006",
+      "integration_status": "source_reviewed_build_in_progress_device_pending",
+      "based_on_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0"
+    },
+    {
+      "id": "AGEDS-TASK-20260930-007",
+      "title": "Protokół koordynacji i reguły architektury",
+      "status": "accepted",
+      "owner": "foundation_jobs",
+      "scope": [
+        "AGENTS.md",
+        "coordination/README.md",
+        "coordination/state.json",
+        "docs/ARCHITECTURE_RULES.md"
+      ],
+      "acceptance": [
+        "Limit siedmiu procesów jest jawny",
+        "Historia jest recall, a commit+ID służą przekazaniu",
+        "Reguły oddzielają źródła od propozycji",
+        "Straty/dodatki/granice są konkretne dla SMS/WAV/scanu"
+      ],
+      "depends_on": [],
+      "authority": "inferred",
+      "source_refs": [
+        "U1",
+        "U2",
+        "E1",
+        "C1"
+      ],
+      "result_id": "AGEDS-RESULT-20260930-007",
+      "integration_status": "integrated_and_accepted_locally",
+      "based_on_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0"
+    }
+  ],
+  "results": [
+    {
+      "id": "AGEDS-RESULT-20260930-001",
+      "task_id": "AGEDS-TASK-20260930-001",
+      "scope": "integrated_foundation_increment",
+      "commit": null,
+      "validation": {
+        "integrity_tests": 13
+      },
+      "limits": []
+    },
+    {
+      "id": "AGEDS-RESULT-20260930-002",
+      "task_id": "AGEDS-TASK-20260930-002",
+      "scope": "integrated_foundation_increment",
+      "commit": null,
+      "validation": {
+        "queue_tests": 19
+      },
+      "limits": [
+        "Synthetic ASR adapter only",
+        "Stop legacy workers before upgrade",
+        "Lease uses system wall clock"
+      ]
+    },
+    {
+      "id": "AGEDS-RESULT-20260930-003",
+      "task_id": "AGEDS-TASK-20260930-003",
+      "scope": "integrated_foundation_increment",
+      "commit": null,
+      "validation": {
+        "importer_tests": 14
+      },
+      "limits": []
+    },
+    {
+      "id": "AGEDS-RESULT-20260930-004",
+      "task_id": "AGEDS-TASK-20260930-004",
+      "scope": "integrated_foundation_increment",
+      "commit": null,
+      "validation": {
+        "scanner_tests": 21,
+        "cli_tests": 9
+      },
+      "limits": [
+        "POSIX no-follow descriptors required",
+        "Scanner field observations differ from byte-acquisition observations",
+        "Coverage bounded and explicit"
+      ]
+    },
+    {
+      "id": "AGEDS-RESULT-20260930-005",
+      "task_id": "AGEDS-TASK-20260930-005",
+      "scope": "integrated_foundation_increment",
+      "commit": null,
+      "validation": {
+        "citation_tests": 18,
+        "package_tests": 16,
+        "api_tests": 12
+      },
+      "limits": [
+        "Segment precision only",
+        "No audio verification",
+        "Unsigned metadata-only; no media, replay or restore"
+      ]
+    },
+    {
+      "id": "AGEDS-RESULT-20260930-006",
+      "task_id": "AGEDS-TASK-20260930-006",
+      "scope": "android_source_review_build_in_progress",
+      "commit": null,
+      "validation": {
+        "android_compile": "in_progress",
+        "device_test": "not_performed"
+      },
+      "limits": [
+        "Prepared JSON seed still required in Android corpus",
+        "Device validation pending"
+      ]
+    },
+    {
+      "id": "AGEDS-RESULT-20260930-007",
+      "task_id": "AGEDS-TASK-20260930-007",
+      "scope": "integrated_foundation_increment",
+      "commit": null,
+      "validation": {
+        "method": "source_scoped_document_review_and_json_parse"
+      },
+      "limits": [
+        "Other management thread not created or verified",
+        "No background scheduler or guaranteed chat delivery"
+      ]
+    }
+  ],
+  "next_tasks": [
+    {
+      "id": "AGEDS-TASK-20260930-008",
+      "status": "proposed",
+      "title": "Native Android SAF: skan wskazanych źródeł bez seed",
+      "acceptance": "Natywny przepływ read-only z CSV/XLS/XLSX, lokatorami, konfliktami i zakresem pokrycia"
+    },
+    {
+      "id": "AGEDS-TASK-20260930-009",
+      "status": "in_progress",
+      "title": "Rzeczywisty build Android i odbiór telefonu",
+      "acceptance": "Artefakt builda oraz sprawdzona ścieżka wyboru, uploadu, transkrypcji i cytatu",
+      "owner": "foundation_android",
+      "progress": "Verified Gradle and SDK tools downloaded; SDK install/build underway"
+    },
+    {
+      "id": "AGEDS-TASK-20260930-010",
+      "status": "proposed",
+      "title": "Word timestamps i dokładne selektory cytatów",
+      "acceptance": "Wybór słów wskazuje konkretną wersję i weryfikowany przedział"
+    },
+    {
+      "id": "AGEDS-TASK-20260930-011",
+      "status": "proposed",
+      "title": "Dokładny metadata export/reimport",
+      "acceptance": "ID, relacje, wersje, konflikty i błędy zachowane; zakres mediów i podpisu jawny"
+    },
+    {
+      "id": "AGEDS-TASK-20260930-012",
+      "status": "proposed",
+      "title": "Opcjonalne zdolności LLM i pięć warstw AGEDS",
+      "acceptance": "Konkretny scenariusz i testy każdej warstwy; bez deklarowania gotowości na podstawie samego ASR"
+    }
+  ],
+  "known_limits": [
+    "Anthropic export identified but not searched: transfer unavailable",
+    "Latest source-scanner request recovered from history, not complete raw export",
+    "Ecosystem adapters are conceptual, not implemented",
+    "Metadata package is not a full replay, signed artifact or exact restore",
+    "Native Android source scan without seed and actual device validation remain next scope"
+  ],
+  "validation": {
+    "command": "python -m pytest server/tests -q",
+    "passed": 123,
+    "subtests_passed": 84,
+    "failed": 0,
+    "warnings": 3,
+    "data": "synthetic",
+    "asr": "synthetic_adapter_only",
+    "independent_api_checks_passed": 31,
+    "report": "docs/FOUNDATION_QA.md"
+  }
+}

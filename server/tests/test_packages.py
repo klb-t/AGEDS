@@ -233,8 +233,9 @@ class MetadataPackageTests(unittest.TestCase):
         original_connect = database.connect
         changed = []
         class SnapshotConnection:
-            def __init__(self):
-                self.inner = original_connect()
+            def __init__(inner_self, *, read_only=False):
+                self.assertTrue(read_only, 'export must request a SQLite read-only connection')
+                inner_self.inner = original_connect(read_only=read_only)
             def execute(inner_self, sql, *args):
                 cursor = inner_self.inner.execute(sql, *args)
                 if sql.startswith('SELECT * FROM cases') and not changed:
@@ -254,6 +255,33 @@ class MetadataPackageTests(unittest.TestCase):
         self.assertTrue(packages.validate_metadata_package(package)['valid'])
         with original_connect() as connection:
             self.assertEqual(connection.execute('SELECT case_id FROM sources WHERE id=?', (self.source,)).fetchone()[0], changed[0])
+
+    def test_export_missing_database_fails_without_creating_files(self):
+        missing = self.root/'never-created.db'
+        with patch.object(database, 'settings', replace(self.settings, db_path=missing)):
+            before = {path.relative_to(self.root) for path in self.root.rglob('*')}
+            with self.assertRaises(sqlite3.OperationalError):
+                self.export()
+            after = {path.relative_to(self.root) for path in self.root.rglob('*')}
+            self.assertEqual(after, before)
+            self.assertFalse(missing.exists())
+
+    def test_read_only_connection_rejects_writes_and_escapes_literal_uri_filename(self):
+        unusual = self.root/'literal ?mode=rwc&other=1#%ą.sqlite'
+        with database.connect(unusual) as connection:
+            connection.execute('CREATE TABLE check_read_only(value TEXT)')
+            connection.execute("INSERT INTO check_read_only VALUES('retained')")
+        before = unusual.read_bytes()
+        connection = database.connect(unusual, read_only=True)
+        try:
+            self.assertEqual(connection.row_factory, sqlite3.Row)
+            self.assertEqual(connection.execute('PRAGMA foreign_keys').fetchone()[0], 1)
+            self.assertEqual(connection.execute('SELECT value FROM check_read_only').fetchone()[0], 'retained')
+            with self.assertRaises(sqlite3.OperationalError):
+                connection.execute("INSERT INTO check_read_only VALUES('forbidden')")
+        finally:
+            connection.close()
+        self.assertEqual(unusual.read_bytes(), before)
 
 
 class LegacyMetadataPackageTests(unittest.TestCase):

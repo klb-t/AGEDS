@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sqlite3
 import sys
 import tempfile
 from pathlib import Path
@@ -102,7 +103,7 @@ def main(argv: list[str] | None = None) -> int:
         result = validate_metadata_package(package)
         _emit({"command": "metadata-verify", **result})
         return 0 if result["valid"] else 1
-    except (OSError, ValueError, RuntimeError) as exc:
+    except (OSError, ValueError, RuntimeError, sqlite3.DatabaseError) as exc:
         _emit({"command": args.command, "error": type(exc).__name__, "message": str(exc)}, error=True)
         return 2
 

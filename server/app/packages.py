@@ -59,7 +59,7 @@ def export_metadata_package() -> dict:
     # Verification can be used in an isolated CLI without importing config,
     # whose initialization creates live storage directories.
     from .db import connect
-    db = connect()
+    db = connect(read_only=True)
     try:
         db.execute('BEGIN')
         existing = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}

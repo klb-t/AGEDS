@@ -122,6 +122,20 @@ class CliTests(unittest.TestCase):
             self.assertNotEqual(main(['metadata-export', str(output)]), 0)
         self.assertEqual(output.read_bytes(), b'database bytes')
 
+    def test_metadata_export_missing_database_fails_without_creating_database_or_output(self):
+        private_runtime = self.base / 'runtime-data'
+        missing = private_runtime / 'missing.db'
+        self.env.update(EW_DATA_DIR=str(private_runtime), EW_STORE_DIR=str(private_runtime/'store'), EW_DB_PATH=str(missing))
+        before = snapshot(self.source)
+        output = self.base / 'metadata.json'
+        process = self.command('metadata-export', output)
+        self.assertEqual(process.returncode, 2, process.stderr)
+        self.assertEqual(json.loads(process.stderr)['error'], 'OperationalError')
+        self.assertNotIn('Traceback', process.stderr)
+        self.assertFalse(missing.exists())
+        self.assertFalse(output.exists())
+        self.assertEqual(snapshot(self.source), before)
+
     def test_metadata_export_writes_only_metadata_and_reports_capabilities(self):
         output = self.base / 'snapshot.json'
         package = {'schema': 'ageds.metadata-package/v1', 'metadata_only': True, 'replay_supported': False, 'signed': False}

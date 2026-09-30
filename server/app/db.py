@@ -159,8 +159,15 @@ CREATE INDEX IF NOT EXISTS idx_events_thread ON events(thread_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status, priority DESC, id);
 '''
 
-def connect(path: Path | None = None) -> sqlite3.Connection:
-    db = sqlite3.connect(str(path or settings.db_path))
+def connect(path: Path | None = None, *, read_only: bool = False) -> sqlite3.Connection:
+    database_path = path or settings.db_path
+    if read_only:
+        # as_uri percent-escapes literal ?, # and % in filenames; they must not
+        # become SQLite URI parameters. mode=ro never creates a missing database.
+        uri = Path(database_path).resolve().as_uri() + '?mode=ro'
+        db = sqlite3.connect(uri, uri=True)
+    else:
+        db = sqlite3.connect(str(database_path))
     db.row_factory = sqlite3.Row
     db.execute("PRAGMA foreign_keys=ON")
     return db

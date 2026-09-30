@@ -1,0 +1,277 @@
+{
+  "task_id": "AGEDS-20261001-N11",
+  "attempts": [
+    {
+      "schema_version": 1,
+      "task_id": "AGEDS-20261001-N11",
+      "started_at": "2026-09-30T23:13:24.603506+00:00",
+      "status": "failed",
+      "actual_inference_completed": false,
+      "input_kind": "generated_synthetic_speech",
+      "expected_text": "The quick brown fox jumps over the lazy dog. This is a test of local speech recognition.",
+      "model": {
+        "repository": "Systran/faster-whisper-tiny.en",
+        "acquisition_revision": "0d3d19a32d3338f10357c0889762bd8d64bbdeba",
+        "file_sha256": {
+          "config.json": "14b1b421a90349bc551b881461426b561a874049cb9e4c4864f2ca384f6a7cc5",
+          "tokenizer.json": "929c5252409436dce1b38a75d1abbcb5e132d170d8e324e4e04ed915fa2d22df",
+          "vocabulary.txt": "ff77588746d3a2595d32ab5b69ffd7b95ce2441ac57533cb66fc3eb575a115cf",
+          "model.bin": "1a5afae06a4db91c975c9a9d78be5cc110ee4ea022ad57d55492e4550e936b2a"
+        }
+      },
+      "environment": {
+        "python": "3.12.14",
+        "platform": "Linux-6.18.44-x86_64-with-glibc2.39",
+        "cpu_count": 9,
+        "packages": {
+          "faster-whisper": "1.2.0",
+          "ctranslate2": "4.8.2",
+          "onnxruntime": "1.30.0",
+          "av": "19.0.0",
+          "numpy": "2.5.3",
+          "tokenizers": "0.23.2",
+          "huggingface-hub": "1.33.0"
+        }
+      },
+      "limitations": [
+        "Single generated English utterance; not human corpus quality evaluation.",
+        "No manual listening or acoustic alignment verification.",
+        "Model revision is recorded by this harness; production adapter reports unknown.",
+        "Metadata archive excludes audio and model bytes; not replay or live restore."
+      ],
+      "code_sha256": {
+        "server/app/worker.py": "29d91c8769a738e0b36e5b9a0b25bbb7c9457e3f252de9ae712a23c441f2cc95",
+        "server/app/jobs.py": "20800c6e8e32967f5d35862c1beabfe36837c0914198f1f2e0ea4ec904b37b9d",
+        "server/app/citations.py": "6a2780c9c7e18a62d425f9a413217ccfb84bd6091de300a3587a373fc44543bf",
+        "server/app/packages.py": "9eebc973e3fc015a1e9dd01080b7525f448d0846a6660f57c530e64e56825e2b"
+      },
+      "synthesis": {
+        "command": [
+          "ffmpeg",
+          "-nostdin",
+          "-v",
+          "error",
+          "-f",
+          "lavfi",
+          "-i",
+          "flite=text=The quick brown fox jumps over the lazy dog. This is a test of local speech recognition.:voice=slt",
+          "-ar",
+          "16000",
+          "-ac",
+          "1",
+          "/workspace/scratch/773725428b88/review/asr-run-1/synthetic.wav"
+        ],
+        "ffmpeg_version": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers",
+        "sha256": "f9495cb6cd1a94a13e916d33ec07bfc5244084ce9ed52a0f91193411ac5ab2af",
+        "duration_seconds": 5.43
+      },
+      "error_type": "RuntimeError",
+      "error": "Install requirements-whisper.txt to enable transcription",
+      "traceback": "Traceback (most recent call last):\n  File \"/workspace/scratch/773725428b88/AGEDS/server/app/worker.py\", line 47, in transcribe\n    from faster_whisper import WhisperModel\n  File \"/workspace/scratch/773725428b88/review/asr-deps/faster_whisper/__init__.py\", line 2, in <module>\n    from faster_whisper.transcribe import BatchedInferencePipeline, WhisperModel\n  File \"/workspace/scratch/773725428b88/review/asr-deps/faster_whisper/transcribe.py\", line 22, in <module>\n    from faster_whisper.utils import download_model, format_timestamp, get_end, get_logger\n  File \"/workspace/scratch/773725428b88/review/asr-deps/faster_whisper/utils.py\", line 8, in <module>\n    import requests\nModuleNotFoundError: No module named 'requests'\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"/workspace/scratch/773725428b88/AGEDS/scripts/real_asr_smoke.py\", line 94, in main\n    transcript_id = worker.process_job(job, lease_seconds=300)\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/scratch/773725428b88/AGEDS/server/app/worker.py\", line 132, in process_job\n    return run_transcribe(job, adapter)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/scratch/773725428b88/AGEDS/server/app/worker.py\", line 111, in run_transcribe\n    result = adapter.transcribe(str(path))\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/scratch/773725428b88/AGEDS/server/app/worker.py\", line 49, in transcribe\n    raise RuntimeError(\"Install requirements-whisper.txt to enable transcription\") from e\nRuntimeError: Install requirements-whisper.txt to enable transcription\n",
+      "total_seconds": 1.8518232700007502,
+      "finished_at": "2026-09-30T23:13:26.565422+00:00"
+    },
+    {
+      "schema_version": 1,
+      "task_id": "AGEDS-20261001-N11",
+      "started_at": "2026-09-30T23:14:09.338893+00:00",
+      "status": "failed",
+      "actual_inference_completed": false,
+      "input_kind": "generated_synthetic_speech",
+      "expected_text": "The quick brown fox jumps over the lazy dog. This is a test of local speech recognition.",
+      "model": {
+        "repository": "Systran/faster-whisper-tiny.en",
+        "acquisition_revision": "0d3d19a32d3338f10357c0889762bd8d64bbdeba",
+        "file_sha256": {
+          "config.json": "14b1b421a90349bc551b881461426b561a874049cb9e4c4864f2ca384f6a7cc5",
+          "tokenizer.json": "929c5252409436dce1b38a75d1abbcb5e132d170d8e324e4e04ed915fa2d22df",
+          "vocabulary.txt": "ff77588746d3a2595d32ab5b69ffd7b95ce2441ac57533cb66fc3eb575a115cf",
+          "model.bin": "1a5afae06a4db91c975c9a9d78be5cc110ee4ea022ad57d55492e4550e936b2a"
+        }
+      },
+      "environment": {
+        "python": "3.12.14",
+        "platform": "Linux-6.18.44-x86_64-with-glibc2.39",
+        "cpu_count": 9,
+        "packages": {
+          "faster-whisper": "1.2.0",
+          "ctranslate2": "4.8.2",
+          "onnxruntime": "1.30.0",
+          "av": "19.0.0",
+          "numpy": "2.5.3",
+          "tokenizers": "0.23.2",
+          "huggingface-hub": "1.33.0",
+          "requests": "2.34.2"
+        }
+      },
+      "limitations": [
+        "Single generated English utterance; not human corpus quality evaluation.",
+        "No manual listening or acoustic alignment verification.",
+        "Model revision is recorded by this harness; production adapter reports unknown.",
+        "Metadata archive excludes audio and model bytes; not replay or live restore."
+      ],
+      "code_sha256": {
+        "server/app/worker.py": "29d91c8769a738e0b36e5b9a0b25bbb7c9457e3f252de9ae712a23c441f2cc95",
+        "server/app/jobs.py": "20800c6e8e32967f5d35862c1beabfe36837c0914198f1f2e0ea4ec904b37b9d",
+        "server/app/citations.py": "6a2780c9c7e18a62d425f9a413217ccfb84bd6091de300a3587a373fc44543bf",
+        "server/app/packages.py": "9eebc973e3fc015a1e9dd01080b7525f448d0846a6660f57c530e64e56825e2b"
+      },
+      "synthesis": {
+        "command": [
+          "ffmpeg",
+          "-nostdin",
+          "-v",
+          "error",
+          "-f",
+          "lavfi",
+          "-i",
+          "flite=text=The quick brown fox jumps over the lazy dog. This is a test of local speech recognition.:voice=slt",
+          "-ar",
+          "16000",
+          "-ac",
+          "1",
+          "/workspace/scratch/773725428b88/review/asr-run-2/synthetic.wav"
+        ],
+        "ffmpeg_version": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers",
+        "sha256": "f9495cb6cd1a94a13e916d33ec07bfc5244084ce9ed52a0f91193411ac5ab2af",
+        "duration_seconds": 5.43
+      },
+      "error_type": "TypeError",
+      "error": "open() got an unexpected keyword argument 'metadata_errors'",
+      "traceback": "Traceback (most recent call last):\n  File \"/workspace/scratch/773725428b88/AGEDS/scripts/real_asr_smoke.py\", line 94, in main\n    transcript_id = worker.process_job(job, lease_seconds=300)\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/scratch/773725428b88/AGEDS/server/app/worker.py\", line 132, in process_job\n    return run_transcribe(job, adapter)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/scratch/773725428b88/AGEDS/server/app/worker.py\", line 111, in run_transcribe\n    result = adapter.transcribe(str(path))\n             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/scratch/773725428b88/AGEDS/server/app/worker.py\", line 52, in transcribe\n    segments, info = model.transcribe(path, word_timestamps=True, vad_filter=True)\n                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/scratch/773725428b88/review/asr-deps/faster_whisper/transcribe.py\", line 850, in transcribe\n    audio = decode_audio(audio, sampling_rate=sampling_rate)\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/scratch/773725428b88/review/asr-deps/faster_whisper/audio.py\", line 46, in decode_audio\n    with av.open(input_file, mode=\"r\", metadata_errors=\"ignore\") as container:\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"av/container/core.py\", line 479, in av.container.core.open\n    def open(\nTypeError: open() got an unexpected keyword argument 'metadata_errors'\n",
+      "total_seconds": 4.6291179549989465,
+      "finished_at": "2026-09-30T23:14:14.115754+00:00"
+    },
+    {
+      "schema_version": 1,
+      "task_id": "AGEDS-20261001-N11",
+      "started_at": "2026-09-30T23:14:58.349779+00:00",
+      "status": "failed",
+      "actual_inference_completed": true,
+      "input_kind": "generated_synthetic_speech",
+      "expected_text": "The quick brown fox jumps over the lazy dog. This is a test of local speech recognition.",
+      "model": {
+        "repository": "Systran/faster-whisper-tiny.en",
+        "acquisition_revision": "0d3d19a32d3338f10357c0889762bd8d64bbdeba",
+        "file_sha256": {
+          "config.json": "14b1b421a90349bc551b881461426b561a874049cb9e4c4864f2ca384f6a7cc5",
+          "tokenizer.json": "929c5252409436dce1b38a75d1abbcb5e132d170d8e324e4e04ed915fa2d22df",
+          "vocabulary.txt": "ff77588746d3a2595d32ab5b69ffd7b95ce2441ac57533cb66fc3eb575a115cf",
+          "model.bin": "1a5afae06a4db91c975c9a9d78be5cc110ee4ea022ad57d55492e4550e936b2a"
+        }
+      },
+      "environment": {
+        "python": "3.12.14",
+        "platform": "Linux-6.18.44-x86_64-with-glibc2.39",
+        "cpu_count": 9,
+        "packages": {
+          "faster-whisper": "1.2.0",
+          "ctranslate2": "4.8.2",
+          "onnxruntime": "1.30.0",
+          "av": "16.1.0",
+          "numpy": "2.5.3",
+          "tokenizers": "0.23.2",
+          "huggingface-hub": "1.33.0",
+          "requests": "2.34.2"
+        }
+      },
+      "limitations": [
+        "Single generated English utterance; not human corpus quality evaluation.",
+        "No manual listening or acoustic alignment verification.",
+        "Model revision is recorded by this harness; production adapter reports unknown.",
+        "Metadata archive excludes audio and model bytes; not replay or live restore."
+      ],
+      "code_sha256": {
+        "server/app/worker.py": "29d91c8769a738e0b36e5b9a0b25bbb7c9457e3f252de9ae712a23c441f2cc95",
+        "server/app/jobs.py": "20800c6e8e32967f5d35862c1beabfe36837c0914198f1f2e0ea4ec904b37b9d",
+        "server/app/citations.py": "6a2780c9c7e18a62d425f9a413217ccfb84bd6091de300a3587a373fc44543bf",
+        "server/app/packages.py": "9eebc973e3fc015a1e9dd01080b7525f448d0846a6660f57c530e64e56825e2b"
+      },
+      "synthesis": {
+        "command": [
+          "ffmpeg",
+          "-nostdin",
+          "-v",
+          "error",
+          "-f",
+          "lavfi",
+          "-i",
+          "flite=text=The quick brown fox jumps over the lazy dog. This is a test of local speech recognition.:voice=slt",
+          "-ar",
+          "16000",
+          "-ac",
+          "1",
+          "/workspace/scratch/773725428b88/review/asr-run-3/synthetic.wav"
+        ],
+        "ffmpeg_version": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers",
+        "sha256": "f9495cb6cd1a94a13e916d33ec07bfc5244084ce9ed52a0f91193411ac5ab2af",
+        "duration_seconds": 5.43
+      },
+      "worker_seconds": 10.589271728000313,
+      "processing_runs": [
+        {
+          "id": 1,
+          "job_id": 1,
+          "artifact_id": 1,
+          "lease_token": "1862f3d6f0a248b7aa7ba2e4d07f62a4",
+          "status": "done",
+          "started_at": "2026-09-30T23:14:59.840461+00:00",
+          "finished_at": "2026-09-30T23:15:10.423502+00:00",
+          "tool": "faster-whisper",
+          "tool_version": "1.2.0",
+          "provider": "local",
+          "model": "/workspace/scratch/773725428b88/review/asr-model",
+          "model_version": "unknown",
+          "parameters_json": "{\"compute_type\": \"int8\", \"device\": \"cpu\", \"unspecified_options\": \"library defaults; effective transcription options recorded in result\", \"vad_filter\": true, \"word_timestamps\": true}",
+          "provenance_json": "{\"artifact_id\": 1, \"attempt\": 1, \"input_hash_recorded\": \"f9495cb6cd1a94a13e916d33ec07bfc5244084ce9ed52a0f91193411ac5ab2af\", \"input_sha256\": \"f9495cb6cd1a94a13e916d33ec07bfc5244084ce9ed52a0f91193411ac5ab2af\", \"job_id\": 1, \"pipeline\": \"AGEDS transcription worker\", \"pipeline_version\": \"unknown\", \"source_id\": 1, \"source_locator\": \"synthetic://n11/flite-slt\", \"worker_id\": \"real-asr-smoke\"}",
+          "metadata_json": "{\"ctranslate2_version\": \"4.8.2\", \"model_revision\": \"unknown\", \"python_version\": \"3.12.14\", \"seed\": \"unknown\"}",
+          "error": null
+        }
+      ],
+      "jobs": [
+        {
+          "id": 1,
+          "kind": "transcribe",
+          "artifact_id": 1,
+          "status": "done",
+          "priority": 0,
+          "attempts": 1,
+          "payload_json": "{}",
+          "error": null,
+          "created_at": "2026-09-30 23:14:59",
+          "started_at": "2026-09-30T23:14:59.840461+00:00",
+          "finished_at": "2026-09-30T23:15:10.423502+00:00",
+          "lease_token": "1862f3d6f0a248b7aa7ba2e4d07f62a4",
+          "lease_expires_at": null,
+          "heartbeat_at": "2026-09-30T23:14:59.840461+00:00",
+          "worker_id": "real-asr-smoke"
+        }
+      ],
+      "transcript": {
+        "id": 1,
+        "artifact_id": 1,
+        "kind": "transcript",
+        "model": "/workspace/scratch/773725428b88/review/asr-model",
+        "language": "en",
+        "text": "The quick brown fox jumps over the lazy dog, this is a test of locals' peach recognition.",
+        "segments_json": "[{\"start\": 0.0, \"end\": 5.02, \"text\": \" The quick brown fox jumps over the lazy dog, this is a test of locals' peach recognition.\", \"words\": [{\"start\": 0.0, \"end\": 0.42, \"word\": \" The\", \"probability\": 0.6262677907943726}, {\"start\": 0.42, \"end\": 0.66, \"word\": \" quick\", \"probability\": 0.6658167243003845}, {\"start\": 0.66, \"end\": 1.02, \"word\": \" brown\", \"probability\": 0.8637793064117432}, {\"start\": 1.02, \"end\": 1.32, \"word\": \" fox\", \"probability\": 0.8854045867919922}, {\"start\": 1.32, \"end\": 1.7, \"word\": \" jumps\", \"probability\": 0.765833854675293}, {\"start\": 1.7, \"end\": 2.04, \"word\": \" over\", \"probability\": 0.9984363913536072}, {\"start\": 2.04, \"end\": 2.28, \"word\": \" the\", \"probability\": 0.9918236136436462}, {\"start\": 2.28, \"end\": 2.54, \"word\": \" lazy\", \"probability\": 0.9613946676254272}, {\"start\": 2.54, \"end\": 2.9, \"word\": \" dog,\", \"probability\": 0.9750102758407593}, {\"start\": 3.06, \"end\": 3.2, \"word\": \" this\", \"probability\": 0.819684624671936}, {\"start\": 3.2, \"end\": 3.34, \"word\": \" is\", \"probability\": 0.9860469698905945}, {\"start\": 3.34, \"end\": 3.46, \"word\": \" a\", \"probability\": 0.9700666666030884}, {\"start\": 3.46, \"end\": 3.66, \"word\": \" test\", \"probability\": 0.9967603087425232}, {\"start\": 3.66, \"end\": 3.86, \"word\": \" of\", \"probability\": 0.996325671672821}, {\"start\": 3.86, \"end\": 4.22, \"word\": \" locals'\", \"probability\": 0.4923376739025116}, {\"start\": 4.5, \"end\": 4.58, \"word\": \" peach\", \"probability\": 0.5271578431129456}, {\"start\": 4.58, \"end\": 5.02, \"word\": \" recognition.\", \"probability\": 0.995010495185852}]}]",
+        "confidence": null,
+        "created_at": "2026-09-30 23:15:10",
+        "run_id": 1,
+        "metadata_json": "{\"language_probability\": 1, \"language_probability_meaning\": \"language identification probability; not transcript correctness\", \"transcript_confidence\": \"unknown\", \"effective_transcription_options\": {\"beam_size\": 5, \"best_of\": 5, \"patience\": 1, \"length_penalty\": 1, \"repetition_penalty\": 1, \"no_repeat_ngram_size\": 0, \"log_prob_threshold\": -1.0, \"no_speech_threshold\": 0.6, \"compression_ratio_threshold\": 2.4, \"condition_on_previous_text\": true, \"prompt_reset_on_temperature\": 0.5, \"temperatures\": [0.0, 0.2, 0.4, 0.6, 0.8, 1.0], \"initial_prompt\": null, \"prefix\": null, \"suppress_blank\": true, \"suppress_tokens\": [1, 2, 7, 8, 9, 10, 14, 25, 26, 27, 28, 29, 31, 58, 59, 60, 61, 62, 63, 90, 91, 92, 93, 357, 366, 438, 532, 685, 705, 796, 930, 1058, 1220, 1267, 1279, 1303, 1343, 1377, 1391, 1635, 1782, 1875, 2162, 2361, 2488, 3467, 4008, 4211, 4600, 4808, 5299, 5855, 6329, 7203, 9609, 9959, 10563, 10786, 11420, 11709, 11907, 13163, 13697, 13700, 14808, 15306, 16410, 16791, 17992, 19203, 19510, 20724, 22305, 22935, 27007, 30109, 30420, 33409, 34949, 40283, 40493, 40549, 47282, 49146, 50257, 50357, 50358, 50359, 50360], \"without_timestamps\": false, \"max_initial_timestamp\": 1.0, \"word_timestamps\": true, \"prepend_punctuations\": \"\\\"'\u201c\u00bf([{-\", \"append_punctuations\": \"\\\"'.\u3002,\uff0c!\uff01?\uff1f:\uff1a\u201d)]}\u3001\", \"multilingual\": false, \"max_new_tokens\": null, \"clip_timestamps\": [0.0], \"hallucination_silence_threshold\": null, \"hotwords\": null}, \"input_sha256\": \"f9495cb6cd1a94a13e916d33ec07bfc5244084ce9ed52a0f91193411ac5ab2af\", \"word_timing\": {\"schema_version\": 1, \"kind\": \"asr_word_timing\", \"source_time_unit\": \"seconds\", \"anchor_time_unit\": \"milliseconds\", \"anchor_rounding\": \"nearest_ms\", \"source_resolution\": \"as_supplied_by_asr\", \"alignment_verification\": \"not_performed\", \"audio_verification\": \"not_performed\", \"raw_words_modified\": false, \"segments\": [{\"segment_index\": 0, \"word_selection_available\": false, \"reason\": \"time must be nonnegative seconds representable as SQLite milliseconds\"}], \"status\": \"unavailable\", \"coverage_complete\": true, \"total_segments\": 1, \"examined_segments\": 1, \"available_segments\": 0}}"
+      },
+      "error_type": "RuntimeError",
+      "error": "ASR words are not selectable",
+      "traceback": "Traceback (most recent call last):\n  File \"/workspace/scratch/773725428b88/AGEDS/scripts/real_asr_smoke.py\", line 105, in main\n    require(metadata['word_timing']['status'] == 'available', 'ASR words are not selectable')\n  File \"/workspace/scratch/773725428b88/AGEDS/scripts/real_asr_smoke.py\", line 37, in require\n    raise RuntimeError(message)\nRuntimeError: ASR words are not selectable\n",
+      "total_seconds": 11.69408588099759,
+      "finished_at": "2026-09-30T23:15:10.449328+00:00"
+    }
+  ],
+  "scalar_diagnosis": {
+    "segment_start_end": "numpy.float64",
+    "word_start_end_probability": "numpy.float64",
+    "raw_capability": "unavailable",
+    "json_roundtrip_capability": "available",
+    "verification": "Second actual FasterWhisperAdapter.transcribe invocation on the same generated WAV, no fake adapter."
+  }
+}

@@ -2,6 +2,7 @@ from __future__ import annotations
 import dataclasses
 import importlib.metadata
 import math
+from numbers import Integral, Real
 import platform
 import threading
 import time
@@ -21,6 +22,22 @@ def _version(distribution: str) -> str:
         return importlib.metadata.version(distribution)
     except importlib.metadata.PackageNotFoundError:
         return "unknown"
+
+def _json_number(value):
+    """Project model numeric scalars to the same numeric types persisted by JSON.
+
+    faster-whisper can return numpy.float64 timestamps. Validators deliberately
+    require plain JSON numbers; do not let runtime scalar classes falsely mark
+    valid words unavailable before the identical values are serialized.
+    Preserve bool/None/invalid values so validation never coerces them valid.
+    """
+    if type(value) in (int, float, bool, type(None)):
+        return value
+    if isinstance(value, Integral):
+        return int(value)
+    if isinstance(value, Real):
+        return float(value)
+    return value
 
 @dataclass
 class TranscriptionResult:
@@ -52,9 +69,9 @@ class FasterWhisperAdapter:
         segments, info = model.transcribe(path, word_timestamps=True, vad_filter=True)
         out, texts = [], []
         for segment in segments:
-            words = [{"start": word.start, "end": word.end, "word": word.word,
-                      "probability": word.probability} for word in (segment.words or [])]
-            out.append({"start": segment.start, "end": segment.end, "text": segment.text, "words": words})
+            words = [{"start": _json_number(word.start), "end": _json_number(word.end), "word": word.word,
+                      "probability": _json_number(word.probability)} for word in (segment.words or [])]
+            out.append({"start": _json_number(segment.start), "end": _json_number(segment.end), "text": segment.text, "words": words})
             texts.append(segment.text.strip())
         options = getattr(info, "transcription_options", None)
         if dataclasses.is_dataclass(options):
@@ -64,7 +81,7 @@ class FasterWhisperAdapter:
         elif not isinstance(options, dict):
             options = "unknown"
         return TranscriptionResult(" ".join(texts), getattr(info, "language", None), out, {
-            "language_probability": getattr(info, "language_probability", None),
+            "language_probability": _json_number(getattr(info, "language_probability", None)),
             "language_probability_meaning": "language identification probability; not transcript correctness",
             "transcript_confidence": "unknown", "effective_transcription_options": options,
         })

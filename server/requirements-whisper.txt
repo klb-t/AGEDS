@@ -1,1 +1,5 @@
 faster-whisper==1.2.0
+# faster-whisper imports requests directly; newer huggingface-hub no longer supplies it.
+requests==2.34.2
+# PyAV 19 removed metadata_errors used by faster-whisper 1.2.0 audio decoding.
+av==16.1.0

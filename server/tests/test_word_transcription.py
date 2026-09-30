@@ -77,6 +77,34 @@ class WordTimingCapabilityTests(unittest.TestCase):
         self.assertEqual(captured, {'word_timestamps': True, 'vad_filter': True})
         self.assertEqual(result.metadata['transcript_confidence'], 'unknown')
 
+    def test_model_numeric_scalars_keep_word_timing_available_before_and_after_storage(self):
+        # Models emit numpy.float64; float subclass reproduces the strict-type
+        # boundary without adding NumPy or a model to the offline test suite.
+        class ModelFloat(float):
+            pass
+        raw = fixture()[0]
+        segment = SimpleNamespace(start=ModelFloat(raw['start']), end=ModelFloat(raw['end']),
+            text=raw['text'], words=[SimpleNamespace(**{**w, 'start': ModelFloat(w['start']),
+                'end': ModelFloat(w['end']), 'probability': ModelFloat(w['probability'])
+                if w['probability'] is not None else None}) for w in raw['words']])
+        class Model:
+            def __init__(self, *args, **kwargs): pass
+            def transcribe(self, *args, **kwargs):
+                return iter([segment]), SimpleNamespace(language='pl', language_probability=ModelFloat(.9))
+        with patch.dict(sys.modules, {'faster_whisper': SimpleNamespace(WhisperModel=Model)}):
+            result = worker.FasterWhisperAdapter().transcribe('synthetic:not-read')
+        self.assertEqual(result.segments, [raw])
+        self.assertIs(type(result.segments[0]['start']), float)
+        self.assertIs(type(result.segments[0]['words'][0]['start']), float)
+        self.assertIs(type(result.metadata['language_probability']), float)
+        before = transcription.word_timing_capabilities(result.segments)
+        after = transcription.word_timing_capabilities(json.loads(json.dumps(result.segments)))
+        self.assertEqual(before['status'], 'available')
+        self.assertEqual(before, after)
+        self.assertEqual(worker._json_number(True), True)
+        self.assertIs(type(worker._json_number(True)), bool)
+        self.assertEqual(worker._json_number('0.5'), '0.5')
+
 
 class WorkerWordTimingTests(unittest.TestCase):
     def setUp(self):

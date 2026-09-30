@@ -126,6 +126,16 @@ class MetadataPackageTests(unittest.TestCase):
         package['tables']['derived_text'][0]['kind'] = 'summary'
         self.assert_error(packages.validate_metadata_package(rehash(package)), 'anchor_version_mismatch')
 
+    def test_embedded_selector_and_segments_json_reject_duplicate_keys(self):
+        package = self.export()
+        anchor = package['tables']['evidence_anchors'][0]
+        anchor['selector_json'] = anchor['selector_json'].replace('"kind":', '"kind":"ignored", "kind":', 1)
+        self.assert_error(packages.validate_metadata_package(rehash(package)), 'invalid_anchor_selector')
+        package = self.export()
+        transcript = package['tables']['derived_text'][0]
+        transcript['segments_json'] = transcript['segments_json'].replace('"start":', '"start":999, "start":', 1)
+        self.assert_error(packages.validate_metadata_package(rehash(package)), 'invalid_anchor_selector')
+
     def test_case_relationships_cannot_be_reassigned_by_rehashing(self):
         package = self.export()
         case = deepcopy(package['tables']['cases'][0])

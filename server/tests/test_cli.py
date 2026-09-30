@@ -143,6 +143,44 @@ class CliTests(unittest.TestCase):
             self.assertEqual(main(['metadata-export', str(output)]), 0)
         self.assertEqual(json.loads(output.read_text()), package)
 
+    def test_archive_cli_roundtrip_is_exact_and_does_not_create_live_storage(self):
+        from server.tests.test_metadata_archive import fixture
+        from server.app.packages import canonical_json
+        package = fixture()
+        source = self.source / 'metadata.json'
+        source.write_bytes(canonical_json(package))
+        before = snapshot(self.source)
+        archived = self.base / 'history.sqlite'
+        output = self.base / 'roundtrip.json'
+        imported = self.command('metadata-archive-import', source, archived)
+        self.assertEqual(imported.returncode, 0, imported.stderr)
+        self.assertTrue(json.loads(imported.stdout)['inert'])
+        self.assertFalse(json.loads(imported.stdout)['jobs_resumed'])
+        exported = self.command('metadata-archive-export', archived, output)
+        self.assertEqual(exported.returncode, 0, exported.stderr)
+        self.assertEqual(canonical_json(json.loads(output.read_bytes())), canonical_json(package))
+        self.assertEqual(snapshot(self.source), before)
+        again = self.command('metadata-archive-import', source, archived)
+        self.assertEqual(again.returncode, 2)
+        self.assertNotIn('Traceback', again.stderr)
+
+    def test_duplicate_json_keys_nonfinite_and_limits_fail_cleanly(self):
+        source = self.source / 'metadata.json'
+        target = self.base / 'never.sqlite'
+        for raw in ('{"schema":1,"schema":2}', '{"number":NaN}', '{"number":1e9999}'):
+            source.write_text(raw)
+            for args in (('metadata-verify', source), ('metadata-archive-import', source, target)):
+                with self.subTest(args=args, raw=raw):
+                    process = self.command(*args)
+                    self.assertEqual(process.returncode, 2, process.stderr)
+                    self.assertNotIn('Traceback', process.stderr)
+            self.assertFalse(target.exists())
+        from server.tests.test_metadata_archive import fixture
+        source.write_text(json.dumps(fixture()))
+        limited = self.command('metadata-archive-import', source, target, '--max-rows', 1)
+        self.assertEqual(limited.returncode, 2)
+        self.assertFalse(target.exists())
+
 
 if __name__ == '__main__':
     unittest.main()

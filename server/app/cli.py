@@ -43,6 +43,17 @@ def _parser() -> argparse.ArgumentParser:
     verify = commands.add_parser("metadata-verify", help="verify metadata hashes and relationships")
     verify.add_argument("input", type=Path)
     verify.add_argument("--max-input-bytes", type=_positive_integer, default=32 * 1024 * 1024)
+    archive_import = commands.add_parser("metadata-archive-import", help="create a NEW inert SQLite metadata archive; never restore live state")
+    archive_import.add_argument("input", type=Path)
+    archive_import.add_argument("output", type=Path)
+    archive_export = commands.add_parser("metadata-archive-export", help="export the exact package from an inert metadata archive")
+    archive_export.add_argument("input", type=Path)
+    archive_export.add_argument("output", type=Path)
+    for command in (archive_import, archive_export):
+        command.add_argument("--max-input-bytes", type=_positive_integer, default=32 * 1024 * 1024,
+                             help="maximum JSON package bytes (both directions)")
+        command.add_argument("--max-archive-bytes", type=_positive_integer, default=128 * 1024 * 1024)
+        command.add_argument("--max-rows", type=_positive_integer, default=100_000)
     return parser
 
 
@@ -94,12 +105,19 @@ def main(argv: list[str] | None = None) -> int:
                    "schema": package["schema"], "metadata_only": package["metadata_only"],
                    "replay_supported": package["replay_supported"], "signed": package["signed"]})
             return 0
+        from .archive import ArchiveLimits, load_package
+        if args.command in ("metadata-archive-import", "metadata-archive-export"):
+            from .archive import import_metadata_archive, export_metadata_archive
+            limits = ArchiveLimits(max_input_bytes=args.max_input_bytes,
+                                   max_archive_bytes=args.max_archive_bytes, max_rows=args.max_rows)
+            if args.command == "metadata-archive-import":
+                result = import_metadata_archive(load_package(args.input, limits=limits), args.output, limits=limits)
+            else:
+                result = export_metadata_archive(args.input, args.output, limits=limits)
+            _emit({"command": args.command, "output": str(args.output.resolve()), **result})
+            return 0
         from .packages import validate_metadata_package
-        with args.input.open("rb") as handle:
-            raw = handle.read(args.max_input_bytes + 1)
-        if len(raw) > args.max_input_bytes:
-            raise ValueError("Metadata input exceeds size limit")
-        package = json.loads(raw)
+        package = load_package(args.input, limits=ArchiveLimits(max_input_bytes=args.max_input_bytes))
         result = validate_metadata_package(package)
         _emit({"command": "metadata-verify", **result})
         return 0 if result["valid"] else 1

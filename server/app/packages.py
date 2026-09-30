@@ -311,8 +311,8 @@ def validate_metadata_package(package: Any) -> dict:
         if type(start) is not int or type(end) is not int or start < 0 or end < start:
             error('invalid_anchor_interval', path, 'Anchor interval must be nonnegative integer milliseconds.', 'anchors')
         try:
-            selector = json.loads(anchor.get('selector_json', ''))
-            segments = json.loads(text.get('segments_json', '[]'))
+            selector = _strict_stored_json(anchor.get('selector_json', ''))
+            segments = _strict_stored_json(text.get('segments_json', '[]'), finite=False)
             projection = _select_quote(selector, segments)
             if (quote, anchor.get('quote_sha256'), start, end) != (projection['quote_text'],projection['quote_sha256'],projection['start_ms'],projection['end_ms']):
                 error('anchor_selector_mismatch', path, 'Quote or interval differs from the pinned selector.', 'anchors')
@@ -331,14 +331,27 @@ def validate_metadata_package(package: Any) -> dict:
     return result()
 
 
+def _strict_stored_json(raw: str, *, finite: bool = True) -> Any:
+    """Selectors are executable selection data; ambiguous object keys are invalid.
+
+    This deliberately does not parse arbitrary raw metadata/error strings.
+    """
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise ValueError(f'Duplicate stored JSON key: {key}')
+            result[key] = value
+        return result
+    value = json.loads(raw, object_pairs_hook=pairs)
+    if finite:
+        canonical_json(value)  # Selector numbers/Unicode must be canonical.
+    # Raw segments may retain invalid historic word fields. The selected
+    # projection validates every used timestamp/text, independently of unused words.
+    return value
+
+
 def _select_quote(selector: Any, segments: Any) -> dict:
-    """The v1 selector contract; rejects implicit guesses or lossy fallbacks."""
-    if not isinstance(selector, dict) or not isinstance(segments, list):
-        raise ValueError('Selector must be an object and segments an array.')
-    if selector.get('kind') != 'segments':
-        raise ValueError('Unsupported selector kind.')
-    from .citations import projection_from_segments
-    projection = projection_from_segments(segments, selector.get('indices'))
-    if canonical_json(selector) != canonical_json(projection['selector']):
-        raise ValueError('Selector contract differs from the canonical exact-concatenation selector.')
-    return projection
+    """Resolve the exact stored selector against its pinned text version."""
+    from .citations import projection_from_selector
+    return projection_from_selector(segments, selector)

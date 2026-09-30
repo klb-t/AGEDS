@@ -105,7 +105,9 @@ Syntetyczny adapter ASR nie potwierdza jakości realnego rozpoznawania mowy.
 Historyczne defaulty powyżej opisują decyzję fundamentu. Bieżące rozszerzenia:
 
 - Android: samodzielny SAF CSV/TSV/XLSX/WAV + inventory bez seed; dawny katalog
-  pozostaje opcjonalny. XLS i część kodowań jawnie unsupported. Źródła read-only.
+  pozostaje opcjonalny. XLS: ograniczona projekcja BIFF8, zawsze partial. UTF-16
+  z BOM i hipotezy separatorów CSV są jawne; pozostałe kodowania/struktury
+  pozostają unsupported. Źródła read-only.
 - Cytat: segment lub ciąg słów z konkretnej wersji. Dokładny tekst/hashes/indices
   nie oznaczają zweryfikowanej akustycznej precyzji ASR. Przy błędnych słowach
   zachowujemy raw i możliwy poprawny wybór segmentowy.
@@ -116,5 +118,8 @@ Historyczne defaulty powyżej opisują decyzję fundamentu. Bieżące rozszerzen
   źródła nie jest zaufanym markupem interfejsu.
 
 Weryfikacja i konkretne granice: `docs/NIGHT_QA.md`,
-`docs/ANDROID_NIGHT_BUILD_RECEIPT.json`, `docs/METADATA_ARCHIVE.md`.
+`docs/ANDROID_WAVE2_BUILD_RECEIPT.json`, `docs/METADATA_ARCHIVE.md`,
+`docs/REAL_ASR_SMOKE.md` i `docs/BROWSER_NIGHT_QA.md`. Realny ASR sprawdzono
+na jednym syntetycznym głosie; błędy rozpoznania zachowano bez korekty.
+Chromium sprawdził odtwarzanie zapisanych zakresów, bez weryfikacji alignmentu.
 Te rozszerzenia nie deklarują działających adapterów innych projektów.

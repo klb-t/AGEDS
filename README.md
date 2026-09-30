@@ -25,7 +25,7 @@ The first practical module is the Evidence Workbench: ingest communication evide
 
 The Android client is deliberately thin. Evidence bytes, provenance, derived text and the audit log live in the evidence service rather than in Android-specific state.
 
-Android now opens a **Sources** workspace without a prepared seed. Choose a folder through SAF to inspect bounded read-only CSV/TSV, XLSX and WAV observations, inventory other files, and select exact audio URIs for the evidence client. The previous seed-based catalog remains optional. Native XLS is explicitly unsupported; the server/local CLI has its separate XLS adapter. No device/provider interaction test has been performed. See [HANDOFF.md](HANDOFF.md) for verified behavior and remaining work.
+Android now opens a **Sources** workspace without a prepared seed. Choose a folder through SAF to inspect bounded read-only CSV/TSV, XLSX and WAV observations, inventory other files, and select exact audio URIs for the evidence client. The previous seed-based catalog remains optional. Native XLS provides a bounded, explicitly partial BIFF8 projection; UTF-16 BOM text and explicit CSV dialect hypotheses are supported. The server/local CLI has its separate parser policy. See [native format boundaries](docs/NATIVE_SOURCE_FORMATS.md). No device/provider interaction test has been performed. See [HANDOFF.md](HANDOFF.md) for verified behavior and remaining work.
 
 ## Project coordination
 
@@ -66,7 +66,7 @@ For a physical Android device set the app's **Evidence server** field to the rea
 
 ## Android build
 
-Install a full JDK 21 (including `javac`) and Android SDK platform 37.0, then run `./gradlew :androidApp:assembleDebug :androidApp:testDebugUnitTest :core:desktopTest`, or open the repository in Android Studio. The official Gradle 9.7.0 wrapper is included with a distribution checksum. Dependency versions remain pinned. [The latest build report](docs/ANDROID_NIGHT_BUILD.md) records 26 passing JVM tests, APK integrity and all source-input hashes. Compilation and a phone test remain distinct checks.
+Install a full JDK 21 (including `javac`) and Android SDK platform 37.0, then run `./gradlew :androidApp:assembleDebug :androidApp:testDebugUnitTest :core:desktopTest`, or open the repository in Android Studio. The official Gradle 9.7.0 wrapper is included with a distribution checksum. Dependency versions remain pinned. [The wave-2 build report](docs/ANDROID_WAVE2_BUILD.md) records the current JVM tests, APK integrity and source-input hashes; the earlier [wave-1 receipt](docs/ANDROID_NIGHT_BUILD.md) is preserved. Compilation and a phone test remain distinct checks.
 
 ## Read-only source scan
 
@@ -100,7 +100,7 @@ python -m pytest server/tests -q
 node --test server/tests/js/range-player.test.mjs
 ```
 
-Tests use synthetic source data and an ASR adapter. They do not download a model or establish actual recognition quality. Before upgrading an existing service, stop old workers, back up the SQLite database and content store, then start the new service/workers. Startup applies additive migrations while preserving legacy records; unknown historical provenance stays unknown. Old loaded workers do not use the new lease fencing.
+The default tests use synthetic source data and an ASR adapter without model downloads. A separate [real local ASR smoke](docs/REAL_ASR_SMOKE.md) executed tiny.en on generated speech through the worker, word citation and inert archive roundtrip; recognition errors remain raw. [Actual Chromium acceptance](docs/BROWSER_NIGHT_QA.md) covers selection and playback of saved version-pinned citations. Neither establishes human-corpus quality or physical-device behavior. Before upgrading an existing service, stop old workers, back up the SQLite database and content store, then start the new service/workers. Startup applies additive migrations while preserving legacy records; unknown historical provenance stays unknown. Old loaded workers do not use the new lease fencing.
 
 ## Non-negotiable evidence invariants
 

@@ -2,7 +2,9 @@
 
 Stan bieżący: nocny przyrost 2026-10-01. Fundament PR #2 scalono w `main`
 w commicie `b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2`.
-Branch pracy: `codex/ageds-night-20261001`, PR #3.
+PR #3 scalono w main (`8c3efb9e65999dd4931b22b555329da76379c31e`).
+Bieżąca fala 2: branch `codex/ageds-night-20261001`, PR #4 (otwarty).
+Kod opublikowany i sprawdzony; nie wykonano scalenia fali 2 do main.
 **Najświeższy odbiór i kolejka: `coordination/night-20261001.json`.**
 Procedura wznowienia: `coordination/NIGHT_WORK.md`.
 `coordination/state.json` zachowuje odbiór fundamentu i odsyła do nowego etapu.
@@ -35,24 +37,30 @@ w tamtym wątku; nie zakładamy dodatkowej puli sześciu procesów.
 | Wyniki i cytaty | Adnotacja wskazuje wyświetloną wersję. Cytat segmentowy lub słowny zachowuje dokładny tekst, hash i selektor. Wybór słów wymaga zgodnych zapisanych znaczników ASR; brak precyzji pozostaje jawny. Weryfikacja oznacza zgodność z zapisaną wersją ASR; nie oznacza odsłuchu lub prawdziwości wypowiedzi. |
 | Skaner | Read-only CSV/TSV, XLS, XLSX, WAV, inwentaryzacja/hash innych plików. Kolizje nazw, kandydaci powiązań i sprzeczności zachowane. Limity, brak adaptera i uszkodzenia jawne. Safe no-follow descriptors wymagają wspieranego systemu POSIX. |
 | Pakiet | Snapshot 16 tabel metadanych, digests i walidacja grafu oraz cytatów. Dokładny kanoniczny roundtrip do inertnego archiwum SQLite i z powrotem. Bez bajtów źródeł, podpisu, wznowienia jobs, replay lub przywrócenia live DB. |
-| Android | Wszystkie URI kolizyjnych nazw, wybór konkretnego kandydata, prywatny manifest wyboru, jawne wysłanie na wybrany serwer, wyniki/błędy każdego pliku, wersja adnotacji. Widok Źródła skanuje SAF bez seed: CSV/TSV, XLSX, podstawowy WAV i inventory, raw komórki, lokatory, kolizje, ograniczenia. Dawny katalog JSON jest opcjonalny. Natywny XLS pozostaje unsupported. Build debug APK i 26 testów JVM przeszły; telefon pozostaje oddzielnym odbiorem. |
+| Android | Wszystkie URI kolizyjnych nazw, wybór konkretnego kandydata, prywatny manifest wyboru, jawne wysłanie na wybrany serwer, wyniki/błędy każdego pliku, wersja adnotacji. Widok Źródła skanuje SAF bez seed: CSV/TSV, XLSX, podstawowy WAV i inventory, raw komórki, lokatory, kolizje, ograniczenia. Dawny katalog JSON jest opcjonalny. Natywny XLS: ograniczona, jawnie częściowa projekcja BIFF8. UTF-16 BOM i hipotezy separatorów CSV z metadanymi niejednoznaczności. Aktualny build i testy: `docs/ANDROID_WAVE2_BUILD.md`; telefon pozostaje oddzielnym odbiorem. |
 
 `scanner.observations` to obserwacje pól i hipotez; SQLite `source_observations`
 to pozyskania bajtów. Wspólny zapis JSON nie oznacza wspólnej semantyki.
 
 ## Odbiór
 
-Fundament miał 126 testów i 84 podtesty. Nocny przyrost rozszerza ten odbiór;
-aktualne dokładne liczby oraz dowody zapisują `docs/NIGHT_QA.md`
-i `coordination/night-20261001.json`. Rzeczywisty build Android wykonał
-57 zadań oraz 16 testów Android JVM i 10 desktop. Sprawdzono podpis APK
-i 35 hashy źródeł; receipt: `docs/ANDROID_NIGHT_BUILD_RECEIPT.json`.
+Fundament i fala 1 zachowują swoje historyczne receipty. Fala 2: **183 testy
+backend i 207 podtestów**, 14 testów Node oraz **11 testów rzeczywistego Chromium**.
+Odbiór parserów: 34 bezpośrednie testy JVM, w tym 20 niezależnych testów
+adwersarialnych. Końcowy zintegrowany build i dokładne hashe zapisują
+`docs/ANDROID_WAVE2_BUILD.md` oraz `docs/ANDROID_WAVE2_BUILD_RECEIPT.json`.
 
-Odbiór obejmuje cytat starszej wersji, raw błędne dane, dokładny roundtrip
-archiwum, odrzucenie niejednoznacznego JSON i ochronę źródeł. Node sprawdza
-odtwarzacz na atrapie audio. Przegląd wykrył i naprawił wykonywalny HTML
-w snippetach wyszukiwania; fragment jest teraz wyświetlany jako tekst.
-Nie przeprowadzono realnej inferencji ASR ani interakcji SAF na telefonie.
+Wykonano rzeczywistą lokalną inferencję tiny.en CPU/int8 na syntetycznej mowie,
+z zapisem 17 słów, cytatem i dokładnym roundtripem inertnego archiwum.
+Naprawiono dwie niezgodności zależności i granicę typów NumPy/JSON.
+Raw ASR zawiera błąd rozpoznania — nie skorygowano go ani nie zadeklarowano
+jakości na ludzkim korpusie. Dowód: `docs/REAL_ASR_SMOKE_RECEIPT.json`.
+Chromium sprawdził także odtwarzanie zapisanego cytatu starszej wersji podczas
+wybrania nowszej; receipt: `docs/BROWSER_NIGHT_RECEIPT.json`.
+
+Sześć testów dostawcy SAF i osobna aplikacja testowa skompilowały się, ale
+nie wykonały: brak urządzenia/emulatora. `docs/ANDROID_SAF_PROVIDER_ACCEPTANCE.md`
+odróżnia tę kompilację od testu runtime i podaje procedurę kontynuacji.
 
 Przed aktualizacją działającej instalacji zatrzymaj stare workery i wykonaj
 backup bazy oraz store. Ograniczenia append-only SQLite i uprawnienia plików
@@ -60,16 +68,20 @@ nie są fizycznym WORM ani kryptograficznym podpisem łańcucha pochodzenia.
 
 ## Następny zakres wykonawczy
 
-1. Test dostawcy SAF na urządzeniu/emulatorze: folder bez seed, kolizje URI,
-   odmowa uprawnień, anulowanie, źródła bez zmian i selekcja nagrań. APK gotowy.
-2. Natywny adapter XLS oraz dodatkowe kodowania/separatory, po sprawdzeniu
-   ograniczeń adaptera. Unsupported musi pozostać jawne do realnego odbioru.
-3. Rzeczywista inferencja ASR na małym syntetycznym nagraniu; oddzielić
-   wykonanie adaptera od jakości na prywatnym korpusie.
-4. Cytaty słowne i przeglądarkowy wybór/odtwarzanie zakresu są wdrożone.
-   Następnie odbiór interaktywny i ewentualny analogiczny klient Android.
-5. Inertny roundtrip metadanych jest wdrożony. Kontrolowany restore live DB,
-   zakres mediów i podpis wymagają osobnego kontraktu; starych lease nie wznawiać.
+1. Konkretny kontrakt wymiany dowodów: pakiet wskazujący wersję, selektor,
+   pochodzenie i jawne braki oraz niezależny konsument-fixture w AGEDS.
+   Nie otwierać lokatorów źródła i nie deklarować adaptera partnera bez testu
+   z rzeczywistym drugim projektem. Praca tej nocy dotyczy tylko repo AGEDS.
+2. Uruchomić gotowe sześć testów SAF, gdy będzie dostępny runtime Android;
+   oddzielnie sprawdzić picker, cykl uprawnień i wybór nagrań. Brak emulatora
+   w obecnym środowisku jest obserwowaną blokadą, nie dowodem błędu aplikacji.
+3. Odpowiednik wyboru cytatu wersji i zakresu w kliencie Android — uzgodnić
+   istniejący kontrakt HTTP, a następnie przetestować konkretne zachowanie.
+4. Rozszerzać XLS/teksty tylko dla konkretnego nieobsługiwanego wzorca:
+   aktualne granice opisują `docs/NATIVE_XLS.md` i `docs/NATIVE_SOURCE_FORMATS.md`.
+5. Po odzyskaniu miejsca sprawdzić czystą instalację przypiętych zależności ASR;
+   bieżący poprawiony zestaw jest przetestowany wykonaniem, druga świeża
+   instalacja nie została wykonana. Jakość/Polski ASR to osobny eksperyment.
 6. Profile pięciu warstw AGEDS i rozumowanie LLM — konkretne przypadki,
    jawne RAW odpowiedzi oraz deterministyczna polityka liczb/wyliczeń.
 

@@ -4,13 +4,14 @@
   "branch": "codex/ageds-night-20261001",
   "base_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2",
   "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate",
-  "updated_at": "2026-09-30T23:19:50.209818+00:00",
+  "updated_at": "2026-09-30T23:26:04.032034+00:00",
   "coordinator": {
     "owner": "root-wave2-20261001T0106",
-    "status": "active",
+    "status": "completed",
     "claimed_at": "2026-09-30T23:07:39.448536+00:00",
-    "lease_expires_at": "2026-10-01T00:04:50.209818+00:00",
-    "based_on_remote_head": "dca4470284ebf74c8a5089632c933f3c658282b0"
+    "lease_expires_at": "2026-09-30T23:26:04.032034+00:00",
+    "based_on_remote_head": "dca4470284ebf74c8a5089632c933f3c658282b0",
+    "completed_at": "2026-09-30T23:26:04.032034+00:00"
   },
   "tasks": [
     {
@@ -171,8 +172,14 @@
       "scope": [
         "new XLS parser and tests"
       ],
-      "status": "in_progress",
-      "result": null
+      "status": "accepted",
+      "result": {
+        "own_xls_tests": 14,
+        "independent_xls_tests": 12,
+        "integrated_build": "passed",
+        "scope": "bounded CFB v3 and BIFF8 stored-cell projection, always partial",
+        "report": "docs/NATIVE_XLS.md"
+      }
     },
     {
       "id": "AGEDS-20261001-N10",
@@ -181,8 +188,16 @@
       "scope": [
         "new instrumentation tests and device receipts"
       ],
-      "status": "in_progress",
-      "result": null
+      "status": "accepted",
+      "result": {
+        "acceptance": "capability result and instrumentation compilation only",
+        "instrumentation_tests_compiled": 6,
+        "instrumentation_tests_executed": 0,
+        "compile_tasks_executed": 60,
+        "runtime_blocker": "no connected device, emulator binary/system image or KVM",
+        "report": "docs/ANDROID_SAF_PROVIDER_ACCEPTANCE.md",
+        "receipt": "docs/ANDROID_SAF_PROVIDER_RECEIPT.json"
+      }
     },
     {
       "id": "AGEDS-20261001-N11",
@@ -244,8 +259,14 @@
       "scope": [
         "SourceScanner, SourceWorkbookParser, source models and format tests"
       ],
-      "status": "in_progress",
-      "result": null
+      "status": "accepted",
+      "result": {
+        "own_format_tests": 14,
+        "independent_format_tests": 8,
+        "scope": "strict BOM UTF16, UTF8, delimiter hypotheses and ambiguity, guarded XML encodings",
+        "integrated_build": "passed",
+        "report": "docs/NATIVE_SOURCE_FORMATS.md"
+      }
     },
     {
       "id": "AGEDS-20261001-N15",
@@ -254,30 +275,40 @@
       "scope": [
         "new adversarial tests and QA receipt"
       ],
-      "status": "in_progress",
-      "result": null
+      "status": "accepted",
+      "result": {
+        "independent_tests": 20,
+        "direct_parser_tests_including_owner": 34,
+        "integrated_build": "passed",
+        "defects_identified_and_fixed": 5,
+        "synthetic_input_hashes": 24,
+        "report": "docs/N15_ADVERSARIAL_QA.md",
+        "receipt": "docs/N15_ADVERSARIAL_QA_RECEIPT.json"
+      }
     }
   ],
   "publication": {
-    "status": "wave2_in_progress_with_verified_checkpoints",
+    "status": "wave2_content_published_and_tree_verified",
     "foundation_pr": "https://github.com/klb-t/AGEDS/pull/2",
     "foundation_merged": true,
-    "content_commit": "feefdb2d72f3b8f8807c4cb5bd3fec3810c422ad",
-    "pull_request": "https://github.com/klb-t/AGEDS/pull/3",
-    "merge_status": "consult current GitHub PR status; this receipt precedes integration",
+    "content_commit": "903d3d3004ccf878b91d407b4d4983660b2081b5",
+    "pull_request": "https://github.com/klb-t/AGEDS/pull/4",
+    "merge_status": "open; branch publication complete; no wave2 main merge performed",
     "previous_increment_merged_at": "8c3efb9e65999dd4931b22b555329da76379c31e",
     "wave2_content_commits": [
       "ecc664706a592cf9a2d34d6450efe54b0c9a60ed",
-      "38a76a93d212f062d4ce1abc001b7b859cfc821d"
-    ]
+      "38a76a93d212f062d4ce1abc001b7b859cfc821d",
+      "280f848f593be1402b82eb08505ef74507ba925e",
+      "903d3d3004ccf878b91d407b4d4983660b2081b5"
+    ],
+    "content_tree": "8b5761237e6fb64c934d3efea1f3adb1166005b8"
   },
   "next_queue": [
-    "N9: Native XLS read-only adapter with bounded malformed-workbook tests; if no sound implementation feasible, publish concrete negative result and retain unsupported status",
-    "N10: Automated device/emulator SAF-provider acceptance without requiring user phone; test denied permission, partial listings, duplicate URIs, cancellation and unchanged source bytes",
-    "N11: Real ASR integration using a small synthetic speech fixture and free local model; record exact adapter/model and distinguish synthetic success from human-corpus quality",
-    "N12: Interactive browser/device acceptance of word selection and range playback; Android quote client if clear API contract",
-    "N13: Extend native CSV separators/encodings and OOXML encodings from explicit source metadata, preserving raw values and ambiguity",
-    "N14: Concrete read-only ecosystem evidence exchange with version-pinned selectors and a real consumer fixture; never assume shared ontology or automatic private-data access"
+    "N14: Build a bounded read-only version-pinned evidence exchange contract and independent consumer fixture inside AGEDS; keep source locators inert and reject incompatible versions; no partner integration claim without actual partner acceptance",
+    "N16: Android client for selecting a concrete transcript version, word/segment quote and bounded playback using existing HTTP contracts",
+    "N10-runtime: Execute six compiled synthetic SAF-provider tests only when a device/emulator is available; picker/grant lifecycle and recording selection remain distinct",
+    "N17: Once disk capacity permits, verify a wholly clean ASR dependency installation using the new explicit pins; current corrected runtime passed actual inference",
+    "N18: Extend native workbook/text formats only against concrete unsupported source patterns with bounded independent fixtures; maintain partial coverage and source preservation"
   ],
   "automation": {
     "created": true,
@@ -285,8 +316,27 @@
     "window": "2026-10-01 01:00 through 06:00 hourly flexible, six occurrences",
     "guard": "fresh active coordinator claim prevents duplicate takeover"
   },
-  "accepted_code_commit": "feefdb2d72f3b8f8807c4cb5bd3fec3810c422ad",
+  "accepted_code_commit": "903d3d3004ccf878b91d407b4d4983660b2081b5",
   "validation": {
+    "backend_tests": 183,
+    "backend_subtests": 207,
+    "backend_failures": 0,
+    "existing_deprecation_warnings": 3,
+    "node_fake_audio_tests": 14,
+    "actual_chromium_tests": 11,
+    "android_jvm_tests": 64,
+    "desktop_jvm_tests": 10,
+    "gradle_tasks_executed": 57,
+    "build_inputs_verified": 45,
+    "instrumentation_tests_compiled": 6,
+    "instrumentation_runtime_tests": 0,
+    "phone_saf_test": "not_performed_no_runtime",
+    "real_asr": "passed_local_tiny_en_generated_speech",
+    "source_data": "synthetic",
+    "apk_sha256": "a4fce4b144cb13e3a7637421f6d5bebb4d638ed94221f0360b030db27b026605"
+  },
+  "current_wave": 2,
+  "wave1_validation": {
     "backend_tests": 182,
     "backend_subtests": 207,
     "backend_failures": 0,
@@ -300,5 +350,20 @@
     "real_asr": "not_performed",
     "source_data": "synthetic"
   },
-  "current_wave": 2
+  "next_concrete_step": {
+    "id": "AGEDS-20261001-N14",
+    "status": "ready",
+    "authority": "inferred from explicit ecosystem mandate and overnight queue",
+    "scope": [
+      "new read-only exchange contract",
+      "independent consumer fixture and integration tests",
+      "explicit compatibility/loss/provenance documentation"
+    ],
+    "acceptance": [
+      "exact source digest, derived version and selector retained",
+      "no implicit source locator access or executable archive jobs",
+      "unknowns and incompatibilities rejected or represented explicitly",
+      "independent consumer fixture passes without claiming deployed partner integration"
+    ]
+  }
 }

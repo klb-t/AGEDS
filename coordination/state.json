@@ -2,12 +2,12 @@
   "schema_version": 1,
   "project": "AGEDS",
   "state_id": "AGEDS-STATE-20260930-001",
-  "updated_at": "2026-09-30T22:57:35.238130+00:00",
+  "updated_at": "2026-09-30T23:26:04.032034+00:00",
   "based_on_remote_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0",
   "local_branch": "codex/ageds-foundation-20260930",
   "changes_published": true,
   "published_commit": "ffda747b11b6fe7d527a044ff334553df71bed40",
-  "status_summary": "Fundament PR #2 scalony. Bieżący nocny etap: patrz coordination/night-20261001.json — 182 testy backend, 207 podtestów, 14 Node oraz rzeczywisty Android build z 26 testami JVM.",
+  "status_summary": "Fala 2 opublikowana na nocnej gałęzi (PR #4): native partial XLS, jawne dialekty/kodowania, realny ASR i Chromium; 183 backend +207 podtestów, 74 JVM, 11 browser. Najnowszy claim/kolejka: coordination/night-20261001.json.",
   "coordination": {
     "transport": "repository_commits_and_stable_ids",
     "history_search_role": "context_recall_only_not_delivery_or_order_guarantee",
@@ -427,8 +427,8 @@
     "Anthropic export identified but not searched: transfer unavailable",
     "Latest source-scanner request recovered from history, not complete raw export",
     "Ecosystem adapters are conceptual, not implemented",
-    "Native Android source scan implemented without seed; XLS and device/provider validation remain.",
-    "Exact inert metadata archive roundtrip is implemented; full live restore, source media and replay are not."
+    "Exact inert metadata archive roundtrip is implemented; full live restore, source media and replay are not.",
+    "Native Android partial BIFF8 XLS and BOM encodings implemented; six SAF instrumentation tests compiled, runtime unavailable. Real ASR tested only on synthetic English speech."
   ],
   "validation": {
     "command": "python -m pytest server/tests -q",

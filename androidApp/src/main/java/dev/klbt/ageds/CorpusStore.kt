@@ -5,15 +5,20 @@ import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import dev.klbt.ageds.core.CorpusSeed
 import kotlinx.serialization.json.Json
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import java.io.File
 import java.util.ArrayDeque
 
 data class RecordingScan(
-    val found: Map<String, Uri>,
+    val found: Map<String, List<RecordingCandidate>>,
     val scannedFiles: Int,
     val scannedDirectories: Int,
     val sampleNames: List<String>,
 )
+
+/** A filename is an observation, never the identity of a physical recording. */
+data class RecordingCandidate(val name: String, val uri: Uri, val relativePath: String, val sizeBytes: Long)
 
 class CorpusStore(private val context: Context) {
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
@@ -39,30 +44,37 @@ class CorpusStore(private val context: Context) {
 
     fun savedRecordingTree(): Uri? = prefs.getString("recordingTree", null)?.let(Uri::parse)
 
-    fun indexRecordingTree(treeUri: Uri, expectedNames: Set<String>): RecordingScan {
+    suspend fun indexRecordingTree(treeUri: Uri, expectedNames: Set<String>): RecordingScan {
         val root = DocumentFile.fromTreeUri(context, treeUri) ?: error("Nie mogę otworzyć wskazanego folderu")
-        val found = LinkedHashMap<String, Uri>()
+        val found = LinkedHashMap<String, MutableList<RecordingCandidate>>()
         val samples = ArrayList<String>()
-        val queue = ArrayDeque<DocumentFile>()
-        queue.add(root)
+        val queue = ArrayDeque<Pair<DocumentFile, String>>()
+        val visited = HashSet<String>()
+        queue.add(root to "")
         var scannedFiles = 0
         var scannedDirectories = 0
 
         while (queue.isNotEmpty()) {
-            val node = queue.removeFirst()
+            currentCoroutineContext().ensureActive()
+            val (node, path) = queue.removeFirst()
+            if (!visited.add(node.uri.toString())) continue
             if (node.isDirectory) {
                 scannedDirectories++
                 val children = runCatching { node.listFiles().toList() }
                     .getOrElse { throw IllegalStateException("Nie mogę odczytać folderu ${node.name ?: node.uri}: ${it.message}", it) }
-                children.forEach(queue::addLast)
+                children.forEach { child ->
+                    queue.addLast(child to listOf(path, child.name ?: child.uri.toString()).filter { it.isNotEmpty() }.joinToString("/"))
+                }
                 continue
             }
             scannedFiles++
             val name = node.name ?: continue
             if (samples.size < 12) samples += name
-            if (name in expectedNames && name !in found) found[name] = node.uri
+            if (name in expectedNames) found.getOrPut(name) { ArrayList() }
+                .add(RecordingCandidate(name, node.uri, path, node.length()))
         }
 
+        currentCoroutineContext().ensureActive()
         saveRecordingTree(treeUri)
         return RecordingScan(found, scannedFiles, scannedDirectories, samples)
     }

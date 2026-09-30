@@ -57,3 +57,4 @@ Java_dev_klbt_ageds_whisper_WhisperNative_free(JNIEnv *, jobject, jlong ptr) {
     auto *ctx = reinterpret_cast<whisper_context *>(ptr);
     if (ctx) whisper_free(ctx);
 }
+

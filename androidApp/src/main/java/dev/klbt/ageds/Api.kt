@@ -15,6 +15,8 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.utils.io.streams.*
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 class EvidenceApi(private var baseUrl: String) {
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
@@ -23,6 +25,7 @@ class EvidenceApi(private var baseUrl: String) {
     }
 
     fun setBaseUrl(value: String) { baseUrl = value.trimEnd('/') }
+    fun close() { client.close() }
 
     suspend fun artifacts(): List<ArtifactSummary> = client.get("$baseUrl/api/artifacts").body()
     suspend fun transcript(artifactId: Long): Transcript? = client.get("$baseUrl/api/artifacts/$artifactId/transcript").body()
@@ -37,18 +40,26 @@ class EvidenceApi(private var baseUrl: String) {
             setBody(annotation)
         }.body()
 
-    suspend fun uploadAudio(resolver: ContentResolver, uri: Uri): UploadResult {
+    suspend fun uploadAudio(resolver: ContentResolver, uri: Uri, sourcePath: String? = null): UploadResult {
         val name = queryName(resolver, uri) ?: "recording"
+        val transportName = name.replace('"', '_').replace('\\', '_').replace('\r', '_').replace('\n', '_')
         val mime = resolver.getType(uri) ?: "application/octet-stream"
         return client.submitFormWithBinaryData(
             url = "$baseUrl/api/artifacts/upload",
             formData = formData {
                 append("source_label", "AGEDS Android import")
+                append("source_locator", uri.toString())
+                append("metadata_json", buildJsonObject {
+                    put("client", "AGEDS Android")
+                    put("locator_kind", "android_saf_uri")
+                    put("client_original_name", name)
+                    if (sourcePath != null) put("client_relative_path", sourcePath)
+                }.toString())
                 append("file", InputProvider {
                     resolver.openInputStream(uri)?.asInput() ?: error("Cannot open $uri")
                 }, Headers.build {
                     append(HttpHeaders.ContentType, mime)
-                    append(HttpHeaders.ContentDisposition, "filename=\"${name.replace("\"", "_")}\"")
+                    append(HttpHeaders.ContentDisposition, "filename=\"$transportName\"")
                 })
             }
         ).body()

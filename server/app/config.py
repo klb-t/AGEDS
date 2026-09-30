@@ -12,6 +12,7 @@ class Settings:
     whisper_model: str = os.getenv("EW_WHISPER_MODEL", "small")
     whisper_device: str = os.getenv("EW_WHISPER_DEVICE", "cpu")
     whisper_compute_type: str = os.getenv("EW_WHISPER_COMPUTE_TYPE", "int8")
+    scan_roots: tuple[Path, ...] = tuple(Path(p).absolute() for p in os.getenv("EW_SCAN_ROOTS", "").split(os.pathsep) if p)
 
 settings = Settings()
 settings.data_dir.mkdir(parents=True, exist_ok=True)

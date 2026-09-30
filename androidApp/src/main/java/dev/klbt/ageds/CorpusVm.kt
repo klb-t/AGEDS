@@ -11,6 +11,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import dev.klbt.ageds.core.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -23,33 +25,47 @@ class CorpusVm(application: Application) : AndroidViewModel(application) {
     val error = mutableStateOf<String?>(null)
     val message = mutableStateOf<String?>(null)
     val progress = mutableStateOf<String?>(null)
-    val linkedRecordingUris = mutableStateMapOf<String, Uri>()
+    val linkedRecordingCandidates = mutableStateMapOf<String, List<RecordingCandidate>>()
     val scanFiles = mutableStateOf(0)
     val scanDirectories = mutableStateOf(0)
     val scanSamples = mutableStateOf<List<String>>(emptyList())
+    val indexedTree = mutableStateOf<String?>(null)
     private val manualPhones = mutableStateListOf<String>()
     private val excludedPhones = mutableStateListOf<String>()
     private val store = CorpusStore(application)
+    private var scanJob: Job? = null
+    private var scanGeneration = 0
+    private var importing = false
+    private var scanning = false
+    private fun updateBusy() { busy.value = importing || scanning }
 
     init { store.loadCached()?.let { install(it) } }
 
     private fun install(seed: CorpusSeed) {
         corpus.value = seed
-        linkedRecordingUris.clear()
+        linkedRecordingCandidates.clear()
+        scanFiles.value = 0
+        scanDirectories.value = 0
+        scanSamples.value = emptyList()
+        indexedTree.value = null
         selectPriority()
         store.savedRecordingTree()?.let { indexRecordings(it) }
     }
 
     fun importCorpus(uri: Uri) {
+        if (busy.value) return
         viewModelScope.launch {
-            busy.value = true
+            importing = true
+            updateBusy()
             try {
                 val seed = withContext(Dispatchers.IO) { store.import(uri) }
                 install(seed)
                 message.value = "Wczytano ${seed.contacts.size} numerów · ${seed.sms.size} SMS · ${seed.calls.size} połączeń · ${seed.recordings.size} nagrań."
                 error.value = null
-            } catch (t: Throwable) { error.value = "Import: ${t.message}" }
-            finally { busy.value = false }
+            } catch (t: Throwable) {
+                if (t is CancellationException) throw t
+                error.value = "Import: ${t.message}"
+            } finally { importing = false; updateBusy() }
         }
     }
 
@@ -87,7 +103,7 @@ class CorpusVm(application: Application) : AndroidViewModel(application) {
     }
     fun selectedRecordings(): List<CorpusRecording> {
         val seed = corpus.value ?: return emptyList(); val phones = selectedPhones(); val keys = keywords()
-        return seed.recordings.filter { r -> r.phone in phones || keys.any { k -> r.contact?.contains(k, true) == true } }.distinctBy { it.name }.sortedByDescending { it.resolvedTime ?: it.callStart ?: "" }
+        return seed.recordings.filter { r -> r.phone in phones || keys.any { k -> r.contact?.contains(k, true) == true } }.sortedByDescending { it.resolvedTime ?: it.callStart ?: "" }
     }
     fun selectedEmails(): List<EmailIdentity> {
         val seed = corpus.value ?: return emptyList(); val ps = activePresets()
@@ -99,32 +115,66 @@ class CorpusVm(application: Application) : AndroidViewModel(application) {
 
     fun indexRecordings(treeUri: Uri) {
         val seed = corpus.value ?: return
-        viewModelScope.launch {
-            busy.value = true
+        val generation = ++scanGeneration
+        scanJob?.cancel()
+        scanning = true
+        updateBusy()
+        scanJob = viewModelScope.launch {
             progress.value = "Indeksuję nagrania…"
             error.value = null
             try {
                 val scan = withContext(Dispatchers.IO) { store.indexRecordingTree(treeUri, seed.recordings.map { it.name }.toSet()) }
-                linkedRecordingUris.clear()
-                linkedRecordingUris.putAll(scan.found)
+                if (generation != scanGeneration) return@launch
+                linkedRecordingCandidates.clear()
+                linkedRecordingCandidates.putAll(scan.found)
                 scanFiles.value = scan.scannedFiles
                 scanDirectories.value = scan.scannedDirectories
                 scanSamples.value = scan.sampleNames
+                indexedTree.value = treeUri.toString()
                 val selected = linkedSelectedCount()
-                message.value = "Przeskanowano ${scan.scannedFiles} plików w ${scan.scannedDirectories} folderach · dopasowano ${scan.found.size}/${seed.recordings.size} · z aktualnego wyboru $selected/${selectedRecordings().size}."
+                message.value = "Przeskanowano ${scan.scannedFiles} plików w ${scan.scannedDirectories} folderach · znaleziono ${scan.found.values.sumOf { it.size }} kandydatów dla ${scan.found.size} nazw · z aktualnego wyboru $selected/${selectedRecordings().size} pozycji katalogu."
                 if (scan.scannedFiles == 200 && seed.recordings.size > 200) {
-                    error.value = "Google Drive zwrócił dokładnie 200 plików — wygląda na limit providera SAF. Wskaż folder „AGEDS - Priority recordings” albo otwieraj pliki bezpośrednio z kart nagrań."
+                    message.value += " Provider zwrócił 200 plików; kompletność skanu nie została potwierdzona. Możesz wskazać mniejszy folder lub pliki bezpośrednio."
                 }
-            } catch (t: Throwable) { error.value = "Nagrania: ${t.message}" }
-            finally { busy.value = false; progress.value = null }
+            } catch (t: Throwable) {
+                if (t is CancellationException) throw t
+                if (generation == scanGeneration) error.value = "Nagrania: ${t.message}"
+            } finally {
+                if (generation == scanGeneration) {
+                    scanning = false
+                    progress.value = null
+                    updateBusy()
+                }
+            }
         }
     }
 
-    fun linkedSelectedCount() = selectedRecordings().count { it.name in linkedRecordingUris }
+    fun candidates(rec: CorpusRecording) = linkedRecordingCandidates[rec.name].orEmpty()
+    fun linkedSelectedCount() = selectedRecordings().count { candidates(it).isNotEmpty() }
+    fun selectedCandidates() = selectedRecordings().flatMap(::candidates).distinctBy { it.uri.toString() }
+
+    fun prepareTranscription(activity: ComponentActivity, candidates: List<RecordingCandidate>) {
+        try {
+            activity.startActivity(PendingRecordingStore(activity).prepare(candidates))
+            error.value = null
+        } catch (t: Throwable) { error.value = "Przekazanie wyboru: ${t.message}" }
+    }
+
+    fun openCandidate(activity: ComponentActivity, candidate: RecordingCandidate, mime: String?) {
+        try {
+            activity.startActivity(Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(candidate.uri, mime ?: "audio/*")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            })
+            error.value = null
+        } catch (t: Throwable) { error.value = "Nie mogę otworzyć ${candidate.relativePath}: ${t.message}" }
+    }
 
     fun openRecording(activity: ComponentActivity, rec: CorpusRecording) {
         try {
-            val local = linkedRecordingUris[rec.name]
+            val candidates = candidates(rec)
+            require(candidates.size <= 1) { "Nazwa ma ${candidates.size} kandydatów; wybierz konkretny plik" }
+            val local = candidates.singleOrNull()?.uri
             val intent = if (local != null) {
                 Intent(Intent.ACTION_VIEW).apply {
                     setDataAndType(local, rec.mime ?: "audio/*")

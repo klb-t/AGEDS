@@ -35,7 +35,9 @@ fun CorpusApp(vm: CorpusVm = viewModel()) {
             vm.indexRecordings(uri)
         }
     }
-    Scaffold(topBar = { TopAppBar(title = { Text("AGEDS · Korpus komunikacji") }) }) { pad ->
+    Scaffold(topBar = { TopAppBar(title = { Text("AGEDS · Korpus komunikacji") }, actions = {
+        TextButton(onClick = { activity.startActivity(Intent(activity, MainActivity::class.java)) }) { Text("Transkrypcje") }
+    }) }) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             vm.error.value?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(horizontal = 12.dp)) }
             vm.message.value?.let { Text(it, modifier = Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodySmall) }
@@ -67,11 +69,37 @@ private fun ColumnScope.CorpusLoaded(
 ) {
     var section by remember { mutableStateOf(CorpusSection.NUMBERS) }
     var query by remember { mutableStateOf("") }
+    var candidateChoice by remember { mutableStateOf<CorpusRecording?>(null) }
+    var chooseForTranscription by remember { mutableStateOf(false) }
     val sms = vm.selectedSms()
     val calls = vm.selectedCalls()
     val recordings = vm.selectedRecordings()
     val emails = vm.selectedEmails()
     val linked = vm.linkedSelectedCount()
+    val selectedCandidates = vm.selectedCandidates()
+
+    candidateChoice?.let { recording ->
+        AlertDialog(
+            onDismissRequest = { candidateChoice = null },
+            title = { Text("Wybierz plik: ${recording.name}") },
+            text = { Column {
+                Text("Ta sama nazwa występuje w kilku lokalizacjach. Nazwa nie potwierdza tożsamości ani rozmówcy.")
+                LazyColumn(Modifier.heightIn(max = 340.dp)) {
+                    items(vm.candidates(recording), key = { it.uri.toString() }) { candidate ->
+                        TextButton(onClick = {
+                            if (chooseForTranscription) vm.prepareTranscription(activity, listOf(candidate))
+                            else vm.openCandidate(activity, candidate, recording.mime)
+                            candidateChoice = null
+                        }) { Column(Modifier.fillMaxWidth()) {
+                            Text(candidate.relativePath)
+                            Text("${candidate.sizeBytes} B · ${candidate.uri}", style = MaterialTheme.typography.labelSmall)
+                        } }
+                    }
+                }
+            } },
+            confirmButton = { TextButton(onClick = { candidateChoice = null }) { Text("Zamknij") } }
+        )
+    }
 
     LazyColumn(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item { Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -97,15 +125,21 @@ private fun ColumnScope.CorpusLoaded(
         item { Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Nagrania", fontWeight = FontWeight.Bold)
             Text(
-                "Dopasowane z wybranego folderu: ${vm.linkedRecordingUris.size}/${seed.recordings.size}; z aktualnego korpusu $linked/${recordings.size}. " +
-                    "Każdą kartę nagrania możesz kliknąć — znaleziony plik otworzy się lokalnie, a pozostały przez jego URL w Google Drive.",
+                "Nazwy z kandydatami w wybranym folderze: ${vm.linkedRecordingCandidates.size}; z aktualnego katalogu $linked/${recordings.size} pozycji. " +
+                    "Wszystkie pliki o tej samej nazwie są zachowane. Powiązania katalogu, numery i daty są danymi źródłowymi do weryfikacji.",
                 style = MaterialTheme.typography.bodySmall
             )
             if (vm.scanFiles.value > 0) {
                 Text("Ostatni skan: ${vm.scanFiles.value} plików · ${vm.scanDirectories.value} folderów.", style = MaterialTheme.typography.bodySmall)
                 if (vm.scanSamples.value.isNotEmpty()) Text("Przykłady: ${vm.scanSamples.value.take(4).joinToString()}", style = MaterialTheme.typography.labelSmall)
             }
+            vm.indexedTree.value?.let { Text("Źródło indeksu: $it", style = MaterialTheme.typography.labelSmall) }
             OutlinedButton(onClick = pickRecordings, enabled = !vm.busy.value) { Text("Wskaż folder z nagraniami") }
+            OutlinedButton(
+                onClick = { vm.prepareTranscription(activity, selectedCandidates) },
+                enabled = !vm.busy.value && selectedCandidates.isNotEmpty()
+            ) { Text("Przygotuj transkrypcję (${selectedCandidates.size} plików)") }
+            Text("Następny krok pozwala przejrzeć pliki i wybrać serwer przed wysłaniem. Oryginały są tylko odczytywane.", style = MaterialTheme.typography.bodySmall)
         } } }
 
         item {
@@ -118,8 +152,7 @@ private fun ColumnScope.CorpusLoaded(
         when (section) {
             CorpusSection.NUMBERS -> items(
                 seed.contacts.filter { c -> query.isBlank() || listOf(c.phone, c.label, c.backupName, c.publicId).any { it?.contains(query, true) == true } }
-                    .sortedByDescending { it.interactions },
-                key = { it.phone ?: "${it.label}-${it.interactions}" }
+                    .sortedByDescending { it.interactions }
             ) { c ->
                 Row(Modifier.fillMaxWidth().clickable { vm.togglePhone(c.phone) }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(vm.isPhoneSelected(c.phone), { vm.togglePhone(c.phone) })
@@ -129,23 +162,32 @@ private fun ColumnScope.CorpusLoaded(
                     }
                 }
             }
-            CorpusSection.SMS -> items(sms.filter { query.isBlank() || it.text.contains(query, true) || it.contact?.contains(query, true) == true || it.rawSender?.contains(query, true) == true }.take(1000)) { s ->
+            CorpusSection.SMS -> items(sms.filter { query.isBlank() || it.text.contains(query, true) || it.contact?.contains(query, true) == true || it.rawSender?.contains(query, true) == true }) { s ->
                 CorpusRow("${s.contact ?: vm.labelFor(s.phone)} · ${s.at ?: ""}", "${s.type ?: ""} · ${s.rawSender ?: s.phone ?: ""}", s.text)
             }
-            CorpusSection.CALLS -> items(calls.filter { query.isBlank() || it.contact?.contains(query, true) == true || it.phone?.contains(query, true) == true }.take(1000)) { c ->
+            CorpusSection.CALLS -> items(calls.filter { query.isBlank() || it.contact?.contains(query, true) == true || it.phone?.contains(query, true) == true }) { c ->
                 CorpusRow("${c.contact ?: vm.labelFor(c.phone)} · ${c.start ?: ""}", "${c.type ?: ""} · ${c.durationSec}s · ${c.phone ?: ""}")
             }
             CorpusSection.RECORDINGS -> items(
-                recordings.filter { query.isBlank() || it.name.contains(query, true) || it.contact?.contains(query, true) == true || it.phone?.contains(query, true) == true }.take(1000),
-                key = { it.name }
+                recordings.filter { query.isBlank() || it.name.contains(query, true) || it.contact?.contains(query, true) == true || it.phone?.contains(query, true) == true }
             ) { r ->
-                val local = r.name in vm.linkedRecordingUris
-                CorpusRow(
-                    "${if (local) "▶ " else "↗ "}${r.contact ?: vm.labelFor(r.phone)} · ${r.resolvedTime ?: r.callStart ?: ""}",
-                    "${if (local) "plik znaleziony" else "Google Drive"} · ${r.confidence ?: "?"} · ${r.name}",
-                    r.note,
-                    onClick = { vm.openRecording(activity, r) }
-                )
+                val candidates = vm.candidates(r)
+                Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(10.dp)) {
+                    Text("${r.contact ?: vm.labelFor(r.phone)} · ${r.resolvedTime ?: r.callStart ?: ""}", fontWeight = FontWeight.SemiBold)
+                    Text("${r.name} · ${candidates.size} kandydatów · pewność w katalogu: ${r.confidence ?: "?"}", style = MaterialTheme.typography.bodySmall)
+                    r.folder?.let { Text("Folder katalogu: $it", style = MaterialTheme.typography.labelSmall) }
+                    r.note?.takeIf { it.isNotBlank() }?.let { Text(it, maxLines = 5, overflow = TextOverflow.Ellipsis) }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = {
+                            if (candidates.size > 1) { candidateChoice = r; chooseForTranscription = false }
+                            else vm.openRecording(activity, r)
+                        }) { Text(if (candidates.isEmpty()) "Otwórz Drive" else "Odsłuch") }
+                        TextButton(onClick = {
+                            if (candidates.size > 1) { candidateChoice = r; chooseForTranscription = true }
+                            else vm.prepareTranscription(activity, candidates)
+                        }, enabled = candidates.isNotEmpty()) { Text("Transkrypcja") }
+                    }
+                } }
             }
             CorpusSection.EMAILS -> {
                 val domains = vm.emailDomains()

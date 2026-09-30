@@ -2,6 +2,7 @@ package dev.klbt.ageds.core
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 
 @Serializable
 data class ArtifactSummary(
@@ -45,6 +46,8 @@ data class Transcript(
     val segments: List<TranscriptSegment> = emptyList(),
     val confidence: Double? = null,
     val createdAt: String? = null,
+    val runId: Long? = null,
+    val metadata: JsonObject? = null,
 )
 
 @Serializable
@@ -57,6 +60,7 @@ data class Annotation(
     val startMs: Long? = null,
     val endMs: Long? = null,
     val createdAt: String? = null,
+    val derivedTextId: Long? = null,
 )
 
 @Serializable
@@ -76,6 +80,7 @@ data class AnnotationCreate(
     val kind: String = "note",
     val startMs: Long? = null,
     val endMs: Long? = null,
+    val derivedTextId: Long? = null,
 )
 
 /**

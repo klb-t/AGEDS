@@ -10,3 +10,4 @@ object EvidenceInvariant {
     const val CORRELATION_IS_A_RELATION = true
     const val UNCERTAINTY_MUST_BE_EXPLICIT = true
 }
+

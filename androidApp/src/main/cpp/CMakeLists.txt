@@ -19,3 +19,4 @@ add_library(ageds_whisper SHARED whisper_jni.cpp)
 target_include_directories(ageds_whisper PRIVATE ${whispercpp_SOURCE_DIR}/include)
 find_library(log-lib log)
 target_link_libraries(ageds_whisper PRIVATE whisper ${log-lib} android)
+

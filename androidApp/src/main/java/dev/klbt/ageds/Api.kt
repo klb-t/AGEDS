@@ -18,9 +18,11 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-class EvidenceApi(private var baseUrl: String) {
+class EvidenceApi(baseUrl: String) {
+    private var baseUrl: String = baseUrl.trimEnd('/')
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
     private val client = HttpClient(OkHttp) {
+        expectSuccess = true
         install(ContentNegotiation) { json(json) }
     }
 
@@ -28,7 +30,24 @@ class EvidenceApi(private var baseUrl: String) {
     fun close() { client.close() }
 
     suspend fun artifacts(): List<ArtifactSummary> = client.get("$baseUrl/api/artifacts").body()
-    suspend fun transcript(artifactId: Long): Transcript? = client.get("$baseUrl/api/artifacts/$artifactId/transcript").body()
+    suspend fun transcriptVersions(artifactId: Long): List<TranscriptVersion> =
+        client.get("$baseUrl/api/artifacts/$artifactId/transcripts").body()
+
+    suspend fun transcript(artifactId: Long, derivedTextId: Long? = null): Transcript? =
+        client.get("$baseUrl/api/artifacts/$artifactId/transcript") {
+            if (derivedTextId != null) parameter("derived_text_id", derivedTextId)
+        }.body()
+
+    suspend fun citations(artifactId: Long): List<Citation> =
+        client.get("$baseUrl/api/artifacts/$artifactId/citations").body()
+
+    suspend fun createCitation(artifactId: Long, request: CitationCreate): Citation =
+        client.post("$baseUrl/api/artifacts/$artifactId/citations") {
+            contentType(ContentType.Application.Json)
+            setBody(request)
+        }.body()
+
+    fun contentUrl(artifactId: Long): String = "$baseUrl/api/artifacts/$artifactId/content"
     suspend fun annotations(artifactId: Long): List<EvidenceAnnotation> = client.get("$baseUrl/api/artifacts/$artifactId/annotations").body()
 
     suspend fun queueTranscription(artifactId: Long, priority: Int): QueueResult =

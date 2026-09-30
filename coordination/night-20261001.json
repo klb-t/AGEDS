@@ -4,13 +4,13 @@
   "branch": "codex/ageds-night-20261001",
   "base_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2",
   "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate; user 01:33 Europe/Amsterdam explicitly requests continuous progression while useful work remains, without ending after a checkpoint",
-  "updated_at": "2026-09-30T23:35:18.866504+00:00",
+  "updated_at": "2026-09-30T23:54:16.467580+00:00",
   "coordinator": {
-    "owner": "root-wave3-20261001T0133",
+    "owner": "root-wave4-20261001T0155",
     "status": "active",
-    "claimed_at": "2026-09-30T23:35:18.866504+00:00",
-    "lease_expires_at": "2026-10-01T00:30:18.866504+00:00",
-    "based_on_remote_head": "8ed60462fd8fdbc61f5bae15f4800c623a4b543a"
+    "claimed_at": "2026-09-30T23:54:16.467580+00:00",
+    "lease_expires_at": "2026-10-01T00:49:16.467580+00:00",
+    "based_on_remote_head": "13a489502ad991a9aae1a9fce690a8b127d571a8"
   },
   "tasks": [
     {
@@ -294,8 +294,16 @@
         "producer tests",
         "exchange contract doc"
       ],
-      "status": "in_progress",
-      "result": null
+      "status": "accepted",
+      "result": {
+        "published_commit": "13a489502ad991a9aae1a9fce690a8b127d571a8",
+        "reports": [
+          "docs/WAVE3_EXCHANGE_QA.md",
+          "docs/WAVE3_ANDROID_QA.md",
+          "docs/WAVE3_BROWSER_QA.md"
+        ],
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N19",
@@ -304,8 +312,16 @@
       "scope": [
         "new standalone consumer and consumer tests"
       ],
-      "status": "in_progress",
-      "result": null
+      "status": "accepted",
+      "result": {
+        "published_commit": "13a489502ad991a9aae1a9fce690a8b127d571a8",
+        "reports": [
+          "docs/WAVE3_EXCHANGE_QA.md",
+          "docs/WAVE3_ANDROID_QA.md",
+          "docs/WAVE3_BROWSER_QA.md"
+        ],
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N16",
@@ -315,8 +331,16 @@
         "core Models.kt and new citation selection code/tests",
         "androidApp Api.kt"
       ],
-      "status": "in_progress",
-      "result": null
+      "status": "accepted",
+      "result": {
+        "published_commit": "13a489502ad991a9aae1a9fce690a8b127d571a8",
+        "reports": [
+          "docs/WAVE3_EXCHANGE_QA.md",
+          "docs/WAVE3_ANDROID_QA.md",
+          "docs/WAVE3_BROWSER_QA.md"
+        ],
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N20",
@@ -326,8 +350,16 @@
         "MainActivity.kt",
         "new citation UI/controller/audio files"
       ],
-      "status": "in_progress",
-      "result": null
+      "status": "accepted",
+      "result": {
+        "published_commit": "13a489502ad991a9aae1a9fce690a8b127d571a8",
+        "reports": [
+          "docs/WAVE3_EXCHANGE_QA.md",
+          "docs/WAVE3_ANDROID_QA.md",
+          "docs/WAVE3_BROWSER_QA.md"
+        ],
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N21",
@@ -336,8 +368,16 @@
       "scope": [
         "new exchange adversarial and boundary tests"
       ],
-      "status": "in_progress",
-      "result": null
+      "status": "accepted",
+      "result": {
+        "published_commit": "13a489502ad991a9aae1a9fce690a8b127d571a8",
+        "reports": [
+          "docs/WAVE3_EXCHANGE_QA.md",
+          "docs/WAVE3_ANDROID_QA.md",
+          "docs/WAVE3_BROWSER_QA.md"
+        ],
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N22",
@@ -346,15 +386,101 @@
       "scope": [
         "new Android/core independent tests and QA receipt"
       ],
+      "status": "accepted",
+      "result": {
+        "published_commit": "13a489502ad991a9aae1a9fce690a8b127d571a8",
+        "reports": [
+          "docs/WAVE3_EXCHANGE_QA.md",
+          "docs/WAVE3_ANDROID_QA.md",
+          "docs/WAVE3_BROWSER_QA.md"
+        ],
+        "independent_acceptance": "passed"
+      }
+    },
+    {
+      "id": "AGEDS-20261001-N23",
+      "owner": "exchange_core",
+      "title": "Verified descriptor media streaming",
+      "scope": [
+        "server/app/verified_media.py; owner tests"
+      ],
       "status": "in_progress",
-      "result": null
+      "acceptance": [
+        "No pathname reopen; bounded verified chunks; HTTP single ranges; no corpus copy"
+      ],
+      "based_on_commit": "13a489502ad991a9aae1a9fce690a8b127d571a8"
+    },
+    {
+      "id": "AGEDS-20261001-N24",
+      "owner": "exchange_qa",
+      "title": "Independent streaming integrity acceptance",
+      "scope": [
+        "new independent media tests and QA report"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "Reproduce replacement/mutation gap and reject unverified bytes"
+      ],
+      "based_on_commit": "13a489502ad991a9aae1a9fce690a8b127d571a8"
+    },
+    {
+      "id": "AGEDS-20261001-N25",
+      "owner": "android_contract",
+      "title": "Bounded native BIFF8 continued string table",
+      "scope": [
+        "SourceXlsParser.kt; new continuation tests; NATIVE_XLS.md"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "Concrete synthetic continued Unicode SST; explicit unsupported/partial coverage"
+      ],
+      "based_on_commit": "13a489502ad991a9aae1a9fce690a8b127d571a8"
+    },
+    {
+      "id": "AGEDS-20261001-N26",
+      "owner": "android_qa",
+      "title": "Independent native XLS continuation acceptance",
+      "scope": [
+        "new XLS adversarial continuation tests and report"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "Budget/corruption/mixed compression boundaries; no device claim"
+      ],
+      "based_on_commit": "13a489502ad991a9aae1a9fce690a8b127d571a8"
+    },
+    {
+      "id": "AGEDS-20261001-N27",
+      "owner": "exchange_consumer",
+      "title": "Bounded explicit search validation",
+      "scope": [
+        "server/app/search.py; new tests; search docs"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "Malformed syntax and limits produce explicit errors; preserve raw source"
+      ],
+      "based_on_commit": "13a489502ad991a9aae1a9fce690a8b127d571a8"
+    },
+    {
+      "id": "AGEDS-20261001-N28",
+      "owner": "android_citations",
+      "title": "Browser exact identifier boundary",
+      "scope": [
+        "server/app/static/citations.mjs; new standalone JS tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "Unsafe numeric IDs fail explicitly before wrong version requests"
+      ],
+      "based_on_commit": "13a489502ad991a9aae1a9fce690a8b127d571a8"
     }
   ],
   "publication": {
-    "status": "wave2_content_published_and_tree_verified",
+    "status": "wave3_content_published_and_tree_verified",
     "foundation_pr": "https://github.com/klb-t/AGEDS/pull/2",
     "foundation_merged": true,
-    "content_commit": "903d3d3004ccf878b91d407b4d4983660b2081b5",
+    "content_commit": "13a489502ad991a9aae1a9fce690a8b127d571a8",
     "pull_request": "https://github.com/klb-t/AGEDS/pull/4",
     "merge_status": "open; branch publication complete; no wave2 main merge performed",
     "previous_increment_merged_at": "8c3efb9e65999dd4931b22b555329da76379c31e",
@@ -364,11 +490,13 @@
       "280f848f593be1402b82eb08505ef74507ba925e",
       "903d3d3004ccf878b91d407b4d4983660b2081b5"
     ],
-    "content_tree": "8b5761237e6fb64c934d3efea1f3adb1166005b8"
+    "content_tree": "28a5de10bd11a0579eceea902403d76372a92fbe",
+    "wave3_content_commits": [
+      "9e5e11d9de3b796a902715eef1344b5734eaa0f0",
+      "13a489502ad991a9aae1a9fce690a8b127d571a8"
+    ]
   },
   "next_queue": [
-    "N14: Build a bounded read-only version-pinned evidence exchange contract and independent consumer fixture inside AGEDS; keep source locators inert and reject incompatible versions; no partner integration claim without actual partner acceptance",
-    "N16: Android client for selecting a concrete transcript version, word/segment quote and bounded playback using existing HTTP contracts",
     "N10-runtime: Execute six compiled synthetic SAF-provider tests only when a device/emulator is available; picker/grant lifecycle and recording selection remain distinct",
     "N17: Once disk capacity permits, verify a wholly clean ASR dependency installation using the new explicit pins; current corrected runtime passed actual inference",
     "N18: Extend native workbook/text formats only against concrete unsupported source patterns with bounded independent fixtures; maintain partial coverage and source preservation"
@@ -379,8 +507,71 @@
     "window": "2026-10-01 01:00 through 06:00 hourly flexible, six occurrences",
     "guard": "fresh active coordinator claim prevents duplicate takeover"
   },
-  "accepted_code_commit": "903d3d3004ccf878b91d407b4d4983660b2081b5",
+  "accepted_code_commit": "13a489502ad991a9aae1a9fce690a8b127d571a8",
   "validation": {
+    "backend_tests": 221,
+    "backend_subtests": 272,
+    "backend_failures": 0,
+    "existing_deprecation_warnings": 3,
+    "node_fake_audio_tests": 14,
+    "actual_chromium_tests": 13,
+    "android_jvm_tests": 86,
+    "desktop_jvm_tests": 30,
+    "gradle_tasks_executed": 57,
+    "build_inputs_verified": 56,
+    "instrumentation_tests_compiled": 6,
+    "instrumentation_runtime_tests": 0,
+    "phone_saf_test": "not_performed_no_runtime",
+    "real_asr": "passed_local_tiny_en_generated_speech",
+    "source_data": "synthetic",
+    "apk_sha256": "b6f085dc5579e96f1a44e18281379aba9649e081e6db0fd226f7de549fbce572"
+  },
+  "current_wave": 4,
+  "wave1_validation": {
+    "backend_tests": 182,
+    "backend_subtests": 207,
+    "backend_failures": 0,
+    "existing_deprecation_warnings": 3,
+    "node_fake_audio_tests": 14,
+    "android_jvm_tests": 16,
+    "desktop_jvm_tests": 10,
+    "gradle_tasks_executed": 57,
+    "build_inputs_verified": 35,
+    "phone_saf_test": "not_performed",
+    "real_asr": "not_performed",
+    "source_data": "synthetic"
+  },
+  "next_concrete_step": {
+    "id": "AGEDS-20261001-N23",
+    "status": "in_progress",
+    "scope": [
+      "verified read-only media streaming and independent adversarial acceptance"
+    ],
+    "acceptance": [
+      "no unverified replacement bytes served",
+      "bounded metadata; no media copy",
+      "actual browser range regression"
+    ]
+  },
+  "coordinator_history": [
+    {
+      "owner": "root-wave2-20261001T0106",
+      "status": "completed",
+      "claimed_at": "2026-09-30T23:07:39.448536+00:00",
+      "lease_expires_at": "2026-09-30T23:26:04.032034+00:00",
+      "based_on_remote_head": "dca4470284ebf74c8a5089632c933f3c658282b0",
+      "completed_at": "2026-09-30T23:26:04.032034+00:00"
+    },
+    {
+      "owner": "root-wave3-20261001T0133",
+      "status": "completed",
+      "claimed_at": "2026-09-30T23:35:18.866504+00:00",
+      "lease_expires_at": "2026-09-30T23:54:16.467580+00:00",
+      "based_on_remote_head": "8ed60462fd8fdbc61f5bae15f4800c623a4b543a",
+      "completed_at": "2026-09-30T23:54:16.467580+00:00"
+    }
+  ],
+  "wave2_validation": {
     "backend_tests": 183,
     "backend_subtests": 207,
     "backend_failures": 0,
@@ -397,46 +588,5 @@
     "real_asr": "passed_local_tiny_en_generated_speech",
     "source_data": "synthetic",
     "apk_sha256": "a4fce4b144cb13e3a7637421f6d5bebb4d638ed94221f0360b030db27b026605"
-  },
-  "current_wave": 3,
-  "wave1_validation": {
-    "backend_tests": 182,
-    "backend_subtests": 207,
-    "backend_failures": 0,
-    "existing_deprecation_warnings": 3,
-    "node_fake_audio_tests": 14,
-    "android_jvm_tests": 16,
-    "desktop_jvm_tests": 10,
-    "gradle_tasks_executed": 57,
-    "build_inputs_verified": 35,
-    "phone_saf_test": "not_performed",
-    "real_asr": "not_performed",
-    "source_data": "synthetic"
-  },
-  "next_concrete_step": {
-    "id": "AGEDS-20261001-N14",
-    "status": "ready",
-    "authority": "inferred from explicit ecosystem mandate and overnight queue",
-    "scope": [
-      "new read-only exchange contract",
-      "independent consumer fixture and integration tests",
-      "explicit compatibility/loss/provenance documentation"
-    ],
-    "acceptance": [
-      "exact source digest, derived version and selector retained",
-      "no implicit source locator access or executable archive jobs",
-      "unknowns and incompatibilities rejected or represented explicitly",
-      "independent consumer fixture passes without claiming deployed partner integration"
-    ]
-  },
-  "coordinator_history": [
-    {
-      "owner": "root-wave2-20261001T0106",
-      "status": "completed",
-      "claimed_at": "2026-09-30T23:07:39.448536+00:00",
-      "lease_expires_at": "2026-09-30T23:26:04.032034+00:00",
-      "based_on_remote_head": "dca4470284ebf74c8a5089632c933f3c658282b0",
-      "completed_at": "2026-09-30T23:26:04.032034+00:00"
-    }
-  ]
+  }
 }

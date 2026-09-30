@@ -3,8 +3,10 @@
 Stan bieżący: nocny przyrost 2026-10-01. Fundament PR #2 scalono w `main`
 w commicie `b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2`.
 PR #3 scalono w main (`8c3efb9e65999dd4931b22b555329da76379c31e`).
-Bieżąca fala 2: branch `codex/ageds-night-20261001`, PR #4 (otwarty).
-Kod opublikowany i sprawdzony; nie wykonano scalenia fali 2 do main.
+Bieżący opublikowany checkpoint: fala 3. branch `codex/ageds-night-20261001`, PR #4 (otwarty).
+Kod fali 3 opublikowany i sprawdzony; nie wykonano scalenia PR #4 do main.
+Trwa fala 4: integralność strumienia mediów, XLS CONTINUE, błędy wyszukiwania
+i granice identyfikatorów w przeglądarce. Szczegóły przydziałów w indeksie.
 **Najświeższy odbiór i kolejka: `coordination/night-20261001.json`.**
 Procedura wznowienia: `coordination/NIGHT_WORK.md`.
 `coordination/state.json` zachowuje odbiór fundamentu i odsyła do nowego etapu.
@@ -98,3 +100,12 @@ rewizji repo. Potwierdź odczytany commit i task ID. Prowadź priorytety i decyz
 przekazując wykonaniu zlecenia z rozłącznym zakresem i kryteriami odbioru.
 Przyjmuj wyniki dopiero z ich dowodami testów i ograniczeniami. Nie wymagaj
 codziennych zatwierdzeń użytkownika dla pracy już objętej jego mandatem.
+
+## Odbiór fali 3
+
+221 testów backend + 272 podprzypadki, 116 JVM, 13 Chromium: przeszły.
+Eksport cytatu i niezależny konsument zachowują wersję, surowy tekst i pochodzenie;
+lokatory pozostają inertne. Android wybiera wersję, cytat i zakres odtwarzania.
+Build: `docs/ANDROID_WAVE3_BUILD.md`. Brak testu telefonu/SAF runtime.
+Kontrakt pakietu nie dowodzi prawdy ani wdrożonej integracji partnera.
+Po checkpointcie przejęto następne rozłączne zadania; nie zakończono aktywnej pracy.

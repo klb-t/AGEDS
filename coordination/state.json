@@ -2,12 +2,12 @@
   "schema_version": 1,
   "project": "AGEDS",
   "state_id": "AGEDS-STATE-20260930-001",
-  "updated_at": "2026-09-30T17:54:55.251937+00:00",
+  "updated_at": "2026-09-30T18:04:16.059522+00:00",
   "based_on_remote_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0",
   "local_branch": "codex/ageds-foundation-20260930",
   "changes_published": true,
-  "published_commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
-  "status_summary": "Backend: 126 testów i 84 podtesty. Android: rzeczywisty build końcowego snapshotu i 1 test JVM przeszły; debug APK podpis poprawny. Publikacja finalnego narzędzia i odbioru w toku, bez wdrożenia produkcji.",
+  "published_commit": "ffda747b11b6fe7d527a044ff334553df71bed40",
+  "status_summary": "Odbiór przyrostu zakończony: 126 testów serwera i 84 podtesty; rzeczywisty build Android oraz 1 test JVM przeszły, podpis debug APK poprawny. Kod opublikowany w PR #2 gotowym do przeglądu. Bez merge i wdrożenia produkcji; test telefonu i realny ASR pozostają do wykonania.",
   "coordination": {
     "transport": "repository_commits_and_stable_ids",
     "history_search_role": "context_recall_only_not_delivery_or_order_guarantee",
@@ -286,7 +286,7 @@
       "id": "AGEDS-RESULT-20260930-001",
       "task_id": "AGEDS-TASK-20260930-001",
       "scope": "integrated_foundation_increment",
-      "commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
+      "commit": "ffda747b11b6fe7d527a044ff334553df71bed40",
       "validation": {
         "integrity_tests": 13
       },
@@ -296,7 +296,7 @@
       "id": "AGEDS-RESULT-20260930-002",
       "task_id": "AGEDS-TASK-20260930-002",
       "scope": "integrated_foundation_increment",
-      "commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
+      "commit": "ffda747b11b6fe7d527a044ff334553df71bed40",
       "validation": {
         "queue_tests": 19
       },
@@ -310,7 +310,7 @@
       "id": "AGEDS-RESULT-20260930-003",
       "task_id": "AGEDS-TASK-20260930-003",
       "scope": "integrated_foundation_increment",
-      "commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
+      "commit": "ffda747b11b6fe7d527a044ff334553df71bed40",
       "validation": {
         "importer_tests": 14
       },
@@ -320,7 +320,7 @@
       "id": "AGEDS-RESULT-20260930-004",
       "task_id": "AGEDS-TASK-20260930-004",
       "scope": "integrated_foundation_increment",
-      "commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
+      "commit": "ffda747b11b6fe7d527a044ff334553df71bed40",
       "validation": {
         "scanner_tests": 21,
         "cli_tests": 10
@@ -335,7 +335,7 @@
       "id": "AGEDS-RESULT-20260930-005",
       "task_id": "AGEDS-TASK-20260930-005",
       "scope": "integrated_foundation_increment",
-      "commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
+      "commit": "ffda747b11b6fe7d527a044ff334553df71bed40",
       "validation": {
         "citation_tests": 18,
         "package_tests": 18,
@@ -351,7 +351,7 @@
       "id": "AGEDS-RESULT-20260930-006",
       "task_id": "AGEDS-TASK-20260930-006",
       "scope": "source_review_and_real_clean_snapshot_build",
-      "commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
+      "commit": "ffda747b11b6fe7d527a044ff334553df71bed40",
       "validation": {
         "command": "./gradlew :androidApp:assembleDebug :core:desktopTest",
         "result": "BUILD SUCCESSFUL",
@@ -363,7 +363,9 @@
         "apk_sha256": "b7d4548a12fa23ea20b76f30d13e742dc4c2c19562985418b730e9f48a57bc91",
         "signature": "debug_v2_verified",
         "device_test": "not_performed",
-        "report": "docs/ANDROID_BUILD.md"
+        "report": "docs/ANDROID_BUILD.md",
+        "published_build_inputs_verified": 25,
+        "source_commit": "ffda747b11b6fe7d527a044ff334553df71bed40"
       },
       "limits": [
         "Prepared JSON seed still required in Android corpus",
@@ -374,7 +376,7 @@
       "id": "AGEDS-RESULT-20260930-007",
       "task_id": "AGEDS-TASK-20260930-007",
       "scope": "integrated_foundation_increment",
-      "commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
+      "commit": "ffda747b11b6fe7d527a044ff334553df71bed40",
       "validation": {
         "method": "source_scoped_document_review_and_json_parse"
       },
@@ -448,17 +450,25 @@
       "apk_sha256": "b7d4548a12fa23ea20b76f30d13e742dc4c2c19562985418b730e9f48a57bc91",
       "signature": "debug_v2_verified",
       "device_test": "not_performed",
-      "report": "docs/ANDROID_BUILD.md"
+      "report": "docs/ANDROID_BUILD.md",
+      "published_build_inputs_verified": 25,
+      "source_commit": "ffda747b11b6fe7d527a044ff334553df71bed40"
     }
   },
   "publication": {
-    "content_commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
-    "content_tree": "68d6bcd445775a5d38a5781d31aa87c4fa68dc8b",
-    "changed_files_verified": 42,
+    "content_commit": "ffda747b11b6fe7d527a044ff334553df71bed40",
+    "content_tree": "c6e0fb8a566e04173b737eef7042cf753890fed4",
     "branch": "codex/ageds-foundation-20260930",
     "pull_request": "https://github.com/klb-t/AGEDS/pull/2",
-    "draft": true,
+    "draft": false,
     "merged": false,
-    "receipt_semantics": "This record confirms the referenced content commit; the receipt itself is stored in a later commit."
+    "receipt_semantics": "This record confirms the referenced content commit; the receipt itself is stored in a later commit.",
+    "build_inputs_verified": 25,
+    "content_commits": [
+      "91529270254271b4d84c47d7e1b1b6904edb1d0f",
+      "66f906c85df8ce8bc6005e15d1a33d1240b087a2",
+      "86045f83a98c0f430057ccd49d199525a8f17584",
+      "ffda747b11b6fe7d527a044ff334553df71bed40"
+    ]
   }
 }

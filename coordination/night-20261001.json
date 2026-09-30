@@ -3,15 +3,14 @@
   "batch": "AGEDS-NIGHT-20261001",
   "branch": "codex/ageds-night-20261001",
   "base_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2",
-  "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate",
-  "updated_at": "2026-09-30T23:26:04.032034+00:00",
+  "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate; user 01:33 Europe/Amsterdam explicitly requests continuous progression while useful work remains, without ending after a checkpoint",
+  "updated_at": "2026-09-30T23:35:18.866504+00:00",
   "coordinator": {
-    "owner": "root-wave2-20261001T0106",
-    "status": "completed",
-    "claimed_at": "2026-09-30T23:07:39.448536+00:00",
-    "lease_expires_at": "2026-09-30T23:26:04.032034+00:00",
-    "based_on_remote_head": "dca4470284ebf74c8a5089632c933f3c658282b0",
-    "completed_at": "2026-09-30T23:26:04.032034+00:00"
+    "owner": "root-wave3-20261001T0133",
+    "status": "active",
+    "claimed_at": "2026-09-30T23:35:18.866504+00:00",
+    "lease_expires_at": "2026-10-01T00:30:18.866504+00:00",
+    "based_on_remote_head": "8ed60462fd8fdbc61f5bae15f4800c623a4b543a"
   },
   "tasks": [
     {
@@ -285,6 +284,70 @@
         "report": "docs/N15_ADVERSARIAL_QA.md",
         "receipt": "docs/N15_ADVERSARIAL_QA_RECEIPT.json"
       }
+    },
+    {
+      "id": "AGEDS-20261001-N14",
+      "owner": "exchange_core",
+      "title": "Bounded version-pinned evidence exchange producer",
+      "scope": [
+        "server/app/exchange.py",
+        "producer tests",
+        "exchange contract doc"
+      ],
+      "status": "in_progress",
+      "result": null
+    },
+    {
+      "id": "AGEDS-20261001-N19",
+      "owner": "exchange_consumer",
+      "title": "Independent inert exchange consumer",
+      "scope": [
+        "new standalone consumer and consumer tests"
+      ],
+      "status": "in_progress",
+      "result": null
+    },
+    {
+      "id": "AGEDS-20261001-N16",
+      "owner": "android_contract",
+      "title": "Android citation models/API/selection contract",
+      "scope": [
+        "core Models.kt and new citation selection code/tests",
+        "androidApp Api.kt"
+      ],
+      "status": "in_progress",
+      "result": null
+    },
+    {
+      "id": "AGEDS-20261001-N20",
+      "owner": "android_citations",
+      "title": "Android version-pinned quote workspace and range playback",
+      "scope": [
+        "MainActivity.kt",
+        "new citation UI/controller/audio files"
+      ],
+      "status": "in_progress",
+      "result": null
+    },
+    {
+      "id": "AGEDS-20261001-N21",
+      "owner": "exchange_qa",
+      "title": "Independent exchange and HTTP/CLI acceptance",
+      "scope": [
+        "new exchange adversarial and boundary tests"
+      ],
+      "status": "in_progress",
+      "result": null
+    },
+    {
+      "id": "AGEDS-20261001-N22",
+      "owner": "android_qa",
+      "title": "Independent Android quotation acceptance and lifecycle review",
+      "scope": [
+        "new Android/core independent tests and QA receipt"
+      ],
+      "status": "in_progress",
+      "result": null
     }
   ],
   "publication": {
@@ -335,7 +398,7 @@
     "source_data": "synthetic",
     "apk_sha256": "a4fce4b144cb13e3a7637421f6d5bebb4d638ed94221f0360b030db27b026605"
   },
-  "current_wave": 2,
+  "current_wave": 3,
   "wave1_validation": {
     "backend_tests": 182,
     "backend_subtests": 207,
@@ -365,5 +428,15 @@
       "unknowns and incompatibilities rejected or represented explicitly",
       "independent consumer fixture passes without claiming deployed partner integration"
     ]
-  }
+  },
+  "coordinator_history": [
+    {
+      "owner": "root-wave2-20261001T0106",
+      "status": "completed",
+      "claimed_at": "2026-09-30T23:07:39.448536+00:00",
+      "lease_expires_at": "2026-09-30T23:26:04.032034+00:00",
+      "based_on_remote_head": "dca4470284ebf74c8a5089632c933f3c658282b0",
+      "completed_at": "2026-09-30T23:26:04.032034+00:00"
+    }
+  ]
 }

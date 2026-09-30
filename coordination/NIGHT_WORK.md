@@ -20,4 +20,7 @@ Sześć aktualnych pakietów i ich właściciele są w JSON. Nie nadpisuj zakres
 
 Nie zmieniaj, nie usuwaj, nie przenoś ani nie kopiuj źródeł korpusu podczas skanu. Tylko ograniczone metadane poza źródłem. Testuj danymi syntetycznymi. Bez nowych płatnych usług, wywołań modeli lub GitHub Actions; commity `[skip ci]`, testy lokalne. Nie kasuj cudzej pracy ani historii. Integracje ekosystemu pozostają koncepcyjne do sprawdzenia konkretnego przepływu. Inertne archiwum metadanych nie jest odtworzeniem live bazy i nie uruchamia zadań.
 
-Automatyczne wznowienia są ograniczone do nocy 2026-10-01 Europe/Amsterdam; nie ustanawiają bezterminowej autonomii. Aktualny wykonawca może zakończyć etap wcześniej.
+Automatyczne wznowienia są ograniczone do nocy 2026-10-01 Europe/Amsterdam; nie ustanawiają bezterminowej autonomii. Aktualizacja mandatu użytkownika 01:33: po checkpointcie przechodź do kolejnego
+gotowego zadania, zamiast dobrowolnie kończyć aktywne wykonanie. Granice runtime
+i rzeczywiste blokady nadal obowiązują; checkpoint nie gwarantuje pracy po
+zakończeniu procesu.

@@ -1,6 +1,7 @@
 # AGEDS — zasady pracy agentów
 
-Najpierw przeczytaj `HANDOFF.md`, `coordination/state.json`, `coordination/README.md`,
+Najpierw przeczytaj `HANDOFF.md`, bieżący indeks wskazany w nim (obecnie
+`coordination/night-20261001.json`), `coordination/state.json`, `coordination/README.md`,
 `docs/ARCHITECTURE_RULES.md` i `ECOSYSTEM.md`. Jeśli `HANDOFF.md` nie jest jeszcze
 dostępny, użyj pozostałych plików i jawnie odnotuj brak. Stan z historii czatu
 sprawdzaj wobec aktualnego kodu i commitów.
@@ -50,8 +51,9 @@ sprawdzaj wobec aktualnego kodu i commitów.
   oznacz jako `unknown`. Kolejny ukończony run daje nowy wynik.
 - Wynik publikuje tylko właściciel ważnej lease, atomowo z zakończeniem zadania.
   `language_probability` nie jest pewnością poprawności transkrypcji.
-- Cytat wskazuje konkretną wersję wyniku i zakres. Obecny zakres segmentowy
-  nie oznacza dokładnego przypięcia słów ani zweryfikowanej prawdy wypowiedzi.
+- Cytat wskazuje konkretną wersję wyniku i zakres. Selektor słowny wymaga
+  zapisanych znaczników ASR; żaden selektor nie dowodzi poprawności alignmentu,
+  odsłuchu ani prawdy wypowiedzi.
 - Pakiet metadanych nie jest kompletnym replay, podpisem ani bezpiecznym restore.
   Nie opisuj planowanej zdolności jako dostępnej.
 

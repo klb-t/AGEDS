@@ -15,6 +15,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 private val defaultPresetIds = listOf("gemeente_oss", "uwv", "susanne_walstra", "wettbewind", "acture")
 
@@ -30,6 +32,13 @@ class CorpusVm(application: Application) : AndroidViewModel(application) {
     val scanDirectories = mutableStateOf(0)
     val scanSamples = mutableStateOf<List<String>>(emptyList())
     val indexedTree = mutableStateOf<String?>(null)
+    val sourceScan = mutableStateOf<SourceScanResult?>(null)
+    val sourceScanCached = mutableStateOf(false)
+    val sourceCacheNotice = mutableStateOf<String?>(null)
+    val sourceAccessNotice = mutableStateOf<String?>(null)
+    val selectedSourceUris = mutableStateListOf<String>()
+    val sourceScanning = mutableStateOf(false)
+    private val sourceCache = SourceScanCache(application)
     private val manualPhones = mutableStateListOf<String>()
     private val excludedPhones = mutableStateListOf<String>()
     private val store = CorpusStore(application)
@@ -39,17 +48,30 @@ class CorpusVm(application: Application) : AndroidViewModel(application) {
     private var scanning = false
     private fun updateBusy() { busy.value = importing || scanning }
 
-    init { store.loadCached()?.let { install(it) } }
+    init {
+        importing = true
+        updateBusy()
+        viewModelScope.launch {
+            try {
+                val seed = withContext(Dispatchers.IO) { runCatching { store.loadCached() } }
+                seed.onSuccess { it?.let(::install) }.onFailure {
+                    if (it is CancellationException) throw it
+                    error.value = "Poprzedni katalog nie został wczytany: ${it.message}. Możesz nadal skanować źródła."
+                }
+                val cached = withContext(Dispatchers.IO) { runCatching { sourceCache.read() } }
+                cached.onSuccess { scan ->
+                    if (scan != null) { installScan(scan); sourceScanCached.value = true }
+                }.onFailure {
+                    if (it is CancellationException) throw it
+                    sourceCacheNotice.value = "Poprzedniego skanu nie można odczytać: ${it.message}"
+                }
+            } finally { importing = false; updateBusy() }
+        }
+    }
 
     private fun install(seed: CorpusSeed) {
         corpus.value = seed
-        linkedRecordingCandidates.clear()
-        scanFiles.value = 0
-        scanDirectories.value = 0
-        scanSamples.value = emptyList()
-        indexedTree.value = null
         selectPriority()
-        store.savedRecordingTree()?.let { indexRecordings(it) }
     }
 
     fun importCorpus(uri: Uri) {
@@ -113,35 +135,93 @@ class CorpusVm(application: Application) : AndroidViewModel(application) {
     fun emailDomains() = activePresets().flatMap { it.emailDomains }.toSet()
     fun labelFor(phone: String?) = corpus.value?.contacts?.firstOrNull { it.phone == phone }?.label ?: phone ?: "Nieznany"
 
-    fun indexRecordings(treeUri: Uri) {
-        val seed = corpus.value ?: return
+    /** Seed catalogue matching remains a name-based candidate relation, not an identity claim. */
+    private fun installScan(scan: SourceScanResult) {
+        sourceScan.value = scan
+        val audio = scan.files.filter { it.kind == "audio" }
+        linkedRecordingCandidates.clear()
+        linkedRecordingCandidates.putAll(audio.groupBy { it.name }.mapValues { (_, files) -> files.map(::asCandidate) })
+        scanFiles.value = scan.files.size
+        scanDirectories.value = scan.scannedDirectories
+        scanSamples.value = scan.files.take(12).map { it.name }
+        indexedTree.value = scan.rootUri
+    }
+
+    private fun asCandidate(file: ScannedSourceFile) = RecordingCandidate(
+        file.name, Uri.parse(file.uri), file.relativePath, file.sizeBytes ?: -1L
+    )
+
+    fun toggleSource(uri: String) {
+        if (sourceScan.value?.files?.none { it.uri == uri && it.kind == "audio" } != false) return
+        if (uri in selectedSourceUris) selectedSourceUris.remove(uri) else selectedSourceUris.add(uri)
+    }
+
+    fun selectSourceAudio() {
+        selectedSourceUris.clear()
+        selectedSourceUris.addAll(sourceScan.value?.files.orEmpty().filter { it.kind == "audio" }.map { it.uri }.distinct())
+    }
+
+    fun clearSourceSelection() { selectedSourceUris.clear() }
+    fun selectedSourceCandidates() = sourceScan.value?.files.orEmpty()
+        .filter { it.kind == "audio" && it.uri in selectedSourceUris }.map(::asCandidate).distinctBy { it.uri.toString() }
+    fun sourceCandidate(file: ScannedSourceFile) = asCandidate(file)
+
+    fun cancelSourceScan() {
+        ++scanGeneration
+        scanJob?.cancel()
+        scanning = false
+        sourceScanning.value = false
+        progress.value = null
+        message.value = "Skan anulowany. Ostatni zapisany cache pozostaje historycznym wynikiem."
+        updateBusy()
+    }
+
+    fun indexRecordings(treeUri: Uri) = scanSources(treeUri)
+
+    fun scanSources(treeUri: Uri, persistentAccess: Boolean = true) {
+        if (importing) return
         val generation = ++scanGeneration
         scanJob?.cancel()
+        selectedSourceUris.clear()
+        sourceScan.value = null
+        sourceScanCached.value = false
+        sourceCacheNotice.value = null
+        sourceAccessNotice.value = if (persistentAccess) null else
+            "Dostawca nie udzielił trwałego dostępu. Po ponownym uruchomieniu może być konieczny ponowny wybór folderu."
+        linkedRecordingCandidates.clear()
+        scanFiles.value = 0
+        scanDirectories.value = 0
+        scanSamples.value = emptyList()
+        indexedTree.value = null
+        message.value = null
         scanning = true
+        sourceScanning.value = true
         updateBusy()
         scanJob = viewModelScope.launch {
-            progress.value = "Indeksuję nagrania…"
+            progress.value = "Odczytuję folder i surowe metadane…"
             error.value = null
             try {
-                val scan = withContext(Dispatchers.IO) { store.indexRecordingTree(treeUri, seed.recordings.map { it.name }.toSet()) }
+                val scan = withContext(Dispatchers.IO) { SourceScanner(getApplication()).scan(treeUri) }
                 if (generation != scanGeneration) return@launch
-                linkedRecordingCandidates.clear()
-                linkedRecordingCandidates.putAll(scan.found)
-                scanFiles.value = scan.scannedFiles
-                scanDirectories.value = scan.scannedDirectories
-                scanSamples.value = scan.sampleNames
-                indexedTree.value = treeUri.toString()
-                val selected = linkedSelectedCount()
-                message.value = "Przeskanowano ${scan.scannedFiles} plików w ${scan.scannedDirectories} folderach · znaleziono ${scan.found.values.sumOf { it.size }} kandydatów dla ${scan.found.size} nazw · z aktualnego wyboru $selected/${selectedRecordings().size} pozycji katalogu."
-                if (scan.scannedFiles == 200 && seed.recordings.size > 200) {
-                    message.value += " Provider zwrócił 200 plików; kompletność skanu nie została potwierdzona. Możesz wskazać mniejszy folder lub pliki bezpośrednio."
+                installScan(scan)
+                message.value = "Skan: ${scan.files.size} plików · ${scan.scannedDirectories} folderów. Wybierz nagrania i przejrzyj ograniczenia odczytu."
+                // Snapshot output is visible even if the bounded private cache cannot be saved.
+                val saved = withContext(Dispatchers.IO) {
+                    val scanContext = currentCoroutineContext()
+                    runCatching { sourceCache.write(scan) { scanContext.ensureActive() } }
                 }
+                if (generation != scanGeneration) return@launch
+                saved.onFailure {
+                    sourceCacheNotice.value = "Bieżący wynik jest tylko w pamięci: ${it.message}. Poprzedni cache, jeśli istniał, pozostał niezmieniony."
+                }
+                store.saveRecordingTree(treeUri)
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
-                if (generation == scanGeneration) error.value = "Nagrania: ${t.message}"
+                if (generation == scanGeneration) error.value = "Skan źródeł: ${t.message}"
             } finally {
                 if (generation == scanGeneration) {
                     scanning = false
+                    sourceScanning.value = false
                     progress.value = null
                     updateBusy()
                 }

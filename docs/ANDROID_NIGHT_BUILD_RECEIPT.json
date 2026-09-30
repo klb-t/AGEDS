@@ -1,0 +1,98 @@
+{
+  "started_at": "2026-09-30T22:47:50.538503+00:00",
+  "finished_at": "2026-09-30T22:49:13.346986+00:00",
+  "tasks": [
+    ":androidApp:assembleDebug",
+    ":androidApp:testDebugUnitTest",
+    ":core:desktopTest"
+  ],
+  "build_exit_code": 0,
+  "source_sha256": {
+    "androidApp/build.gradle.kts": "01475ad68c59454344ed4a4efcc4267b1d2521ea7700322f49b56e07f5ae8f2d",
+    "androidApp/src/debug/AndroidManifest.xml": "bf548047b3f213c426f010300b21a952d9c261f3a9459a57d1694daa17ff0a19",
+    "androidApp/src/main/AndroidManifest.xml": "3312bc332bc3f6f77f8f2b9f89a57a561b96cfbbc457b744ef087e6d9f1e6fd6",
+    "androidApp/src/main/cpp/CMakeLists.txt": "839136a66c948c63ab388ad9d6c7c4d7584034d589fd7b548a8fb0d17ff177d8",
+    "androidApp/src/main/cpp/whisper_jni.cpp": "a657b54a6f820136c19fc9a69b884a7a36304ef6d119d93f0a2152713c018da0",
+    "androidApp/src/main/java/dev/klbt/ageds/Api.kt": "a775dc32be36bf215b2b4fd5899eb4d9fa57b5e4e61cd9aa744c15cf7e75db86",
+    "androidApp/src/main/java/dev/klbt/ageds/BoundedMetadataCache.kt": "a1e336762a8b629f8b514b83aeebd0bd6a97d08923b4d1765924d7b241edf659",
+    "androidApp/src/main/java/dev/klbt/ageds/CorpusActivity.kt": "0dc47d154855521f9d3658a0d7d484ec0f72c4e3629f54a8e14b57fb64a48e1c",
+    "androidApp/src/main/java/dev/klbt/ageds/CorpusStore.kt": "00f3a231033cae5777acefe7882e51135b68c998260e08124bebb4e58e6601ea",
+    "androidApp/src/main/java/dev/klbt/ageds/CorpusUi.kt": "b44645b323c9eb8c7edfd6d86cb7d9ad6fcb649cc34f800bb86b321c2d34e2f3",
+    "androidApp/src/main/java/dev/klbt/ageds/CorpusVm.kt": "099a72264dfef814fe52053c0146816629f6e44ff4afc76310861436ce190a3f",
+    "androidApp/src/main/java/dev/klbt/ageds/MainActivity.kt": "99e8730ecf85a37915279cdfa55bfac5415fb15d4dc73cbf7209520cd35769ed",
+    "androidApp/src/main/java/dev/klbt/ageds/PendingRecordings.kt": "1130db7bb0341c752fb82ef22bb74eb6cddf6b3a5419a167cf86dc28792bedeb",
+    "androidApp/src/main/java/dev/klbt/ageds/SourceScanCache.kt": "88f5a1f9bd512155f08ccff3f10bd37e50e4332c76d78353de7f30017526d73f",
+    "androidApp/src/main/java/dev/klbt/ageds/SourceScanUi.kt": "5de8b3fe717e1b36e5b8718c40d8c75d901637b73e3c7276671dc5734299ff57",
+    "androidApp/src/main/java/dev/klbt/ageds/SourceScanner.kt": "f8d6f54625367be9597975ce7afec6a6f190f78e334813d7ff3a67c9b675f048",
+    "androidApp/src/main/java/dev/klbt/ageds/SourceWorkbookParser.kt": "ba22b6a6105c0267c55ad289b2b2da3e1eadb75fde672e19d7ab881cb55c4137",
+    "androidApp/src/main/res/values/styles.xml": "6a7531a6e7b821113cdaa407e9de407df7e5d281b85584991a91b35ecccb07c6",
+    "androidApp/src/test/java/dev/klbt/ageds/BoundedMetadataCacheTest.kt": "db490f8468f8f4d88ee7e32ccb523fad8fecbb66305a36443bc6528566379563",
+    "androidApp/src/test/java/dev/klbt/ageds/SourceWorkbookParserTest.kt": "3f0d5a7a2b1da4524fc89ce0acbb6892250ee59d45dea0943d252dea5005d58f",
+    "build.gradle.kts": "2e08e0d90bf374556599ec6cb677a7ac89bf6edeb4d408629fd6eeabbdcc1cac",
+    "core/build.gradle.kts": "83c6817f4ca4de6be58f87bcc4241ee64a0013fd0258c9111f9fcfc4570966be",
+    "core/src/commonMain/kotlin/dev/klbt/ageds/core/CorpusModels.kt": "11f14184f74ff07335dc6679fd74504a0c964b78664653cc00a09ce5529ff7ba",
+    "core/src/commonMain/kotlin/dev/klbt/ageds/core/EvidenceInvariant.kt": "9854a1f7f352042b1f23991258ced7cfb828af39e549a37fd0c5a6e24a1348e7",
+    "core/src/commonMain/kotlin/dev/klbt/ageds/core/Models.kt": "d376cf8121d531ce7df1bf682f4b4639e3e0cd94a9ffe00e4627e4e8dacd3a2a",
+    "core/src/commonMain/kotlin/dev/klbt/ageds/core/SourceScanModels.kt": "45002bdebf384e912156a86cef8f295be35a012bf5297aa661e6f95c6483b91f",
+    "core/src/commonMain/kotlin/dev/klbt/ageds/core/SourceTextParser.kt": "939b8b3d698b0c62d6ac9c17bf4385b24a7d17aec02b2be5cfb864648108834e",
+    "core/src/commonTest/kotlin/dev/klbt/ageds/core/PriorityTest.kt": "8d34cdd20951399901ec43b0006ec6bbf25a3e5e8a49a6eed7e08635f675e61f",
+    "core/src/commonTest/kotlin/dev/klbt/ageds/core/SourceTextParserTest.kt": "32e556cced43c61388d88cbfdaf6bdeb7241f52e2567a45a0278e3f3fe7b3021",
+    "gradle.properties": "39fe86ddf046dbfa81ebd50aeafb8956e9351374c95b80e88dadf2f93a756157",
+    "gradle/wrapper/gradle-wrapper.jar": "7a9ce74cff467ca1bf60a4fcd9f05185acceda4d0f382434d393e17864262c5d",
+    "gradle/wrapper/gradle-wrapper.properties": "2f32fe111c0de78ff9b4aa65d86855fbb1f32989d62c4818b817ec93d088b510",
+    "gradlew": "a5a5c199ba02189ae8c46a334223371a20599d9c298ef65e7540ede4a3f72d59",
+    "gradlew.bat": "d539676c48b596afda64c963ec8f7ee56c7b3fe7e3b81d1dbe2d1a1e3dd9e9f8",
+    "settings.gradle.kts": "3b9cdf74adf2506f104110cd8c9dcc4f721f3a4958e8e6f2e24658825c898328"
+  },
+  "source_unchanged": true,
+  "tests": [
+    {
+      "path": "core/build/test-results/desktopTest/TEST-dev.klbt.ageds.core.PriorityTest.xml",
+      "suite": "PriorityTest[desktop]",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "core/build/test-results/desktopTest/TEST-dev.klbt.ageds.core.SourceTextParserTest.xml",
+      "suite": "SourceTextParserTest[desktop]",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.SourceWorkbookParserTest.xml",
+      "suite": "dev.klbt.ageds.SourceWorkbookParserTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.BoundedMetadataCacheTest.xml",
+      "suite": "dev.klbt.ageds.BoundedMetadataCacheTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "checkout_commit": "17c318aad724c1ef5a69c5eb2660103a1f288483",
+  "java_version": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode, sharing)",
+  "apk_sha256": "f20b9e04e127a89282064fcf992611e540b21921b097ae4dfc872de374fa89d1",
+  "apk_bytes": 14025749,
+  "apksigner_exit_code": 0,
+  "receipt_scope": "Working source snapshot; checkout_commit alone does not identify uncommitted inputs. Match every source_sha256 entry to identify the tested sources.",
+  "signature_scheme": "debug APK v2",
+  "gradle_version": "9.7.0",
+  "build_cache_enabled": false,
+  "tasks_executed": 57,
+  "test_total": 26,
+  "toolchain_recovery": "Reused the previously verified isolated toolchain recorded in docs/ANDROID_BUILD.md; actual Java/javac, Gradle and SDK versions checked again.",
+  "log_sha256": {
+    "gradle.log": "758b629589b103d6bb3e055fca05b10b09abf3d4dc6aed7db616472f46488857",
+    "apksigner.log": "ef272a051f8fdfb9e45ccb4fad6d0653dc67cf7a1d7f79fd07b2844aea9c01e1"
+  }
+}

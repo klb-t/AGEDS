@@ -12,6 +12,7 @@ from pathlib import Path
 from .config import settings
 from .db import init_db, session
 from .evidence import sha256_file
+from .transcription import word_timing_capabilities
 from .jobs import (DEFAULT_LEASE_SECONDS, LeaseLost, claim_job, finish_job,
                    publish_transcript, renew_lease, update_run_metadata)
 
@@ -113,6 +114,7 @@ def run_transcribe(job: dict, adapter=None) -> int:
     result_metadata = dict(result.metadata)
     result_metadata["transcript_confidence"] = "unknown"
     result_metadata["input_sha256"] = input_sha256
+    result_metadata["word_timing"] = word_timing_capabilities(result.segments)
     return publish_transcript(job, text=result.text, model=metadata.get("model") or "unknown", language=result.language,
                               segments=result.segments, metadata=result_metadata)
 

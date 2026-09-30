@@ -2,17 +2,17 @@
   "schema_version": 1,
   "project": "AGEDS",
   "state_id": "AGEDS-STATE-20260930-001",
-  "updated_at": "2026-09-30T18:04:16.059522+00:00",
+  "updated_at": "2026-09-30T22:57:35.238130+00:00",
   "based_on_remote_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0",
   "local_branch": "codex/ageds-foundation-20260930",
   "changes_published": true,
   "published_commit": "ffda747b11b6fe7d527a044ff334553df71bed40",
-  "status_summary": "Odbiór przyrostu zakończony: 126 testów serwera i 84 podtesty; rzeczywisty build Android oraz 1 test JVM przeszły, podpis debug APK poprawny. Kod opublikowany w PR #2 gotowym do przeglądu. Bez merge i wdrożenia produkcji; test telefonu i realny ASR pozostają do wykonania.",
+  "status_summary": "Fundament PR #2 scalony. Bieżący nocny etap: patrz coordination/night-20261001.json — 182 testy backend, 207 podtestów, 14 Node oraz rzeczywisty Android build z 26 testami JVM.",
   "coordination": {
     "transport": "repository_commits_and_stable_ids",
     "history_search_role": "context_recall_only_not_delivery_or_order_guarantee",
     "management_thread": "requested_not_created_or_verified",
-    "execution_lifecycle": "active_execution_only_no_background_promise",
+    "execution_lifecycle": "active_execution_plus_six_user_authorized_overnight_scheduled_resumptions; consult latest batch claim",
     "this_session_max_concurrent_processes": 7,
     "coordinator_processes": 1,
     "worker_slots": 6,
@@ -389,9 +389,10 @@
   "next_tasks": [
     {
       "id": "AGEDS-TASK-20260930-008",
-      "status": "proposed",
+      "status": "ready",
       "title": "Native Android SAF: skan wskazanych źródeł bez seed",
-      "acceptance": "Natywny przepływ read-only z CSV/XLS/XLSX, lokatorami, konfliktami i zakresem pokrycia"
+      "acceptance": "Natywny przepływ read-only z CSV/XLS/XLSX, lokatorami, konfliktami i zakresem pokrycia",
+      "progress": "Native bounded SAF CSV/TSV/XLSX/WAV and inventory implemented without seed; native XLS and device/provider acceptance remain. See nightly receipt."
     },
     {
       "id": "AGEDS-TASK-20260930-009",
@@ -399,19 +400,21 @@
       "title": "Odbiór gotowego debug APK na telefonie",
       "acceptance": "Artefakt builda oraz sprawdzona ścieżka wyboru, uploadu, transkrypcji i cytatu",
       "owner": "unassigned",
-      "progress": "Actual Android build and JVM test completed; phone validation remains"
+      "progress": "Updated nightly APK built, signed and source-hash verified with 26 JVM tests. Device validation remains."
     },
     {
       "id": "AGEDS-TASK-20260930-010",
-      "status": "proposed",
+      "status": "accepted",
       "title": "Word timestamps i dokładne selektory cytatów",
-      "acceptance": "Wybór słów wskazuje konkretną wersję i weryfikowany przedział"
+      "acceptance": "Wybór słów wskazuje konkretną wersję i weryfikowany przedział",
+      "progress": "Exact word selectors, pinned version, strict raw-text/time validation and browser range playback implemented. ASR alignment/audio verification not claimed."
     },
     {
       "id": "AGEDS-TASK-20260930-011",
-      "status": "proposed",
+      "status": "accepted",
       "title": "Dokładny metadata export/reimport",
-      "acceptance": "ID, relacje, wersje, konflikty i błędy zachowane; zakres mediów i podpisu jawny"
+      "acceptance": "ID, relacje, wersje, konflikty i błędy zachowane; zakres mediów i podpisu jawny",
+      "progress": "Exact canonical metadata package roundtrip via inert SQLite archive. No live DB restore, source media, signature or job replay."
     },
     {
       "id": "AGEDS-TASK-20260930-012",
@@ -424,8 +427,8 @@
     "Anthropic export identified but not searched: transfer unavailable",
     "Latest source-scanner request recovered from history, not complete raw export",
     "Ecosystem adapters are conceptual, not implemented",
-    "Metadata package is not a full replay, signed artifact or exact restore",
-    "Native Android source scan without seed and actual device validation remain next scope; compilation passed"
+    "Native Android source scan implemented without seed; XLS and device/provider validation remain.",
+    "Exact inert metadata archive roundtrip is implemented; full live restore, source media and replay are not."
   ],
   "validation": {
     "command": "python -m pytest server/tests -q",
@@ -461,7 +464,7 @@
     "branch": "codex/ageds-foundation-20260930",
     "pull_request": "https://github.com/klb-t/AGEDS/pull/2",
     "draft": false,
-    "merged": false,
+    "merged": true,
     "receipt_semantics": "This record confirms the referenced content commit; the receipt itself is stored in a later commit.",
     "build_inputs_verified": 25,
     "content_commits": [
@@ -469,6 +472,9 @@
       "66f906c85df8ce8bc6005e15d1a33d1240b087a2",
       "86045f83a98c0f430057ccd49d199525a8f17584",
       "ffda747b11b6fe7d527a044ff334553df71bed40"
-    ]
-  }
+    ],
+    "merge_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2"
+  },
+  "latest_batch_file": "coordination/night-20261001.json",
+  "latest_handoff": "coordination/NIGHT_WORK.md"
 }

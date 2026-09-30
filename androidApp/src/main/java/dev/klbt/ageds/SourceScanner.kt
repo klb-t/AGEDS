@@ -9,8 +9,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
-import java.nio.ByteBuffer
-import java.nio.charset.CodingErrorAction
 import java.security.MessageDigest
 import java.time.Instant
 import java.util.ArrayDeque
@@ -97,6 +95,7 @@ class SourceScanner(private val context: Context) {
             var rows: List<SourceRow> = emptyList()
             var hash: String? = null
             var duration: Double? = null
+            var textFormat: SourceTextFormat? = null
             var coverage = "inventory_only"
             try {
                 val remaining = (limits.maxTotalBytes - bytesRead).coerceAtLeast(0)
@@ -106,7 +105,7 @@ class SourceScanner(private val context: Context) {
                     fileIssues += ScanIssue("bytes_limit", "Content not read because byte budget would be exceeded", uri.toString())
                 } else {
                     val digest = MessageDigest.getInstance("SHA-256")
-                    val output = if (ext in setOf("csv", "tsv", "xlsx", "wav")) ByteArrayOutputStream() else null
+                    val output = if (ext in setOf("csv", "tsv", "xlsx", "xls", "wav")) ByteArrayOutputStream() else null
                     var total = 0L
                     var complete = false
                     context.contentResolver.openInputStream(uri)?.use { input ->
@@ -131,19 +130,19 @@ class SourceScanner(private val context: Context) {
                         if (node.size != null && node.size != total)
                             fileIssues += ScanIssue("size_changed", "Provider size differs from bytes read; source may have changed", uri.toString())
                         val data = output?.toByteArray()
-                        if (ext in setOf("csv", "tsv", "xlsx")) {
+                        if (ext in setOf("csv", "tsv", "xlsx", "xls")) {
                             // Shared caps prevent thousands of compressed workbooks expanding into unbounded UI state.
                             if (retainedChars >= 4_000_000 || retainedCells >= 50000 || retainedRows >= 10000) {
                                 fileIssues += ScanIssue("result_limit", "Global retained-result budget reached", uri.toString())
                             } else {
                                 val perFile = limits.copy(maxCellsPerFile = minOf(limits.maxCellsPerFile, 50000 - retainedCells),
                                     maxRowsPerFile = minOf(limits.maxRowsPerFile, 10000 - retainedRows))
-                                val parsed = if (ext == "xlsx") SourceWorkbookParser.parse(data!!, uri.toString(), perFile, check)
-                                else {
-                                    val text = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
-                                        .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(data!!)).toString()
-                                    SourceTextParser.delimited(text, if (ext == "tsv") '\t' else ',', uri.toString(), perFile, check)
+                                val parsed = when (ext) {
+                                    "xlsx" -> SourceWorkbookParser.parse(data!!, uri.toString(), perFile, check)
+                                    "xls" -> SourceXlsParser.parse(data!!, uri.toString(), perFile, check)
+                                    else -> SourceDelimitedParser.parse(data!!, uri.toString(), perFile, ext == "tsv", check)
                                 }
+                                textFormat = parsed.textFormat
                                 val kept = mutableListOf<SourceRow>()
                                 for (row in parsed.rows) {
                                     check()
@@ -156,9 +155,6 @@ class SourceScanner(private val context: Context) {
                                 rows = kept; fileIssues += parsed.issues
                             }
                             coverage = if (fileIssues.any { it.code != "xlsx_projection" }) "partial" else "complete_within_scope"
-                        } else if (ext == "xls") {
-                            coverage = "unsupported"
-                            fileIssues += ScanIssue("unsupported_xls", "Legacy binary XLS retained in inventory; native parser unavailable", uri.toString())
                         } else if (ext == "wav") {
                             duration = SourceTextParser.wavDuration(data!!)
                             if (duration == null) fileIssues += ScanIssue("wav_unknown", "Unsupported or incomplete WAV layout; duration unknown", uri.toString())
@@ -170,7 +166,7 @@ class SourceScanner(private val context: Context) {
                 coverage = "unreadable"
                 fileIssues += ScanIssue("read_failed", "Read/parse failed: ${e.message?.take(200)}", uri.toString())
             }
-            files += ScannedSourceFile(uri.toString(), node.name, node.path, node.mime, node.size, kind, hash, coverage, rows, fileIssues, duration)
+            files += ScannedSourceFile(uri.toString(), node.name, node.path, node.mime, node.size, kind, hash, coverage, rows, fileIssues, duration, textFormat)
         }
         val collisions = files.groupBy { it.name }.filterValues { it.size > 1 }
         collisions.forEach { (name, members) ->

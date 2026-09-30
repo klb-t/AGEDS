@@ -1,0 +1,42 @@
+AGEDS/androidApp/src/test/java/dev/klbt/ageds/SourceAdversarialFormatsTest.kt:51:61: warning: unnecessary non-null assertion (!!) on a non-null receiver of type 'SourceTextFormat'.
+        assertEquals(setOf(",", ";", "|"), parsed.textFormat!!.delimiterCandidates.toSet())
+                                                            ^^
+AGEDS/androidApp/src/test/java/dev/klbt/ageds/SourceAdversarialFormatsTest.kt:68:38: warning: unnecessary non-null assertion (!!) on a non-null receiver of type 'SourceTextFormat'.
+        assertFalse(parsed.textFormat!!.delimiterAmbiguous)
+                                     ^^
+JUnit version 4.13.2
+...............N15_INPUT zero-tail-poison cb66357160435e041c6081738687de1eafde0cad3cf872ded458a9a09839327b 5632
+..N15_INPUT unsigned-length bc37747fc268b58dc2c2204c79807502ff665194024ae1744a07c1925246f623 5632
+.N15_INPUT fat-cycle ebac2b44803165bdae79367026154f127ef04f52cdc19aa11f9d8710e3150b48 5632
+.N15_INPUT row-budget b71f3eeecccf036fbc781bdd5002f5148e006f0912e14672fff3810165559c94 5632
+.N15_INPUT invalid-formula-bool c03da33b726cd58f0ed5fe70dc08e8a7b02dfbef4f0024d9fe7cc388075d95b4 5632
+.N15_INPUT overlap a72231274942a87de598bcd658234242a6003434a0173373f9c11bf304083ca2 5632
+.N15_INPUT mulrk-amplification 740ca79e7fdcab49ff730955a4d5faa10e9b2a11f2f21f6efbca314d6e5a521e 5632
+.N15_INPUT oversized-record f27fecc50053dea6f82ae4fe3c9f77f90a9c25473f064210787e89e4a2e12577 5632
+.N15_INPUT directory-cycle 42c5a2dedb4ffae39f00711510c04be30b7462cc4a1a4c87ad72fe44c6c9ca11 5632
+.N15_INPUT control ef919c6193f22e795ef4124f9ba6add21f39cb25d7947e97c5b6ba5a886405d4 5632
+.N15_INPUT cell-budget 2c41b7db5498b717de7b53486317832ed3b0803a09546aa586d646d6a9dfb42f 5632
+.N15_INPUT formats 1fb0af073f771755cc0e9031cc5fa2d88b667cd35ab85c123b00bb4e9e95d72e 16
+.N15_INPUT formats c95a4fead577ca197f1094206aeb3263c8b553f5c4e89a00354f1db980c49657 3
+N15_INPUT formats 40e8e640d60d0373bd69c8b3de3ba49fe48fa46ead4cd51617c78ec402789f34 5
+N15_INPUT formats ea650e964892a56c80e21725544d8e62cab20bb86c3f4f9b49848f68053a72fe 8
+.N15_INPUT formats ceda4673b5e3aea210ee7e76576c2d53fd1a85c2e432e6b929ac5591741c2473 637
+.N15_INPUT formats a994c648be8c08fbf2c5b4b67b56f5cfacd228dd76005cea595fab5389ea929d 518
+.N15_INPUT formats 11a7b55312b20df6507f080e8acb6299b9af35518083f6f38346cfc5f5d38aab 10
+N15_INPUT formats 427b6128c99588b780306a2b32bcb662aa84bfa285d4e45b7b73cd94c48c139e 12
+N15_INPUT formats a1e48cfc905024b10b81108258e21e5e9b0c32ccf471cd630813613879b21582 12
+.N15_INPUT formats 741c9e015dd1364bd99264b14ab5647f77767c125c706a8408f5e6fd3c27947c 673
+.N15_INPUT formats 6058889c5390225917bc66a5fc1d3a75db9f749bc299385c9f855cf5a591f1d6 681
+N15_INPUT formats aad78df516fd1bb47aa4bc42cceaea9022446b0b2974c73cf2bd7fbd69182b96 682
+.N15_INPUT formats b6bceab394ca0ca96dcee21fccb887b412605c3f6f124a57543750dd8842da67 14
+
+Time: 0.367
+
+OK (34 tests)
+
+A1;stream=Workbook;offset=1274 =>  001 +48 ć  [BIFF8:LABELSST]
+B1;stream=Workbook;offset=1288 => -1.23 [BIFF8:RK]
+A2;stream=Workbook;offset=1322 => true [BIFF8:BOOLERR]
+B2;stream=Workbook;offset=1334 =>  [BIFF8:FORMULA]
+A3;stream=Workbook;offset=1387 => 42.125 [BIFF8:NUMBER]
+ISSUE xls_projection: Partial BIFF8 stored-cell projection: raw is record-payload hex; no formulas executed, styles/date conversion, links, macros, drawings, or full workbook reconstruction

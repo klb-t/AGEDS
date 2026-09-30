@@ -59,8 +59,8 @@ internal fun SourceScanWorkspace(vm: CorpusVm, activity: ComponentActivity, pick
                 Button(onClick = pickFolder, enabled = !vm.busy.value) { Text("Wskaż folder") }
                 if (vm.sourceScanning.value) OutlinedButton(onClick = vm::cancelSourceScan) { Text("Anuluj skan") }
             }
-            Text("CSV, TSV i XLSX: surowe rekordy. Audio: inwentaryzacja i odczytywalne metadane. XLS: format nieobsługiwany w tym skanerze; użyj skanera serwerowego.", style = MaterialTheme.typography.bodySmall)
-            Text("CSV: UTF-8 i przecinek; TSV: UTF-8 i tabulator. Inne kodowania i separatory nie są automatycznie rozpoznawane.", style = MaterialTheme.typography.labelSmall)
+            Text("CSV, TSV i XLSX: rekordy źródłowe. XLS: ograniczony odczyt — sprawdź pokrycie każdego pliku. Audio: inwentaryzacja i odczytywalne metadane.", style = MaterialTheme.typography.bodySmall)
+            Text("Tekst: UTF-8 lub UTF-16 ze znacznikiem BOM. Separator CSV jest hipotezą z próbki; niejednoznaczność pozostaje widoczna w szczegółach. TSV używa tabulatora.", style = MaterialTheme.typography.labelSmall)
             vm.sourceAccessNotice.value?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             vm.sourceCacheNotice.value?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         } } }
@@ -133,13 +133,29 @@ private fun SourceFileDialog(file: ScannedSourceFile, collisions: List<ScannedSo
                 Text("Hash porównuje odczytane bajty; nie potwierdza ich autorstwa ani prawdziwości.", style = MaterialTheme.typography.labelSmall)
                 file.audioDurationSec?.let { Text("Długość z nagłówka audio: $it s") }
             }
+            file.textFormat?.let { format ->
+                item {
+                    Text("Odczyt tekstu", fontWeight = FontWeight.SemiBold)
+                    val encodingBasis = if (format.encodingBasis == "bom") "znacznik BOM źródła" else "domyślna interpretacja UTF-8, bez BOM"
+                    Text("Kodowanie: ${format.encoding} ($encodingBasis)", style = MaterialTheme.typography.bodySmall)
+                    val basis = when (format.delimiterBasis) {
+                        "tsv_extension" -> "wybrany na podstawie rozszerzenia TSV"
+                        "inferred_uniform_records" -> "wywnioskowany z próbki, niepotwierdzony przez autora źródła"
+                        else -> "prowizoryczny wybór domyślny"
+                    }
+                    Text("Separator: ${separatorLabel(format.delimiter)} — $basis", style = MaterialTheme.typography.bodySmall)
+                    Text("Próbka: ${format.sampledRecords} rekordów${if (format.sampleTruncated) "; ograniczona limitem" else ""}.", style = MaterialTheme.typography.labelSmall)
+                    if (format.delimiterAmbiguous) Text("Separator niejednoznaczny. Podział na komórki wymaga sprawdzenia wobec źródła.", color = MaterialTheme.colorScheme.error)
+                    if (format.delimiterCandidates.isNotEmpty()) Text("Kandydaci: ${format.delimiterCandidates.joinToString { separatorLabel(it) }}", style = MaterialTheme.typography.labelSmall)
+                }
+            }
             if (collisions.size > 1) {
                 item { Text("Ta sama nazwa w różnych lokalizacjach:", fontWeight = FontWeight.Bold) }
                 items(collisions) { Text("${it.relativePath}\n${it.uri}", style = MaterialTheme.typography.bodySmall) }
             }
             items(file.issues) { ScanIssueRow(it) }
             item { Text("Surowe rekordy", fontWeight = FontWeight.Bold)
-                Text("Raw zachowuje odczytaną reprezentację komórki; wartość jest projekcją parsera. Formuły nie są wykonywane. Rekordy nie zastępują oryginalnego pliku.", style = MaterialTheme.typography.bodySmall) }
+                Text("Raw zachowuje reprezentację komórki: token CSV, wartość zapisaną w XLSX lub bajty rekordu XLS w zapisie szesnastkowym. Wartość jest projekcją parsera. Formuły nie są wykonywane. Rekordy nie zastępują oryginalnego pliku.", style = MaterialTheme.typography.bodySmall) }
             file.rows.forEach { row ->
                 item { Text(row.locator, fontWeight = FontWeight.SemiBold) }
                 items(row.cells) { cell ->
@@ -155,4 +171,12 @@ private fun SourceFileDialog(file: ScannedSourceFile, collisions: List<ScannedSo
             if (file.rows.isEmpty()) item { Text("Brak odczytanych rekordów tabelarycznych. Sprawdź format i ograniczenia powyżej.") }
         } }
     }, confirmButton = { TextButton(onClick = onDismiss) { Text("Zamknij") } })
+}
+
+private fun separatorLabel(value: String) = when (value) {
+    "," -> "przecinek"
+    ";" -> "średnik"
+    "\t" -> "tabulator"
+    "|" -> "pionowa kreska |"
+    else -> value
 }

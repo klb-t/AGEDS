@@ -3,15 +3,22 @@ package dev.klbt.ageds.core
 /** RFC4180-style quoted records; no header, date, number or identity inference. */
 object SourceTextParser {
     fun delimited(text: String, delimiter: Char, locator: String, limits: SourceScanLimits,
-                  checkCancelled: () -> Unit = {}): ParsedSourceRows {
-        require(delimiter == ',' || delimiter == '\t')
+                  checkCancelled: () -> Unit = {}): ParsedSourceRows = parseDelimited(text, delimiter, locator, limits, true, checkCancelled)
+
+    /** Byte decoding already consumed the transport BOM; leading U+FEFF is cell data. */
+    fun decodedDelimited(text: String, delimiter: Char, locator: String, limits: SourceScanLimits,
+                         checkCancelled: () -> Unit = {}): ParsedSourceRows = parseDelimited(text, delimiter, locator, limits, false, checkCancelled)
+
+    private fun parseDelimited(text: String, delimiter: Char, locator: String, limits: SourceScanLimits,
+                               stripBom: Boolean, checkCancelled: () -> Unit): ParsedSourceRows {
+        require(delimiter in listOf(',', '\t', ';', '|'))
         val rows = mutableListOf<SourceRow>()
         val issues = mutableListOf<ScanIssue>()
         fun issue(value: ScanIssue) {
             if (issues.size < 100) issues += value
             else if (issues.size == 100) issues += ScanIssue("diagnostic_limit", "Further CSV diagnostics omitted", locator)
         }
-        var pos = if (text.startsWith('\uFEFF')) 1 else 0
+        var pos = if (stripBom && text.startsWith('\uFEFF')) 1 else 0
         var count = 0
         var line = 1
         while (pos < text.length) {

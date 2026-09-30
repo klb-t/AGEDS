@@ -2,9 +2,8 @@ package dev.klbt.ageds
 
 import dev.klbt.ageds.core.*
 import java.io.ByteArrayInputStream
+import java.io.StringReader
 import java.io.ByteArrayOutputStream
-import java.nio.ByteBuffer
-import java.nio.charset.CodingErrorAction
 import java.util.zip.ZipInputStream
 import javax.xml.parsers.SAXParserFactory
 import org.xml.sax.Attributes
@@ -91,6 +90,7 @@ object SourceWorkbookParser {
                 var cellTypeRaw: String? = null
                 var field = ""
                 var inCell = false
+                var inRow = false
                 var inline = false
                 val raw = StringBuilder()
                 val formula = StringBuilder()
@@ -101,10 +101,13 @@ object SourceWorkbookParser {
                         checkCancelled()
                         when (val t = tag(local, q)) {
                             "row" -> {
+                                require(!inRow) { "Nested worksheet rows are unsupported" }
                                 if (rows.size >= limits.maxRowsPerFile) throw Bound("row_limit")
+                                inRow = true
                                 cells = mutableListOf(); rowIndex++; rowRef = a.getValue("r") ?: rowIndex.toString()
                             }
                             "c" -> {
+                                require(inRow && !inCell) { "Cells must occur in a single worksheet row" }
                                 if (++cellCount > limits.maxCellsPerFile) throw Bound("cell_limit")
                                 inCell = true; cellRef = a.getValue("r") ?: ""; cellTypeRaw = a.getValue("t"); cellType = cellTypeRaw ?: "n"
                                 raw.clear(); formula.clear(); inlineText.clear(); formulaPresent = false
@@ -148,12 +151,17 @@ object SourceWorkbookParser {
                                     cellRef.takeIf { it.isNotEmpty() }, cellTypeRaw)
                                 inCell = false
                             }
-                            "row" -> rows += SourceRow("$locator!$name#row=$rowRef;ordinal=$rowIndex", cells.toList())
+                            "row" -> {
+                                require(inRow && !inCell) { "Malformed worksheet row" }
+                                if (rows.size >= limits.maxRowsPerFile) throw Bound("row_limit")
+                                rows += SourceRow("$locator!$name#row=$rowRef;ordinal=$rowIndex", cells.toList())
+                                inRow = false
+                            }
                         }
                     }
                 })
             }
-            issue(ScanIssue("xlsx_projection", "Stored cells only: UTF-8 XML; no styles, date conversion, formula evaluation, workbook ordering or external references", locator))
+            issue(ScanIssue("xlsx_projection", "Stored cells only: strict UTF-8 or BOM-marked UTF-16 XML; no styles, date conversion, formula evaluation, workbook ordering or external references", locator))
         } catch (e: Bound) {
             issue(ScanIssue(e.code, "Workbook processing budget reached; remaining content omitted", locator))
         } catch (e: java.util.concurrent.CancellationException) { throw e
@@ -166,16 +174,21 @@ object SourceWorkbookParser {
     private fun tag(local: String?, qualified: String?) = local?.takeIf { it.isNotEmpty() } ?: qualified.orEmpty().substringAfter(':')
 
     private fun parseXml(bytes: ByteArray, handler: DefaultHandler) {
-        // This adapter supports UTF-8 XML only. Strict decoding plus declared-encoding
-        // validation prevents EBCDIC/UTF-7/UTF-16 from hiding a DTD from the preflight.
-        val xml = Charsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
-            .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString()
-        require(!xml.contains('\u0000')) { "Only UTF-8 workbook XML is supported" }
+        // Decode before preflight, then give SAX exactly that character stream. Alternate
+        // encodings cannot hide declarations or cause SAX to reinterpret checked bytes.
+        val decoded = SourceTextDecoding.decode(bytes)
+        val xml = decoded.text
         val declaredEncoding = Regex("""<\?xml[^?]*encoding\s*=\s*["']([^"']+)["']""", RegexOption.IGNORE_CASE)
-            .find(xml)?.groupValues?.get(1)
-        require(declaredEncoding == null || declaredEncoding.lowercase() in setOf("utf-8", "utf8", "us-ascii")) {
-            "Unsupported workbook XML encoding: $declaredEncoding"
+            .find(xml)?.groupValues?.get(1)?.lowercase()
+        val allowed = when (decoded.encoding) {
+            "UTF-16LE" -> setOf("utf-16", "utf-16le")
+            "UTF-16BE" -> setOf("utf-16", "utf-16be")
+            else -> setOf("utf-8", "utf8", "us-ascii")
         }
+        require(declaredEncoding == null || declaredEncoding in allowed) {
+            "Unsupported or conflicting workbook XML encoding: $declaredEncoding"
+        }
+        require(declaredEncoding != "us-ascii" || xml.all { it.code < 128 }) { "Non-ASCII XML declares US-ASCII" }
         require(!xml.contains("<!DOCTYPE", ignoreCase = true) && !xml.contains("<!ENTITY", ignoreCase = true)) {
             "DTD/entity declarations forbidden"
         }
@@ -189,6 +202,6 @@ object SourceWorkbookParser {
         reader.entityResolver = org.xml.sax.EntityResolver { _, _ -> throw IllegalArgumentException("External entity forbidden") }
         reader.contentHandler = handler
         reader.errorHandler = handler
-        reader.parse(InputSource(ByteArrayInputStream(bytes)))
+        reader.parse(InputSource(StringReader(xml)))
     }
 }

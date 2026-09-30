@@ -27,13 +27,27 @@ data class SourceScanLimits(
 @Serializable
 data class ScanIssue(val code: String, val message: String, val locator: String? = null)
 
-/** raw is the CSV lexical token or XLSX stored value; value is a decoded projection. */
+/** raw is a CSV lexical token, XLSX stored value or XLS BIFF payload hex; value is a decoded projection. */
 @Serializable
 data class SourceCell(val column: Int, val raw: String, val value: String, val formula: String? = null,
     val sourceReference: String? = null, val sourceType: String? = null)
 
 @Serializable
 data class SourceRow(val locator: String, val cells: List<SourceCell>)
+
+/** Inference is a parsing hypothesis, not source-supplied dialect metadata. */
+@Serializable
+data class SourceTextFormat(
+    val encoding: String,
+    val encodingBasis: String,
+    val bomBytes: Int,
+    val delimiter: String,
+    val delimiterBasis: String,
+    val delimiterCandidates: List<String> = emptyList(),
+    val delimiterAmbiguous: Boolean = false,
+    val sampledRecords: Int = 0,
+    val sampleTruncated: Boolean = false,
+)
 
 @Serializable
 data class ScannedSourceFile(
@@ -48,6 +62,7 @@ data class ScannedSourceFile(
     val rows: List<SourceRow> = emptyList(),
     val issues: List<ScanIssue> = emptyList(),
     val audioDurationSec: Double? = null,
+    val textFormat: SourceTextFormat? = null,
 )
 
 @Serializable
@@ -63,4 +78,4 @@ data class SourceScanResult(
     val bytesRead: Long = 0,
 )
 
-data class ParsedSourceRows(val rows: List<SourceRow>, val issues: List<ScanIssue>)
+data class ParsedSourceRows(val rows: List<SourceRow>, val issues: List<ScanIssue>, val textFormat: SourceTextFormat? = null)

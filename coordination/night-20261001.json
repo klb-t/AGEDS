@@ -4,13 +4,13 @@
   "branch": "codex/ageds-night-20261001",
   "base_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2",
   "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate",
-  "updated_at": "2026-09-30T22:57:35.238130+00:00",
+  "updated_at": "2026-09-30T23:07:39.448536+00:00",
   "coordinator": {
-    "owner": "current_root",
-    "status": "released",
-    "lease_expires_at": "2026-09-30T22:57:35.238130+00:00",
-    "meaning": "Scheduling guard, not evidence of work; stale claim requires fresh remote comparison before takeover",
-    "released_at": "2026-09-30T22:57:35.238130+00:00"
+    "owner": "root-wave2-20261001T0106",
+    "status": "active",
+    "claimed_at": "2026-09-30T23:07:39.448536+00:00",
+    "lease_expires_at": "2026-10-01T00:02:39.448536+00:00",
+    "based_on_remote_head": "dca4470284ebf74c8a5089632c933f3c658282b0"
   },
   "tasks": [
     {
@@ -163,6 +163,66 @@
         "failed_before_fix": true,
         "raw_source_preserved": true
       }
+    },
+    {
+      "id": "AGEDS-20261001-N9",
+      "owner": "xls_adapter",
+      "title": "Bounded native XLS adapter",
+      "scope": [
+        "new XLS parser and tests"
+      ],
+      "status": "in_progress",
+      "result": null
+    },
+    {
+      "id": "AGEDS-20261001-N10",
+      "owner": "device_qa",
+      "title": "Real emulator/provider acceptance or precise capability result",
+      "scope": [
+        "new instrumentation tests and device receipts"
+      ],
+      "status": "in_progress",
+      "result": null
+    },
+    {
+      "id": "AGEDS-20261001-N11",
+      "owner": "real_asr",
+      "title": "Real local ASR smoke on synthetic speech",
+      "scope": [
+        "new ASR smoke scripts/tests/receipt"
+      ],
+      "status": "in_progress",
+      "result": null
+    },
+    {
+      "id": "AGEDS-20261001-N12",
+      "owner": "browser_qa",
+      "title": "Actual browser citation and playback acceptance",
+      "scope": [
+        "new browser tests/fixtures/receipt"
+      ],
+      "status": "in_progress",
+      "result": null
+    },
+    {
+      "id": "AGEDS-20261001-N13",
+      "owner": "formats",
+      "title": "Native source encodings and delimiter contracts",
+      "scope": [
+        "SourceScanner, SourceWorkbookParser, source models and format tests"
+      ],
+      "status": "in_progress",
+      "result": null
+    },
+    {
+      "id": "AGEDS-20261001-N15",
+      "owner": "adversarial_review",
+      "title": "Independent review of wave2 formats and parser boundaries",
+      "scope": [
+        "new adversarial tests and QA receipt"
+      ],
+      "status": "in_progress",
+      "result": null
     }
   ],
   "publication": {
@@ -171,7 +231,8 @@
     "foundation_merged": true,
     "content_commit": "feefdb2d72f3b8f8807c4cb5bd3fec3810c422ad",
     "pull_request": "https://github.com/klb-t/AGEDS/pull/3",
-    "merge_status": "consult current GitHub PR status; this receipt precedes integration"
+    "merge_status": "consult current GitHub PR status; this receipt precedes integration",
+    "previous_increment_merged_at": "8c3efb9e65999dd4931b22b555329da76379c31e"
   },
   "next_queue": [
     "N9: Native XLS read-only adapter with bounded malformed-workbook tests; if no sound implementation feasible, publish concrete negative result and retain unsupported status",
@@ -201,5 +262,6 @@
     "phone_saf_test": "not_performed",
     "real_asr": "not_performed",
     "source_data": "synthetic"
-  }
+  },
+  "current_wave": 2
 }

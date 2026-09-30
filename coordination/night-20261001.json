@@ -4,12 +4,12 @@
   "branch": "codex/ageds-night-20261001",
   "base_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2",
   "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate",
-  "updated_at": "2026-09-30T23:07:39.448536+00:00",
+  "updated_at": "2026-09-30T23:19:50.209818+00:00",
   "coordinator": {
     "owner": "root-wave2-20261001T0106",
     "status": "active",
     "claimed_at": "2026-09-30T23:07:39.448536+00:00",
-    "lease_expires_at": "2026-10-01T00:02:39.448536+00:00",
+    "lease_expires_at": "2026-10-01T00:04:50.209818+00:00",
     "based_on_remote_head": "dca4470284ebf74c8a5089632c933f3c658282b0"
   },
   "tasks": [
@@ -191,8 +191,27 @@
       "scope": [
         "new ASR smoke scripts/tests/receipt"
       ],
-      "status": "in_progress",
-      "result": null
+      "status": "accepted",
+      "result": {
+        "actual_inference": true,
+        "model": "Systran/faster-whisper-tiny.en",
+        "model_revision_observation": "0d3d19a32d3338f10357c0889762bd8d64bbdeba",
+        "runtime_seconds": 4.655,
+        "words": 17,
+        "citation_and_inert_archive_roundtrip": "passed",
+        "input": "synthetic English speech only",
+        "fixes": [
+          "requests and PyAV runtime pins",
+          "model numeric scalar projection to JSON numbers"
+        ],
+        "report": "docs/REAL_ASR_SMOKE.md",
+        "receipt": "docs/REAL_ASR_SMOKE_RECEIPT.json",
+        "published_commit": "38a76a93d212f062d4ce1abc001b7b859cfc821d"
+      },
+      "contributors": [
+        "coordinator",
+        "browser_qa"
+      ]
     },
     {
       "id": "AGEDS-20261001-N12",
@@ -201,8 +220,22 @@
       "scope": [
         "new browser tests/fixtures/receipt"
       ],
-      "status": "in_progress",
-      "result": null
+      "status": "accepted",
+      "result": {
+        "actual_headless_browser_tests": 11,
+        "failures": 0,
+        "saved_citation_playback": "version-pinned range verified",
+        "report": "docs/BROWSER_NIGHT_QA.md",
+        "receipt": "docs/BROWSER_NIGHT_RECEIPT.json",
+        "published_commit": "ecc664706a592cf9a2d34d6450efe54b0c9a60ed",
+        "limitations": [
+          "headless Chromium only",
+          "not acoustic alignment or phone acceptance"
+        ]
+      },
+      "contributors": [
+        "coordinator"
+      ]
     },
     {
       "id": "AGEDS-20261001-N13",
@@ -226,13 +259,17 @@
     }
   ],
   "publication": {
-    "status": "published_and_verified",
+    "status": "wave2_in_progress_with_verified_checkpoints",
     "foundation_pr": "https://github.com/klb-t/AGEDS/pull/2",
     "foundation_merged": true,
     "content_commit": "feefdb2d72f3b8f8807c4cb5bd3fec3810c422ad",
     "pull_request": "https://github.com/klb-t/AGEDS/pull/3",
     "merge_status": "consult current GitHub PR status; this receipt precedes integration",
-    "previous_increment_merged_at": "8c3efb9e65999dd4931b22b555329da76379c31e"
+    "previous_increment_merged_at": "8c3efb9e65999dd4931b22b555329da76379c31e",
+    "wave2_content_commits": [
+      "ecc664706a592cf9a2d34d6450efe54b0c9a60ed",
+      "38a76a93d212f062d4ce1abc001b7b859cfc821d"
+    ]
   },
   "next_queue": [
     "N9: Native XLS read-only adapter with bounded malformed-workbook tests; if no sound implementation feasible, publish concrete negative result and retain unsupported status",

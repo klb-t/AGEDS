@@ -3,3 +3,4 @@
          Release builds do not include this manifest and should use HTTPS. -->
     <application android:usesCleartextTraffic="true" />
 </manifest>
+

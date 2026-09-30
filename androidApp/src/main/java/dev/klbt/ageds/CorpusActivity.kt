@@ -11,3 +11,4 @@ class CorpusActivity : ComponentActivity() {
         setContent { MaterialTheme { CorpusApp() } }
     }
 }
+

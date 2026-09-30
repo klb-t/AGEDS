@@ -14,3 +14,4 @@ dependencyResolutionManagement {
 }
 rootProject.name = "ageds"
 include(":core", ":androidApp")
+

@@ -34,3 +34,4 @@ dependencies {
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.6.0")
     implementation("io.ktor:ktor-client-logging:3.6.0")
 }
+

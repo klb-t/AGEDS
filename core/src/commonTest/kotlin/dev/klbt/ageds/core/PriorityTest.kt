@@ -10,3 +10,4 @@ class PriorityTest {
         assertTrue(human > heuristic)
     }
 }
+

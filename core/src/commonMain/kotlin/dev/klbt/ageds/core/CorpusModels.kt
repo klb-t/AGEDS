@@ -109,3 +109,4 @@ data class CorpusSeed(
     val recordings: List<CorpusRecording> = emptyList(),
     val shortSenders: List<JsonObject> = emptyList(),
 )
+

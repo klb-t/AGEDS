@@ -26,13 +26,15 @@ private enum class CorpusSection(val title: String) { NUMBERS("Numery"), SMS("SM
 @Composable
 fun CorpusApp(vm: CorpusVm = viewModel()) {
     val activity = androidx.compose.ui.platform.LocalContext.current as ComponentActivity
+    var showSources by remember { mutableStateOf(true) }
     val importPack = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) vm.importCorpus(uri)
     }
     val folderPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri != null) {
-            runCatching { activity.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
-            vm.indexRecordings(uri)
+            val persistent = runCatching { activity.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }.isSuccess
+            showSources = true
+            vm.scanSources(uri, persistent)
         }
     }
     Scaffold(topBar = { TopAppBar(title = { Text("AGEDS · Korpus komunikacji") }, actions = {
@@ -43,12 +45,18 @@ fun CorpusApp(vm: CorpusVm = viewModel()) {
             vm.message.value?.let { Text(it, modifier = Modifier.padding(horizontal = 12.dp), style = MaterialTheme.typography.bodySmall) }
             vm.progress.value?.let { Text(it, modifier = Modifier.padding(horizontal = 12.dp), fontWeight = FontWeight.Bold) }
             if (vm.busy.value) LinearProgressIndicator(Modifier.fillMaxWidth())
+            Row(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(showSources, { showSources = true }, label = { Text("Źródła") })
+                FilterChip(!showSources, { showSources = false }, label = { Text("Katalog") })
+            }
             val seed = vm.corpus.value
-            if (seed == null) {
+            if (showSources) {
+                SourceScanWorkspace(vm, activity, pickFolder = { folderPicker.launch(null) })
+            } else if (seed == null) {
                 Card(Modifier.padding(16.dp).fillMaxWidth()) { Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Wczytaj prywatny katalog", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text("Google Drive → a → ageds-corpus-seed.json. Po imporcie katalog działa offline.")
-                    Button(onClick = { importPack.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }) { Text("Wczytaj pakiet") }
+                    Text("Opcjonalny pakiet ageds-corpus-seed.json dodaje wcześniejsze kontakty i grupy. Foldery możesz skanować od razu w karcie Źródła.")
+                    Button(onClick = { importPack.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }, enabled = !vm.busy.value) { Text("Wczytaj pakiet") }
                 } }
             } else CorpusLoaded(
                 vm, seed, activity,
@@ -92,7 +100,7 @@ private fun ColumnScope.CorpusLoaded(
                             candidateChoice = null
                         }) { Column(Modifier.fillMaxWidth()) {
                             Text(candidate.relativePath)
-                            Text("${candidate.sizeBytes} B · ${candidate.uri}", style = MaterialTheme.typography.labelSmall)
+                            Text("${if (candidate.sizeBytes >= 0) "${candidate.sizeBytes} B" else "Rozmiar nieznany"} · ${candidate.uri}", style = MaterialTheme.typography.labelSmall)
                         } }
                     }
                 }

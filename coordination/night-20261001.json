@@ -4,11 +4,11 @@
   "branch": "codex/ageds-night-20261001",
   "base_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2",
   "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate",
-  "updated_at": "2026-09-30T22:48:53.916107+00:00",
+  "updated_at": "2026-09-30T22:52:17.776223+00:00",
   "coordinator": {
     "owner": "current_root",
     "status": "active",
-    "lease_expires_at": "2026-09-30T23:33:53.916107+00:00",
+    "lease_expires_at": "2026-09-30T23:37:17.776223+00:00",
     "meaning": "Scheduling guard, not evidence of work; stale claim requires fresh remote comparison before takeover"
   },
   "tasks": [
@@ -20,8 +20,16 @@
         "SourceScanner.kt",
         "new core scan parsers/models/tests"
       ],
-      "status": "in_progress",
-      "result": null
+      "status": "accepted",
+      "result": {
+        "core_parser_tests": 9,
+        "android_workbook_tests": 9,
+        "limitations": [
+          "Native XLS unsupported",
+          "Provider SAF/device not exercised",
+          "No automatic phone/date correlations"
+        ]
+      }
     },
     {
       "id": "AGEDS-20261001-N2",
@@ -34,8 +42,14 @@
         "SourceScanUi.kt",
         "SourceScanCache.kt"
       ],
-      "status": "in_progress",
-      "result": null
+      "status": "accepted",
+      "result": {
+        "cache_tests": 7,
+        "workflow": "Native source workspace without seed; URI selection; bounded atomic cache",
+        "limitations": [
+          "Physical device UI not exercised"
+        ]
+      }
     },
     {
       "id": "AGEDS-20261001-N3",
@@ -83,8 +97,17 @@
         "Gradle configuration",
         "docs/ANDROID_NIGHT_BUILD.md"
       ],
-      "status": "in_progress",
-      "result": null
+      "status": "accepted",
+      "result": {
+        "tasks_executed": 57,
+        "android_tests": 16,
+        "desktop_tests": 10,
+        "failed": 0,
+        "source_inputs_verified": 35,
+        "apk_sha256": "f20b9e04e127a89282064fcf992611e540b21921b097ae4dfc872de374fa89d1",
+        "report": "docs/ANDROID_NIGHT_BUILD.md",
+        "receipt": "docs/ANDROID_NIGHT_BUILD_RECEIPT.json"
+      }
     },
     {
       "id": "AGEDS-20261001-N6",

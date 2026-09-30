@@ -10,6 +10,29 @@ if (root) {
   let transcript = null, units = [], generation = 0, playGeneration = 0, controller = null, saving = false;
   function stopPlayback() { playGeneration += 1; player?.stop(); }
   function show(message) { status.textContent = message; }
+  async function playBounds(start, end) {
+    if (!player) return;
+    const request = generation, playRequest = ++playGeneration;
+    try { await player.play(start, end); }
+    catch (error) { if (request === generation && playRequest === playGeneration) show(error.message); }
+  }
+  function savedBounds(button) {
+    const startMs = Number(button.dataset.startMs), endMs = Number(button.dataset.endMs);
+    if (!Number.isSafeInteger(startMs) || !Number.isSafeInteger(endMs)) return null;
+    const start = startMs / 1000, end = endMs / 1000;
+    return validRange(start, end) ? {start, end} : null;
+  }
+  for (const button of root.querySelectorAll('[data-citation-play]')) {
+    button.disabled = !player || !savedBounds(button);
+  }
+  $('saved').addEventListener('click', event => {
+    const button = event.target.closest('[data-citation-play]');
+    if (!button || !$('saved').contains(button) || button.disabled) return;
+    const bounds = savedBounds(button);
+    if (!bounds) return;
+    show(`Odtwarzanie cytatu #${button.dataset.citationId}, wersja #${button.dataset.derivedTextId}. Zakres pochodzi z zapisanego cytatu; odsłuch nie weryfikuje automatycznie tekstu ASR.`);
+    void playBounds(bounds.start, bounds.end);
+  });
   function selection() {
     const start = Number(first.value), end = Number(last.value);
     if (!units.length || !Number.isInteger(start) || !Number.isInteger(end) || end < start || end >= units.length) return [];
@@ -74,10 +97,7 @@ if (root) {
   play.addEventListener('click', async () => {
     const picked = selection();
     if (!player || !picked.length) return;
-    const request = generation;
-    const playRequest = ++playGeneration;
-    try { await player.play(picked[0].start, picked.at(-1).end); }
-    catch (error) { if (request === generation && playRequest === playGeneration) show(error.message); }
+    await playBounds(picked[0].start, picked.at(-1).end);
   });
   save.addEventListener('click', async () => {
     const picked = selection();
@@ -96,7 +116,12 @@ if (root) {
       const label = document.createElement('small');
       label.textContent = `Cytat #${result.id} · transkrypt #${pinnedId} · ${result.start_ms}–${result.end_ms} ms`;
       const quote = document.createElement('p'); quote.className = 'transcript'; quote.textContent = result.quote_text;
-      article.append(label, quote); $('saved').prepend(article);
+      const replay = document.createElement('button'); replay.type = 'button';
+      replay.dataset.citationPlay = ''; replay.dataset.citationId = String(result.id);
+      replay.dataset.derivedTextId = String(pinnedId);
+      replay.dataset.startMs = String(result.start_ms); replay.dataset.endMs = String(result.end_ms);
+      replay.textContent = 'Odtwórz zapisany cytat'; replay.disabled = !player || !savedBounds(replay);
+      article.append(label, quote, replay); $('saved').prepend(article);
     } catch (error) { if (request === generation) show(error.message); }
     finally { saving = false; refresh(); }
   });

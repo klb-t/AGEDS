@@ -1,0 +1,81 @@
+{
+  "git_head": "f52c30b3b0e15a85114df407f9e779f392cb767f",
+  "playwright": "1.62.1",
+  "source_sha256": {
+    "server/app/main.py": "3605666f08e29b502fd06ec952036a21ad51dd1bfdbf06a5550a7536b9a85931",
+    "server/app/static/citations.mjs": "71264fe3d5aa1fdf3987bb9fc36b4bc8f74825461c9cae9c465f2a91f8006331",
+    "server/app/static/range-player.mjs": "f451e2f333cf480100d29dafa9181c8c6ebae748dda03092c0bc03c0664b901c",
+    "server/app/templates/artifact.html": "f6fd4d4565f39c078a61ee8dc761de65208c7664b73eea1f380ee99dc49ee3da",
+    "server/app/templates/index.html": "019e3300e771263b721145a3684ff5cf25f74a9ce0fed37dcf48f420d694702d"
+  },
+  "task": "AGEDS-20261001-N12",
+  "started_at": "2026-09-30T23:14:01.613Z",
+  "fixture": "generated 4s mono PCM WAV; temporary SQLite; synthetic transcript versions",
+  "cases": [
+    {
+      "name": "older version exact word citation and literal XSS text",
+      "status": "passed"
+    },
+    {
+      "name": "fresh saved quote replay uses old anchor while latest version selected",
+      "status": "passed"
+    },
+    {
+      "name": "persisted quote replay retains anchor and cancels on seek outside range",
+      "status": "passed"
+    },
+    {
+      "name": "stale transcript response cannot replace newer selected version",
+      "status": "passed"
+    },
+    {
+      "name": "pending save stays pinned while version switches",
+      "status": "passed"
+    },
+    {
+      "name": "real WAV playback seeks and stops at selected end",
+      "status": "passed"
+    },
+    {
+      "name": "stop button cancels real playback without later resumption",
+      "status": "passed"
+    },
+    {
+      "name": "version change cancels audio and clears unavailable word selection",
+      "status": "passed"
+    },
+    {
+      "name": "selection change cancels native playback",
+      "status": "passed"
+    },
+    {
+      "name": "stop during delayed metadata prevents late native playback",
+      "status": "passed"
+    },
+    {
+      "name": "search snippets keep source HTML inert in actual browser",
+      "status": "passed"
+    }
+  ],
+  "browser": "141.0.7390.37",
+  "playback": {
+    "playing": {
+      "paused": false,
+      "time": 0.227959,
+      "duration": 4,
+      "ready": 4,
+      "native": true
+    },
+    "stopped": {
+      "paused": true,
+      "time": 1.1,
+      "duration": 4,
+      "ready": 4,
+      "native": true
+    },
+    "tolerance_seconds": 0.03
+  },
+  "page_errors": [],
+  "status": "passed",
+  "finished_at": "2026-09-30T23:14:14.564Z"
+}

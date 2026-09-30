@@ -4,11 +4,11 @@
   "branch": "codex/ageds-night-20261001",
   "base_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2",
   "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate",
-  "updated_at": "2026-09-30T22:40:24.174352+00:00",
+  "updated_at": "2026-09-30T22:45:42.201504+00:00",
   "coordinator": {
     "owner": "current_root",
     "status": "active",
-    "lease_expires_at": "2026-09-30T23:25:24.174352+00:00",
+    "lease_expires_at": "2026-09-30T23:30:42.201504+00:00",
     "meaning": "Scheduling guard, not evidence of work; stale claim requires fresh remote comparison before takeover"
   },
   "tasks": [
@@ -47,8 +47,13 @@
         "server/app/worker.py",
         "word citation tests"
       ],
-      "status": "in_progress",
-      "result": null
+      "status": "accepted",
+      "result": {
+        "tests": 60,
+        "subtests": 148,
+        "new_tests": 23,
+        "scope": "word projection plus citation/job regressions; synthetic ASR only"
+      }
     },
     {
       "id": "AGEDS-20261001-N4",
@@ -98,5 +103,11 @@
     "Controlled segment/word playback and citation UI",
     "Real ASR using small synthetic public fixture only if dependency/model download feasible and no paid services",
     "Read-only ecosystem evidence export contract tested against a concrete consumer, never pretend implemented integrations"
-  ]
+  ],
+  "automation": {
+    "created": true,
+    "timezone": "Europe/Amsterdam",
+    "window": "2026-10-01 01:00 through 06:00 hourly flexible, six occurrences",
+    "guard": "fresh active coordinator claim prevents duplicate takeover"
+  }
 }

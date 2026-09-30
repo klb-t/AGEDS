@@ -1,0 +1,124 @@
+{
+  "git_head": "55381a64cef75ceda53e0489598ef09afddb3fc3",
+  "playwright": "1.62.1",
+  "source_sha256": {
+    "server/app/main.py": "61fa7f0836ee791e69228ef0eb57831b515f7854a61a4318c9d2e112cd36741e",
+    "server/app/static/citations.mjs": "eb95ab2f9d0a484eadfc4aa639527894d6d1a0de2ac7e6e28af94b5b2611bfab",
+    "server/app/static/range-player.mjs": "f451e2f333cf480100d29dafa9181c8c6ebae748dda03092c0bc03c0664b901c",
+    "server/app/templates/artifact.html": "2d698c305f89d09f10c120d26641201c90a24d8aa05dee56026c1f8bc08d4d03",
+    "server/app/templates/index.html": "019e3300e771263b721145a3684ff5cf25f74a9ce0fed37dcf48f420d694702d",
+    "server/app/exchange.py": "f1f80e17c6e8697833d0e5b910807efe0e469aa22107ed1d5cc0e6fed1e061bc",
+    "server/app/exchange_consumer.py": "95bff415061954ae8cce8ca998f06229c70cf5477c4b47e0dba2fc3b210c3049",
+    "server/tests/browser/acceptance.cjs": "45817c8989e4494f2b8df483d311bd6692ea52d36ca1ff8116234f215dee4be7",
+    "server/tests/browser_fixture.py": "0b6ed2f676d4ed66a16530cb25ae5e189955775828a70f2233c498586b81872d"
+  },
+  "task": "AGEDS-20261001-N21-browser",
+  "baseline_task": "AGEDS-20261001-N12",
+  "started_at": "2026-09-30T23:46:36.183Z",
+  "fixture": "generated 4s mono PCM WAV; temporary SQLite; synthetic transcript versions",
+  "cases": [
+    {
+      "name": "older version exact word citation and literal XSS text",
+      "status": "passed"
+    },
+    {
+      "name": "fresh saved quote replay uses old anchor while latest version selected",
+      "status": "passed"
+    },
+    {
+      "name": "fresh packet link downloads and independently verifies old version while latest selected",
+      "status": "passed"
+    },
+    {
+      "name": "persisted quote replay retains anchor and cancels on seek outside range",
+      "status": "passed"
+    },
+    {
+      "name": "persisted packet link downloads identical pinned evidence while latest selected",
+      "status": "passed"
+    },
+    {
+      "name": "stale transcript response cannot replace newer selected version",
+      "status": "passed"
+    },
+    {
+      "name": "pending save stays pinned while version switches",
+      "status": "passed"
+    },
+    {
+      "name": "real WAV playback seeks and stops at selected end",
+      "status": "passed"
+    },
+    {
+      "name": "stop button cancels real playback without later resumption",
+      "status": "passed"
+    },
+    {
+      "name": "version change cancels audio and clears unavailable word selection",
+      "status": "passed"
+    },
+    {
+      "name": "selection change cancels native playback",
+      "status": "passed"
+    },
+    {
+      "name": "stop during delayed metadata prevents late native playback",
+      "status": "passed"
+    },
+    {
+      "name": "search snippets keep source HTML inert in actual browser",
+      "status": "passed"
+    }
+  ],
+  "browser": "141.0.7390.37",
+  "downloads": [
+    {
+      "rendering": "dynamic",
+      "filename": "ageds-citation-1-1.json",
+      "content_disposition": "attachment; filename=\"ageds-citation-1-1.json\"",
+      "bytes": 3925,
+      "sha256": "705e0e7df983ee07cd359ba378a8439d78299805abf07f19903b44582a2ff045",
+      "derived_text_id": 1,
+      "anchor_id": 1,
+      "verification": "matches_included_pinned_transcript",
+      "media_requests": 0,
+      "stored_path_included": false,
+      "source_bytes_included": false,
+      "media_bytes_included": false
+    },
+    {
+      "rendering": "persisted",
+      "filename": "ageds-citation-1-1.json",
+      "content_disposition": "attachment; filename=\"ageds-citation-1-1.json\"",
+      "bytes": 3925,
+      "sha256": "705e0e7df983ee07cd359ba378a8439d78299805abf07f19903b44582a2ff045",
+      "derived_text_id": 1,
+      "anchor_id": 1,
+      "verification": "matches_included_pinned_transcript",
+      "media_requests": 0,
+      "stored_path_included": false,
+      "source_bytes_included": false,
+      "media_bytes_included": false
+    }
+  ],
+  "playback": {
+    "playing": {
+      "paused": false,
+      "time": 0.213886,
+      "duration": 4,
+      "ready": 4,
+      "native": true
+    },
+    "stopped": {
+      "paused": true,
+      "time": 1.1,
+      "duration": 4,
+      "ready": 4,
+      "native": true
+    },
+    "tolerance_seconds": 0.03
+  },
+  "page_errors": [],
+  "status": "passed",
+  "finished_at": "2026-09-30T23:46:43.838Z"
+}

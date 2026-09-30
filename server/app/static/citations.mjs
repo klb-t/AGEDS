@@ -121,7 +121,12 @@ if (root) {
       replay.dataset.derivedTextId = String(pinnedId);
       replay.dataset.startMs = String(result.start_ms); replay.dataset.endMs = String(result.end_ms);
       replay.textContent = 'Odtwórz zapisany cytat'; replay.disabled = !player || !savedBounds(replay);
-      article.append(label, quote, replay); $('saved').prepend(article);
+      const packet = document.createElement('a');
+      packet.href = `/api/artifacts/${root.dataset.artifactId}/citations/${result.id}/packet`;
+      packet.textContent = 'Pobierz metadane cytatu';
+      packet.title = 'Pakiet zawiera pełną przypiętą wersję transkryptu i zapisane pochodzenie, bez nagrania.';
+      packet.dataset.citationPacket = '';
+      article.append(label, quote, replay, packet); $('saved').prepend(article);
     } catch (error) { if (request === generation) show(error.message); }
     finally { saving = false; refresh(); }
   });

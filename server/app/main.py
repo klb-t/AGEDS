@@ -1,10 +1,10 @@
 from __future__ import annotations
-import csv, io, json, shutil, tempfile
+import csv, io, json, shutil, sqlite3, tempfile
 from pathlib import Path
 from typing import Annotated
 from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi import Path as PathParameter
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
@@ -327,6 +327,26 @@ def api_citation_create(artifact_id:SqlPathId,a:CitationIn):
 def api_citations(artifact_id:SqlPathId):
     with session() as db:
         return [anchor_payload(r) for r in db.execute('SELECT * FROM evidence_anchors WHERE artifact_id=? ORDER BY id',(artifact_id,))]
+
+@app.get('/api/artifacts/{artifact_id}/citations/{anchor_id}/packet')
+def api_citation_packet(artifact_id: SqlPathId, anchor_id: SqlPathId):
+    from .exchange import (PacketLimitError, PacketNotFound, canonical_packet_bytes,
+                           export_citation_packet)
+    try:
+        packet = export_citation_packet(artifact_id, anchor_id)
+        payload = canonical_packet_bytes(packet)
+    except PacketNotFound as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except PacketLimitError as exc:
+        raise HTTPException(413, str(exc)) from exc
+    except (ValueError, TypeError, UnicodeError) as exc:
+        raise HTTPException(409, 'Stored evidence cannot form a valid citation packet; original records remain unchanged.') from exc
+    except (OSError, sqlite3.Error) as exc:
+        raise HTTPException(503, 'Evidence database is unavailable for read-only export.') from exc
+    return Response(content=payload, media_type='application/json', headers={
+        'Content-Disposition': f'attachment; filename="ageds-citation-{artifact_id}-{anchor_id}.json"',
+        'Cache-Control': 'no-store',
+    })
 
 @app.get('/api/source-roots')
 def api_source_roots():

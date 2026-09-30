@@ -6,6 +6,7 @@ const {once} = require('node:events');
 const net = require('node:net');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const assert = require('node:assert/strict');
 const repo = path.resolve(__dirname, '../../..');
 const delay = ms => new Promise(r => setTimeout(r, ms));
@@ -16,7 +17,7 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
   let stderr = ''; server.stderr.on('data', d => stderr += d);
   let browser;
   const fingerprint = file => createHash('sha256').update(fs.readFileSync(path.join(repo, file))).digest('hex');
-  const receipt = {git_head: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: repo, encoding: 'utf8'}).trim(), playwright: require('playwright/package.json').version, source_sha256: Object.fromEntries(['server/app/main.py', 'server/app/static/citations.mjs', 'server/app/static/range-player.mjs', 'server/app/templates/artifact.html', 'server/app/templates/index.html'].map(file => [file, fingerprint(file)])), task: 'AGEDS-20261001-N12', started_at: new Date().toISOString(), fixture: 'generated 4s mono PCM WAV; temporary SQLite; synthetic transcript versions', cases: []};
+  const receipt = {git_head: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: repo, encoding: 'utf8'}).trim(), playwright: require('playwright/package.json').version, source_sha256: Object.fromEntries(['server/app/main.py', 'server/app/static/citations.mjs', 'server/app/static/range-player.mjs', 'server/app/templates/artifact.html', 'server/app/templates/index.html', 'server/app/exchange.py', 'server/app/exchange_consumer.py', 'server/tests/browser/acceptance.cjs', 'server/tests/browser_fixture.py'].map(file => [file, fingerprint(file)])), task: 'AGEDS-20261001-N21-browser', baseline_task: 'AGEDS-20261001-N12', started_at: new Date().toISOString(), fixture: 'generated 4s mono PCM WAV; temporary SQLite; synthetic transcript versions', cases: []};
   try {
     const fixture = await new Promise((resolve, reject) => {
       let buf = ''; server.stdout.on('data', d => {buf += d; if (buf.includes('\n')) {try {resolve(JSON.parse(buf.split('\n')[0]));} catch(e) {reject(e);}}});
@@ -35,6 +36,74 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
     const sel = name => page.locator(`${workspace} [data-${name}]`);
     async function version(id) {await sel('version').selectOption(String(id)); await page.waitForFunction(id => document.querySelector('[data-status]').textContent.includes(`Wersja #${id}.`), id);}
     async function test(name, fn) {await fn(); receipt.cases.push({name, status: 'passed'}); console.log(`PASS ${name}`);}
+    let downloadedPacket;
+    async function downloadPinnedPacket(rendering) {
+      assert.equal(await sel('version').inputValue(), String(fixture.new));
+      const link = page.locator('[data-citation-packet]').first();
+      const href = await link.getAttribute('href');
+      const anchors = await (await fetch(`${base}/api/artifacts/${fixture.artifact}/citations`)).json();
+      const anchor = anchors[0];
+      assert.equal(href, `/api/artifacts/${fixture.artifact}/citations/${anchor.id}/packet`);
+      const mediaRequests = [];
+      const observe = request => {if (new URL(request.url()).pathname.endsWith('/content')) mediaRequests.push(request.url());};
+      page.on('request', observe);
+      try {
+        const [download, response] = await Promise.all([
+          page.waitForEvent('download'), page.waitForResponse(r => r.url() === base + href), link.click()
+        ]);
+        assert.equal(response.status(), 200);
+        const filename = `ageds-citation-${fixture.artifact}-${anchor.id}.json`;
+        assert.equal(download.suggestedFilename(), filename);
+        assert.equal(response.headers()['content-disposition'], `attachment; filename="${filename}"`);
+        assert.equal(response.headers()['cache-control'], 'no-store');
+        assert.match(response.headers()['content-type'], /^application\/json/);
+        assert.equal(await download.failure(), null);
+        const downloaded = await download.path();
+        const bytes = fs.readFileSync(downloaded);
+        const packet = JSON.parse(bytes);
+        assert.equal(packet.payload.anchor.id, anchor.id);
+        assert.equal(packet.payload.anchor.derived_text_id, fixture.old);
+        assert.equal(packet.payload.derived_text.id, fixture.old);
+        assert.notEqual(packet.payload.derived_text.id, fixture.new);
+        assert.equal(packet.payload.projection.quote_text, '  gęślą' + fixture.literal);
+        assert.equal(packet.payload.derived_text.text, ' Zażółć  gęślą' + fixture.literal);
+        assert.equal('stored_path' in packet.payload.artifact, false);
+        assert.equal(packet.payload.scope.stored_path_included, false);
+        assert.equal(packet.payload.scope.source_bytes_included, false);
+        assert.equal(packet.payload.scope.media_bytes_included, false);
+        assert.equal(packet.payload.scope.live_restore_supported, false);
+        assert.equal(packet.payload.scope.tasks_imported, false);
+        assert.equal(packet.payload.scope.locators, 'literal_inert_metadata');
+        assert.ok(packet.payload.source_observations.length > 0);
+        assert.match(packet.payload.artifact.sha256, /^[a-f0-9]{64}$/);
+        const isolated = fs.mkdtempSync(path.join(os.tmpdir(), 'ageds-download-inspect-'));
+        let inspection;
+        try {
+          inspection = JSON.parse(execFileSync(process.env.PYTHON || 'python', ['-m', 'server.app.exchange_consumer', downloaded], {
+            cwd: repo, encoding: 'utf8', env: {...process.env,
+              EW_DATA_DIR: path.join(isolated, 'never-live'), EW_STORE_DIR: path.join(isolated, 'never-live', 'store'),
+              EW_DB_PATH: path.join(isolated, 'never-live', 'database.sqlite')}
+          }));
+          assert.equal(fs.existsSync(path.join(isolated, 'never-live')), false);
+        } finally {fs.rmSync(isolated, {recursive: true, force: true});}
+        assert.equal(inspection.verification, 'matches_included_pinned_transcript');
+        assert.equal(inspection.derived_text_id, fixture.old);
+        assert.equal(inspection.quote_text, packet.payload.projection.quote_text);
+        assert.equal(inspection.selector.precision, 'word_asr');
+        assert.deepEqual(mediaRequests, []);
+        assert.equal(await sel('version').inputValue(), String(fixture.new));
+        assert.equal(page.url(), `${base}/artifact/${fixture.artifact}`);
+        assert.equal(await page.locator('img').count(), 0);
+        assert.equal(await page.evaluate(() => window.__sourceExecuted), undefined);
+        if (downloadedPacket) assert.deepEqual(packet, downloadedPacket);
+        downloadedPacket = packet;
+        (receipt.downloads ||= []).push({rendering, filename, content_disposition: response.headers()['content-disposition'],
+          bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex'),
+          derived_text_id: inspection.derived_text_id, anchor_id: inspection.anchor_id,
+          verification: inspection.verification, media_requests: mediaRequests.length,
+          stored_path_included: false, source_bytes_included: false, media_bytes_included: false});
+      } finally {page.off('request', observe);}
+    }
     await page.goto(`${base}/artifact/${fixture.artifact}`);
     await page.waitForFunction(id => document.querySelector('[data-status]').textContent.includes(`Wersja #${id}.`), fixture.new);
     await test('older version exact word citation and literal XSS text', async () => {
@@ -60,6 +129,9 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
       assert.match(await sel('status').textContent(), new RegExp(`wersja #${fixture.old}`));
       await page.waitForFunction(() => {const a = document.querySelector('audio'); return a.paused && Math.abs(a.currentTime - 1.8) < .03;});
     });
+    await test('fresh packet link downloads and independently verifies old version while latest selected', async () => {
+      await downloadPinnedPacket('dynamic');
+    });
     await test('persisted quote replay retains anchor and cancels on seek outside range', async () => {
       await page.reload(); await page.waitForFunction(id => document.querySelector('[data-status]').textContent.includes(`Wersja #${id}.`), fixture.new);
       assert.equal(await sel('saved').locator('p').first().textContent(), '  gęślą' + fixture.literal);
@@ -71,6 +143,9 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
       await page.waitForFunction(() => document.querySelector('audio').paused);
       await replay.click(); await page.waitForFunction(() => !document.querySelector('audio').paused);
       await sel('stop').click(); await delay(100); assert.ok(await page.locator('audio').evaluate(a => a.paused));
+    });
+    await test('persisted packet link downloads identical pinned evidence while latest selected', async () => {
+      await downloadPinnedPacket('persisted');
     });
     await test('stale transcript response cannot replace newer selected version', async () => {
       let release, entered; const held = new Promise(r => release = r); const arrived = new Promise(r => entered = r);

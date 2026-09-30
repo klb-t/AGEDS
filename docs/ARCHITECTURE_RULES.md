@@ -99,3 +99,22 @@ Najbliższy odbiór obejmuje serwerowy skan, idempotentne importy, lease, wersje
 wyników i przypięcie cytatu. Native SAF, test telefonu,
 dokładne słowa oraz restore metadanych są oddzielnymi następnymi zadaniami.
 Syntetyczny adapter ASR nie potwierdza jakości realnego rozpoznawania mowy.
+
+## Stan implementacji po nocnym przyroście 2026-10-01
+
+Historyczne defaulty powyżej opisują decyzję fundamentu. Bieżące rozszerzenia:
+
+- Android: samodzielny SAF CSV/TSV/XLSX/WAV + inventory bez seed; dawny katalog
+  pozostaje opcjonalny. XLS i część kodowań jawnie unsupported. Źródła read-only.
+- Cytat: segment lub ciąg słów z konkretnej wersji. Dokładny tekst/hashes/indices
+  nie oznaczają zweryfikowanej akustycznej precyzji ASR. Przy błędnych słowach
+  zachowujemy raw i możliwy poprawny wybór segmentowy.
+- Metadane: inertne archiwum SQLite z dokładnym kanonicznym eksportem zwrotnym;
+  brak live restore, mediów, podpisu oraz wznowienia zadań. Format archiwum
+  ma odrębne tabele, aby historyczny running job nie stał się wykonywalny.
+- UI: tekst źródła jest danymi również w wyszukiwaniu i cytatach. HTML ze
+  źródła nie jest zaufanym markupem interfejsu.
+
+Weryfikacja i konkretne granice: `docs/NIGHT_QA.md`,
+`docs/ANDROID_NIGHT_BUILD_RECEIPT.json`, `docs/METADATA_ARCHIVE.md`.
+Te rozszerzenia nie deklarują działających adapterów innych projektów.

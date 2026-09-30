@@ -4,12 +4,13 @@
   "branch": "codex/ageds-night-20261001",
   "base_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2",
   "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate",
-  "updated_at": "2026-09-30T22:56:13.925411+00:00",
+  "updated_at": "2026-09-30T22:57:35.238130+00:00",
   "coordinator": {
     "owner": "current_root",
-    "status": "active",
-    "lease_expires_at": "2026-09-30T23:41:13.925411+00:00",
-    "meaning": "Scheduling guard, not evidence of work; stale claim requires fresh remote comparison before takeover"
+    "status": "released",
+    "lease_expires_at": "2026-09-30T22:57:35.238130+00:00",
+    "meaning": "Scheduling guard, not evidence of work; stale claim requires fresh remote comparison before takeover",
+    "released_at": "2026-09-30T22:57:35.238130+00:00"
   },
   "tasks": [
     {
@@ -165,22 +166,40 @@
     }
   ],
   "publication": {
-    "status": "claimed",
+    "status": "published_and_verified",
     "foundation_pr": "https://github.com/klb-t/AGEDS/pull/2",
-    "foundation_merged": true
+    "foundation_merged": true,
+    "content_commit": "feefdb2d72f3b8f8807c4cb5bd3fec3810c422ad",
+    "pull_request": "https://github.com/klb-t/AGEDS/pull/3",
+    "merge_status": "consult current GitHub PR status; this receipt precedes integration"
   },
   "next_queue": [
-    "Fix independently reproduced correctness failures before adding scope",
-    "Native XLS adapter if still unsupported; bounded raw observations, no formula execution",
-    "Device/emulator SAF acceptance if available; otherwise record concrete device checklist",
-    "Controlled segment/word playback and citation UI",
-    "Real ASR using small synthetic public fixture only if dependency/model download feasible and no paid services",
-    "Read-only ecosystem evidence export contract tested against a concrete consumer, never pretend implemented integrations"
+    "N9: Native XLS read-only adapter with bounded malformed-workbook tests; if no sound implementation feasible, publish concrete negative result and retain unsupported status",
+    "N10: Automated device/emulator SAF-provider acceptance without requiring user phone; test denied permission, partial listings, duplicate URIs, cancellation and unchanged source bytes",
+    "N11: Real ASR integration using a small synthetic speech fixture and free local model; record exact adapter/model and distinguish synthetic success from human-corpus quality",
+    "N12: Interactive browser/device acceptance of word selection and range playback; Android quote client if clear API contract",
+    "N13: Extend native CSV separators/encodings and OOXML encodings from explicit source metadata, preserving raw values and ambiguity",
+    "N14: Concrete read-only ecosystem evidence exchange with version-pinned selectors and a real consumer fixture; never assume shared ontology or automatic private-data access"
   ],
   "automation": {
     "created": true,
     "timezone": "Europe/Amsterdam",
     "window": "2026-10-01 01:00 through 06:00 hourly flexible, six occurrences",
     "guard": "fresh active coordinator claim prevents duplicate takeover"
+  },
+  "accepted_code_commit": "feefdb2d72f3b8f8807c4cb5bd3fec3810c422ad",
+  "validation": {
+    "backend_tests": 182,
+    "backend_subtests": 207,
+    "backend_failures": 0,
+    "existing_deprecation_warnings": 3,
+    "node_fake_audio_tests": 14,
+    "android_jvm_tests": 16,
+    "desktop_jvm_tests": 10,
+    "gradle_tasks_executed": 57,
+    "build_inputs_verified": 35,
+    "phone_saf_test": "not_performed",
+    "real_asr": "not_performed",
+    "source_data": "synthetic"
   }
 }

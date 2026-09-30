@@ -7,15 +7,15 @@ from fastapi import Path as PathParameter
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from .db import init_db, session
 from .config import settings
 from .evidence import IntegrityError, ensure_source, ingest_file, sha256_file
-from .citations import anchor_payload, create_citation, milliseconds
+from .citations import anchor_payload, create_citation, loads_transcript_segments, milliseconds
 from .importers.sms_backup import import_sms_backup
 from .importers.whatsapp import import_whatsapp_txt
 from .search import search as fts_search
-from .transcription import queue_all_audio, queue_transcription
+from .transcription import queue_all_audio, queue_transcription, word_timing_capabilities
 
 app=FastAPI(title='AGEDS Evidence Workbench',version='0.2.0')
 app.mount('/static',StaticFiles(directory=Path(__file__).parent/'static'),name='static')
@@ -132,7 +132,8 @@ def artifact(request:Request,artifact_id:SqlPathId):
         texts=[dict(r) for r in db.execute("SELECT * FROM derived_text WHERE artifact_id=? ORDER BY id DESC",(artifact_id,))]
         anns=[dict(r) for r in db.execute("SELECT * FROM annotations WHERE artifact_id=? ORDER BY id DESC",(artifact_id,))]
         events=[dict(r) for r in db.execute("SELECT * FROM events WHERE artifact_id=? ORDER BY ts_start",(artifact_id,))]
-    return templates.TemplateResponse(request,'artifact.html',{'a':dict(art),'texts':texts,'annotations':anns,'events':events})
+        citations=[dict(r) for r in db.execute('SELECT * FROM evidence_anchors WHERE artifact_id=? ORDER BY id DESC',(artifact_id,))]
+    return templates.TemplateResponse(request,'artifact.html',{'a':dict(art),'texts':texts,'annotations':anns,'events':events,'citations':citations})
 
 @app.post('/artifact/{artifact_id}/annotate')
 def annotate(artifact_id:SqlPathId,body:str=Form(...),label:str=Form(''),kind:str=Form('note'),start_ms:int|None=Form(None,ge=0,le=MAX_SQL_INTEGER),end_ms:int|None=Form(None,ge=0,le=MAX_SQL_INTEGER),derived_text_id:str|None=Form(None)):
@@ -189,9 +190,17 @@ class AnnotationIn(BaseModel):
     endMs: StrictMilliseconds | None = None
     derivedTextId: StrictSqlId | None = None
 
+class WordReferenceIn(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    segment_index: Annotated[StrictInt, Field(ge=0)]
+    word_index: Annotated[StrictInt, Field(ge=0)]
+
 class CitationIn(BaseModel):
+    model_config = ConfigDict(extra='forbid')
     derivedTextId: StrictSqlId
-    segmentIndices: list[StrictInt]
+    segmentIndices: list[StrictInt] | None = Field(default=None, max_length=10000)
+    wordRefs: list[WordReferenceIn] | None = Field(default=None, max_length=10000)
+    quoteText: str | None = Field(default=None, max_length=1000000)
 
 class ScanIn(BaseModel):
     rootId: StrictInt
@@ -265,12 +274,22 @@ def api_transcript(artifact_id:SqlPathId,derived_text_id:int|None=Query(None,ge=
         run_payload = dict(run) if run else None
         if run_payload:
             run_payload.pop('lease_token', None)
-        return {
-            'id':r['id'],'artifactId':r['artifact_id'],'model':r['model'],'language':r['language'],'text':r['text'],
-            'segments':json.loads(r['segments_json'] or '[]'),'confidence':r['confidence'],'createdAt':r['created_at'],
-            'runId':r['run_id'],'metadata':json.loads(r['metadata_json']),'run':run_payload,
-            'provenanceStatus':'recorded_processing_run' if run else 'legacy_unknown'
-        }
+        try:
+            segments = loads_transcript_segments(r['segments_json'] or '[]')
+            metadata = json.loads(r['metadata_json'])
+            if not isinstance(segments, list) or not isinstance(metadata, dict):
+                raise ValueError('invalid stored projection types')
+            payload = {
+                'id':r['id'],'artifactId':r['artifact_id'],'model':r['model'],'language':r['language'],'text':r['text'],
+                'segments':segments,'confidence':r['confidence'],'createdAt':r['created_at'],
+                'runId':r['run_id'],'metadata':metadata,'run':run_payload,
+                'provenanceStatus':'recorded_processing_run' if run else 'legacy_unknown',
+                'wordTiming':word_timing_capabilities(segments)
+            }
+            json.dumps(payload, ensure_ascii=False, allow_nan=False).encode('utf-8')
+            return payload
+        except (ValueError, TypeError, UnicodeError) as exc:
+            raise HTTPException(409, 'Stored transcript has malformed or nonfinite JSON; original values remain preserved in metadata export.') from exc
 
 @app.get('/api/artifacts/{artifact_id}/transcripts')
 def api_transcript_versions(artifact_id:SqlPathId):
@@ -298,7 +317,9 @@ def api_artifact_content(artifact_id:SqlPathId):
 @app.post('/api/artifacts/{artifact_id}/citations')
 def api_citation_create(artifact_id:SqlPathId,a:CitationIn):
     try:
-        return create_citation(artifact_id,a.derivedTextId,a.segmentIndices)
+        return create_citation(artifact_id,a.derivedTextId,a.segmentIndices,
+                              word_refs=[ref.model_dump() for ref in a.wordRefs] if a.wordRefs is not None else None,
+                              quote_text=a.quoteText)
     except ValueError as exc:
         raise HTTPException(422,str(exc)) from exc
 

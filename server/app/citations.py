@@ -147,6 +147,29 @@ def projection_from_selector(segments: list, selector: dict) -> dict:
     return projection
 
 
+def loads_transcript_segments(raw) -> list:
+    """Decode stored segments without silently resolving duplicate JSON keys.
+
+    Historical NaN values are retained in unused fields: the chosen projection
+    validates its actual text/times, so broken word data cannot grant word
+    precision but does not disable an independent legacy segment selector.
+    """
+    def object_without_duplicates(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError('stored transcript segments contain duplicate JSON keys')
+            result[key] = value
+        return result
+    try:
+        segments = json.loads(raw, object_pairs_hook=object_without_duplicates)
+    except (TypeError, ValueError) as error:
+        raise ValueError('stored transcript segments are invalid: ' + str(error)) from error
+    if not isinstance(segments, list):
+        raise ValueError('stored transcript segments must be an array')
+    return segments
+
+
 def anchor_payload(row) -> dict:
     result = dict(row)
     result['selector'] = json.loads(result.pop('selector_json'))
@@ -170,10 +193,7 @@ def create_citation(artifact_id: int, derived_text_id: int, segment_indices: lis
                                 (derived_text_id, artifact_id)).fetchone()
         if not transcript:
             raise ValueError('concrete transcript version does not belong to artifact')
-        try:
-            segments = json.loads(transcript['segments_json'])
-        except (ValueError, TypeError) as exc:
-            raise ValueError('stored transcript segments are invalid') from exc
+        segments = loads_transcript_segments(transcript['segments_json'])
         projection = (projection_from_words(segments, word_refs) if word_refs is not None
                       else projection_from_segments(segments, segment_indices))
         if quote_text is not None and quote_text != projection['quote_text']:

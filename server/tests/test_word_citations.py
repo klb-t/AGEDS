@@ -183,3 +183,40 @@ class StoredWordCitationTests(unittest.TestCase):
     def test_legacy_segment_citation_keeps_same_selector(self):
         anchor = citations.create_citation(self.aid, self.tid, [0])
         self.assertEqual(anchor['selector'], citations.projection_from_segments(segments(), [0])['selector'])
+
+    def test_duplicate_json_keys_at_any_depth_reject_creation_atomically(self):
+        raw_values = [
+            '[{"start":0,"end":1,"text":"first","text":"second"}]',
+            '[{"start":0,"end":1,"text":"x","words":[{"start":0,"start":0.1,"end":1,"word":"x"}]}]',
+            '[{"start":0,"end":1,"text":"x","metadata":{"origin":"one","origin":"two"}}]',
+        ]
+        for raw in raw_values:
+            with db.session() as conn:
+                tid = conn.execute("INSERT INTO derived_text(artifact_id,kind,text,segments_json) VALUES (?,'transcript','raw',?)",
+                                   (self.aid, raw)).lastrowid
+            before = self.counts()
+            for kwargs in ({'segment_indices': [0]}, {'word_refs': refs((0, 0))}):
+                with self.subTest(raw=raw, kwargs=kwargs), self.assertRaisesRegex(ValueError, 'duplicate JSON keys'):
+                    citations.create_citation(self.aid, tid, **kwargs)
+            self.assertEqual(self.counts(), before)
+
+    def test_unused_legacy_nan_words_do_not_disable_segment_citation(self):
+        raw = '[{"start":0,"end":1,"text":"x","words":[{"start":NaN,"end":1,"word":"x"}]}]'
+        with db.session() as conn:
+            tid = conn.execute("INSERT INTO derived_text(artifact_id,kind,text,segments_json) VALUES (?,'transcript','raw',?)",
+                               (self.aid, raw)).lastrowid
+        anchor = citations.create_citation(self.aid, tid, [0])
+        self.assertEqual(anchor['quote_text'], 'x')
+        self.assertEqual(anchor['selector']['precision'], 'segment')
+        before = self.counts()
+        with self.assertRaisesRegex(ValueError, 'finite'):
+            citations.create_citation(self.aid, tid, word_refs=refs((0, 0)))
+        self.assertEqual(self.counts(), before)
+        with db.session() as conn:
+            self.assertEqual(conn.execute('SELECT segments_json FROM derived_text WHERE id=?', (tid,)).fetchone()[0], raw)
+
+    def test_loader_rejects_non_array_or_invalid_json_and_retains_order(self):
+        for raw in (None, '', '{bad', '{}', 'null', '0', '"text"'):
+            with self.subTest(raw=raw), self.assertRaises(ValueError):
+                citations.loads_transcript_segments(raw)
+        self.assertEqual(citations.loads_transcript_segments(json.dumps(segments())), segments())

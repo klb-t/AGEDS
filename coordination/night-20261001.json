@@ -4,11 +4,11 @@
   "branch": "codex/ageds-night-20261001",
   "base_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2",
   "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate",
-  "updated_at": "2026-09-30T22:52:17.776223+00:00",
+  "updated_at": "2026-09-30T22:56:13.925411+00:00",
   "coordinator": {
     "owner": "current_root",
     "status": "active",
-    "lease_expires_at": "2026-09-30T23:37:17.776223+00:00",
+    "lease_expires_at": "2026-09-30T23:41:13.925411+00:00",
     "meaning": "Scheduling guard, not evidence of work; stale claim requires fresh remote comparison before takeover"
   },
   "tasks": [
@@ -117,8 +117,51 @@
         "server/tests/test_night_integration.py",
         "docs/NIGHT_QA.md"
       ],
-      "status": "in_progress",
-      "result": null
+      "status": "accepted",
+      "result": {
+        "backend_tests": 182,
+        "subtests": 207,
+        "warnings": 3,
+        "failed": 0,
+        "node_tests": 14,
+        "report": "docs/NIGHT_QA.md",
+        "scope": "Synthetic ASR, HTTP, roundtrip, HTML safety and fake audio control; no device/real ASR"
+      }
+    },
+    {
+      "id": "AGEDS-20261001-N7",
+      "owner": "coordinator",
+      "title": "Browser citation selection, bounded playback and strict HTTP projection",
+      "status": "accepted",
+      "scope": [
+        "server/app/main.py",
+        "server/app/templates/artifact.html",
+        "server/app/static/citations.mjs",
+        "server/app/static/range-player.mjs"
+      ],
+      "result": {
+        "node_tests": 14,
+        "included_in_full_backend": true,
+        "limitations": [
+          "No interactive physical browser/audio acceptance; approximate media seek"
+        ]
+      }
+    },
+    {
+      "id": "AGEDS-20261001-N8",
+      "owner": "night_packages",
+      "title": "Render source search fragments as text",
+      "status": "accepted",
+      "scope": [
+        "server/app/search.py",
+        "server/app/templates/index.html",
+        "server/tests/test_search_rendering.py"
+      ],
+      "result": {
+        "regressions": 2,
+        "failed_before_fix": true,
+        "raw_source_preserved": true
+      }
     }
   ],
   "publication": {

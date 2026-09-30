@@ -27,7 +27,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.URI
-import kotlin.math.roundToLong
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -344,7 +343,7 @@ private fun ColumnScope.TranscriptPane(
             else items(transcript.segments) { segment ->
                 Text("${"%.1f".format(segment.start)}–${"%.1f".format(segment.end)}  ${segment.text}",
                     modifier = Modifier.fillMaxWidth().clickable {
-                        interval = (segment.start * 1000).roundToLong() to (segment.end * 1000).roundToLong()
+                        interval = Math.rint(segment.start * 1000).toLong() to Math.rint(segment.end * 1000).toLong()
                     }.padding(vertical = 4.dp))
             }
         }

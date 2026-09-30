@@ -13,3 +13,4 @@ server/data/*
 __pycache__/
 *.py[cod]
 /data/
+.kotlin/

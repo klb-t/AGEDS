@@ -2,12 +2,12 @@
   "schema_version": 1,
   "project": "AGEDS",
   "state_id": "AGEDS-STATE-20260930-001",
-  "updated_at": "2026-09-30T17:29:09.866890+00:00",
+  "updated_at": "2026-09-30T17:54:55.251937+00:00",
   "based_on_remote_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0",
   "local_branch": "codex/ageds-foundation-20260930",
   "changes_published": true,
   "published_commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
-  "status_summary": "Backend zintegrowany, odebrany i opublikowany w PR #2: 123 testy i 84 podtesty. Android real build w toku; PR draft, bez wdrożenia main/produkcji.",
+  "status_summary": "Backend: 126 testów i 84 podtesty. Android: rzeczywisty build końcowego snapshotu i 1 test JVM przeszły; debug APK podpis poprawny. Publikacja finalnego narzędzia i odbioru w toku, bez wdrożenia produkcji.",
   "coordination": {
     "transport": "repository_commits_and_stable_ids",
     "history_search_role": "context_recall_only_not_delivery_or_order_guarantee",
@@ -221,14 +221,19 @@
     {
       "id": "AGEDS-TASK-20260930-006",
       "title": "Android: seed chooser, kolizje nazw i przejście do klienta",
-      "status": "done",
+      "status": "accepted",
       "owner": "foundation_android",
       "scope": [
         "androidApp/src/main/java/dev/klbt/ageds/CorpusStore.kt",
         "androidApp/src/main/java/dev/klbt/ageds/CorpusVm.kt",
         "androidApp/src/main/java/dev/klbt/ageds/CorpusUi.kt",
         "androidApp/src/main/java/dev/klbt/ageds/PendingRecordings.kt",
-        "androidApp/src/main/java/dev/klbt/ageds/MainActivity.kt"
+        "androidApp/src/main/java/dev/klbt/ageds/MainActivity.kt",
+        "gradlew",
+        "gradlew.bat",
+        "gradle/wrapper/gradle-wrapper.jar",
+        "gradle/wrapper/gradle-wrapper.properties",
+        "docs/ANDROID_BUILD.md"
       ],
       "acceptance": [
         "Dwa różne pliki o tej samej nazwie nie znikają",
@@ -243,7 +248,7 @@
         "A10"
       ],
       "result_id": "AGEDS-RESULT-20260930-006",
-      "integration_status": "source_reviewed_build_in_progress_device_pending",
+      "integration_status": "source_review_and_real_build_accepted_device_test_pending",
       "based_on_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0"
     },
     {
@@ -318,7 +323,7 @@
       "commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
       "validation": {
         "scanner_tests": 21,
-        "cli_tests": 9
+        "cli_tests": 10
       },
       "limits": [
         "POSIX no-follow descriptors required",
@@ -333,7 +338,7 @@
       "commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
       "validation": {
         "citation_tests": 18,
-        "package_tests": 16,
+        "package_tests": 18,
         "api_tests": 12
       },
       "limits": [
@@ -345,15 +350,24 @@
     {
       "id": "AGEDS-RESULT-20260930-006",
       "task_id": "AGEDS-TASK-20260930-006",
-      "scope": "android_source_review_build_in_progress",
+      "scope": "source_review_and_real_clean_snapshot_build",
       "commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
       "validation": {
-        "android_compile": "in_progress",
-        "device_test": "not_performed"
+        "command": "./gradlew :androidApp:assembleDebug :core:desktopTest",
+        "result": "BUILD SUCCESSFUL",
+        "jvm_tests": 1,
+        "failures": 0,
+        "source_hashes_match_repository": true,
+        "apk_name": "AGEDS_foundation_debug_2026-09-30.apk",
+        "apk_size_bytes": 14091343,
+        "apk_sha256": "b7d4548a12fa23ea20b76f30d13e742dc4c2c19562985418b730e9f48a57bc91",
+        "signature": "debug_v2_verified",
+        "device_test": "not_performed",
+        "report": "docs/ANDROID_BUILD.md"
       },
       "limits": [
         "Prepared JSON seed still required in Android corpus",
-        "Device validation pending"
+        "No device UI test or actual ASR model inference"
       ]
     },
     {
@@ -379,11 +393,11 @@
     },
     {
       "id": "AGEDS-TASK-20260930-009",
-      "status": "in_progress",
-      "title": "Rzeczywisty build Android i odbiór telefonu",
+      "status": "ready",
+      "title": "Odbiór gotowego debug APK na telefonie",
       "acceptance": "Artefakt builda oraz sprawdzona ścieżka wyboru, uploadu, transkrypcji i cytatu",
-      "owner": "foundation_android",
-      "progress": "Verified Gradle and SDK tools downloaded; SDK install/build underway"
+      "owner": "unassigned",
+      "progress": "Actual Android build and JVM test completed; phone validation remains"
     },
     {
       "id": "AGEDS-TASK-20260930-010",
@@ -409,11 +423,11 @@
     "Latest source-scanner request recovered from history, not complete raw export",
     "Ecosystem adapters are conceptual, not implemented",
     "Metadata package is not a full replay, signed artifact or exact restore",
-    "Native Android source scan without seed and actual device validation remain next scope"
+    "Native Android source scan without seed and actual device validation remain next scope; compilation passed"
   ],
   "validation": {
     "command": "python -m pytest server/tests -q",
-    "passed": 123,
+    "passed": 126,
     "subtests_passed": 84,
     "failed": 0,
     "warnings": 3,
@@ -422,7 +436,20 @@
     "independent_api_checks_passed": 31,
     "report": "docs/FOUNDATION_QA.md",
     "desktop_form_probe": "artifact page plus generic/versioned notes passed; blank version is treated as generic note",
-    "secondary_branch_review": "fix/standalone-android has identical relevant blobs to main; no missing patch"
+    "secondary_branch_review": "fix/standalone-android has identical relevant blobs to main; no missing patch",
+    "android": {
+      "command": "./gradlew :androidApp:assembleDebug :core:desktopTest",
+      "result": "BUILD SUCCESSFUL",
+      "jvm_tests": 1,
+      "failures": 0,
+      "source_hashes_match_repository": true,
+      "apk_name": "AGEDS_foundation_debug_2026-09-30.apk",
+      "apk_size_bytes": 14091343,
+      "apk_sha256": "b7d4548a12fa23ea20b76f30d13e742dc4c2c19562985418b730e9f48a57bc91",
+      "signature": "debug_v2_verified",
+      "device_test": "not_performed",
+      "report": "docs/ANDROID_BUILD.md"
+    }
   },
   "publication": {
     "content_commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",

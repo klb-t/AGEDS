@@ -25,7 +25,7 @@ The first practical module is the Evidence Workbench: ingest communication evide
 
 The Android client is deliberately thin. Evidence bytes, provenance, derived text and the audit log live in the evidence service rather than in Android-specific state.
 
-Android's corpus screen still reads a prepared JSON seed. The independent spreadsheet scanner runs on the server/local CLI; a native SAF scanner without a seed is the next increment. This increment does not yet have a compiled Android APK or a device test. See [HANDOFF.md](HANDOFF.md) for verified behavior and remaining work.
+Android's corpus screen still reads a prepared JSON seed. The independent spreadsheet scanner runs on the server/local CLI; a native SAF scanner without a seed is the next increment. The debug APK and JVM test have been built successfully; no device test has been performed. See [HANDOFF.md](HANDOFF.md) for verified behavior and remaining work.
 
 ## Project coordination
 
@@ -51,8 +51,12 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 pip install -r requirements-whisper.txt
+set -a
+. ./.env
+set +a
 uvicorn app.main:app --host 0.0.0.0 --port 8080
 # another shell:
+# activate the same environment and load .env with the three lines above
 python -m app.worker
 ```
 
@@ -60,7 +64,7 @@ For a physical Android device set the app's **Evidence server** field to the rea
 
 ## Android build
 
-Open the repository in Android Studio, or install Gradle 9.7.0, Java 21 and Android SDK 37, then run `gradle :androidApp:assembleDebug :core:desktopTest`. The workflow defines the same command. The repository currently has wrapper properties but lacks `gradlew` and the wrapper JAR, so `./gradlew` is not available. Dependency versions are pinned in the build files; their presence alone does not establish build success.
+Install a full JDK 21 (including `javac`) and Android SDK platform 37.0, then run `./gradlew :androidApp:assembleDebug :core:desktopTest`, or open the repository in Android Studio. The official Gradle 9.7.0 wrapper is included with a distribution checksum. Dependency versions remain pinned in the build files. The build report and verified artifact details are recorded in `docs/ANDROID_BUILD.md`; compilation and a phone test remain distinct checks.
 
 ## Read-only source scan
 

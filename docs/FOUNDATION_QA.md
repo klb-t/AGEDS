@@ -4,20 +4,22 @@
 serwerowy skan, API, cytaty segmentowe, pakiet metadanych oraz protokół koordynacji.
 
 **W sprawdzonym zakresie serwerowym nie pozostał materialny bloker.** Android
-przeszedł przegląd kodu; kompilacja i odbiór na urządzeniu wymagają osobnej
-weryfikacji. Wszystkie dane wykonanych testów były syntetyczne. Nie wykonywano
+przeszedł przegląd kodu oraz rzeczywistą kompilację końcowego snapshotu.
+Odbiór na urządzeniu pozostaje osobnym sprawdzeniem. Wszystkie dane wykonanych testów były syntetyczne. Nie wykonywano
 realnej inferencji ASR ani odczytu prywatnego korpusu użytkownika.
 
 ## Wyniki
 
 | Sprawdzenie | Wynik | Co rzeczywiście potwierdza |
 |---|---|---|
-| Zbiorcze `python -m pytest server/tests -q` | **123 testy i 84 subtesty przeszły**, 3 ostrzeżenia deprecacji | Integrację bieżącego backendu, w tym TestClient i procesy CLI. |
+| Zbiorcze `python -m pytest server/tests -q` | **126 testów i 84 subtesty przeszły**, 3 ostrzeżenia deprecacji | Integrację bieżącego backendu, w tym TestClient i procesy CLI. |
 | Niezależna ścieżka API | **31/31 sprawdzeń przeszło** | Upload → akwizycje → kolejka → syntetyczny worker → wersja tekstu → adnotacja/cytat → eksport i walidacja. |
 | Migracja starego schematu | Poprawne i uszkodzone historyczne metadane zachowane; ponowna migracja idempotentna | Stare rekordy nie są zastępowane fikcyjnym pochodzeniem. |
 | Integralność pozyskania | Dwa źródła zachowane; granice spraw sprawdzone; uszkodzona kopia odrzucona | Deduplikacja nie usuwa kolejnej akwizycji i nie naprawia po cichu zapisanego materiału. |
 | Niezależna walidacja pakietu | Zmienione digesty, brakujące relacje i sfabrykowany cytat wykrywane | Graf metadanych i selektor są sprawdzane; bajty źródeł i prawdziwość wypowiedzi nie są weryfikowane. |
+| Eksport brakującej bazy | Odmowa bez utworzenia bazy lub wyjściowego pakietu; CLI JSON błędu i exit 2 | SQLite mode=ro zamiast domyślnego tworzenia pliku. Globalny config może tworzyć prywatne katalogi runtime. |
 | CLI verify z rzeczywistym pakietem zawierającym cytat | Poprawna walidacja bez utworzenia katalogów lub plików w pustym cwd | Weryfikacja selektora nie uruchamia konfiguracji storage ani pracy jobów. |
+| Android build i JVM | BUILD SUCCESSFUL; 1 test JVM, podpis APK debug v2 poprawny | Końcowe źródła zgodne hashami z repo; szczegóły w `ANDROID_BUILD.md`. Nie jest to test telefonu lub ASR. |
 | Przegląd dokumentów koordynacji | Bez deklaracji dodatkowych slotów, doręczenia przez historię lub aktywności w tle | Protokół wymaga odczytanego commitu, stabilnego ID i potwierdzenia odbioru. |
 
 Ostrzeżenia dotyczą dotychczasowego `on_event` FastAPI i aliasu AnyIO używanego
@@ -93,8 +95,7 @@ cytatu. Jego precision jest segmentowe; odsłuch audio nie został wykonany.
   domenowych pól.
 - Nowy skaner CSV/XLS/XLSX działa na serwerze. Android nadal korzysta z seed JSON
   i indeksowania nagrań; samodzielny skan SAF bez seed pozostaje kolejnym zadaniem.
-- Test adaptera syntetycznego nie potwierdza jakości faster-whisper. Build Android,
-  test telefonu, dokładne selektory słów i realne integracje ekosystemu wymagają
+- Test adaptera syntetycznego nie potwierdza jakości faster-whisper. Test telefonu, dokładne selektory słów i realne integracje ekosystemu wymagają
   odrębnych dowodów wykonania.
 
 Rutynowe strategie techniczne w powierzonym zakresie pozostają autonomiczne.

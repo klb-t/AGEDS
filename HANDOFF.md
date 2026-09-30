@@ -30,14 +30,15 @@ w tamtym wątku; nie zakładamy dodatkowej puli sześciu procesów.
 | Wyniki i cytaty | Adnotacja wskazuje wyświetloną wersję. Cytat segmentowy zachowuje dokładny tekst, hash i selektor. Weryfikacja oznacza zgodność z zapisaną wersją ASR; nie oznacza odsłuchu lub prawdziwości wypowiedzi. |
 | Skaner | Read-only CSV/TSV, XLS, XLSX, WAV, inwentaryzacja/hash innych plików. Kolizje nazw, kandydaci powiązań i sprzeczności zachowane. Limity, brak adaptera i uszkodzenia jawne. Safe no-follow descriptors wymagają wspieranego systemu POSIX. |
 | Pakiet | Snapshot 16 tabel metadanych, digests i walidacja grafu oraz cytatów. Bez bajtów źródeł, podpisu, wznowienia jobs, replay lub przywrócenia live DB. |
-| Android | Wszystkie URI kolizyjnych nazw, wybór konkretnego kandydata, prywatny manifest wyboru, jawne wysłanie na wybrany serwer, wyniki/błędy każdego pliku, wersja adnotacji. Corpus nadal wymaga seed JSON. Build i test telefonu są oddzielnym odbiorem. |
+| Android | Wszystkie URI kolizyjnych nazw, wybór konkretnego kandydata, prywatny manifest wyboru, jawne wysłanie na wybrany serwer, wyniki/błędy każdego pliku, wersja adnotacji. Corpus nadal wymaga seed JSON. Build debug APK i test JVM przeszły; test telefonu pozostaje oddzielnym odbiorem. |
 
 `scanner.observations` to obserwacje pól i hipotez; SQLite `source_observations`
 to pozyskania bajtów. Wspólny zapis JSON nie oznacza wspólnej semantyki.
 
 ## Odbiór
 
-Wykonano syntetyczne testy jednostkowe, współbieżności i HTTP; dokładny wynik
+Wykonano 126 testów serwera i 84 podtesty, rzeczywisty build Android oraz
+1 test JVM. Sprawdzono podpis debug APK; dokładny wynik
 pełnego przebiegu zapisuje `docs/FOUNDATION_QA.md` oraz `coordination/state.json`.
 Niezależny odbiór obejmuje migrację starego schematu, powtórne importy,
 przerwanie workera, przypięcie starszej wersji, ingerencję w pakiet i skan bez
@@ -49,8 +50,9 @@ nie są fizycznym WORM ani kryptograficznym podpisem łańcucha pochodzenia.
 
 ## Następny zakres wykonawczy
 
-1. Rzeczywisty build Android i próba telefonu; naprawa narzędzi/builda na
-   podstawie błędów, bez deklarowania APK na podstawie przeglądu kodu.
+1. Odbiór na telefonie z gotowym debug APK: wybór źródeł, upload, kolejka,
+   transkrypcja i przypięcie adnotacji. Build i test JVM już przeszły;
+   szczegóły i SHA-256 są w `docs/ANDROID_BUILD.md`.
 2. Natywny skan wskazanego drzewa SAF bez seed: raw rekordy/komórki, lokatory,
    konflikty i pokrycie. Zachować wspólne kontrakty, bez kopiowania serwerowej
    semantyki ścieżek do Android URI.

@@ -42,6 +42,7 @@ class EvidenceApi(private var baseUrl: String) {
 
     suspend fun uploadAudio(resolver: ContentResolver, uri: Uri, sourcePath: String? = null): UploadResult {
         val name = queryName(resolver, uri) ?: "recording"
+        val transportName = name.replace('"', '_').replace('\\', '_').replace('\r', '_').replace('\n', '_')
         val mime = resolver.getType(uri) ?: "application/octet-stream"
         return client.submitFormWithBinaryData(
             url = "$baseUrl/api/artifacts/upload",
@@ -51,13 +52,14 @@ class EvidenceApi(private var baseUrl: String) {
                 append("metadata_json", buildJsonObject {
                     put("client", "AGEDS Android")
                     put("locator_kind", "android_saf_uri")
+                    put("client_original_name", name)
                     if (sourcePath != null) put("client_relative_path", sourcePath)
                 }.toString())
                 append("file", InputProvider {
                     resolver.openInputStream(uri)?.asInput() ?: error("Cannot open $uri")
                 }, Headers.build {
                     append(HttpHeaders.ContentType, mime)
-                    append(HttpHeaders.ContentDisposition, "filename=\"${name.replace("\"", "_")}\"")
+                    append(HttpHeaders.ContentDisposition, "filename=\"$transportName\"")
                 })
             }
         ).body()

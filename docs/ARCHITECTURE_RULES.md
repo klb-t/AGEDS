@@ -96,6 +96,6 @@ kontraktu partnera, nie skutkiem samej obecności w ekosystemie.
 | LLM / pięć warstw | Zachowane wymagania H1 i rozumowanie H2; nieaktywne rozszerzenia. | Konkretny scenariusz i test metadanych, klasyfikacji, Live Explainer, custody oraz kontroli rozbieżności. |
 
 Najbliższy odbiór obejmuje serwerowy skan, idempotentne importy, lease, wersje
-wyników i przypięcie cytatu. Native SAF, faktyczny build Android i test telefonu,
+wyników i przypięcie cytatu. Native SAF, test telefonu,
 dokładne słowa oraz restore metadanych są oddzielnymi następnymi zadaniami.
 Syntetyczny adapter ASR nie potwierdza jakości realnego rozpoznawania mowy.

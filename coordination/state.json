@@ -2,12 +2,12 @@
   "schema_version": 1,
   "project": "AGEDS",
   "state_id": "AGEDS-STATE-20260930-001",
-  "updated_at": "2026-09-30T17:24:28.416504+00:00",
+  "updated_at": "2026-09-30T17:29:09.866890+00:00",
   "based_on_remote_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0",
   "local_branch": "codex/ageds-foundation-20260930",
-  "changes_published": false,
-  "published_commit": null,
-  "status_summary": "Backend zintegrowany i odebrany: 123 testy oraz 84 podtesty. Android source review ukończony; rzeczywisty build w toku. Publikacja zdalna czeka na potwierdzenie.",
+  "changes_published": true,
+  "published_commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
+  "status_summary": "Backend zintegrowany, odebrany i opublikowany w PR #2: 123 testy i 84 podtesty. Android real build w toku; PR draft, bez wdrożenia main/produkcji.",
   "coordination": {
     "transport": "repository_commits_and_stable_ids",
     "history_search_role": "context_recall_only_not_delivery_or_order_guarantee",
@@ -281,7 +281,7 @@
       "id": "AGEDS-RESULT-20260930-001",
       "task_id": "AGEDS-TASK-20260930-001",
       "scope": "integrated_foundation_increment",
-      "commit": null,
+      "commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
       "validation": {
         "integrity_tests": 13
       },
@@ -291,7 +291,7 @@
       "id": "AGEDS-RESULT-20260930-002",
       "task_id": "AGEDS-TASK-20260930-002",
       "scope": "integrated_foundation_increment",
-      "commit": null,
+      "commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
       "validation": {
         "queue_tests": 19
       },
@@ -305,7 +305,7 @@
       "id": "AGEDS-RESULT-20260930-003",
       "task_id": "AGEDS-TASK-20260930-003",
       "scope": "integrated_foundation_increment",
-      "commit": null,
+      "commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
       "validation": {
         "importer_tests": 14
       },
@@ -315,7 +315,7 @@
       "id": "AGEDS-RESULT-20260930-004",
       "task_id": "AGEDS-TASK-20260930-004",
       "scope": "integrated_foundation_increment",
-      "commit": null,
+      "commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
       "validation": {
         "scanner_tests": 21,
         "cli_tests": 9
@@ -330,7 +330,7 @@
       "id": "AGEDS-RESULT-20260930-005",
       "task_id": "AGEDS-TASK-20260930-005",
       "scope": "integrated_foundation_increment",
-      "commit": null,
+      "commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
       "validation": {
         "citation_tests": 18,
         "package_tests": 16,
@@ -346,7 +346,7 @@
       "id": "AGEDS-RESULT-20260930-006",
       "task_id": "AGEDS-TASK-20260930-006",
       "scope": "android_source_review_build_in_progress",
-      "commit": null,
+      "commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
       "validation": {
         "android_compile": "in_progress",
         "device_test": "not_performed"
@@ -360,7 +360,7 @@
       "id": "AGEDS-RESULT-20260930-007",
       "task_id": "AGEDS-TASK-20260930-007",
       "scope": "integrated_foundation_increment",
-      "commit": null,
+      "commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
       "validation": {
         "method": "source_scoped_document_review_and_json_parse"
       },
@@ -420,6 +420,18 @@
     "data": "synthetic",
     "asr": "synthetic_adapter_only",
     "independent_api_checks_passed": 31,
-    "report": "docs/FOUNDATION_QA.md"
+    "report": "docs/FOUNDATION_QA.md",
+    "desktop_form_probe": "artifact page plus generic/versioned notes passed; blank version is treated as generic note",
+    "secondary_branch_review": "fix/standalone-android has identical relevant blobs to main; no missing patch"
+  },
+  "publication": {
+    "content_commit": "91529270254271b4d84c47d7e1b1b6904edb1d0f",
+    "content_tree": "68d6bcd445775a5d38a5781d31aa87c4fa68dc8b",
+    "changed_files_verified": 42,
+    "branch": "codex/ageds-foundation-20260930",
+    "pull_request": "https://github.com/klb-t/AGEDS/pull/2",
+    "draft": true,
+    "merged": false,
+    "receipt_semantics": "This record confirms the referenced content commit; the receipt itself is stored in a later commit."
   }
 }

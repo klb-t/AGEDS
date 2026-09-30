@@ -1,0 +1,102 @@
+{
+  "schema_version": 1,
+  "batch": "AGEDS-NIGHT-20261001",
+  "branch": "codex/ageds-night-20261001",
+  "base_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2",
+  "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate",
+  "updated_at": "2026-09-30T22:40:24.174352+00:00",
+  "coordinator": {
+    "owner": "current_root",
+    "status": "active",
+    "lease_expires_at": "2026-09-30T23:25:24.174352+00:00",
+    "meaning": "Scheduling guard, not evidence of work; stale claim requires fresh remote comparison before takeover"
+  },
+  "tasks": [
+    {
+      "id": "AGEDS-20261001-N1",
+      "owner": "night_scan",
+      "title": "Native SAF bounded read-only engine",
+      "scope": [
+        "SourceScanner.kt",
+        "new core scan parsers/models/tests"
+      ],
+      "status": "in_progress",
+      "result": null
+    },
+    {
+      "id": "AGEDS-20261001-N2",
+      "owner": "night_android",
+      "title": "Source workspace without seed and exact URI selection",
+      "scope": [
+        "CorpusStore.kt",
+        "CorpusVm.kt",
+        "CorpusUi.kt",
+        "SourceScanUi.kt",
+        "SourceScanCache.kt"
+      ],
+      "status": "in_progress",
+      "result": null
+    },
+    {
+      "id": "AGEDS-20261001-N3",
+      "owner": "night_citations",
+      "title": "Word timestamps and version-pinned exact word citations",
+      "scope": [
+        "server/app/citations.py",
+        "server/app/transcription.py",
+        "server/app/worker.py",
+        "word citation tests"
+      ],
+      "status": "in_progress",
+      "result": null
+    },
+    {
+      "id": "AGEDS-20261001-N4",
+      "owner": "night_packages",
+      "title": "Inert metadata archive exact import/export",
+      "scope": [
+        "server/app/packages.py",
+        "server/app/archive.py",
+        "server/app/cli.py",
+        "archive/package/CLI tests"
+      ],
+      "status": "in_progress",
+      "result": null
+    },
+    {
+      "id": "AGEDS-20261001-N5",
+      "owner": "night_build",
+      "title": "Actual Android build and test toolchain",
+      "scope": [
+        "Gradle configuration",
+        "docs/ANDROID_NIGHT_BUILD.md"
+      ],
+      "status": "in_progress",
+      "result": null
+    },
+    {
+      "id": "AGEDS-20261001-N6",
+      "owner": "night_qa",
+      "title": "Independent end-to-end acceptance",
+      "scope": [
+        "server/tests/test_night_integration.py",
+        "docs/NIGHT_QA.md"
+      ],
+      "status": "in_progress",
+      "result": null
+    }
+  ],
+  "publication": {
+    "status": "claimed",
+    "foundation_pr": "https://github.com/klb-t/AGEDS/pull/2",
+    "foundation_merged": true
+  },
+  "next_queue": [
+    "Fix independently reproduced correctness failures before adding scope",
+    "Native XLS adapter if still unsupported; bounded raw observations, no formula execution",
+    "Device/emulator SAF acceptance if available; otherwise record concrete device checklist",
+    "Controlled segment/word playback and citation UI",
+    "Real ASR using small synthetic public fixture only if dependency/model download feasible and no paid services",
+    "Read-only ecosystem evidence export contract tested against a concrete consumer, never pretend implemented integrations"
+  ]
+}

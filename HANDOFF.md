@@ -3,10 +3,10 @@
 Stan bieżący: nocny przyrost 2026-10-01. Fundament PR #2 scalono w `main`
 w commicie `b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2`.
 PR #3 scalono w main (`8c3efb9e65999dd4931b22b555329da76379c31e`).
-Bieżący opublikowany checkpoint: fala 8. branch `codex/ageds-night-20261001`, PR #4 (otwarty).
-Kod fali 8 opublikowany i sprawdzony; nie wykonano scalenia PR #4 do main.
-Trwa fala 9: testowalna na hoście produkcyjna polityka drzewa źródeł
-z cienkim adapterem SAF. Szczegóły przydziałów w indeksie.
+Bieżący opublikowany checkpoint: fala 9. branch `codex/ageds-night-20261001`, PR #4 (otwarty).
+Kod fali 9 opublikowany i sprawdzony; nie wykonano scalenia PR #4 do main.
+Trwa fala 10: wspólne limity zdekodowanego JSON i pracy cytatów
+w inertnym archiwum. Szczegóły przydziałów w indeksie.
 **Najświeższy odbiór i kolejka: `coordination/night-20261001.json`.**
 Procedura wznowienia: `coordination/NIGHT_WORK.md`.
 `coordination/state.json` zachowuje odbiór fundamentu i odsyła do nowego etapu.
@@ -39,7 +39,7 @@ w tamtym wątku; nie zakładamy dodatkowej puli sześciu procesów.
 | Wyniki i cytaty | Adnotacja wskazuje wyświetloną wersję. Cytat segmentowy lub słowny zachowuje dokładny tekst, hash i selektor. Wybór słów wymaga zgodnych zapisanych znaczników ASR; brak precyzji pozostaje jawny. Weryfikacja oznacza zgodność z zapisaną wersją ASR; nie oznacza odsłuchu lub prawdziwości wypowiedzi. |
 | Skaner | Read-only CSV/TSV, XLS, XLSX, WAV, inwentaryzacja/hash innych plików. Kolizje nazw, kandydaci powiązań i sprzeczności zachowane. Limity, brak adaptera i uszkodzenia jawne. Safe no-follow descriptors wymagają wspieranego systemu POSIX. |
 | Pakiet | Snapshot 16 tabel metadanych, digests i walidacja grafu oraz cytatów. Dokładny kanoniczny roundtrip do inertnego archiwum SQLite i z powrotem. Bez bajtów źródeł, podpisu, wznowienia jobs, replay lub przywrócenia live DB. |
-| Android | Wszystkie URI kolizyjnych nazw, wybór konkretnego kandydata, prywatny manifest wyboru, jawne wysłanie na wybrany serwer, wyniki/błędy każdego pliku, wersja adnotacji. Widok Źródła skanuje SAF bez seed: CSV/TSV, XLSX, podstawowy WAV i inventory, raw komórki, lokatory, kolizje, ograniczenia. Dawny katalog JSON jest opcjonalny. Natywny XLS: ograniczona, jawnie częściowa projekcja BIFF8. UTF-16 BOM i hipotezy separatorów CSV z metadanymi niejednoznaczności. Aktualny zaakceptowany build i testy: `docs/ANDROID_WAVE7_BUILD.md`; telefon pozostaje oddzielnym odbiorem. |
+| Android | Wszystkie URI kolizyjnych nazw, wybór konkretnego kandydata, prywatny manifest wyboru, jawne wysłanie na wybrany serwer, wyniki/błędy każdego pliku, wersja adnotacji. Widok Źródła skanuje SAF bez seed: CSV/TSV, XLSX, podstawowy WAV i inventory, raw komórki, lokatory, kolizje, ograniczenia. Dawny katalog JSON jest opcjonalny. Natywny XLS: ograniczona, jawnie częściowa projekcja BIFF8. UTF-16 BOM i hipotezy separatorów CSV z metadanymi niejednoznaczności. Aktualny zaakceptowany build i testy: `docs/ANDROID_WAVE9_BUILD.md`; telefon pozostaje oddzielnym odbiorem. |
 
 `scanner.observations` to obserwacje pól i hipotez; SQLite `source_observations`
 to pozyskania bajtów. Wspólny zapis JSON nie oznacza wspólnej semantyki.
@@ -70,8 +70,8 @@ nie są fizycznym WORM ani kryptograficznym podpisem łańcucha pochodzenia.
 
 ## Następny zakres wykonawczy
 
-1. Aktywna fala 9: wykonać produkcyjną politykę całego drzewa na syntetycznym
-   dostawcy JVM; oddzielić ten odbiór od nadal niedostępnego runtime SAF.
+1. Aktywna fala 10: ograniczyć dekodowanie zagnieżdżonego JSON i powtarzaną
+   pracę projekcji cytatów w inertnym archiwum, zachowując dokładny roundtrip.
 2. Uruchomić gotowe sześć testów SAF, gdy będzie dostępny runtime Android;
    oddzielnie sprawdzić picker, cykl uprawnień i wybór nagrań. Brak emulatora
    w obecnym środowisku jest obserwowaną blokadą, nie dowodem błędu aplikacji.
@@ -149,3 +149,10 @@ od wcześniejszych, niepowtarzanych prób serwera/ASR. Telefon nadal niebadany.
 syntetyczne, a oba parsery WAV zgodziły się w24 przypadkach/408 polach.
 Naprawiono błędną kompletność uciętego pliku oraz trzy błędy obsługi zmiany
 plików i deskryptorów. Dowody: `docs/WAVE8_QA.md`. APK nadal z fali7.
+
+## Odbiór fali 9
+
+337 JVM przeszło; produkcyjny silnik wykonał50 nowych testów polityki,
+formatów, zasobów i cache. Cienki SAF adapter skompilowano. Pierwszy build
+ujawnił niezgodny classpath testu; poprawiony pełny build i APK przeszły.
+Dowody: `docs/WAVE9_QA.md`. Telefon/SAF runtime nadal niebadane.

@@ -4,13 +4,13 @@
   "branch": "codex/ageds-night-20261001",
   "base_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2",
   "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate; user 01:33 Europe/Amsterdam explicitly requests continuous progression while useful work remains, without ending after a checkpoint",
-  "updated_at": "2026-10-01T01:03:30.470096+00:00",
+  "updated_at": "2026-10-01T01:20:16.624563+00:00",
   "coordinator": {
-    "owner": "root-wave9-20261001T0304",
+    "owner": "root-wave10-20261001T0320",
     "status": "active",
-    "claimed_at": "2026-10-01T01:03:30.470096+00:00",
-    "lease_expires_at": "2026-10-01T01:58:30.470096+00:00",
-    "based_on_remote_head": "ccae82c43777bed457ce7ef2b582a20af8a2a65d"
+    "claimed_at": "2026-10-01T01:20:16.624563+00:00",
+    "lease_expires_at": "2026-10-01T02:15:16.624563+00:00",
+    "based_on_remote_head": "9965a3563d04a0136a88760d416ea0aa2362f5f7"
   },
   "tasks": [
     {
@@ -981,11 +981,17 @@
       "scope": [
         "new SourceScanEngine.kt and read-only provider contracts; owner tests/doc"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Same bounded traversal and real parsers through injected read-only provider; no new parser behavior; lazy closeable child enumeration"
       ],
-      "based_on_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d"
+      "based_on_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d",
+      "result": {
+        "report": "docs/WAVE9_QA.md",
+        "integrated_jvm_tests": 337,
+        "runtime_saf": "not_executed",
+        "new_tests_by_task": 6
+      }
     },
     {
       "id": "AGEDS-20261001-N56",
@@ -994,11 +1000,17 @@
       "scope": [
         "SourceScanner.kt; adapter documentation"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "DocumentsContract URI behavior retained; actual ContentResolver only adapter; cancellation and IO dispatcher preserved; no write methods"
       ],
-      "based_on_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d"
+      "based_on_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d",
+      "result": {
+        "report": "docs/WAVE9_QA.md",
+        "integrated_jvm_tests": 337,
+        "runtime_saf": "not_executed",
+        "new_tests_by_task": 0
+      }
     },
     {
       "id": "AGEDS-20261001-N57",
@@ -1007,11 +1019,17 @@
       "scope": [
         "new JVM traversal adversarial tests/doc"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Cycles, duplicate names/URIs, directory/file/locator/content/result budgets, partial coverage and actual requested resources"
       ],
-      "based_on_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d"
+      "based_on_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d",
+      "result": {
+        "report": "docs/WAVE9_QA.md",
+        "integrated_jvm_tests": 337,
+        "runtime_saf": "not_executed",
+        "new_tests_by_task": 14
+      }
     },
     {
       "id": "AGEDS-20261001-N58",
@@ -1020,11 +1038,17 @@
       "scope": [
         "new JVM mixed-format engine fixtures/tests/doc"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Actual production CSV/XLS/XLSX/WAV parsers invoked through tree engine; raw cells and URI/source separation maintained"
       ],
-      "based_on_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d"
+      "based_on_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d",
+      "result": {
+        "report": "docs/WAVE9_QA.md",
+        "integrated_jvm_tests": 337,
+        "runtime_saf": "not_executed",
+        "new_tests_by_task": 5
+      }
     },
     {
       "id": "AGEDS-20261001-N59",
@@ -1033,11 +1057,17 @@
       "scope": [
         "new JVM engine cancellation/failure tests/doc"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Every cursor/input closes on caps/errors/cancel; consumed bytes and failure coverage retained; no Android runtime claim"
       ],
-      "based_on_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d"
+      "based_on_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d",
+      "result": {
+        "report": "docs/WAVE9_QA.md",
+        "integrated_jvm_tests": 337,
+        "runtime_saf": "not_executed",
+        "new_tests_by_task": 20
+      }
     },
     {
       "id": "AGEDS-20261001-N60",
@@ -1046,11 +1076,110 @@
       "scope": [
         "new host scan/cache integration tests/doc"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Actual engine result roundtrip to separate metadata cache; source unchanged, URI collisions preserved, failed oversized cache preserves prior snapshot"
       ],
-      "based_on_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d"
+      "based_on_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d",
+      "result": {
+        "report": "docs/WAVE9_QA.md",
+        "integrated_jvm_tests": 337,
+        "runtime_saf": "not_executed",
+        "new_tests_by_task": 5
+      }
+    },
+    {
+      "id": "AGEDS-20261001-N61",
+      "owner": "exchange_core",
+      "title": "Bound semantic JSON and projection work in package verification",
+      "scope": [
+        "server/app/packages.py",
+        "new semantic budget helper",
+        "owner tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "synthetic data only",
+        "bounded semantic work with explicit failures",
+        "exact canonical roundtrip retained",
+        "no live restore or replay"
+      ]
+    },
+    {
+      "id": "AGEDS-20261001-N62",
+      "owner": "android_contract",
+      "title": "Apply archive limits across semantic verification entrypoints",
+      "scope": [
+        "server/app/archive.py",
+        "archive limit owner tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "synthetic data only",
+        "bounded semantic work with explicit failures",
+        "exact canonical roundtrip retained",
+        "no live restore or replay"
+      ]
+    },
+    {
+      "id": "AGEDS-20261001-N63",
+      "owner": "exchange_qa",
+      "title": "Independent adversarial semantic node/depth/cache acceptance",
+      "scope": [
+        "new resource-budget tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "synthetic data only",
+        "bounded semantic work with explicit failures",
+        "exact canonical roundtrip retained",
+        "no live restore or replay"
+      ]
+    },
+    {
+      "id": "AGEDS-20261001-N64",
+      "owner": "exchange_consumer",
+      "title": "Exact inert archive roundtrip with bounded decoded semantics",
+      "scope": [
+        "new roundtrip acceptance tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "synthetic data only",
+        "bounded semantic work with explicit failures",
+        "exact canonical roundtrip retained",
+        "no live restore or replay"
+      ]
+    },
+    {
+      "id": "AGEDS-20261001-N65",
+      "owner": "android_citations",
+      "title": "Actual CLI archive budget rejection and atomic outputs",
+      "scope": [
+        "new CLI acceptance tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "synthetic data only",
+        "bounded semantic work with explicit failures",
+        "exact canonical roundtrip retained",
+        "no live restore or replay"
+      ]
+    },
+    {
+      "id": "AGEDS-20261001-N66",
+      "owner": "android_qa",
+      "title": "Independent repeated word-projection work budget acceptance",
+      "scope": [
+        "new projection-work tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "synthetic data only",
+        "bounded semantic work with explicit failures",
+        "exact canonical roundtrip retained",
+        "no live restore or replay"
+      ]
     }
   ],
   "publication": {
@@ -1093,12 +1222,17 @@
     "wave8_content_commits": [
       "ff1879d7e4cd5823b234cbdb1e813fcd075931a8",
       "ccae82c43777bed457ce7ef2b582a20af8a2a65d"
+    ],
+    "wave9_content_commits": [
+      "0d1a0c3693b3773a53470d96da29141b4cb73dbb",
+      "9965a3563d04a0136a88760d416ea0aa2362f5f7"
     ]
   },
   "next_queue": [
     "N10-runtime: Execute six compiled synthetic SAF-provider tests only when a device/emulator is available; picker/grant lifecycle and recording selection remain distinct",
     "N17: Once disk capacity permits, verify a wholly clean ASR dependency installation using the new explicit pins; current corrected runtime passed actual inference",
-    "N18: Extend native workbook/text formats only against concrete unsupported source patterns with bounded independent fixtures; maintain partial coverage and source preservation"
+    "N18: Extend native workbook/text formats only against concrete unsupported source patterns with bounded independent fixtures; maintain partial coverage and source preservation",
+    "Native scan cancellation/cache publication TOCTOU: linearize generation invalidation and final atomic move; concrete window between ensureActive and Files.move identified in wave9 review."
   ],
   "automation": {
     "created": true,
@@ -1106,7 +1240,7 @@
     "window": "2026-10-01 01:00 through 06:00 hourly flexible, six occurrences",
     "guard": "fresh active coordinator claim prevents duplicate takeover"
   },
-  "accepted_code_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d",
+  "accepted_code_commit": "9965a3563d04a0136a88760d416ea0aa2362f5f7",
   "validation": {
     "backend_tests": 370,
     "backend_subtests": 506,
@@ -1114,16 +1248,16 @@
     "existing_deprecation_warnings": 3,
     "node_fake_audio_tests": 14,
     "actual_chromium_tests": 21,
-    "android_jvm_tests": 176,
+    "android_jvm_tests": 226,
     "desktop_jvm_tests": 111,
     "gradle_tasks_executed": 57,
-    "build_inputs_verified": 76,
+    "build_inputs_verified": 82,
     "instrumentation_tests_compiled": 6,
     "instrumentation_runtime_tests": 0,
     "phone_saf_test": "not_performed_no_runtime",
     "real_asr": "passed_offline_tiny_en_verified_seekable_input_generated_speech",
     "source_data": "synthetic",
-    "apk_sha256": "284203bf79260c8266f16c7515b6b72609152723c17523e69109dfb6be7ece1d",
+    "apk_sha256": "05d4eea3b424b79f21fdf89b2687da7992ee297bb39c160ed9836c61e80044bc",
     "node_identifier_tests": 9,
     "node_history_page_tests": 11,
     "node_history_payload_tests": 15,
@@ -1132,9 +1266,10 @@
     "wave8_rerun_scope": "full backend, actual CLI source scan, both production WAV parsers; Android APK/browser/ASR unchanged",
     "wav_cross_runtime_cases": 24,
     "wav_cross_runtime_field_comparisons": 408,
-    "actual_cli_wav_fixtures": 5
+    "actual_cli_wav_fixtures": 5,
+    "wave9_rerun_scope": "337 JVM tests and actual Android build; backend/browser/ASR unchanged"
   },
-  "current_wave": 9,
+  "current_wave": 10,
   "wave1_validation": {
     "backend_tests": 182,
     "backend_subtests": 207,
@@ -1150,18 +1285,19 @@
     "source_data": "synthetic"
   },
   "next_concrete_step": {
-    "id": "AGEDS-20261001-N55",
+    "id": "AGEDS-20261001-N61",
     "status": "in_progress",
-    "observed_gap": "Native traversal orchestration only compiles; no device available. Parser/reader execution does not test combined tree policy.",
+    "observed_gap": "Archive outer limits exclude decoded selector/segments JSON; same version decoded per anchor, repeated word projection also needs bounded work. Reproduced with compact synthetic inputs.",
     "scope": [
-      "read-only provider seam and production host-testable scan engine",
-      "unchanged thin SAF adapter"
+      "shared node/depth budget",
+      "per-validation decode reuse",
+      "bounded projection work"
     ],
     "acceptance": [
-      "real production traversal with synthetic provider",
-      "no new paid/runtime dependencies",
-      "independent mixed-format/resource/cache tests",
-      "device limitations explicit"
+      "independent adversarial tests",
+      "exact canonical roundtrip",
+      "actual CLI no partial publication",
+      "full backend regression"
     ]
   },
   "coordinator_history": [
@@ -1220,6 +1356,14 @@
       "lease_expires_at": "2026-10-01T01:03:30.470096+00:00",
       "based_on_remote_head": "c723fd535d5b7b07565697d37d57a867649f06b2",
       "completed_at": "2026-10-01T01:03:30.470096+00:00"
+    },
+    {
+      "owner": "root-wave9-20261001T0304",
+      "status": "completed",
+      "claimed_at": "2026-10-01T01:03:30.470096+00:00",
+      "lease_expires_at": "2026-10-01T01:20:16.624563+00:00",
+      "based_on_remote_head": "ccae82c43777bed457ce7ef2b582a20af8a2a65d",
+      "completed_at": "2026-10-01T01:20:16.624563+00:00"
     }
   ],
   "wave2_validation": {
@@ -1341,5 +1485,32 @@
     "node_history_payload_tests": 15,
     "node_total_tests": 49,
     "wave7_rerun_scope": "Android/core JVM and APK; backend/Node/browser/ASR unchanged since wave6"
+  },
+  "wave8_validation": {
+    "backend_tests": 370,
+    "backend_subtests": 506,
+    "backend_failures": 0,
+    "existing_deprecation_warnings": 3,
+    "node_fake_audio_tests": 14,
+    "actual_chromium_tests": 21,
+    "android_jvm_tests": 176,
+    "desktop_jvm_tests": 111,
+    "gradle_tasks_executed": 57,
+    "build_inputs_verified": 76,
+    "instrumentation_tests_compiled": 6,
+    "instrumentation_runtime_tests": 0,
+    "phone_saf_test": "not_performed_no_runtime",
+    "real_asr": "passed_offline_tiny_en_verified_seekable_input_generated_speech",
+    "source_data": "synthetic",
+    "apk_sha256": "284203bf79260c8266f16c7515b6b72609152723c17523e69109dfb6be7ece1d",
+    "node_identifier_tests": 9,
+    "node_history_page_tests": 11,
+    "node_history_payload_tests": 15,
+    "node_total_tests": 49,
+    "wave7_rerun_scope": "Android/core JVM and APK; backend/Node/browser/ASR unchanged since wave6",
+    "wave8_rerun_scope": "full backend, actual CLI source scan, both production WAV parsers; Android APK/browser/ASR unchanged",
+    "wav_cross_runtime_cases": 24,
+    "wav_cross_runtime_field_comparisons": 408,
+    "actual_cli_wav_fixtures": 5
   }
 }

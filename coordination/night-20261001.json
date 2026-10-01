@@ -4,13 +4,13 @@
   "branch": "codex/ageds-night-20261001",
   "base_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2",
   "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate; user 01:33 Europe/Amsterdam explicitly requests continuous progression while useful work remains, without ending after a checkpoint",
-  "updated_at": "2026-10-01T01:20:16.624563+00:00",
+  "updated_at": "2026-10-01T01:29:37.190192+00:00",
   "coordinator": {
-    "owner": "root-wave10-20261001T0320",
+    "owner": "root-wave11-20261001T0330",
     "status": "active",
-    "claimed_at": "2026-10-01T01:20:16.624563+00:00",
-    "lease_expires_at": "2026-10-01T02:15:16.624563+00:00",
-    "based_on_remote_head": "9965a3563d04a0136a88760d416ea0aa2362f5f7"
+    "claimed_at": "2026-10-01T01:29:37.190192+00:00",
+    "lease_expires_at": "2026-10-01T02:24:37.190192+00:00",
+    "based_on_remote_head": "ad46ef0ed35a44980ad9db92409bb15e1d9f1352"
   },
   "tasks": [
     {
@@ -1097,13 +1097,20 @@
         "new semantic budget helper",
         "owner tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "synthetic data only",
         "bounded semantic work with explicit failures",
         "exact canonical roundtrip retained",
         "no live restore or replay"
-      ]
+      ],
+      "result": {
+        "report": "docs/WAVE10_QA.md",
+        "backend_tests": 417,
+        "backend_subtests": 523,
+        "actual_cli_subprocesses": 9,
+        "no_live_restore": true
+      }
     },
     {
       "id": "AGEDS-20261001-N62",
@@ -1113,13 +1120,20 @@
         "server/app/archive.py",
         "archive limit owner tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "synthetic data only",
         "bounded semantic work with explicit failures",
         "exact canonical roundtrip retained",
         "no live restore or replay"
-      ]
+      ],
+      "result": {
+        "report": "docs/WAVE10_QA.md",
+        "backend_tests": 417,
+        "backend_subtests": 523,
+        "actual_cli_subprocesses": 9,
+        "no_live_restore": true
+      }
     },
     {
       "id": "AGEDS-20261001-N63",
@@ -1128,13 +1142,20 @@
       "scope": [
         "new resource-budget tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "synthetic data only",
         "bounded semantic work with explicit failures",
         "exact canonical roundtrip retained",
         "no live restore or replay"
-      ]
+      ],
+      "result": {
+        "report": "docs/WAVE10_QA.md",
+        "backend_tests": 417,
+        "backend_subtests": 523,
+        "actual_cli_subprocesses": 9,
+        "no_live_restore": true
+      }
     },
     {
       "id": "AGEDS-20261001-N64",
@@ -1143,13 +1164,20 @@
       "scope": [
         "new roundtrip acceptance tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "synthetic data only",
         "bounded semantic work with explicit failures",
         "exact canonical roundtrip retained",
         "no live restore or replay"
-      ]
+      ],
+      "result": {
+        "report": "docs/WAVE10_QA.md",
+        "backend_tests": 417,
+        "backend_subtests": 523,
+        "actual_cli_subprocesses": 9,
+        "no_live_restore": true
+      }
     },
     {
       "id": "AGEDS-20261001-N65",
@@ -1158,13 +1186,20 @@
       "scope": [
         "new CLI acceptance tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "synthetic data only",
         "bounded semantic work with explicit failures",
         "exact canonical roundtrip retained",
         "no live restore or replay"
-      ]
+      ],
+      "result": {
+        "report": "docs/WAVE10_QA.md",
+        "backend_tests": 417,
+        "backend_subtests": 523,
+        "actual_cli_subprocesses": 9,
+        "no_live_restore": true
+      }
     },
     {
       "id": "AGEDS-20261001-N66",
@@ -1173,12 +1208,113 @@
       "scope": [
         "new projection-work tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "synthetic data only",
         "bounded semantic work with explicit failures",
         "exact canonical roundtrip retained",
         "no live restore or replay"
+      ],
+      "result": {
+        "report": "docs/WAVE10_QA.md",
+        "backend_tests": 417,
+        "backend_subtests": 523,
+        "actual_cli_subprocesses": 9,
+        "no_live_restore": true
+      }
+    },
+    {
+      "id": "AGEDS-20261001-N67",
+      "owner": "exchange_core",
+      "title": "Linearizable generation gate for scan publication",
+      "scope": [
+        "new SourceScanPublicationGate.kt",
+        "owner tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "deterministic host JVM race test",
+        "short atomic publication critical section",
+        "preserve prior snapshot on invalidation before commit",
+        "no device claim"
+      ]
+    },
+    {
+      "id": "AGEDS-20261001-N68",
+      "owner": "android_contract",
+      "title": "Guard atomic cache move without changing legacy calls",
+      "scope": [
+        "BoundedMetadataCache.kt",
+        "SourceScanCache.kt",
+        "owner tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "deterministic host JVM race test",
+        "short atomic publication critical section",
+        "preserve prior snapshot on invalidation before commit",
+        "no device claim"
+      ]
+    },
+    {
+      "id": "AGEDS-20261001-N69",
+      "owner": "android_citations",
+      "title": "Integrate scan generation gate with start/cancel/clear",
+      "scope": [
+        "CorpusVm.kt",
+        "integration review docs"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "deterministic host JVM race test",
+        "short atomic publication critical section",
+        "preserve prior snapshot on invalidation before commit",
+        "no device claim"
+      ]
+    },
+    {
+      "id": "AGEDS-20261001-N70",
+      "owner": "exchange_qa",
+      "title": "Independent deterministic stale commit interleaving",
+      "scope": [
+        "new latch-based race tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "deterministic host JVM race test",
+        "short atomic publication critical section",
+        "preserve prior snapshot on invalidation before commit",
+        "no device claim"
+      ]
+    },
+    {
+      "id": "AGEDS-20261001-N71",
+      "owner": "exchange_consumer",
+      "title": "Independent cache rollback and typed flow acceptance",
+      "scope": [
+        "new guarded cache acceptance tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "deterministic host JVM race test",
+        "short atomic publication critical section",
+        "preserve prior snapshot on invalidation before commit",
+        "no device claim"
+      ]
+    },
+    {
+      "id": "AGEDS-20261001-N72",
+      "owner": "android_qa",
+      "title": "Independent cancellation/deadlock and API compatibility review",
+      "scope": [
+        "new targeted tests or review docs"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "deterministic host JVM race test",
+        "short atomic publication critical section",
+        "preserve prior snapshot on invalidation before commit",
+        "no device claim"
       ]
     }
   ],
@@ -1226,6 +1362,10 @@
     "wave9_content_commits": [
       "0d1a0c3693b3773a53470d96da29141b4cb73dbb",
       "9965a3563d04a0136a88760d416ea0aa2362f5f7"
+    ],
+    "wave10_content_commits": [
+      "f5d7001274465e70d5def62ce32be123460bad4d",
+      "ad46ef0ed35a44980ad9db92409bb15e1d9f1352"
     ]
   },
   "next_queue": [
@@ -1240,10 +1380,10 @@
     "window": "2026-10-01 01:00 through 06:00 hourly flexible, six occurrences",
     "guard": "fresh active coordinator claim prevents duplicate takeover"
   },
-  "accepted_code_commit": "9965a3563d04a0136a88760d416ea0aa2362f5f7",
+  "accepted_code_commit": "ad46ef0ed35a44980ad9db92409bb15e1d9f1352",
   "validation": {
-    "backend_tests": 370,
-    "backend_subtests": 506,
+    "backend_tests": 417,
+    "backend_subtests": 523,
     "backend_failures": 0,
     "existing_deprecation_warnings": 3,
     "node_fake_audio_tests": 14,
@@ -1267,9 +1407,11 @@
     "wav_cross_runtime_cases": 24,
     "wav_cross_runtime_field_comparisons": 408,
     "actual_cli_wav_fixtures": 5,
-    "wave9_rerun_scope": "337 JVM tests and actual Android build; backend/browser/ASR unchanged"
+    "wave9_rerun_scope": "337 JVM tests and actual Android build; backend/browser/ASR unchanged",
+    "wave10_rerun_scope": "full backend and9 actual CLI calls; Android/browser/ASR unchanged",
+    "archive_cli_checks": 9
   },
-  "current_wave": 10,
+  "current_wave": 11,
   "wave1_validation": {
     "backend_tests": 182,
     "backend_subtests": 207,
@@ -1285,19 +1427,19 @@
     "source_data": "synthetic"
   },
   "next_concrete_step": {
-    "id": "AGEDS-20261001-N61",
+    "id": "AGEDS-20261001-N67",
     "status": "in_progress",
-    "observed_gap": "Archive outer limits exclude decoded selector/segments JSON; same version decoded per anchor, repeated word projection also needs bounded work. Reproduced with compact synthetic inputs.",
+    "observed_gap": "ensureActive and Files.move are separate; cancellation/new scan can invalidate after last check but before old snapshot publication",
     "scope": [
-      "shared node/depth budget",
-      "per-validation decode reuse",
-      "bounded projection work"
+      "per-owner publication gate",
+      "cache final move callback",
+      "ViewModel lifecycle binding"
     ],
     "acceptance": [
-      "independent adversarial tests",
-      "exact canonical roundtrip",
-      "actual CLI no partial publication",
-      "full backend regression"
+      "both race orderings deterministic",
+      "typed cache sources unchanged",
+      "actual Android build",
+      "explicit linearization boundary"
     ]
   },
   "coordinator_history": [
@@ -1364,6 +1506,14 @@
       "lease_expires_at": "2026-10-01T01:20:16.624563+00:00",
       "based_on_remote_head": "ccae82c43777bed457ce7ef2b582a20af8a2a65d",
       "completed_at": "2026-10-01T01:20:16.624563+00:00"
+    },
+    {
+      "owner": "root-wave10-20261001T0320",
+      "status": "completed",
+      "claimed_at": "2026-10-01T01:20:16.624563+00:00",
+      "lease_expires_at": "2026-10-01T01:29:37.190192+00:00",
+      "based_on_remote_head": "9965a3563d04a0136a88760d416ea0aa2362f5f7",
+      "completed_at": "2026-10-01T01:29:37.190192+00:00"
     }
   ],
   "wave2_validation": {
@@ -1512,5 +1662,33 @@
     "wav_cross_runtime_cases": 24,
     "wav_cross_runtime_field_comparisons": 408,
     "actual_cli_wav_fixtures": 5
+  },
+  "wave9_validation": {
+    "backend_tests": 370,
+    "backend_subtests": 506,
+    "backend_failures": 0,
+    "existing_deprecation_warnings": 3,
+    "node_fake_audio_tests": 14,
+    "actual_chromium_tests": 21,
+    "android_jvm_tests": 226,
+    "desktop_jvm_tests": 111,
+    "gradle_tasks_executed": 57,
+    "build_inputs_verified": 82,
+    "instrumentation_tests_compiled": 6,
+    "instrumentation_runtime_tests": 0,
+    "phone_saf_test": "not_performed_no_runtime",
+    "real_asr": "passed_offline_tiny_en_verified_seekable_input_generated_speech",
+    "source_data": "synthetic",
+    "apk_sha256": "05d4eea3b424b79f21fdf89b2687da7992ee297bb39c160ed9836c61e80044bc",
+    "node_identifier_tests": 9,
+    "node_history_page_tests": 11,
+    "node_history_payload_tests": 15,
+    "node_total_tests": 49,
+    "wave7_rerun_scope": "Android/core JVM and APK; backend/Node/browser/ASR unchanged since wave6",
+    "wave8_rerun_scope": "full backend, actual CLI source scan, both production WAV parsers; Android APK/browser/ASR unchanged",
+    "wav_cross_runtime_cases": 24,
+    "wav_cross_runtime_field_comparisons": 408,
+    "actual_cli_wav_fixtures": 5,
+    "wave9_rerun_scope": "337 JVM tests and actual Android build; backend/browser/ASR unchanged"
   }
 }

@@ -3,10 +3,10 @@
 Stan bieżący: nocny przyrost 2026-10-01. Fundament PR #2 scalono w `main`
 w commicie `b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2`.
 PR #3 scalono w main (`8c3efb9e65999dd4931b22b555329da76379c31e`).
-Bieżący opublikowany checkpoint: fala 9. branch `codex/ageds-night-20261001`, PR #4 (otwarty).
-Kod fali 9 opublikowany i sprawdzony; nie wykonano scalenia PR #4 do main.
-Trwa fala 10: wspólne limity zdekodowanego JSON i pracy cytatów
-w inertnym archiwum. Szczegóły przydziałów w indeksie.
+Bieżący opublikowany checkpoint: fala 10. branch `codex/ageds-night-20261001`, PR #4 (otwarty).
+Kod fali 10 opublikowany i sprawdzony; nie wykonano scalenia PR #4 do main.
+Trwa fala 11: uporządkowanie anulowania skanu i publikacji prywatnego
+cache Androida. Szczegóły przydziałów w indeksie.
 **Najświeższy odbiór i kolejka: `coordination/night-20261001.json`.**
 Procedura wznowienia: `coordination/NIGHT_WORK.md`.
 `coordination/state.json` zachowuje odbiór fundamentu i odsyła do nowego etapu.
@@ -70,8 +70,8 @@ nie są fizycznym WORM ani kryptograficznym podpisem łańcucha pochodzenia.
 
 ## Następny zakres wykonawczy
 
-1. Aktywna fala 10: ograniczyć dekodowanie zagnieżdżonego JSON i powtarzaną
-   pracę projekcji cytatów w inertnym archiwum, zachowując dokładny roundtrip.
+1. Aktywna fala 11: zlinearyzować anulowanie/nowy skan z finalnym zapisem
+   cache; wykonać deterministyczny test obu porządków wyścigu.
 2. Uruchomić gotowe sześć testów SAF, gdy będzie dostępny runtime Android;
    oddzielnie sprawdzić picker, cykl uprawnień i wybór nagrań. Brak emulatora
    w obecnym środowisku jest obserwowaną blokadą, nie dowodem błędu aplikacji.
@@ -122,7 +122,7 @@ opis pierwszego nieudanego testu i konkretnej poprawki. Telefon nadal niebadany.
 
 ## Odbiór fali 5
 
-293 backend +427 podprzypadków,184 JVM,34 Node,20 Chromium przeszło.
+293 backend +427 podprzypadków,184 JVM,34 Node, 20 Chromium przeszło.
 Stronicowane wersje/cytaty/adnotacje mają jawne pokrycie i granice ID;
 Chromium sprawdził po125 wpisów i wybór wersji podczas opóźnionego odczytu.
 Szczegóły i granice: `docs/WAVE5_QA.md`. Limit1000 pozycji nie zastępuje
@@ -130,7 +130,7 @@ agregatowego budżetu danych klienta — to następny aktywny zakres.
 
 ## Odbiór fali 6
 
-321 backend +430 podprzypadków,207 JVM,49 Node,21 Chromium przeszło.
+321 backend +430 podprzypadków, 207 JVM,49 Node,21 Chromium przeszło.
 Realny tiny.en odczytał zweryfikowany strumień, a dokładny cytat i inertny
 roundtrip przeszły. Klienty mają limit4MiB danych historii na kolekcję.
 Dowody i ograniczenia: `docs/WAVE6_QA.md`. Program30 rotujących ról:
@@ -152,7 +152,14 @@ plików i deskryptorów. Dowody: `docs/WAVE8_QA.md`. APK nadal z fali7.
 
 ## Odbiór fali 9
 
-337 JVM przeszło; produkcyjny silnik wykonał50 nowych testów polityki,
+337 JVM przeszło; produkcyjny silnik wykonał 50 nowych testów polityki,
 formatów, zasobów i cache. Cienki SAF adapter skompilowano. Pierwszy build
 ujawnił niezgodny classpath testu; poprawiony pełny build i APK przeszły.
 Dowody: `docs/WAVE9_QA.md`. Telefon/SAF runtime nadal niebadane.
+
+## Odbiór fali 10
+
+417 testów backend i 523 podtesty przeszły; dziewięć rzeczywistych poleceń
+CLI potwierdziło dokładny roundtrip i odrzucenie ukrytej głębokości bez
+częściowych wyników. Budżet obejmuje interpretowany JSON oraz powtarzane
+projekcje. Surowe opaque pola pozostają zachowane. `docs/WAVE10_QA.md`.

@@ -3,10 +3,10 @@
 Stan bieżący: nocny przyrost 2026-10-01. Fundament PR #2 scalono w `main`
 w commicie `b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2`.
 PR #3 scalono w main (`8c3efb9e65999dd4931b22b555329da76379c31e`).
-Bieżący opublikowany checkpoint: fala 5. branch `codex/ageds-night-20261001`, PR #4 (otwarty).
-Kod fali 5 opublikowany i sprawdzony; nie wykonano scalenia PR #4 do main.
-Trwa fala 6: zweryfikowany strumień wejścia ASR i agregatowe limity danych
-zachowywanych przez klienty. Szczegóły przydziałów w indeksie.
+Bieżący opublikowany checkpoint: fala 6. branch `codex/ageds-night-20261001`, PR #4 (otwarty).
+Kod fali 6 opublikowany i sprawdzony; nie wykonano scalenia PR #4 do main.
+Trwa fala 7: ograniczony natywny odczyt nagłówków dużych WAV z jawnym
+pochodzeniem i zakresem inspekcji. Szczegóły przydziałów w indeksie.
 **Najświeższy odbiór i kolejka: `coordination/night-20261001.json`.**
 Procedura wznowienia: `coordination/NIGHT_WORK.md`.
 `coordination/state.json` zachowuje odbiór fundamentu i odsyła do nowego etapu.
@@ -125,3 +125,11 @@ Stronicowane wersje/cytaty/adnotacje mają jawne pokrycie i granice ID;
 Chromium sprawdził po125 wpisów i wybór wersji podczas opóźnionego odczytu.
 Szczegóły i granice: `docs/WAVE5_QA.md`. Limit1000 pozycji nie zastępuje
 agregatowego budżetu danych klienta — to następny aktywny zakres.
+
+## Odbiór fali 6
+
+321 backend +430 podprzypadków,207 JVM,49 Node,21 Chromium przeszło.
+Realny tiny.en odczytał zweryfikowany strumień, a dokładny cytat i inertny
+roundtrip przeszły. Klienty mają limit4MiB danych historii na kolekcję.
+Dowody i ograniczenia: `docs/WAVE6_QA.md`. Program30 rotujących ról:
+`coordination/AGENT_PROGRAM.md`. Telefon i adapter partnera nadal niebadane.

@@ -4,13 +4,13 @@
   "branch": "codex/ageds-night-20261001",
   "base_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2",
   "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate; user 01:33 Europe/Amsterdam explicitly requests continuous progression while useful work remains, without ending after a checkpoint",
-  "updated_at": "2026-10-01T00:23:26.745377+00:00",
+  "updated_at": "2026-10-01T00:38:24.932472+00:00",
   "coordinator": {
-    "owner": "root-wave6-20261001T0225",
+    "owner": "root-wave7-20261001T0239",
     "status": "active",
-    "claimed_at": "2026-10-01T00:23:26.745377+00:00",
-    "lease_expires_at": "2026-10-01T01:18:26.745377+00:00",
-    "based_on_remote_head": "0d9b0d0560db4e158c43937bf82c800ce7e362b8"
+    "claimed_at": "2026-10-01T00:38:24.932472+00:00",
+    "lease_expires_at": "2026-10-01T01:33:24.932472+00:00",
+    "based_on_remote_head": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3"
   },
   "tasks": [
     {
@@ -636,11 +636,16 @@
       "scope": [
         "new verified reader; shared verified media primitive and owner tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "No pathname reopens, bytes checked before read, bounded metadata/read buffers and explicit close"
       ],
-      "based_on_commit": "0d9b0d0560db4e158c43937bf82c800ce7e362b8"
+      "based_on_commit": "0d9b0d0560db4e158c43937bf82c800ce7e362b8",
+      "result": {
+        "published_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3",
+        "report": "docs/WAVE6_QA.md",
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N37",
@@ -649,11 +654,16 @@
       "scope": [
         "server/app/worker.py and owner ASR adapter tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Model receives verified seekable input; failed reads/identity cannot publish; preserve leases/run provenance"
       ],
-      "based_on_commit": "0d9b0d0560db4e158c43937bf82c800ce7e362b8"
+      "based_on_commit": "0d9b0d0560db4e158c43937bf82c800ce7e362b8",
+      "result": {
+        "published_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3",
+        "report": "docs/WAVE6_QA.md",
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N38",
@@ -662,11 +672,16 @@
       "scope": [
         "new worker input adversarial tests and QA doc"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Reproduce old swap-and-restore gap; replacement/inplace/cancel/lease and source no-copy constraints"
       ],
-      "based_on_commit": "0d9b0d0560db4e158c43937bf82c800ce7e362b8"
+      "based_on_commit": "0d9b0d0560db4e158c43937bf82c800ce7e362b8",
+      "result": {
+        "published_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3",
+        "report": "docs/WAVE6_QA.md",
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N39",
@@ -675,11 +690,16 @@
       "scope": [
         "new local smoke result and receipt with existing tiny model"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Actual generated-speech inference through production path and pinned quote/inert archive roundtrip; no downloads or corpus"
       ],
-      "based_on_commit": "0d9b0d0560db4e158c43937bf82c800ce7e362b8"
+      "based_on_commit": "0d9b0d0560db4e158c43937bf82c800ce7e362b8",
+      "result": {
+        "published_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3",
+        "report": "docs/WAVE6_QA.md",
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N40",
@@ -688,11 +708,16 @@
       "scope": [
         "ArtifactPageChain.kt, CitationWorkspace.kt, citations.mjs and owner tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Explicit aggregate serialized-data budget per collection; never silently skip a page or exceed count/byte caps"
       ],
-      "based_on_commit": "0d9b0d0560db4e158c43937bf82c800ce7e362b8"
+      "based_on_commit": "0d9b0d0560db4e158c43937bf82c800ce7e362b8",
+      "result": {
+        "published_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3",
+        "report": "docs/WAVE6_QA.md",
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N41",
@@ -701,11 +726,16 @@
       "scope": [
         "new Kotlin and Node cap adversarial tests and QA doc"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Unicode/exact byte boundary/large rows/pending saves and stale pages preserve coverage/selection"
       ],
-      "based_on_commit": "0d9b0d0560db4e158c43937bf82c800ce7e362b8"
+      "based_on_commit": "0d9b0d0560db4e158c43937bf82c800ce7e362b8",
+      "result": {
+        "published_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3",
+        "report": "docs/WAVE6_QA.md",
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N42",
@@ -714,18 +744,104 @@
       "scope": [
         "coordination/AGENT_PROGRAM.md"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Thirty proposed roles mapped to six rotating slots, concrete evidence gates, management not invented extra capacity"
       ],
-      "based_on_commit": "0d9b0d0560db4e158c43937bf82c800ce7e362b8"
+      "based_on_commit": "0d9b0d0560db4e158c43937bf82c800ce7e362b8",
+      "result": {
+        "published_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3",
+        "report": "docs/WAVE6_QA.md",
+        "independent_acceptance": "coordinator_document_review"
+      }
+    },
+    {
+      "id": "AGEDS-20261001-N43",
+      "owner": "exchange_core",
+      "title": "Bounded pure WAV header projection",
+      "scope": [
+        "new core WavHeaderProbe models/parser/tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "At most64KiB inspection; declared duration remains hypothesis; malformed/unsupported/conflicting sizes explicit"
+      ],
+      "based_on_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3"
+    },
+    {
+      "id": "AGEDS-20261001-N44",
+      "owner": "android_contract",
+      "title": "Read-only bounded WAV stream integration",
+      "scope": [
+        "SourceScanner.kt",
+        "SourceScanModels.kt",
+        "new SourceWavReader helper/owner tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "Known oversized and unknown size audio consume bounded prefix; count actual bytes; no hash for incomplete content; close and cancellation"
+      ],
+      "based_on_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3"
+    },
+    {
+      "id": "AGEDS-20261001-N45",
+      "owner": "exchange_qa",
+      "title": "Independent WAV header acceptance",
+      "scope": [
+        "new core WAV adversarial tests and doc"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "Truncation, overflow, formats, duplicate chunks, provider disagreement and budget boundaries"
+      ],
+      "based_on_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3"
+    },
+    {
+      "id": "AGEDS-20261001-N46",
+      "owner": "android_citations",
+      "title": "WAV metadata provenance in native source UI",
+      "scope": [
+        "SourceScanUi.kt",
+        "new audio projection helper/tests/doc"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "Header-derived duration and unread body explicit; old cache and other file formats compatible"
+      ],
+      "based_on_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3"
+    },
+    {
+      "id": "AGEDS-20261001-N47",
+      "owner": "android_qa",
+      "title": "Independent bounded audio stream acceptance",
+      "scope": [
+        "new Android JVM stream adversarial tests and doc"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "Exact read caps, unknown sizes, lying provider, zero progress, cancellation, close, no copy; no device claim"
+      ],
+      "based_on_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3"
+    },
+    {
+      "id": "AGEDS-20261001-N48",
+      "owner": "exchange_consumer",
+      "title": "Audio scan metadata cache compatibility",
+      "scope": [
+        "new cache/serialization tests and doc"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "New bounded metadata roundtrips outside source; old schema still readable; no raw media retained"
+      ],
+      "based_on_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3"
     }
   ],
   "publication": {
-    "status": "wave5_content_published_and_tree_verified",
+    "status": "wave6_content_published_and_tree_verified",
     "foundation_pr": "https://github.com/klb-t/AGEDS/pull/2",
     "foundation_merged": true,
-    "content_commit": "0d9b0d0560db4e158c43937bf82c800ce7e362b8",
+    "content_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3",
     "pull_request": "https://github.com/klb-t/AGEDS/pull/4",
     "merge_status": "open; branch publication complete; no wave2 main merge performed",
     "previous_increment_merged_at": "8c3efb9e65999dd4931b22b555329da76379c31e",
@@ -735,7 +851,7 @@
       "280f848f593be1402b82eb08505ef74507ba925e",
       "903d3d3004ccf878b91d407b4d4983660b2081b5"
     ],
-    "content_tree": "6b4a7598eaa61f00168fece28c608080e1e296ad",
+    "content_tree": "d4ade2d7e79451d90fbc8fb5a0c03ecd7d33fc91",
     "wave3_content_commits": [
       "9e5e11d9de3b796a902715eef1344b5734eaa0f0",
       "13a489502ad991a9aae1a9fce690a8b127d571a8"
@@ -749,13 +865,16 @@
       "b8f988aed81faae253232368ba88f6e3ff7dc48d",
       "d3244e08c7c3e0e7abbae43c648828dc51e390a3",
       "0d9b0d0560db4e158c43937bf82c800ce7e362b8"
+    ],
+    "wave6_content_commits": [
+      "19b45ed7b25e3c683f571ddae0eccd71d2cfd750",
+      "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3"
     ]
   },
   "next_queue": [
     "N10-runtime: Execute six compiled synthetic SAF-provider tests only when a device/emulator is available; picker/grant lifecycle and recording selection remain distinct",
     "N17: Once disk capacity permits, verify a wholly clean ASR dependency installation using the new explicit pins; current corrected runtime passed actual inference",
-    "N18: Extend native workbook/text formats only against concrete unsupported source patterns with bounded independent fixtures; maintain partial coverage and source preservation",
-    "N43: Native bounded WAV header probe for recordings larger than scan byte cap; distinguish header-derived duration from complete file validation/hash; independent synthetic provider-compatible fixtures"
+    "N18: Extend native workbook/text formats only against concrete unsupported source patterns with bounded independent fixtures; maintain partial coverage and source preservation"
   ],
   "automation": {
     "created": true,
@@ -763,28 +882,30 @@
     "window": "2026-10-01 01:00 through 06:00 hourly flexible, six occurrences",
     "guard": "fresh active coordinator claim prevents duplicate takeover"
   },
-  "accepted_code_commit": "0d9b0d0560db4e158c43937bf82c800ce7e362b8",
+  "accepted_code_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3",
   "validation": {
-    "backend_tests": 293,
-    "backend_subtests": 427,
+    "backend_tests": 321,
+    "backend_subtests": 430,
     "backend_failures": 0,
     "existing_deprecation_warnings": 3,
     "node_fake_audio_tests": 14,
-    "actual_chromium_tests": 20,
-    "android_jvm_tests": 125,
-    "desktop_jvm_tests": 59,
+    "actual_chromium_tests": 21,
+    "android_jvm_tests": 132,
+    "desktop_jvm_tests": 75,
     "gradle_tasks_executed": 57,
-    "build_inputs_verified": 62,
+    "build_inputs_verified": 65,
     "instrumentation_tests_compiled": 6,
     "instrumentation_runtime_tests": 0,
     "phone_saf_test": "not_performed_no_runtime",
-    "real_asr": "passed_local_tiny_en_generated_speech",
+    "real_asr": "passed_offline_tiny_en_verified_seekable_input_generated_speech",
     "source_data": "synthetic",
-    "apk_sha256": "2a56f2f49c3761c3f78b07cbed2c7ce465d7f18eb2293845a3e71721cc8c34ba",
+    "apk_sha256": "2274ccf3b3db1949d5fe8e2829a69e34c451738d91fcc9b5cc2825766bd32d14",
     "node_identifier_tests": 9,
-    "node_history_page_tests": 11
+    "node_history_page_tests": 11,
+    "node_history_payload_tests": 15,
+    "node_total_tests": 49
   },
-  "current_wave": 6,
+  "current_wave": 7,
   "wave1_validation": {
     "backend_tests": 182,
     "backend_subtests": 207,
@@ -800,16 +921,17 @@
     "source_data": "synthetic"
   },
   "next_concrete_step": {
-    "id": "AGEDS-20261001-N36",
+    "id": "AGEDS-20261001-N43",
     "status": "in_progress",
     "scope": [
-      "verified input stream for actual ASR",
-      "retained metadata payload budgets"
+      "native bounded WAV header probe",
+      "read-only SAF integration and explicit UI provenance"
     ],
     "acceptance": [
       "no source copy",
-      "race fixture and local real inference",
-      "bounded retention with explicit omitted scope"
+      "bounded actual reads",
+      "declared header duration not full validation/hash",
+      "independent JVM acceptance"
     ]
   },
   "coordinator_history": [
@@ -844,6 +966,14 @@
       "lease_expires_at": "2026-10-01T00:23:26.745377+00:00",
       "based_on_remote_head": "89256b3b38939b8e15131b9c81138b049ce98331",
       "completed_at": "2026-10-01T00:23:26.745377+00:00"
+    },
+    {
+      "owner": "root-wave6-20261001T0225",
+      "status": "completed",
+      "claimed_at": "2026-10-01T00:23:26.745377+00:00",
+      "lease_expires_at": "2026-10-01T00:38:24.932472+00:00",
+      "based_on_remote_head": "0d9b0d0560db4e158c43937bf82c800ce7e362b8",
+      "completed_at": "2026-10-01T00:38:24.932472+00:00"
     }
   ],
   "wave2_validation": {
@@ -900,5 +1030,25 @@
     "source_data": "synthetic",
     "apk_sha256": "2fbb0a5996ef5ccf873b9ec769cdc6e36b1cdfd77a8f0db02671489d9c459076",
     "node_identifier_tests": 9
+  },
+  "wave5_validation": {
+    "backend_tests": 293,
+    "backend_subtests": 427,
+    "backend_failures": 0,
+    "existing_deprecation_warnings": 3,
+    "node_fake_audio_tests": 14,
+    "actual_chromium_tests": 20,
+    "android_jvm_tests": 125,
+    "desktop_jvm_tests": 59,
+    "gradle_tasks_executed": 57,
+    "build_inputs_verified": 62,
+    "instrumentation_tests_compiled": 6,
+    "instrumentation_runtime_tests": 0,
+    "phone_saf_test": "not_performed_no_runtime",
+    "real_asr": "passed_local_tiny_en_generated_speech",
+    "source_data": "synthetic",
+    "apk_sha256": "2a56f2f49c3761c3f78b07cbed2c7ce465d7f18eb2293845a3e71721cc8c34ba",
+    "node_identifier_tests": 9,
+    "node_history_page_tests": 11
   }
 }

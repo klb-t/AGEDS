@@ -17,6 +17,7 @@ import tempfile
 from typing import Any
 
 from .packages import TABLES, canonical_json, validate_metadata_package
+from .verification_budget import VerificationBudget
 
 ARCHIVE_SCHEMA = 'ageds.inert-metadata-archive/v1'
 APPLICATION_ID = 0x41474541
@@ -33,6 +34,7 @@ class ArchiveLimits:
     max_rows: int = 100_000
     max_nodes: int = 2_000_000
     max_depth: int = 64
+    max_projection_visits: int = 2_000_000
 
     def __post_init__(self):
         for value in vars(self).values():
@@ -40,11 +42,16 @@ class ArchiveLimits:
                 raise ValueError('Archive limits must be positive integers')
 
 
+def _verification_budget(limits: ArchiveLimits) -> VerificationBudget:
+    return VerificationBudget(max_nodes=limits.max_nodes, max_depth=limits.max_depth,
+        max_projection_visits=limits.max_projection_visits, max_json_bytes=limits.max_input_bytes)
+
+
 def _pairs(pairs):
     value = {}
     for key, item in pairs:
         if key in value:
-            raise ValueError(f'Duplicate JSON key: {key!r}')
+            raise ValueError(f'Duplicate JSON key: {key[:120]!r}' + (' [truncated]' if len(key) > 120 else ''))
         value[key] = item
     return value
 
@@ -54,31 +61,42 @@ def _constant(value):
 
 
 def _check_shape(value: Any, limits: ArchiveLimits):
-    stack, count = [(value, 0)], 0
+    # Retain depth-sized iterator state rather than enqueueing every sibling
+    # before the node budget can reject a wide caller-provided object.
+    stack, count = [(iter((value,)), 0)], 0
     while stack:
-        node, depth = stack.pop()
+        iterator, depth = stack[-1]
+        try:
+            node = next(iterator)
+        except StopIteration:
+            stack.pop()
+            continue
         count += 1
         if count > limits.max_nodes or depth > limits.max_depth:
             raise ValueError('JSON node/depth limit exceeded')
         if isinstance(node, dict):
             if any(not isinstance(key, str) for key in node):
                 raise ValueError('JSON object keys must be strings')
-            stack.extend((child, depth + 1) for child in node.values())
+            stack.append((iter(node.values()), depth + 1))
         elif isinstance(node, list):
-            stack.extend((child, depth + 1) for child in node)
+            stack.append((iter(node), depth + 1))
         elif isinstance(node, float) and not math.isfinite(node):
             raise ValueError('Nonfinite JSON number')
         elif node is not None and type(node) not in (str, int, float, bool):
             raise ValueError('Non-JSON value')
 
 
-def strict_json(raw: bytes | str, *, limits: ArchiveLimits | None = None) -> Any:
+def strict_json(raw: bytes | str, *, limits: ArchiveLimits | None = None,
+                _budget: VerificationBudget | None = None, _start_depth: int = 0) -> Any:
     limits = limits or ArchiveLimits()
     if len(raw.encode('utf-8') if isinstance(raw, str) else raw) > limits.max_input_bytes:
         raise ValueError('Metadata input exceeds size limit')
     try:
         # Force UTF-8: reject implicit UTF-16/32 detection by json.loads(bytes).
         text = raw.decode('utf-8') if isinstance(raw, bytes) else raw
+        # Token preflight bounds allocations before json.loads. Archive fragments
+        # share one intake budget at their final package-relative depths.
+        (_budget or _verification_budget(limits)).preflight_json(text, start_depth=_start_depth)
         value = json.loads(text, object_pairs_hook=_pairs, parse_constant=_constant)
         _check_shape(value, limits)
         canonical_json(value)  # Reject unpaired surrogate strings as well.
@@ -131,7 +149,9 @@ def _verified(package: Any, limits: ArchiveLimits) -> bytes:
         raise ValueError('Missing tables must be unique names')
     if not isinstance(package.get('exported_at'), str) or not package['exported_at']:
         raise ValueError('Package must retain its exported_at string')
-    result = validate_metadata_package(package)
+    # One semantic budget combines the outer package with decoded projection
+    # inputs and all anchor work; opaque historical metadata stays unparsed.
+    result = validate_metadata_package(package, budget=_verification_budget(limits))
     if not result['valid']:
         codes = ', '.join(item['code'] for item in result['errors'][:8])
         raise ValueError(f'Invalid metadata package: {codes}')
@@ -227,10 +247,15 @@ def _decode_archive(raw: bytes, limits: ArchiveLimits) -> dict:
         expected_hash, envelope_raw = headers[0][2:]
         if not isinstance(envelope_raw, str):
             raise ValueError('Archive envelope must be JSON text')
-        package = strict_json(envelope_raw, limits=limits)
+        intake_budget = _verification_budget(limits)
+        package = strict_json(envelope_raw, limits=limits, _budget=intake_budget)
         if not isinstance(package, dict) or 'tables' in package:
             raise ValueError('Invalid archive envelope JSON')
-        package['tables'] = {name: [] for name in TABLES}
+        tables = {name: [] for name in TABLES}
+        # Envelope supplies the outer root (depth 0); add the omitted tables
+        # object and array scaffolding once, then each row at depth 3.
+        intake_budget.check_structure(tables, start_depth=1)
+        package['tables'] = tables
         count, size = 0, len(envelope_raw.encode('utf-8'))
         for name, ordinal, row_raw in db.execute('SELECT table_name,ordinal,row_json FROM archive_records ORDER BY table_name,ordinal'):
             count += 1
@@ -241,7 +266,8 @@ def _decode_archive(raw: bytes, limits: ArchiveLimits) -> dict:
             size += len(row_raw.encode('utf-8'))
             if size > limits.max_input_bytes:
                 raise ValueError('Metadata input exceeds size limit')
-            package['tables'][name].append(strict_json(row_raw, limits=limits))
+            package['tables'][name].append(strict_json(row_raw, limits=limits,
+                _budget=intake_budget, _start_depth=3))
         package_raw = _verified(package, limits)
         if hashlib.sha256(package_raw).hexdigest() != expected_hash:
             raise ValueError('Archived package SHA-256 mismatch')

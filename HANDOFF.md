@@ -3,10 +3,10 @@
 Stan bieżący: nocny przyrost 2026-10-01. Fundament PR #2 scalono w `main`
 w commicie `b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2`.
 PR #3 scalono w main (`8c3efb9e65999dd4931b22b555329da76379c31e`).
-Bieżący opublikowany checkpoint: fala 3. branch `codex/ageds-night-20261001`, PR #4 (otwarty).
-Kod fali 3 opublikowany i sprawdzony; nie wykonano scalenia PR #4 do main.
-Trwa fala 4: integralność strumienia mediów, XLS CONTINUE, błędy wyszukiwania
-i granice identyfikatorów w przeglądarce. Szczegóły przydziałów w indeksie.
+Bieżący opublikowany checkpoint: fala 4. branch `codex/ageds-night-20261001`, PR #4 (otwarty).
+Kod fali 4 opublikowany i sprawdzony; nie wykonano scalenia PR #4 do main.
+Trwa fala 5: stronicowanie wersji, cytatów i adnotacji z jawnym pokryciem
+oraz klientami Android i przeglądarki. Szczegóły przydziałów w indeksie.
 **Najświeższy odbiór i kolejka: `coordination/night-20261001.json`.**
 Procedura wznowienia: `coordination/NIGHT_WORK.md`.
 `coordination/state.json` zachowuje odbiór fundamentu i odsyła do nowego etapu.
@@ -109,3 +109,11 @@ lokatory pozostają inertne. Android wybiera wersję, cytat i zakres odtwarzania
 Build: `docs/ANDROID_WAVE3_BUILD.md`. Brak testu telefonu/SAF runtime.
 Kontrakt pakietu nie dowodzi prawdy ani wdrożonej integracji partnera.
 Po checkpointcie przejęto następne rozłączne zadania; nie zakończono aktywnej pracy.
+
+## Odbiór fali 4
+
+267 backend +354 podprzypadki, 145 JVM, 23 Node i 17 Chromium przeszło.
+Naprawiono race podmiany pliku audio i wyciek połączenia inicjalizacji SQLite.
+XLS obsługuje ograniczone kontynuacje SST; wyszukiwanie i identyfikatory JS
+odmawiają nieobsługiwanych danych jawnie. `docs/WAVE4_QA.md` zachowuje także
+opis pierwszego nieudanego testu i konkretnej poprawki. Telefon nadal niebadany.

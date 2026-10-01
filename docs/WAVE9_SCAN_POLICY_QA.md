@@ -4,7 +4,7 @@ N57, 2026-10-01. Independent acceptance of the actual JVM `SourceScanEngine`, us
 
 ## Result
 
-**14 tests passed** in `SourceScanEnginePolicyAdversarialTest`; JUnit 4.13.2 reported `OK (14 tests)` in 0.619 seconds after direct compilation with the cached Kotlin 2.4.20 compiler, serialization compiler plugin, and JDK 21. Compilation emitted redundant-conversion/non-null-assertion warnings but no errors. No open blocker was found.
+**14 tests passed** in `SourceScanEnginePolicyAdversarialTest`; JUnit 4.13.2 reported `OK (14 tests)` in 0.619 seconds after direct compilation with the cached Kotlin 2.4.20 compiler, serialization compiler plugin, and JDK 21. Compilation emitted redundant-conversion/non-null-assertion warnings but no errors. The initial direct run did not detect a project test-dependency mismatch; see the Gradle correction below.
 
 The direct compilation included `SourceScanModels`, `SourceTextParser`, `WavHeaderObservation`, `WavHeaderProbe`, `SourceScanEngine`, `SourceDelimitedParser`, `SourceWorkbookParser`, `SourceXlsParser`, and `SourceWavReader`. The test class is in `androidApp/src/test/java/dev/klbt/ageds/SourceScanEnginePolicyAdversarialTest.kt` and can also run with the project's JVM unit-test suite. The local direct-compiler invocation was `python /tmp/ageds-compile-engine-policy-qa.py`; this temporary command depends on the already cached build environment.
 
@@ -30,3 +30,9 @@ Tested source SHA-256:
 The extracted cursor API returns a fully materialized document from `next()`. Root identified that applying the former Android cursor's entry check after this call could access one extra metadata row. The production owner moved the check before `next()`. The independent tests pin that deliberate tightening and its honest exact-boundary partial result. This metadata rule is distinct from the unchanged non-WAV content sentinel.
 
 These are JVM policy tests with synthetic provider streams, not device SAF integration or proof of provider behavior. Resource closure, cancellation and error lifecycle are separately owned by N59; mixed-format interpretation and cache behavior have separate acceptance suites. This receipt does not claim full media decoding or strict non-WAV content byte limits.
+
+## Initial Gradle compilation failure and correction
+
+Root’s first actual Gradle build failed at test compilation because this test imported `kotlin.test`, which is absent from the Android test dependencies. The direct compiler classpath had supplied extra Kotlin test libraries, so its initial passing result did not establish compatibility with the project build. The failure is preserved in `review/night-build/wave9-pass1/gradle.log` (workspace review directory).
+
+The test now imports the existing `org.junit.Test` and `org.junit.Assert.*`, matching neighboring Android tests. Assertions and fixtures are unchanged; no dependency or production changes were made. The corrected test source SHA-256 is `c66c9f6dbc568f7961f5c6ddcdaaab236e80d38bc065278d4798d5661abdd113`. The earlier hash and 14-test direct result above describe the pre-correction version. Root owns the subsequent actual Gradle verification; no additional parallel compiler run was started.

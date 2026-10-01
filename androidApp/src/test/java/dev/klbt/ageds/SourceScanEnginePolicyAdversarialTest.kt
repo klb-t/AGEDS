@@ -3,7 +3,8 @@ package dev.klbt.ageds
 import dev.klbt.ageds.core.*
 import java.io.ByteArrayInputStream
 import java.io.InputStream
-import kotlin.test.*
+import org.junit.Assert.*
+import org.junit.Test
 
 /** N57 counts real production traversal and parses real synthetic CSV inputs. */
 class SourceScanEnginePolicyAdversarialTest {

@@ -4,13 +4,13 @@
   "branch": "codex/ageds-night-20261001",
   "base_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2",
   "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate; user 01:33 Europe/Amsterdam explicitly requests continuous progression while useful work remains, without ending after a checkpoint",
-  "updated_at": "2026-10-01T01:55:28.415211+00:00",
+  "updated_at": "2026-10-01T02:58:23.172517+00:00",
   "coordinator": {
-    "owner": "root-wave13-20261001T0354",
+    "owner": "root-resume-wave13-20261001T0457",
     "status": "active",
-    "claimed_at": "2026-10-01T01:55:28.415211+00:00",
-    "lease_expires_at": "2026-10-01T02:50:28.415211+00:00",
-    "based_on_remote_head": "4c6f73f128d58c43cf0a950f0c3e4b55b8295e3b"
+    "claimed_at": "2026-10-01T02:58:23.172517+00:00",
+    "lease_expires_at": "2026-10-01T03:53:23.172517+00:00",
+    "based_on_remote_head": "e38471fc7d5baf411177d0160ddac0738c628c67"
   },
   "tasks": [
     {
@@ -1519,7 +1519,7 @@
         "CitationSelection.kt",
         "new core matcher and owner tests"
       ],
-      "status": "in_progress",
+      "status": "ready",
       "acceptance": [
         "snapshot before await",
         "exact selected occurrence and canonical selector metadata",
@@ -1536,7 +1536,7 @@
         "CitationWorkspace.kt",
         "workspace save tests"
       ],
-      "status": "in_progress",
+      "status": "ready",
       "acceptance": [
         "snapshot before await",
         "exact selected occurrence and canonical selector metadata",
@@ -1584,7 +1584,7 @@
       "scope": [
         "new core adversarial tests"
       ],
-      "status": "in_progress",
+      "status": "ready",
       "acceptance": [
         "snapshot before await",
         "exact selected occurrence and canonical selector metadata",
@@ -1817,6 +1817,14 @@
       "lease_expires_at": "2026-10-01T01:55:28.415211+00:00",
       "based_on_remote_head": "c2df0513d85437d1e745b187a097887d9e75fc1d",
       "completed_at": "2026-10-01T01:55:28.415211+00:00"
+    },
+    {
+      "owner": "root-wave13-20261001T0354",
+      "status": "expired",
+      "claimed_at": "2026-10-01T01:55:28.415211+00:00",
+      "lease_expires_at": "2026-10-01T02:50:28.415211+00:00",
+      "based_on_remote_head": "4c6f73f128d58c43cf0a950f0c3e4b55b8295e3b",
+      "observed_expired_at": "2026-10-01T02:58:23.172517+00:00"
     }
   ],
   "wave2_validation": {
@@ -2054,5 +2062,6 @@
     "wave10_rerun_scope": "full backend and9 actual CLI calls; Android/browser/ASR unchanged",
     "archive_cli_checks": 9,
     "wave11_rerun_scope": "357JVM+APK and six instrumentation tests compiled offline; runtime0; backend/browser/ASR unchanged"
-  }
+  },
+  "resume_note": "Remote HEAD unchanged since prior claim; prior scratch absent. Resume browser N79/N82/N83 first with local Node and available browser runtime. Native N80/N81/N84 remain pending until toolchain can be verified."
 }

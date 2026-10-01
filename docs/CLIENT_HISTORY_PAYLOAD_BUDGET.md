@@ -75,8 +75,9 @@ first-row overflow with no later-row substitution and closed-view late saves.
 Together with the eleven prior paging tests, these fourteen tests pass. The three
 new common Kotlin tests in `ArtifactPayloadBudgetOwnerTest.kt` cover real serializer
 prefix admission, invalid measured costs even beyond a cutoff, and explicit
-count-only compatibility behavior. Kotlin execution is deferred to the
-coordinator's serial build; no Gradle invocation was made by this task.
+count-only compatibility behavior. The coordinator subsequently ran all three
+successfully within the 207-test integrated JVM build; the owner ran no Gradle.
+See `ANDROID_WAVE6_BUILD_RECEIPT.json`.
 
 Independent N41 budget tests and the coordinator's real Chromium large-row case
 provide additional acceptance separately. This document does not substitute code

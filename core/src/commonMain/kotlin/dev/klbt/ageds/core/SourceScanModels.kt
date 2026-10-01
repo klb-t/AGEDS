@@ -63,6 +63,7 @@ data class ScannedSourceFile(
     val issues: List<ScanIssue> = emptyList(),
     val audioDurationSec: Double? = null,
     val textFormat: SourceTextFormat? = null,
+    val wavHeader: WavHeaderObservation? = null,
 )
 
 @Serializable

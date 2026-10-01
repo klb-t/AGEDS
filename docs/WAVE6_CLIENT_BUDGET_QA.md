@@ -42,9 +42,10 @@ boundary tests; large-row and production-collection tests use real serializers.
   (310.94 ms), including all 12 new independent budget cases and the owner's
   three budget cases. Running the independent 12 separately also passed;
   these counts overlap and must not be added.
-- Seven Android workspace budget tests are authored and frozen, awaiting the
-  coordinator's serial integrated Gradle run with actual Compose dependencies.
-  They are not part of the direct 42-case result.
+- Coordinator integration subsequently passed all seven Android workspace budget
+  cases with actual Compose dependencies, within 207 JVM tests (132 Android,
+  75 desktop). They are not part of the direct 42-case result. Receipt:
+  `ANDROID_WAVE6_BUILD_RECEIPT.json`.
 
 Source review confirmed production serialization costs are wired for version,
 citation and annotation collections; browser retained-row checks cover initial
@@ -66,3 +67,6 @@ and browser JSON representations are measured independently.
 No private corpus, device/emulator, real MediaPlayer, new model download or paid
 service was used by this QA task. Counts and serialization do not establish
 phone lifecycle behavior, server deployment, ASR correctness or alignment.
+
+Coordinator Chromium acceptance separately passed 21 scenarios, including the
+large-row cap and explicit omission: `WAVE6_BROWSER_RECEIPT.json`.

@@ -54,3 +54,12 @@ test results. Instrumentation fixtures compile separately; no Android runtime is
 present in this environment, so SAF, picker and physical-phone acceptance remain
 pending. Native and server parser policies differ; equivalent file extensions do
 not establish cross-platform semantic equivalence.
+
+## Wave 7: bounded WAV header observation
+
+The native WAV path now retains at most 64 KiB, probes known oversized files
+within actual file/total read budgets and streams complete-file hashing only
+when EOF is observed. Duration is a supported header declaration, not measured
+playback or validation of audio samples. Provider/actual EOF size conflicts and
+unsupported layouts stay explicit. See `WAV_HEADER_PROBE.md`,
+`WAVE7_STREAM_QA.md` and `ANDROID_WAVE7_BUILD_RECEIPT.json`.

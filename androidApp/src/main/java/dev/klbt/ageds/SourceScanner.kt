@@ -96,16 +96,31 @@ class SourceScanner(private val context: Context) {
             var hash: String? = null
             var duration: Double? = null
             var textFormat: SourceTextFormat? = null
+            var wavHeader: WavHeaderObservation? = null
             var coverage = "inventory_only"
             try {
                 val remaining = (limits.maxTotalBytes - bytesRead).coerceAtLeast(0)
                 val cap = minOf(limits.maxFileBytes, remaining)
-                if (cap == 0L || (node.size != null && node.size > cap)) {
+                if (ext == "wav" && cap > 0) {
+                    val input = context.contentResolver.openInputStream(uri)
+                        ?: throw IllegalStateException("Provider returned no content stream")
+                    val read = SourceWavReader.read(input, node.size, limits.maxFileBytes, remaining, check)
+                    bytesRead += read.bytesRead
+                    hash = read.sha256
+                    wavHeader = read.wavHeader
+                    duration = read.wavHeader.declaredDurationSec
+                    fileIssues += (read.issues + read.wavHeader.issues).map { it.copy(locator = uri.toString()) }
+                    coverage = when {
+                        read.issues.any { it.code == "read_failed" } -> "unreadable"
+                        !read.complete || read.wavHeader.status != "observed" || fileIssues.isNotEmpty() -> "partial"
+                        else -> "inventory_only"
+                    }
+                } else if (cap == 0L || (node.size != null && node.size > cap)) {
                     coverage = "partial"
                     fileIssues += ScanIssue("bytes_limit", "Content not read because byte budget would be exceeded", uri.toString())
                 } else {
                     val digest = MessageDigest.getInstance("SHA-256")
-                    val output = if (ext in setOf("csv", "tsv", "xlsx", "xls", "wav")) ByteArrayOutputStream() else null
+                    val output = if (ext in setOf("csv", "tsv", "xlsx", "xls")) ByteArrayOutputStream() else null
                     var total = 0L
                     var complete = false
                     context.contentResolver.openInputStream(uri)?.use { input ->
@@ -155,9 +170,6 @@ class SourceScanner(private val context: Context) {
                                 rows = kept; fileIssues += parsed.issues
                             }
                             coverage = if (fileIssues.any { it.code != "xlsx_projection" }) "partial" else "complete_within_scope"
-                        } else if (ext == "wav") {
-                            duration = SourceTextParser.wavDuration(data!!)
-                            if (duration == null) fileIssues += ScanIssue("wav_unknown", "Unsupported or incomplete WAV layout; duration unknown", uri.toString())
                         }
                     }
                 }
@@ -166,7 +178,7 @@ class SourceScanner(private val context: Context) {
                 coverage = "unreadable"
                 fileIssues += ScanIssue("read_failed", "Read/parse failed: ${e.message?.take(200)}", uri.toString())
             }
-            files += ScannedSourceFile(uri.toString(), node.name, node.path, node.mime, node.size, kind, hash, coverage, rows, fileIssues, duration, textFormat)
+            files += ScannedSourceFile(uri.toString(), node.name, node.path, node.mime, node.size, kind, hash, coverage, rows, fileIssues, duration, textFormat, wavHeader)
         }
         val collisions = files.groupBy { it.name }.filterValues { it.size > 1 }
         collisions.forEach { (name, members) ->

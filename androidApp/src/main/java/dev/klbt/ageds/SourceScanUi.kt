@@ -103,6 +103,7 @@ internal fun SourceScanWorkspace(vm: CorpusVm, activity: ComponentActivity, pick
                             Text(file.name, fontWeight = FontWeight.SemiBold)
                             Text(file.relativePath, style = MaterialTheme.typography.bodySmall, maxLines = 3, overflow = TextOverflow.Ellipsis)
                             Text("${file.sizeBytes?.let { "$it B" } ?: "Rozmiar nieznany"} · ${coverageLabel(file.coverage)}", style = MaterialTheme.typography.labelSmall)
+                            SourceAudioProjection.display(file)?.let { Text(it.summary, style = MaterialTheme.typography.labelSmall) }
                         }
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -129,9 +130,15 @@ private fun SourceFileDialog(file: ScannedSourceFile, collisions: List<ScannedSo
         SelectionContainer { LazyColumn(Modifier.heightIn(max = 500.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item {
                 Text("${file.relativePath}\nURI: ${file.uri}\n${coverageLabel(file.coverage)}")
-                Text("SHA-256: ${file.sha256 ?: "nie obliczono pełnego hash"}", style = MaterialTheme.typography.bodySmall)
+                val audioDisplay = SourceAudioProjection.display(file)
+                if (audioDisplay != null) {
+                    Text(audioDisplay.summary, fontWeight = FontWeight.SemiBold)
+                    audioDisplay.details.forEach { Text(it, style = MaterialTheme.typography.bodySmall) }
+                } else {
+                    Text("SHA-256: ${file.sha256 ?: "nie obliczono pełnego hash"}", style = MaterialTheme.typography.bodySmall)
+                    file.audioDurationSec?.let { Text("Długość z nagłówka audio: $it s") }
+                }
                 Text("Hash porównuje odczytane bajty; nie potwierdza ich autorstwa ani prawdziwości.", style = MaterialTheme.typography.labelSmall)
-                file.audioDurationSec?.let { Text("Długość z nagłówka audio: $it s") }
             }
             file.textFormat?.let { format ->
                 item {

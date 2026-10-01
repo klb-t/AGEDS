@@ -4,13 +4,13 @@
   "branch": "codex/ageds-night-20261001",
   "base_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2",
   "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate; user 01:33 Europe/Amsterdam explicitly requests continuous progression while useful work remains, without ending after a checkpoint",
-  "updated_at": "2026-10-01T00:50:59.711497+00:00",
+  "updated_at": "2026-10-01T01:03:30.470096+00:00",
   "coordinator": {
-    "owner": "root-wave8-20261001T0252",
+    "owner": "root-wave9-20261001T0304",
     "status": "active",
-    "claimed_at": "2026-10-01T00:50:59.711497+00:00",
-    "lease_expires_at": "2026-10-01T01:45:59.711497+00:00",
-    "based_on_remote_head": "c723fd535d5b7b07565697d37d57a867649f06b2"
+    "claimed_at": "2026-10-01T01:03:30.470096+00:00",
+    "lease_expires_at": "2026-10-01T01:58:30.470096+00:00",
+    "based_on_remote_head": "ccae82c43777bed457ce7ef2b582a20af8a2a65d"
   },
   "tasks": [
     {
@@ -873,11 +873,16 @@
       "scope": [
         "new server/app/wav_header.py, owner tests and doc"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Bounded64KiB input; raw declarations and explicit malformed/unsupported/size conflict; no audio body validation"
       ],
-      "based_on_commit": "c723fd535d5b7b07565697d37d57a867649f06b2"
+      "based_on_commit": "c723fd535d5b7b07565697d37d57a867649f06b2",
+      "result": {
+        "published_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d",
+        "report": "docs/WAVE8_QA.md",
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N50",
@@ -886,11 +891,16 @@
       "scope": [
         "server/app/scanner.py, owner tests and scan doc"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Same safe descriptor; per-file and aggregate header budget; truncated44byte WAV not complete; preserve compatibility and no source copies"
       ],
-      "based_on_commit": "c723fd535d5b7b07565697d37d57a867649f06b2"
+      "based_on_commit": "c723fd535d5b7b07565697d37d57a867649f06b2",
+      "result": {
+        "published_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d",
+        "report": "docs/WAVE8_QA.md",
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N51",
@@ -899,11 +909,16 @@
       "scope": [
         "new scanner/header adversarial tests and doc"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Old44byte false completeness reproduced; malformed geometry/extents and giant chunk fanout rejected/limited explicitly"
       ],
-      "based_on_commit": "c723fd535d5b7b07565697d37d57a867649f06b2"
+      "based_on_commit": "c723fd535d5b7b07565697d37d57a867649f06b2",
+      "result": {
+        "published_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d",
+        "report": "docs/WAVE8_QA.md",
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N52",
@@ -912,11 +927,16 @@
       "scope": [
         "new CLI smoke script and receipt"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Actual scan/export CLI against valid/truncated/oversized fixtures; source hashes and file lists unchanged; metadata only outside source"
       ],
-      "based_on_commit": "c723fd535d5b7b07565697d37d57a867649f06b2"
+      "based_on_commit": "c723fd535d5b7b07565697d37d57a867649f06b2",
+      "result": {
+        "published_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d",
+        "report": "docs/WAVE8_QA.md",
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N53",
@@ -925,11 +945,16 @@
       "scope": [
         "new shared fixture corpus and Kotlin/Python comparison harness/report"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Execute both production parsers on identical synthetic bytes; compare agreed projection only; source policies and runtime limitations remain distinct"
       ],
-      "based_on_commit": "c723fd535d5b7b07565697d37d57a867649f06b2"
+      "based_on_commit": "c723fd535d5b7b07565697d37d57a867649f06b2",
+      "result": {
+        "published_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d",
+        "report": "docs/WAVE8_QA.md",
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N54",
@@ -938,18 +963,101 @@
       "scope": [
         "new backend stream/counter/mutation tests and doc"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Measure actual header reads including failure and total budget; no reopen/source copies; mutation/status and descriptor closure tested"
       ],
-      "based_on_commit": "c723fd535d5b7b07565697d37d57a867649f06b2"
+      "based_on_commit": "c723fd535d5b7b07565697d37d57a867649f06b2",
+      "result": {
+        "published_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d",
+        "report": "docs/WAVE8_QA.md",
+        "independent_acceptance": "passed"
+      }
+    },
+    {
+      "id": "AGEDS-20261001-N55",
+      "owner": "exchange_core",
+      "title": "Host-testable native source scan policy",
+      "scope": [
+        "new SourceScanEngine.kt and read-only provider contracts; owner tests/doc"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "Same bounded traversal and real parsers through injected read-only provider; no new parser behavior; lazy closeable child enumeration"
+      ],
+      "based_on_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d"
+    },
+    {
+      "id": "AGEDS-20261001-N56",
+      "owner": "android_contract",
+      "title": "Thin SAF adapter for shared scan engine",
+      "scope": [
+        "SourceScanner.kt; adapter documentation"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "DocumentsContract URI behavior retained; actual ContentResolver only adapter; cancellation and IO dispatcher preserved; no write methods"
+      ],
+      "based_on_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d"
+    },
+    {
+      "id": "AGEDS-20261001-N57",
+      "owner": "exchange_qa",
+      "title": "Independent native traversal and budget acceptance",
+      "scope": [
+        "new JVM traversal adversarial tests/doc"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "Cycles, duplicate names/URIs, directory/file/locator/content/result budgets, partial coverage and actual requested resources"
+      ],
+      "based_on_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d"
+    },
+    {
+      "id": "AGEDS-20261001-N58",
+      "owner": "android_citations",
+      "title": "Mixed-format native scan integration",
+      "scope": [
+        "new JVM mixed-format engine fixtures/tests/doc"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "Actual production CSV/XLS/XLSX/WAV parsers invoked through tree engine; raw cells and URI/source separation maintained"
+      ],
+      "based_on_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d"
+    },
+    {
+      "id": "AGEDS-20261001-N59",
+      "owner": "android_qa",
+      "title": "Native scan cancellation and resource lifecycle",
+      "scope": [
+        "new JVM engine cancellation/failure tests/doc"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "Every cursor/input closes on caps/errors/cancel; consumed bytes and failure coverage retained; no Android runtime claim"
+      ],
+      "based_on_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d"
+    },
+    {
+      "id": "AGEDS-20261001-N60",
+      "owner": "exchange_consumer",
+      "title": "Native scan to bounded metadata cache acceptance",
+      "scope": [
+        "new host scan/cache integration tests/doc"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "Actual engine result roundtrip to separate metadata cache; source unchanged, URI collisions preserved, failed oversized cache preserves prior snapshot"
+      ],
+      "based_on_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d"
     }
   ],
   "publication": {
-    "status": "wave7_content_published_and_tree_verified",
+    "status": "wave8_content_published_and_tree_verified",
     "foundation_pr": "https://github.com/klb-t/AGEDS/pull/2",
     "foundation_merged": true,
-    "content_commit": "c723fd535d5b7b07565697d37d57a867649f06b2",
+    "content_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d",
     "pull_request": "https://github.com/klb-t/AGEDS/pull/4",
     "merge_status": "open; branch publication complete; no wave2 main merge performed",
     "previous_increment_merged_at": "8c3efb9e65999dd4931b22b555329da76379c31e",
@@ -959,7 +1067,7 @@
       "280f848f593be1402b82eb08505ef74507ba925e",
       "903d3d3004ccf878b91d407b4d4983660b2081b5"
     ],
-    "content_tree": "d680ccdfc6954de32c12d3fbd64f89009c9c6858",
+    "content_tree": "995d941c68de26ac34656789cc1d96c01bf185ad",
     "wave3_content_commits": [
       "9e5e11d9de3b796a902715eef1344b5734eaa0f0",
       "13a489502ad991a9aae1a9fce690a8b127d571a8"
@@ -981,6 +1089,10 @@
     "wave7_content_commits": [
       "e56e73a8f7f5c317d4740db97ce0b5e58ee57b67",
       "c723fd535d5b7b07565697d37d57a867649f06b2"
+    ],
+    "wave8_content_commits": [
+      "ff1879d7e4cd5823b234cbdb1e813fcd075931a8",
+      "ccae82c43777bed457ce7ef2b582a20af8a2a65d"
     ]
   },
   "next_queue": [
@@ -994,10 +1106,10 @@
     "window": "2026-10-01 01:00 through 06:00 hourly flexible, six occurrences",
     "guard": "fresh active coordinator claim prevents duplicate takeover"
   },
-  "accepted_code_commit": "c723fd535d5b7b07565697d37d57a867649f06b2",
+  "accepted_code_commit": "ccae82c43777bed457ce7ef2b582a20af8a2a65d",
   "validation": {
-    "backend_tests": 321,
-    "backend_subtests": 430,
+    "backend_tests": 370,
+    "backend_subtests": 506,
     "backend_failures": 0,
     "existing_deprecation_warnings": 3,
     "node_fake_audio_tests": 14,
@@ -1016,9 +1128,13 @@
     "node_history_page_tests": 11,
     "node_history_payload_tests": 15,
     "node_total_tests": 49,
-    "wave7_rerun_scope": "Android/core JVM and APK; backend/Node/browser/ASR unchanged since wave6"
+    "wave7_rerun_scope": "Android/core JVM and APK; backend/Node/browser/ASR unchanged since wave6",
+    "wave8_rerun_scope": "full backend, actual CLI source scan, both production WAV parsers; Android APK/browser/ASR unchanged",
+    "wav_cross_runtime_cases": 24,
+    "wav_cross_runtime_field_comparisons": 408,
+    "actual_cli_wav_fixtures": 5
   },
-  "current_wave": 8,
+  "current_wave": 9,
   "wave1_validation": {
     "backend_tests": 182,
     "backend_subtests": 207,
@@ -1034,17 +1150,18 @@
     "source_data": "synthetic"
   },
   "next_concrete_step": {
-    "id": "AGEDS-20261001-N49",
+    "id": "AGEDS-20261001-N55",
     "status": "in_progress",
-    "observed_gap": "44-byte truncated WAV declared16000data bytes produces1second duration and coverage.complete=true in server scanner;10000zeroJUNK chunks produce20009headerreads",
+    "observed_gap": "Native traversal orchestration only compiles; no device available. Parser/reader execution does not test combined tree policy.",
     "scope": [
-      "bounded server WAV header projection and same-descriptor scan integration"
+      "read-only provider seam and production host-testable scan engine",
+      "unchanged thin SAF adapter"
     ],
     "acceptance": [
-      "explicit extent contradiction",
-      "bounded header work",
-      "source unchanged",
-      "actual CLI and independent tests"
+      "real production traversal with synthetic provider",
+      "no new paid/runtime dependencies",
+      "independent mixed-format/resource/cache tests",
+      "device limitations explicit"
     ]
   },
   "coordinator_history": [
@@ -1095,6 +1212,14 @@
       "lease_expires_at": "2026-10-01T00:50:59.711497+00:00",
       "based_on_remote_head": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3",
       "completed_at": "2026-10-01T00:50:59.711497+00:00"
+    },
+    {
+      "owner": "root-wave8-20261001T0252",
+      "status": "completed",
+      "claimed_at": "2026-10-01T00:50:59.711497+00:00",
+      "lease_expires_at": "2026-10-01T01:03:30.470096+00:00",
+      "based_on_remote_head": "c723fd535d5b7b07565697d37d57a867649f06b2",
+      "completed_at": "2026-10-01T01:03:30.470096+00:00"
     }
   ],
   "wave2_validation": {
@@ -1193,5 +1318,28 @@
     "node_history_page_tests": 11,
     "node_history_payload_tests": 15,
     "node_total_tests": 49
+  },
+  "wave7_validation": {
+    "backend_tests": 321,
+    "backend_subtests": 430,
+    "backend_failures": 0,
+    "existing_deprecation_warnings": 3,
+    "node_fake_audio_tests": 14,
+    "actual_chromium_tests": 21,
+    "android_jvm_tests": 176,
+    "desktop_jvm_tests": 111,
+    "gradle_tasks_executed": 57,
+    "build_inputs_verified": 76,
+    "instrumentation_tests_compiled": 6,
+    "instrumentation_runtime_tests": 0,
+    "phone_saf_test": "not_performed_no_runtime",
+    "real_asr": "passed_offline_tiny_en_verified_seekable_input_generated_speech",
+    "source_data": "synthetic",
+    "apk_sha256": "284203bf79260c8266f16c7515b6b72609152723c17523e69109dfb6be7ece1d",
+    "node_identifier_tests": 9,
+    "node_history_page_tests": 11,
+    "node_history_payload_tests": 15,
+    "node_total_tests": 49,
+    "wave7_rerun_scope": "Android/core JVM and APK; backend/Node/browser/ASR unchanged since wave6"
   }
 }

@@ -3,10 +3,10 @@
 Stan bieżący: nocny przyrost 2026-10-01. Fundament PR #2 scalono w `main`
 w commicie `b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2`.
 PR #3 scalono w main (`8c3efb9e65999dd4931b22b555329da76379c31e`).
-Bieżący opublikowany checkpoint: fala 7. branch `codex/ageds-night-20261001`, PR #4 (otwarty).
-Kod fali 7 opublikowany i sprawdzony; nie wykonano scalenia PR #4 do main.
-Trwa fala 8: ograniczony odczyt WAV w skanerze serwera i naprawa błędnego
-statusu kompletności uciętego pliku. Szczegóły przydziałów w indeksie.
+Bieżący opublikowany checkpoint: fala 8. branch `codex/ageds-night-20261001`, PR #4 (otwarty).
+Kod fali 8 opublikowany i sprawdzony; nie wykonano scalenia PR #4 do main.
+Trwa fala 9: testowalna na hoście produkcyjna polityka drzewa źródeł
+z cienkim adapterem SAF. Szczegóły przydziałów w indeksie.
 **Najświeższy odbiór i kolejka: `coordination/night-20261001.json`.**
 Procedura wznowienia: `coordination/NIGHT_WORK.md`.
 `coordination/state.json` zachowuje odbiór fundamentu i odsyła do nowego etapu.
@@ -70,8 +70,8 @@ nie są fizycznym WORM ani kryptograficznym podpisem łańcucha pochodzenia.
 
 ## Następny zakres wykonawczy
 
-1. Aktywna fala 8: ograniczony odczyt nagłówków WAV w skanerze serwera;
-   ucięty plik nie może udawać kompletnego, a praca parsera ma jawny budżet.
+1. Aktywna fala 9: wykonać produkcyjną politykę całego drzewa na syntetycznym
+   dostawcy JVM; oddzielić ten odbiór od nadal niedostępnego runtime SAF.
 2. Uruchomić gotowe sześć testów SAF, gdy będzie dostępny runtime Android;
    oddzielnie sprawdzić picker, cykl uprawnień i wybór nagrań. Brak emulatora
    w obecnym środowisku jest obserwowaną blokadą, nie dowodem błędu aplikacji.
@@ -142,3 +142,10 @@ Dowody i ograniczenia: `docs/WAVE6_QA.md`. Program30 rotujących ról:
 Natywny WAV ma ograniczony prefix i jawne deklaracje; pełny hash wymaga EOF.
 Stary cache pozostaje czytelny. `docs/WAVE7_QA.md` odróżnia wykonany odbiór
 od wcześniejszych, niepowtarzanych prób serwera/ASR. Telefon nadal niebadany.
+
+## Odbiór fali 8
+
+370 backend +506 podtestów przeszło. Rzeczywisty CLI zachował źródła
+syntetyczne, a oba parsery WAV zgodziły się w24 przypadkach/408 polach.
+Naprawiono błędną kompletność uciętego pliku oraz trzy błędy obsługi zmiany
+plików i deskryptorów. Dowody: `docs/WAVE8_QA.md`. APK nadal z fali7.

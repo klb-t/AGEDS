@@ -1,8 +1,8 @@
 # Android — odbiór fali 9
 
 Izolowany assembleDebug, testDebugUnitTest i desktopTest przeszedł: 57 zadań,
-226 testów Android JVM i111 desktop JVM, razem337. Zero błędów/pominięć.
-Sprawdzono82 hashe wejść, niezmienność źródeł i podpis APK (kod0).
+226 testów Android JVM i 111 desktop JVM, razem 337. Zero błędów/pominięć.
+Sprawdzono 82 hashe wejść, niezmienność źródeł i podpis APK (kod 0).
 SHA-256 APK: `05d4eea3b424b79f21fdf89b2687da7992ee297bb39c160ed9836c61e80044bc`.
 
 Pierwszy build przerwał się przy kompilacji testu z importami kotlin.test,

@@ -1,0 +1,285 @@
+{
+  "schema_version": 1,
+  "task_id": "AGEDS-20261001-N65",
+  "status": "passed",
+  "started_at": "2026-10-01T01:26:24.072841+00:00",
+  "commands": [
+    {
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-m",
+        "server.app.cli",
+        "metadata-verify",
+        "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/inputs/valid.json",
+        "--max-input-bytes",
+        "65536"
+      ],
+      "returncode": 0,
+      "stdout": "{\"command\": \"metadata-verify\", \"valid\": true, \"digest_valid\": true, \"relationships_valid\": true, \"anchors_valid\": true, \"errors\": [], \"warnings\": [{\"code\": \"unsigned_metadata_only\", \"path\": \"$\", \"message\": \"Digest is not authentication; source bytes and replay are not included or verified.\"}], \"counts\": {\"cases\": 1, \"sources\": 1, \"artifacts\": 1, \"source_observations\": 0, \"events\": 0, \"processing_runs\": 0, \"derived_text\": 1, \"annotations\": 1, \"evidence_anchors\": 1, \"tags\": 0, \"artifact_tags\": 0, \"event_tags\": 0, \"links\": 0, \"jobs\": 1, \"audit_log\": 0, \"schema_migrations\": 0}}\n",
+      "stderr": "",
+      "readonly_inputs_unchanged": true
+    },
+    {
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-m",
+        "server.app.cli",
+        "metadata-archive-import",
+        "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/inputs/valid.json",
+        "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/outputs/valid.sqlite",
+        "--max-input-bytes",
+        "65536",
+        "--max-archive-bytes",
+        "1048576",
+        "--max-rows",
+        "100"
+      ],
+      "returncode": 0,
+      "stdout": "{\"command\": \"metadata-archive-import\", \"output\": \"/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/outputs/valid.sqlite\", \"archive_schema\": \"ageds.inert-metadata-archive/v1\", \"package_schema\": \"ageds.metadata-package/v1\", \"package_sha256\": \"cd4f88b717276d130f7768d958b21f924354b44cd301b425717aa3e577f53b88\", \"payload_sha256\": \"ee9070ac553fee720cbad29fae9ac401db79f04fa4cceebcbc5569d73cd2f4f4\", \"row_count\": 7, \"inert\": true, \"live_restore_supported\": false, \"jobs_resumed\": false, \"source_bytes_included\": false, \"replay_supported\": false, \"signed\": false}\n",
+      "stderr": "",
+      "readonly_inputs_unchanged": true
+    },
+    {
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-m",
+        "server.app.cli",
+        "metadata-archive-export",
+        "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/outputs/valid.sqlite",
+        "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/outputs/roundtrip.json",
+        "--max-input-bytes",
+        "65536",
+        "--max-archive-bytes",
+        "1048576",
+        "--max-rows",
+        "100"
+      ],
+      "returncode": 0,
+      "stdout": "{\"command\": \"metadata-archive-export\", \"output\": \"/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/outputs/roundtrip.json\", \"archive_schema\": \"ageds.inert-metadata-archive/v1\", \"package_schema\": \"ageds.metadata-package/v1\", \"package_sha256\": \"cd4f88b717276d130f7768d958b21f924354b44cd301b425717aa3e577f53b88\", \"payload_sha256\": \"ee9070ac553fee720cbad29fae9ac401db79f04fa4cceebcbc5569d73cd2f4f4\", \"row_count\": 7, \"inert\": true, \"live_restore_supported\": false, \"jobs_resumed\": false, \"source_bytes_included\": false, \"replay_supported\": false, \"signed\": false}\n",
+      "stderr": "",
+      "readonly_inputs_unchanged": true
+    },
+    {
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-m",
+        "server.app.cli",
+        "metadata-verify",
+        "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/inputs/hidden-segments.json",
+        "--max-input-bytes",
+        "65536"
+      ],
+      "returncode": 1,
+      "stdout": "{\"command\": \"metadata-verify\", \"valid\": false, \"digest_valid\": true, \"relationships_valid\": true, \"anchors_valid\": false, \"errors\": [{\"code\": \"verification_limit_exceeded\", \"path\": \"$.tables.evidence_anchors[id=7]\", \"message\": \"semantic JSON depth limit exceeded\"}], \"warnings\": [], \"counts\": {\"cases\": 1, \"sources\": 1, \"artifacts\": 1, \"source_observations\": 0, \"events\": 0, \"processing_runs\": 0, \"derived_text\": 1, \"annotations\": 1, \"evidence_anchors\": 1, \"tags\": 0, \"artifact_tags\": 0, \"event_tags\": 0, \"links\": 0, \"jobs\": 1, \"audit_log\": 0, \"schema_migrations\": 0}}\n",
+      "stderr": "",
+      "readonly_inputs_unchanged": true
+    },
+    {
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-m",
+        "server.app.cli",
+        "metadata-archive-import",
+        "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/inputs/hidden-segments.json",
+        "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/never-created/hidden-segments.sqlite",
+        "--max-input-bytes",
+        "65536",
+        "--max-archive-bytes",
+        "1048576",
+        "--max-rows",
+        "100"
+      ],
+      "returncode": 2,
+      "stdout": "",
+      "stderr": "{\"command\": \"metadata-archive-import\", \"error\": \"ValueError\", \"message\": \"Invalid metadata package: verification_limit_exceeded\"}\n",
+      "readonly_inputs_unchanged": true
+    },
+    {
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-m",
+        "server.app.cli",
+        "metadata-verify",
+        "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/inputs/hidden-selector.json",
+        "--max-input-bytes",
+        "65536"
+      ],
+      "returncode": 1,
+      "stdout": "{\"command\": \"metadata-verify\", \"valid\": false, \"digest_valid\": true, \"relationships_valid\": true, \"anchors_valid\": false, \"errors\": [{\"code\": \"verification_limit_exceeded\", \"path\": \"$.tables.evidence_anchors[id=7]\", \"message\": \"semantic JSON depth limit exceeded\"}], \"warnings\": [], \"counts\": {\"cases\": 1, \"sources\": 1, \"artifacts\": 1, \"source_observations\": 0, \"events\": 0, \"processing_runs\": 0, \"derived_text\": 1, \"annotations\": 1, \"evidence_anchors\": 1, \"tags\": 0, \"artifact_tags\": 0, \"event_tags\": 0, \"links\": 0, \"jobs\": 1, \"audit_log\": 0, \"schema_migrations\": 0}}\n",
+      "stderr": "",
+      "readonly_inputs_unchanged": true
+    },
+    {
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-m",
+        "server.app.cli",
+        "metadata-archive-import",
+        "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/inputs/hidden-selector.json",
+        "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/never-created/hidden-selector.sqlite",
+        "--max-input-bytes",
+        "65536",
+        "--max-archive-bytes",
+        "1048576",
+        "--max-rows",
+        "100"
+      ],
+      "returncode": 2,
+      "stdout": "",
+      "stderr": "{\"command\": \"metadata-archive-import\", \"error\": \"ValueError\", \"message\": \"Invalid metadata package: verification_limit_exceeded\"}\n",
+      "readonly_inputs_unchanged": true
+    },
+    {
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-m",
+        "server.app.cli",
+        "metadata-archive-export",
+        "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/inputs/hidden-segments.sqlite",
+        "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/never-exported/rejected.json",
+        "--max-input-bytes",
+        "65536",
+        "--max-archive-bytes",
+        "1048576",
+        "--max-rows",
+        "100"
+      ],
+      "returncode": 2,
+      "stdout": "",
+      "stderr": "{\"command\": \"metadata-archive-export\", \"error\": \"ValueError\", \"message\": \"Invalid metadata package: verification_limit_exceeded\"}\n",
+      "readonly_inputs_unchanged": true
+    },
+    {
+      "command": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-m",
+        "server.app.cli",
+        "metadata-archive-import",
+        "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/inputs/valid.json",
+        "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/outputs/valid.sqlite",
+        "--max-input-bytes",
+        "65536",
+        "--max-archive-bytes",
+        "1048576",
+        "--max-rows",
+        "100"
+      ],
+      "returncode": 2,
+      "stdout": "",
+      "stderr": "{\"command\": \"metadata-archive-import\", \"error\": \"FileExistsError\", \"message\": \"Output already exists: /workspace/scratch/773725428b88/review/archive-budget-cli-wave10/outputs/valid.sqlite\"}\n",
+      "readonly_inputs_unchanged": true
+    }
+  ],
+  "input_kind": "compact synthetic metadata and inert archive fixtures",
+  "limits": {
+    "cli_max_input_bytes": 65536,
+    "cli_max_archive_bytes": 1048576,
+    "cli_max_rows": 100,
+    "default_semantic_max_depth": 64,
+    "invalid_semantic_fixture_depth": 70,
+    "opaque_metadata_fixture_depth": 80
+  },
+  "limitations": [
+    "Inert metadata archive only; no live restore, jobs resumed, replay, signatures or media copies.",
+    "Only generated fixtures; no ASR, downloads, private corpus or device interaction.",
+    "Byte equality and hashes are not proof of authenticity or truth."
+  ],
+  "code_sha256": {
+    "server/app/cli.py": "2081a974c17452e76f6a07f4ffc56a2f0f0b96fd0271a9cdc79a9996ffdf7e28",
+    "server/app/packages.py": "28f9425c4bd609e668b122cad3f9c16f45f0655c5afb04254b32401df8cd6ba7",
+    "server/app/archive.py": "7e81eda09acad99c2ee51ce5892f7be05c78de9a06e5af62a7a8011bd886c030",
+    "server/app/verification_budget.py": "99427dff6253279ec8860243620a9ce7b2d73881a5b94d5b7f9bc46e9102604c",
+    "server/app/citations.py": "6a2780c9c7e18a62d425f9a413217ccfb84bd6091de300a3587a373fc44543bf",
+    "scripts/archive_budget_cli_smoke.py": "50f5b9a4a81590cc016b198e48576318949df1d8217687f486ed878316e9b530"
+  },
+  "fixture_wire_depths": {
+    "valid": 4,
+    "hidden-segments": 4,
+    "hidden-selector": 4
+  },
+  "inputs_before": [
+    {
+      "path": "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/inputs/hidden-segments.json",
+      "size_bytes": 3426,
+      "mtime_ns": 1790817984086007508,
+      "sha256": "a86f58abdf58b4b87c2d24fd63ccfe7a71b21a8f3651e5ef5aff2f17d1243107"
+    },
+    {
+      "path": "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/inputs/hidden-selector.json",
+      "size_bytes": 3426,
+      "mtime_ns": 1790817984086180259,
+      "sha256": "018ee397cf788d52dc281b1270592d4a78904d16120dcd2251f743e56bd676ff"
+    },
+    {
+      "path": "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/inputs/literal-source.bin",
+      "size_bytes": 54,
+      "mtime_ns": 1790817984085019176,
+      "sha256": "d5a59fef437f5a471d1484955a0a0bd3da4e4f943d554d259e43421e0634ee5c"
+    },
+    {
+      "path": "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/inputs/valid.json",
+      "size_bytes": 3243,
+      "mtime_ns": 1790817984085850827,
+      "sha256": "cd4f88b717276d130f7768d958b21f924354b44cd301b425717aa3e577f53b88"
+    }
+  ],
+  "actual_cli_subprocesses": 9,
+  "canonical_roundtrip_equal": true,
+  "opaque_deep_metadata_preserved": true,
+  "archive_semantic_hidden_depth_rejections": 3,
+  "metadata_verify_limit_reports": 2,
+  "no_partial_outputs": true,
+  "source_and_inputs_unchanged": true,
+  "inputs_after": [
+    {
+      "path": "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/inputs/hidden-segments.json",
+      "size_bytes": 3426,
+      "mtime_ns": 1790817984086007508,
+      "sha256": "a86f58abdf58b4b87c2d24fd63ccfe7a71b21a8f3651e5ef5aff2f17d1243107"
+    },
+    {
+      "path": "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/inputs/hidden-selector.json",
+      "size_bytes": 3426,
+      "mtime_ns": 1790817984086180259,
+      "sha256": "018ee397cf788d52dc281b1270592d4a78904d16120dcd2251f743e56bd676ff"
+    },
+    {
+      "path": "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/inputs/literal-source.bin",
+      "size_bytes": 54,
+      "mtime_ns": 1790817984085019176,
+      "sha256": "d5a59fef437f5a471d1484955a0a0bd3da4e4f943d554d259e43421e0634ee5c"
+    },
+    {
+      "path": "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/inputs/valid.json",
+      "size_bytes": 3243,
+      "mtime_ns": 1790817984085850827,
+      "sha256": "cd4f88b717276d130f7768d958b21f924354b44cd301b425717aa3e577f53b88"
+    }
+  ],
+  "hostile_archive_unchanged": {
+    "path": "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/inputs/hidden-segments.sqlite",
+    "size_bytes": 16384,
+    "mtime_ns": 1790817984893780129,
+    "sha256": "55c00b3ca3b5ff79f2e7199b8905a9a95ae833a9d42471e42677889d01f1e360"
+  },
+  "output_files": [
+    {
+      "path": "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/outputs/roundtrip.json",
+      "size_bytes": 3243,
+      "mtime_ns": 1790817984350171405,
+      "sha256": "cd4f88b717276d130f7768d958b21f924354b44cd301b425717aa3e577f53b88"
+    },
+    {
+      "path": "/workspace/scratch/773725428b88/review/archive-budget-cli-wave10/outputs/valid.sqlite",
+      "size_bytes": 16384,
+      "mtime_ns": 1790817984264773009,
+      "sha256": "ea34f3df8b624f0428548ed5a22b3e6c0b8208ea8a4eacdbb78eae23cdbb36f8"
+    }
+  ],
+  "inert_table_names": [
+    "archive_envelope",
+    "archive_records"
+  ],
+  "elapsed_seconds": 1.00503435000428,
+  "finished_at": "2026-10-01T01:26:25.077894+00:00"
+}

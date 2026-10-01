@@ -25,7 +25,7 @@ from typing import Any
 from .wav_header import MAX_PREFIX_BYTES, probe_wav_header
 
 SCHEMA_VERSION = "ageds.source-scan/v1"
-SCANNER_VERSION = "1.1.0"
+SCANNER_VERSION = "1.1.1"
 _AUDIO = {".wav", ".mp3", ".m4a", ".aac", ".ogg", ".opus", ".flac", ".amr", ".wma"}
 _VIDEO = {".mp4", ".mov", ".mkv", ".avi", ".webm"}
 
@@ -467,9 +467,12 @@ class _Scan:
             encoding = "cp1250"
             text = raw.decode(encoding, errors="strict")
             self.issue("csv_encoding_inferred", file["relative_path"], encoding=encoding, uncertainty="fallback_not_verified")
-        lines = text.splitlines(keepends=True)
+        # csv.reader counts physical CR/LF/CRLF lines, not Unicode splitlines()
+        # separators (such as U+2028) that can be literal cell content. Feed the
+        # same untranslated physical lines to parsing and raw-record capture.
+        lines = list(io.StringIO(text, newline=""))
         delimiter, start = "\t" if file["extension"] == ".tsv" else None, 0
-        if lines and re.fullmatch(r"sep=([^\r\n])\r?\n?", lines[0], re.IGNORECASE):
+        if lines and re.fullmatch(r"sep=([^\r\n])(?:\r\n|\r|\n)?", lines[0], re.IGNORECASE):
             delimiter = lines[0][4]; start = 1
         if delimiter is None:
             try:
@@ -480,7 +483,7 @@ class _Scan:
                 counts = {candidate: first_line.count(candidate) for candidate in (",", ";", "\t", "|")}
                 delimiter = max(counts, key=counts.get) if any(counts.values()) else ","
         table = self.table(file, "csv", encoding=encoding, delimiter=delimiter, preamble=lines[0] if start else None, parser="python.csv", parser_version=sys.version.split()[0])
-        reader = csv.reader(io.StringIO("".join(lines[start:])), delimiter=delimiter, strict=True)
+        reader = csv.reader(iter(lines[start:]), delimiter=delimiter, strict=True)
         headers, previous_line = None, 0
         try:
             for index, values in enumerate(reader, start=1):

@@ -4,13 +4,13 @@
   "branch": "codex/ageds-night-20261001",
   "base_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2",
   "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate; user 01:33 Europe/Amsterdam explicitly requests continuous progression while useful work remains, without ending after a checkpoint",
-  "updated_at": "2026-10-01T01:29:37.190192+00:00",
+  "updated_at": "2026-10-01T01:43:20.382856+00:00",
   "coordinator": {
-    "owner": "root-wave11-20261001T0330",
+    "owner": "root-wave12-20261001T0342",
     "status": "active",
-    "claimed_at": "2026-10-01T01:29:37.190192+00:00",
-    "lease_expires_at": "2026-10-01T02:24:37.190192+00:00",
-    "based_on_remote_head": "ad46ef0ed35a44980ad9db92409bb15e1d9f1352"
+    "claimed_at": "2026-10-01T01:43:20.382856+00:00",
+    "lease_expires_at": "2026-10-01T02:38:20.382856+00:00",
+    "based_on_remote_head": "c2df0513d85437d1e745b187a097887d9e75fc1d"
   },
   "tasks": [
     {
@@ -1231,13 +1231,20 @@
         "new SourceScanPublicationGate.kt",
         "owner tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "deterministic host JVM race test",
         "short atomic publication critical section",
         "preserve prior snapshot on invalidation before commit",
         "no device claim"
-      ]
+      ],
+      "result": {
+        "report": "docs/WAVE11_QA.md",
+        "integrated_jvm_tests": 357,
+        "new_test_count": 5,
+        "instrumentation_compiled": 6,
+        "runtime_device": 0
+      }
     },
     {
       "id": "AGEDS-20261001-N68",
@@ -1248,13 +1255,20 @@
         "SourceScanCache.kt",
         "owner tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "deterministic host JVM race test",
         "short atomic publication critical section",
         "preserve prior snapshot on invalidation before commit",
         "no device claim"
-      ]
+      ],
+      "result": {
+        "report": "docs/WAVE11_QA.md",
+        "integrated_jvm_tests": 357,
+        "new_test_count": 6,
+        "instrumentation_compiled": 6,
+        "runtime_device": 0
+      }
     },
     {
       "id": "AGEDS-20261001-N69",
@@ -1264,13 +1278,20 @@
         "CorpusVm.kt",
         "integration review docs"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "deterministic host JVM race test",
         "short atomic publication critical section",
         "preserve prior snapshot on invalidation before commit",
         "no device claim"
-      ]
+      ],
+      "result": {
+        "report": "docs/WAVE11_QA.md",
+        "integrated_jvm_tests": 357,
+        "new_test_count": 0,
+        "instrumentation_compiled": 6,
+        "runtime_device": 0
+      }
     },
     {
       "id": "AGEDS-20261001-N70",
@@ -1279,13 +1300,20 @@
       "scope": [
         "new latch-based race tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "deterministic host JVM race test",
         "short atomic publication critical section",
         "preserve prior snapshot on invalidation before commit",
         "no device claim"
-      ]
+      ],
+      "result": {
+        "report": "docs/WAVE11_QA.md",
+        "integrated_jvm_tests": 357,
+        "new_test_count": 4,
+        "instrumentation_compiled": 6,
+        "runtime_device": 0
+      }
     },
     {
       "id": "AGEDS-20261001-N71",
@@ -1294,13 +1322,20 @@
       "scope": [
         "new guarded cache acceptance tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "deterministic host JVM race test",
         "short atomic publication critical section",
         "preserve prior snapshot on invalidation before commit",
         "no device claim"
-      ]
+      ],
+      "result": {
+        "report": "docs/WAVE11_QA.md",
+        "integrated_jvm_tests": 357,
+        "new_test_count": 4,
+        "instrumentation_compiled": 6,
+        "runtime_device": 0
+      }
     },
     {
       "id": "AGEDS-20261001-N72",
@@ -1309,12 +1344,111 @@
       "scope": [
         "new targeted tests or review docs"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "deterministic host JVM race test",
         "short atomic publication critical section",
         "preserve prior snapshot on invalidation before commit",
         "no device claim"
+      ],
+      "result": {
+        "report": "docs/WAVE11_QA.md",
+        "integrated_jvm_tests": 357,
+        "new_test_count": 1,
+        "instrumentation_compiled": 6,
+        "runtime_device": 0
+      }
+    },
+    {
+      "id": "AGEDS-20261001-N73",
+      "owner": "exchange_qa",
+      "title": "Align raw CSV records with actual physical reader lines",
+      "scope": [
+        "server/app/scanner.py",
+        "new owner CSV tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "compact synthetic reproductions",
+        "raw identity preserved with explicit omission",
+        "source unchanged",
+        "independent real parser tests"
+      ]
+    },
+    {
+      "id": "AGEDS-20261001-N74",
+      "owner": "exchange_core",
+      "title": "Separate XLSX phonetic runs from base cell text",
+      "scope": [
+        "SourceWorkbookParser.kt",
+        "new owner XLSX tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "compact synthetic reproductions",
+        "raw identity preserved with explicit omission",
+        "source unchanged",
+        "independent real parser tests"
+      ]
+    },
+    {
+      "id": "AGEDS-20261001-N75",
+      "owner": "android_qa",
+      "title": "Independent CSV Unicode and newline raw fidelity acceptance",
+      "scope": [
+        "new backend CSV tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "compact synthetic reproductions",
+        "raw identity preserved with explicit omission",
+        "source unchanged",
+        "independent real parser tests"
+      ]
+    },
+    {
+      "id": "AGEDS-20261001-N76",
+      "owner": "android_contract",
+      "title": "Independent native XLSX phonetic/rich-text boundaries",
+      "scope": [
+        "new JVM XLSX tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "compact synthetic reproductions",
+        "raw identity preserved with explicit omission",
+        "source unchanged",
+        "independent real parser tests"
+      ]
+    },
+    {
+      "id": "AGEDS-20261001-N77",
+      "owner": "exchange_consumer",
+      "title": "Actual CLI CSV raw-record and source preservation acceptance",
+      "scope": [
+        "new CSV CLI script/report"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "compact synthetic reproductions",
+        "raw identity preserved with explicit omission",
+        "source unchanged",
+        "independent real parser tests"
+      ]
+    },
+    {
+      "id": "AGEDS-20261001-N78",
+      "owner": "android_citations",
+      "title": "Actual native engine/cache XLSX projection loss acceptance",
+      "scope": [
+        "new engine/cache XLSX tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "compact synthetic reproductions",
+        "raw identity preserved with explicit omission",
+        "source unchanged",
+        "independent real parser tests"
       ]
     }
   ],
@@ -1366,13 +1500,17 @@
     "wave10_content_commits": [
       "f5d7001274465e70d5def62ce32be123460bad4d",
       "ad46ef0ed35a44980ad9db92409bb15e1d9f1352"
+    ],
+    "wave11_content_commits": [
+      "c614a0845528f07866d75c7590547600f6dd8779",
+      "c2df0513d85437d1e745b187a097887d9e75fc1d"
     ]
   },
   "next_queue": [
     "N10-runtime: Execute six compiled synthetic SAF-provider tests only when a device/emulator is available; picker/grant lifecycle and recording selection remain distinct",
     "N17: Once disk capacity permits, verify a wholly clean ASR dependency installation using the new explicit pins; current corrected runtime passed actual inference",
     "N18: Extend native workbook/text formats only against concrete unsupported source patterns with bounded independent fixtures; maintain partial coverage and source preservation",
-    "Native scan cancellation/cache publication TOCTOU: linearize generation invalidation and final atomic move; concrete window between ensureActive and Files.move identified in wave9 review."
+    "Browser citation response consistency: same artifact/version/quote but different word refs and interval accepted; compact Node proof exists. Snapshot expected selector/range at save, reject mismatches before history/playback. Backend wrong-anchor production not demonstrated."
   ],
   "automation": {
     "created": true,
@@ -1380,7 +1518,7 @@
     "window": "2026-10-01 01:00 through 06:00 hourly flexible, six occurrences",
     "guard": "fresh active coordinator claim prevents duplicate takeover"
   },
-  "accepted_code_commit": "ad46ef0ed35a44980ad9db92409bb15e1d9f1352",
+  "accepted_code_commit": "c2df0513d85437d1e745b187a097887d9e75fc1d",
   "validation": {
     "backend_tests": 417,
     "backend_subtests": 523,
@@ -1388,16 +1526,16 @@
     "existing_deprecation_warnings": 3,
     "node_fake_audio_tests": 14,
     "actual_chromium_tests": 21,
-    "android_jvm_tests": 226,
+    "android_jvm_tests": 246,
     "desktop_jvm_tests": 111,
     "gradle_tasks_executed": 57,
-    "build_inputs_verified": 82,
+    "build_inputs_verified": 88,
     "instrumentation_tests_compiled": 6,
     "instrumentation_runtime_tests": 0,
     "phone_saf_test": "not_performed_no_runtime",
     "real_asr": "passed_offline_tiny_en_verified_seekable_input_generated_speech",
     "source_data": "synthetic",
-    "apk_sha256": "05d4eea3b424b79f21fdf89b2687da7992ee297bb39c160ed9836c61e80044bc",
+    "apk_sha256": "972a1f99b212dc58febe98b33ca7ced47ce3cbe02ac3644d0392aef246e63073",
     "node_identifier_tests": 9,
     "node_history_page_tests": 11,
     "node_history_payload_tests": 15,
@@ -1409,9 +1547,10 @@
     "actual_cli_wav_fixtures": 5,
     "wave9_rerun_scope": "337 JVM tests and actual Android build; backend/browser/ASR unchanged",
     "wave10_rerun_scope": "full backend and9 actual CLI calls; Android/browser/ASR unchanged",
-    "archive_cli_checks": 9
+    "archive_cli_checks": 9,
+    "wave11_rerun_scope": "357JVM+APK and six instrumentation tests compiled offline; runtime0; backend/browser/ASR unchanged"
   },
-  "current_wave": 11,
+  "current_wave": 12,
   "wave1_validation": {
     "backend_tests": 182,
     "backend_subtests": 207,
@@ -1427,19 +1566,18 @@
     "source_data": "synthetic"
   },
   "next_concrete_step": {
-    "id": "AGEDS-20261001-N67",
+    "id": "AGEDS-20261001-N73",
     "status": "in_progress",
-    "observed_gap": "ensureActive and Files.move are separate; cancellation/new scan can invalidate after last check but before old snapshot publication",
+    "observed_gap": "Server CSV splitlines splits U+2028 unlike csv.reader, shifting raw_record while marking complete; native XLSX code includes rPh phonetic text into base cell value (execution pending).",
     "scope": [
-      "per-owner publication gate",
-      "cache final move callback",
-      "ViewModel lifecycle binding"
+      "CSV physical-line mapping",
+      "XLSX base text vs phonetic annotations"
     ],
     "acceptance": [
-      "both race orderings deterministic",
-      "typed cache sources unchanged",
-      "actual Android build",
-      "explicit linearization boundary"
+      "before/after fixture proof",
+      "exact CSV raw records",
+      "explicit XLSX phonetic omission",
+      "actual CLI and native build"
     ]
   },
   "coordinator_history": [
@@ -1514,6 +1652,14 @@
       "lease_expires_at": "2026-10-01T01:29:37.190192+00:00",
       "based_on_remote_head": "9965a3563d04a0136a88760d416ea0aa2362f5f7",
       "completed_at": "2026-10-01T01:29:37.190192+00:00"
+    },
+    {
+      "owner": "root-wave11-20261001T0330",
+      "status": "completed",
+      "claimed_at": "2026-10-01T01:29:37.190192+00:00",
+      "lease_expires_at": "2026-10-01T01:43:20.382856+00:00",
+      "based_on_remote_head": "ad46ef0ed35a44980ad9db92409bb15e1d9f1352",
+      "completed_at": "2026-10-01T01:43:20.382856+00:00"
     }
   ],
   "wave2_validation": {
@@ -1690,5 +1836,35 @@
     "wav_cross_runtime_field_comparisons": 408,
     "actual_cli_wav_fixtures": 5,
     "wave9_rerun_scope": "337 JVM tests and actual Android build; backend/browser/ASR unchanged"
+  },
+  "wave10_validation": {
+    "backend_tests": 417,
+    "backend_subtests": 523,
+    "backend_failures": 0,
+    "existing_deprecation_warnings": 3,
+    "node_fake_audio_tests": 14,
+    "actual_chromium_tests": 21,
+    "android_jvm_tests": 226,
+    "desktop_jvm_tests": 111,
+    "gradle_tasks_executed": 57,
+    "build_inputs_verified": 82,
+    "instrumentation_tests_compiled": 6,
+    "instrumentation_runtime_tests": 0,
+    "phone_saf_test": "not_performed_no_runtime",
+    "real_asr": "passed_offline_tiny_en_verified_seekable_input_generated_speech",
+    "source_data": "synthetic",
+    "apk_sha256": "05d4eea3b424b79f21fdf89b2687da7992ee297bb39c160ed9836c61e80044bc",
+    "node_identifier_tests": 9,
+    "node_history_page_tests": 11,
+    "node_history_payload_tests": 15,
+    "node_total_tests": 49,
+    "wave7_rerun_scope": "Android/core JVM and APK; backend/Node/browser/ASR unchanged since wave6",
+    "wave8_rerun_scope": "full backend, actual CLI source scan, both production WAV parsers; Android APK/browser/ASR unchanged",
+    "wav_cross_runtime_cases": 24,
+    "wav_cross_runtime_field_comparisons": 408,
+    "actual_cli_wav_fixtures": 5,
+    "wave9_rerun_scope": "337 JVM tests and actual Android build; backend/browser/ASR unchanged",
+    "wave10_rerun_scope": "full backend and9 actual CLI calls; Android/browser/ASR unchanged",
+    "archive_cli_checks": 9
   }
 }

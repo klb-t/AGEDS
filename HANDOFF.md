@@ -3,10 +3,10 @@
 Stan bieżący: nocny przyrost 2026-10-01. Fundament PR #2 scalono w `main`
 w commicie `b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2`.
 PR #3 scalono w main (`8c3efb9e65999dd4931b22b555329da76379c31e`).
-Bieżący opublikowany checkpoint: fala 6. branch `codex/ageds-night-20261001`, PR #4 (otwarty).
-Kod fali 6 opublikowany i sprawdzony; nie wykonano scalenia PR #4 do main.
-Trwa fala 7: ograniczony natywny odczyt nagłówków dużych WAV z jawnym
-pochodzeniem i zakresem inspekcji. Szczegóły przydziałów w indeksie.
+Bieżący opublikowany checkpoint: fala 7. branch `codex/ageds-night-20261001`, PR #4 (otwarty).
+Kod fali 7 opublikowany i sprawdzony; nie wykonano scalenia PR #4 do main.
+Trwa fala 8: ograniczony odczyt WAV w skanerze serwera i naprawa błędnego
+statusu kompletności uciętego pliku. Szczegóły przydziałów w indeksie.
 **Najświeższy odbiór i kolejka: `coordination/night-20261001.json`.**
 Procedura wznowienia: `coordination/NIGHT_WORK.md`.
 `coordination/state.json` zachowuje odbiór fundamentu i odsyła do nowego etapu.
@@ -39,12 +39,12 @@ w tamtym wątku; nie zakładamy dodatkowej puli sześciu procesów.
 | Wyniki i cytaty | Adnotacja wskazuje wyświetloną wersję. Cytat segmentowy lub słowny zachowuje dokładny tekst, hash i selektor. Wybór słów wymaga zgodnych zapisanych znaczników ASR; brak precyzji pozostaje jawny. Weryfikacja oznacza zgodność z zapisaną wersją ASR; nie oznacza odsłuchu lub prawdziwości wypowiedzi. |
 | Skaner | Read-only CSV/TSV, XLS, XLSX, WAV, inwentaryzacja/hash innych plików. Kolizje nazw, kandydaci powiązań i sprzeczności zachowane. Limity, brak adaptera i uszkodzenia jawne. Safe no-follow descriptors wymagają wspieranego systemu POSIX. |
 | Pakiet | Snapshot 16 tabel metadanych, digests i walidacja grafu oraz cytatów. Dokładny kanoniczny roundtrip do inertnego archiwum SQLite i z powrotem. Bez bajtów źródeł, podpisu, wznowienia jobs, replay lub przywrócenia live DB. |
-| Android | Wszystkie URI kolizyjnych nazw, wybór konkretnego kandydata, prywatny manifest wyboru, jawne wysłanie na wybrany serwer, wyniki/błędy każdego pliku, wersja adnotacji. Widok Źródła skanuje SAF bez seed: CSV/TSV, XLSX, podstawowy WAV i inventory, raw komórki, lokatory, kolizje, ograniczenia. Dawny katalog JSON jest opcjonalny. Natywny XLS: ograniczona, jawnie częściowa projekcja BIFF8. UTF-16 BOM i hipotezy separatorów CSV z metadanymi niejednoznaczności. Aktualny build i testy: `docs/ANDROID_WAVE2_BUILD.md`; telefon pozostaje oddzielnym odbiorem. |
+| Android | Wszystkie URI kolizyjnych nazw, wybór konkretnego kandydata, prywatny manifest wyboru, jawne wysłanie na wybrany serwer, wyniki/błędy każdego pliku, wersja adnotacji. Widok Źródła skanuje SAF bez seed: CSV/TSV, XLSX, podstawowy WAV i inventory, raw komórki, lokatory, kolizje, ograniczenia. Dawny katalog JSON jest opcjonalny. Natywny XLS: ograniczona, jawnie częściowa projekcja BIFF8. UTF-16 BOM i hipotezy separatorów CSV z metadanymi niejednoznaczności. Aktualny zaakceptowany build i testy: `docs/ANDROID_WAVE7_BUILD.md`; telefon pozostaje oddzielnym odbiorem. |
 
 `scanner.observations` to obserwacje pól i hipotez; SQLite `source_observations`
 to pozyskania bajtów. Wspólny zapis JSON nie oznacza wspólnej semantyki.
 
-## Odbiór
+## Historyczny odbiór fundamentu i fali 2
 
 Fundament i fala 1 zachowują swoje historyczne receipty. Fala 2: **183 testy
 backend i 207 podtestów**, 14 testów Node oraz **11 testów rzeczywistego Chromium**.
@@ -70,22 +70,24 @@ nie są fizycznym WORM ani kryptograficznym podpisem łańcucha pochodzenia.
 
 ## Następny zakres wykonawczy
 
-1. Konkretny kontrakt wymiany dowodów: pakiet wskazujący wersję, selektor,
-   pochodzenie i jawne braki oraz niezależny konsument-fixture w AGEDS.
-   Nie otwierać lokatorów źródła i nie deklarować adaptera partnera bez testu
-   z rzeczywistym drugim projektem. Praca tej nocy dotyczy tylko repo AGEDS.
+1. Aktywna fala 8: ograniczony odczyt nagłówków WAV w skanerze serwera;
+   ucięty plik nie może udawać kompletnego, a praca parsera ma jawny budżet.
 2. Uruchomić gotowe sześć testów SAF, gdy będzie dostępny runtime Android;
    oddzielnie sprawdzić picker, cykl uprawnień i wybór nagrań. Brak emulatora
    w obecnym środowisku jest obserwowaną blokadą, nie dowodem błędu aplikacji.
-3. Odpowiednik wyboru cytatu wersji i zakresu w kliencie Android — uzgodnić
-   istniejący kontrakt HTTP, a następnie przetestować konkretne zachowanie.
-4. Rozszerzać XLS/teksty tylko dla konkretnego nieobsługiwanego wzorca:
+3. Rozszerzać XLS/teksty tylko dla konkretnego nieobsługiwanego wzorca:
    aktualne granice opisują `docs/NATIVE_XLS.md` i `docs/NATIVE_SOURCE_FORMATS.md`.
-5. Po odzyskaniu miejsca sprawdzić czystą instalację przypiętych zależności ASR;
-   bieżący poprawiony zestaw jest przetestowany wykonaniem, druga świeża
-   instalacja nie została wykonana. Jakość/Polski ASR to osobny eksperyment.
-6. Profile pięciu warstw AGEDS i rozumowanie LLM — konkretne przypadki,
-   jawne RAW odpowiedzi oraz deterministyczna polityka liczb/wyliczeń.
+4. Po odzyskaniu miejsca sprawdzić czystą instalację przypiętych zależności ASR;
+   bieżący zestaw przeszedł rzeczywistą inferencję, druga świeża instalacja
+   nie została wykonana. Jakość i polski ASR wymagają osobnego eksperymentu.
+5. Profile pięciu warstw AGEDS i rozumowanie LLM — konkretne przypadki,
+   jawne surowe odpowiedzi oraz deterministyczna polityka liczb i wyliczeń.
+   Nie uruchamiać płatnych modeli tej nocy.
+
+Wcześniejsze pozycje — pakiet cytatu z niezależnym konsumentem i wybór
+wersji/cytatu w Androidzie — wykonano w fali 3. Nie otwierać lokatorów źródła
+z pakietu i nie deklarować adaptera partnera bez rzeczywistego testu drugiego
+projektu. Praca tej nocy dotyczy tylko repo AGEDS.
 
 Kierunki współpracy z ChatADHD, iOmatrix, Loom/LEM, WatchDog i PixelSpace są
 koncepcyjne. Używać `ECOSYSTEM.md` i `docs/ARCHITECTURE_RULES.md`; adapterów nie
@@ -133,3 +135,10 @@ Realny tiny.en odczytał zweryfikowany strumień, a dokładny cytat i inertny
 roundtrip przeszły. Klienty mają limit4MiB danych historii na kolekcję.
 Dowody i ograniczenia: `docs/WAVE6_QA.md`. Program30 rotujących ról:
 `coordination/AGENT_PROGRAM.md`. Telefon i adapter partnera nadal niebadane.
+
+## Odbiór fali 7
+
+287 JVM (176 Android,111 desktop),76 hashy wejść i build APK przeszły.
+Natywny WAV ma ograniczony prefix i jawne deklaracje; pełny hash wymaga EOF.
+Stary cache pozostaje czytelny. `docs/WAVE7_QA.md` odróżnia wykonany odbiór
+od wcześniejszych, niepowtarzanych prób serwera/ASR. Telefon nadal niebadany.

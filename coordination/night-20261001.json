@@ -4,13 +4,13 @@
   "branch": "codex/ageds-night-20261001",
   "base_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2",
   "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate; user 01:33 Europe/Amsterdam explicitly requests continuous progression while useful work remains, without ending after a checkpoint",
-  "updated_at": "2026-10-01T00:38:24.932472+00:00",
+  "updated_at": "2026-10-01T00:50:59.711497+00:00",
   "coordinator": {
-    "owner": "root-wave7-20261001T0239",
+    "owner": "root-wave8-20261001T0252",
     "status": "active",
-    "claimed_at": "2026-10-01T00:38:24.932472+00:00",
-    "lease_expires_at": "2026-10-01T01:33:24.932472+00:00",
-    "based_on_remote_head": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3"
+    "claimed_at": "2026-10-01T00:50:59.711497+00:00",
+    "lease_expires_at": "2026-10-01T01:45:59.711497+00:00",
+    "based_on_remote_head": "c723fd535d5b7b07565697d37d57a867649f06b2"
   },
   "tasks": [
     {
@@ -762,11 +762,16 @@
       "scope": [
         "new core WavHeaderProbe models/parser/tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "At most64KiB inspection; declared duration remains hypothesis; malformed/unsupported/conflicting sizes explicit"
       ],
-      "based_on_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3"
+      "based_on_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3",
+      "result": {
+        "published_commit": "c723fd535d5b7b07565697d37d57a867649f06b2",
+        "report": "docs/WAVE7_QA.md",
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N44",
@@ -777,11 +782,16 @@
         "SourceScanModels.kt",
         "new SourceWavReader helper/owner tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Known oversized and unknown size audio consume bounded prefix; count actual bytes; no hash for incomplete content; close and cancellation"
       ],
-      "based_on_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3"
+      "based_on_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3",
+      "result": {
+        "published_commit": "c723fd535d5b7b07565697d37d57a867649f06b2",
+        "report": "docs/WAVE7_QA.md",
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N45",
@@ -790,11 +800,16 @@
       "scope": [
         "new core WAV adversarial tests and doc"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Truncation, overflow, formats, duplicate chunks, provider disagreement and budget boundaries"
       ],
-      "based_on_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3"
+      "based_on_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3",
+      "result": {
+        "published_commit": "c723fd535d5b7b07565697d37d57a867649f06b2",
+        "report": "docs/WAVE7_QA.md",
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N46",
@@ -804,11 +819,16 @@
         "SourceScanUi.kt",
         "new audio projection helper/tests/doc"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Header-derived duration and unread body explicit; old cache and other file formats compatible"
       ],
-      "based_on_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3"
+      "based_on_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3",
+      "result": {
+        "published_commit": "c723fd535d5b7b07565697d37d57a867649f06b2",
+        "report": "docs/WAVE7_QA.md",
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N47",
@@ -817,11 +837,16 @@
       "scope": [
         "new Android JVM stream adversarial tests and doc"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "Exact read caps, unknown sizes, lying provider, zero progress, cancellation, close, no copy; no device claim"
       ],
-      "based_on_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3"
+      "based_on_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3",
+      "result": {
+        "published_commit": "c723fd535d5b7b07565697d37d57a867649f06b2",
+        "report": "docs/WAVE7_QA.md",
+        "independent_acceptance": "passed"
+      }
     },
     {
       "id": "AGEDS-20261001-N48",
@@ -830,18 +855,101 @@
       "scope": [
         "new cache/serialization tests and doc"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "New bounded metadata roundtrips outside source; old schema still readable; no raw media retained"
       ],
-      "based_on_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3"
+      "based_on_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3",
+      "result": {
+        "published_commit": "c723fd535d5b7b07565697d37d57a867649f06b2",
+        "report": "docs/WAVE7_QA.md",
+        "independent_acceptance": "passed"
+      }
+    },
+    {
+      "id": "AGEDS-20261001-N49",
+      "owner": "exchange_core",
+      "title": "Bounded server WAV header declarations",
+      "scope": [
+        "new server/app/wav_header.py, owner tests and doc"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "Bounded64KiB input; raw declarations and explicit malformed/unsupported/size conflict; no audio body validation"
+      ],
+      "based_on_commit": "c723fd535d5b7b07565697d37d57a867649f06b2"
+    },
+    {
+      "id": "AGEDS-20261001-N50",
+      "owner": "android_contract",
+      "title": "Server scanner bounded header integration",
+      "scope": [
+        "server/app/scanner.py, owner tests and scan doc"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "Same safe descriptor; per-file and aggregate header budget; truncated44byte WAV not complete; preserve compatibility and no source copies"
+      ],
+      "based_on_commit": "c723fd535d5b7b07565697d37d57a867649f06b2"
+    },
+    {
+      "id": "AGEDS-20261001-N51",
+      "owner": "exchange_qa",
+      "title": "Independent server WAV semantic acceptance",
+      "scope": [
+        "new scanner/header adversarial tests and doc"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "Old44byte false completeness reproduced; malformed geometry/extents and giant chunk fanout rejected/limited explicitly"
+      ],
+      "based_on_commit": "c723fd535d5b7b07565697d37d57a867649f06b2"
+    },
+    {
+      "id": "AGEDS-20261001-N52",
+      "owner": "android_citations",
+      "title": "Actual CLI synthetic source acceptance",
+      "scope": [
+        "new CLI smoke script and receipt"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "Actual scan/export CLI against valid/truncated/oversized fixtures; source hashes and file lists unchanged; metadata only outside source"
+      ],
+      "based_on_commit": "c723fd535d5b7b07565697d37d57a867649f06b2"
+    },
+    {
+      "id": "AGEDS-20261001-N53",
+      "owner": "exchange_consumer",
+      "title": "Cross-platform header projection comparison",
+      "scope": [
+        "new shared fixture corpus and Kotlin/Python comparison harness/report"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "Execute both production parsers on identical synthetic bytes; compare agreed projection only; source policies and runtime limitations remain distinct"
+      ],
+      "based_on_commit": "c723fd535d5b7b07565697d37d57a867649f06b2"
+    },
+    {
+      "id": "AGEDS-20261001-N54",
+      "owner": "android_qa",
+      "title": "Independent server read budgets and descriptor lifecycle",
+      "scope": [
+        "new backend stream/counter/mutation tests and doc"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "Measure actual header reads including failure and total budget; no reopen/source copies; mutation/status and descriptor closure tested"
+      ],
+      "based_on_commit": "c723fd535d5b7b07565697d37d57a867649f06b2"
     }
   ],
   "publication": {
-    "status": "wave6_content_published_and_tree_verified",
+    "status": "wave7_content_published_and_tree_verified",
     "foundation_pr": "https://github.com/klb-t/AGEDS/pull/2",
     "foundation_merged": true,
-    "content_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3",
+    "content_commit": "c723fd535d5b7b07565697d37d57a867649f06b2",
     "pull_request": "https://github.com/klb-t/AGEDS/pull/4",
     "merge_status": "open; branch publication complete; no wave2 main merge performed",
     "previous_increment_merged_at": "8c3efb9e65999dd4931b22b555329da76379c31e",
@@ -851,7 +959,7 @@
       "280f848f593be1402b82eb08505ef74507ba925e",
       "903d3d3004ccf878b91d407b4d4983660b2081b5"
     ],
-    "content_tree": "d4ade2d7e79451d90fbc8fb5a0c03ecd7d33fc91",
+    "content_tree": "d680ccdfc6954de32c12d3fbd64f89009c9c6858",
     "wave3_content_commits": [
       "9e5e11d9de3b796a902715eef1344b5734eaa0f0",
       "13a489502ad991a9aae1a9fce690a8b127d571a8"
@@ -869,6 +977,10 @@
     "wave6_content_commits": [
       "19b45ed7b25e3c683f571ddae0eccd71d2cfd750",
       "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3"
+    ],
+    "wave7_content_commits": [
+      "e56e73a8f7f5c317d4740db97ce0b5e58ee57b67",
+      "c723fd535d5b7b07565697d37d57a867649f06b2"
     ]
   },
   "next_queue": [
@@ -882,7 +994,7 @@
     "window": "2026-10-01 01:00 through 06:00 hourly flexible, six occurrences",
     "guard": "fresh active coordinator claim prevents duplicate takeover"
   },
-  "accepted_code_commit": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3",
+  "accepted_code_commit": "c723fd535d5b7b07565697d37d57a867649f06b2",
   "validation": {
     "backend_tests": 321,
     "backend_subtests": 430,
@@ -890,22 +1002,23 @@
     "existing_deprecation_warnings": 3,
     "node_fake_audio_tests": 14,
     "actual_chromium_tests": 21,
-    "android_jvm_tests": 132,
-    "desktop_jvm_tests": 75,
+    "android_jvm_tests": 176,
+    "desktop_jvm_tests": 111,
     "gradle_tasks_executed": 57,
-    "build_inputs_verified": 65,
+    "build_inputs_verified": 76,
     "instrumentation_tests_compiled": 6,
     "instrumentation_runtime_tests": 0,
     "phone_saf_test": "not_performed_no_runtime",
     "real_asr": "passed_offline_tiny_en_verified_seekable_input_generated_speech",
     "source_data": "synthetic",
-    "apk_sha256": "2274ccf3b3db1949d5fe8e2829a69e34c451738d91fcc9b5cc2825766bd32d14",
+    "apk_sha256": "284203bf79260c8266f16c7515b6b72609152723c17523e69109dfb6be7ece1d",
     "node_identifier_tests": 9,
     "node_history_page_tests": 11,
     "node_history_payload_tests": 15,
-    "node_total_tests": 49
+    "node_total_tests": 49,
+    "wave7_rerun_scope": "Android/core JVM and APK; backend/Node/browser/ASR unchanged since wave6"
   },
-  "current_wave": 7,
+  "current_wave": 8,
   "wave1_validation": {
     "backend_tests": 182,
     "backend_subtests": 207,
@@ -921,17 +1034,17 @@
     "source_data": "synthetic"
   },
   "next_concrete_step": {
-    "id": "AGEDS-20261001-N43",
+    "id": "AGEDS-20261001-N49",
     "status": "in_progress",
+    "observed_gap": "44-byte truncated WAV declared16000data bytes produces1second duration and coverage.complete=true in server scanner;10000zeroJUNK chunks produce20009headerreads",
     "scope": [
-      "native bounded WAV header probe",
-      "read-only SAF integration and explicit UI provenance"
+      "bounded server WAV header projection and same-descriptor scan integration"
     ],
     "acceptance": [
-      "no source copy",
-      "bounded actual reads",
-      "declared header duration not full validation/hash",
-      "independent JVM acceptance"
+      "explicit extent contradiction",
+      "bounded header work",
+      "source unchanged",
+      "actual CLI and independent tests"
     ]
   },
   "coordinator_history": [
@@ -974,6 +1087,14 @@
       "lease_expires_at": "2026-10-01T00:38:24.932472+00:00",
       "based_on_remote_head": "0d9b0d0560db4e158c43937bf82c800ce7e362b8",
       "completed_at": "2026-10-01T00:38:24.932472+00:00"
+    },
+    {
+      "owner": "root-wave7-20261001T0239",
+      "status": "completed",
+      "claimed_at": "2026-10-01T00:38:24.932472+00:00",
+      "lease_expires_at": "2026-10-01T00:50:59.711497+00:00",
+      "based_on_remote_head": "8b4c688ad2944a5c1dde3d8eadede1a91f4d68c3",
+      "completed_at": "2026-10-01T00:50:59.711497+00:00"
     }
   ],
   "wave2_validation": {
@@ -1050,5 +1171,27 @@
     "apk_sha256": "2a56f2f49c3761c3f78b07cbed2c7ce465d7f18eb2293845a3e71721cc8c34ba",
     "node_identifier_tests": 9,
     "node_history_page_tests": 11
+  },
+  "wave6_validation": {
+    "backend_tests": 321,
+    "backend_subtests": 430,
+    "backend_failures": 0,
+    "existing_deprecation_warnings": 3,
+    "node_fake_audio_tests": 14,
+    "actual_chromium_tests": 21,
+    "android_jvm_tests": 132,
+    "desktop_jvm_tests": 75,
+    "gradle_tasks_executed": 57,
+    "build_inputs_verified": 65,
+    "instrumentation_tests_compiled": 6,
+    "instrumentation_runtime_tests": 0,
+    "phone_saf_test": "not_performed_no_runtime",
+    "real_asr": "passed_offline_tiny_en_verified_seekable_input_generated_speech",
+    "source_data": "synthetic",
+    "apk_sha256": "2274ccf3b3db1949d5fe8e2829a69e34c451738d91fcc9b5cc2825766bd32d14",
+    "node_identifier_tests": 9,
+    "node_history_page_tests": 11,
+    "node_history_payload_tests": 15,
+    "node_total_tests": 49
   }
 }

@@ -204,11 +204,9 @@ class CitationWorkspace(
         busy.value = true; error.value = null
         work = scope.launch {
             try {
-                val saved = server.createCitation(selected.artifactId, selected.request)
-                require(saved.artifactId == selected.artifactId && saved.derivedTextId == selected.derivedTextId &&
-                    saved.quoteText == selected.quoteText && saved.startMs == selected.startMs && saved.endMs == selected.endMs) {
-                    "Odpowiedź zapisu nie odpowiada wybranemu cytatowi"
-                }
+                val saved = selected.requireMatchingCreated(
+                    server.createCitation(selected.artifactId, selected.request),
+                )
                 if (epoch.accepts(token)) {
                     citationPages.reset(selected.artifactId); loadOlderCitations()
                     message.value = "Zapisano cytat #${saved.id}, wersja #${saved.derivedTextId}."

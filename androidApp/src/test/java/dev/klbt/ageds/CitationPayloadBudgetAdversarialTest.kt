@@ -3,7 +3,9 @@ package dev.klbt.ageds
 import dev.klbt.ageds.core.*
 import dev.klbt.ageds.core.Annotation as EvidenceAnnotation
 import kotlinx.coroutines.*
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.*
 import org.junit.Test
 import kotlin.coroutines.Continuation
@@ -36,7 +38,18 @@ class CitationPayloadBudgetAdversarialTest {
         }
         override suspend fun annotationsPage(id:Long,limit:Int,beforeId:Long?,snapshotMaxId:Long?)=
             ArtifactPage(id,listOf(EvidenceAnnotation(51,id,body="ą🐈\"\n",derivedTextId=41)),null,51,false,limit)
-        override suspend fun createCitation(id:Long,request:CitationCreate)=citation(101,request.quoteText!!).also { saved=it }
+        override suspend fun createCitation(id:Long,request:CitationCreate)=Citation(
+            101,id,request.derivedTextId,100,200,request.quoteText!!,"fixture",
+            JsonObject(mapOf(
+                "kind" to JsonPrimitive("segments"),
+                "indices" to JsonArray(request.segmentIndices!!.map { JsonPrimitive(it) }),
+                "text_join" to JsonPrimitive("concatenate_exact"),
+                "time_unit" to JsonPrimitive("seconds"),
+                "stored_time_unit" to JsonPrimitive("milliseconds"),
+                "rounding" to JsonPrimitive("nearest_ms"),
+                "precision" to JsonPrimitive("segment"),
+            )),
+        ).also { saved=it }
         override suspend fun annotate(id:Long,request:AnnotationCreate)=error("No annotation writes")
         override fun contentUrl(id:Long)="fixture/$id"
         override fun close() {}

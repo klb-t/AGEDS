@@ -3,7 +3,9 @@ package dev.klbt.ageds
 import dev.klbt.ageds.core.*
 import dev.klbt.ageds.core.Annotation as EvidenceAnnotation
 import kotlinx.coroutines.*
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.*
 import org.junit.Test
 import kotlin.coroutines.Continuation
@@ -22,7 +24,18 @@ class CitationWorkspaceAdversarialTest {
         var closed = 0
         val requests = mutableListOf<Pair<Long,CitationCreate>>()
         fun text(id:Long, version:Long) = Transcript(version,id,text="raw-$version",segments=listOf(TranscriptSegment(0.1,0.2,"raw-$version")))
-        fun saved(id:Long, request:CitationCreate) = Citation(3,id,request.derivedTextId,100,200,request.quoteText!!,"fixture",JsonObject(emptyMap()))
+        fun saved(id:Long, request:CitationCreate) = Citation(
+            3,id,request.derivedTextId,100,200,request.quoteText!!,"fixture",
+            JsonObject(mapOf(
+                "kind" to JsonPrimitive("segments"),
+                "indices" to JsonArray(request.segmentIndices!!.map { JsonPrimitive(it) }),
+                "text_join" to JsonPrimitive("concatenate_exact"),
+                "time_unit" to JsonPrimitive("seconds"),
+                "stored_time_unit" to JsonPrimitive("milliseconds"),
+                "rounding" to JsonPrimitive("nearest_ms"),
+                "precision" to JsonPrimitive("segment"),
+            )),
+        )
         override suspend fun transcriptVersionsPage(id:Long,limit:Int,beforeId:Long?,snapshotMaxId:Long?) = ArtifactPage(id,listOf(TranscriptVersion(41,id),TranscriptVersion(40,id)),null,41,false,limit)
         override suspend fun transcript(id:Long,versionId:Long):Transcript? {
             if(delayRead) return suspendCoroutine { heldRead=it }

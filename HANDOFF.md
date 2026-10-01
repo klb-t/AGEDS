@@ -184,3 +184,12 @@ i porównanie z Pythonem dla3008 przypadków czasu oraz2 projekcji.
 Zamrożony selektor chroni przed zaakceptowaniem innego wystąpienia.
 `docs/WAVE13_QA.md` i receipt oddzielają ten odbiór od Chromium, Androida
 i wcześniejszych wyników. Native pozostaje gotowe; claim zwolniony.
+
+## Fala 13 — klient natywny przygotowany, wykonanie zablokowane
+
+Opublikowano źródłowy kontrakt dokładnej odpowiedzi zapisu cytatu w rdzeniu
+Kotlin oraz jego użycie przed skutkami ubocznymi w Android workspace. Pięć
+plików zawiera 29 przygotowanych testów, a niezależny audyt po poprawce
+Python/JVM daje PASS dla źródła. Testów nie wykonano: wrapper Gradle 9.7.0 nie
+był w cache i jego pobranie zakończyło się `Network is unreachable` przed
+kompilacją. Nie zbudowano nowego APK. Szczegóły: `docs/WAVE13_NATIVE_QA.md`.

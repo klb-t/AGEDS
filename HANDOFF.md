@@ -3,10 +3,10 @@
 Stan bieżący: nocny przyrost 2026-10-01. Fundament PR #2 scalono w `main`
 w commicie `b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2`.
 PR #3 scalono w main (`8c3efb9e65999dd4931b22b555329da76379c31e`).
-Bieżący opublikowany checkpoint: fala 11. branch `codex/ageds-night-20261001`, PR #4 (otwarty).
-Kod fali 11 opublikowany i sprawdzony; nie wykonano scalenia PR #4 do main.
-Trwa fala 12: wierność surowych rekordów CSV i oddzielenie wskazówek
-fonetycznych od bazowego tekstu XLSX. Szczegóły przydziałów w indeksie.
+Bieżący opublikowany checkpoint: fala 12. branch `codex/ageds-night-20261001`, PR #4 (otwarty).
+Kod fali 12 opublikowany i sprawdzony; nie wykonano scalenia PR #4 do main.
+Trwa fala 13: sprawdzanie odpowiedzi zapisu cytatu wobec zamrożonego
+selektora i zakresu w obu klientach. Szczegóły przydziałów w indeksie.
 **Najświeższy odbiór i kolejka: `coordination/night-20261001.json`.**
 Procedura wznowienia: `coordination/NIGHT_WORK.md`.
 `coordination/state.json` zachowuje odbiór fundamentu i odsyła do nowego etapu.
@@ -39,7 +39,7 @@ w tamtym wątku; nie zakładamy dodatkowej puli sześciu procesów.
 | Wyniki i cytaty | Adnotacja wskazuje wyświetloną wersję. Cytat segmentowy lub słowny zachowuje dokładny tekst, hash i selektor. Wybór słów wymaga zgodnych zapisanych znaczników ASR; brak precyzji pozostaje jawny. Weryfikacja oznacza zgodność z zapisaną wersją ASR; nie oznacza odsłuchu lub prawdziwości wypowiedzi. |
 | Skaner | Read-only CSV/TSV, XLS, XLSX, WAV, inwentaryzacja/hash innych plików. Kolizje nazw, kandydaci powiązań i sprzeczności zachowane. Limity, brak adaptera i uszkodzenia jawne. Safe no-follow descriptors wymagają wspieranego systemu POSIX. |
 | Pakiet | Snapshot 16 tabel metadanych, digests i walidacja grafu oraz cytatów. Dokładny kanoniczny roundtrip do inertnego archiwum SQLite i z powrotem. Bez bajtów źródeł, podpisu, wznowienia jobs, replay lub przywrócenia live DB. |
-| Android | Wszystkie URI kolizyjnych nazw, wybór konkretnego kandydata, prywatny manifest wyboru, jawne wysłanie na wybrany serwer, wyniki/błędy każdego pliku, wersja adnotacji. Widok Źródła skanuje SAF bez seed: CSV/TSV, XLSX, podstawowy WAV i inventory, raw komórki, lokatory, kolizje, ograniczenia. Dawny katalog JSON jest opcjonalny. Natywny XLS: ograniczona, jawnie częściowa projekcja BIFF8. UTF-16 BOM i hipotezy separatorów CSV z metadanymi niejednoznaczności. Aktualny zaakceptowany build i testy: `docs/ANDROID_WAVE11_BUILD.md`; telefon pozostaje oddzielnym odbiorem. |
+| Android | Wszystkie URI kolizyjnych nazw, wybór konkretnego kandydata, prywatny manifest wyboru, jawne wysłanie na wybrany serwer, wyniki/błędy każdego pliku, wersja adnotacji. Widok Źródła skanuje SAF bez seed: CSV/TSV, XLSX, podstawowy WAV i inventory, raw komórki, lokatory, kolizje, ograniczenia. Dawny katalog JSON jest opcjonalny. Natywny XLS: ograniczona, jawnie częściowa projekcja BIFF8. UTF-16 BOM i hipotezy separatorów CSV z metadanymi niejednoznaczności. Aktualny zaakceptowany build i testy: `docs/ANDROID_WAVE12_BUILD.md`; telefon pozostaje oddzielnym odbiorem. |
 
 `scanner.observations` to obserwacje pól i hipotez; SQLite `source_observations`
 to pozyskania bajtów. Wspólny zapis JSON nie oznacza wspólnej semantyki.
@@ -70,8 +70,8 @@ nie są fizycznym WORM ani kryptograficznym podpisem łańcucha pochodzenia.
 
 ## Następny zakres wykonawczy
 
-1. Aktywna fala 12: poprawić przypisanie raw_record CSV przy separatorach
-   Unicode oraz zweryfikować i poprawić obsługę rPh w natywnym XLSX.
+1. Aktywna fala 13: odpowiedź zapisu cytatu musi wskazywać dokładnie wybrane
+   wystąpienie słów/segmentów, nie tylko ten sam tekst i wersję.
 2. Uruchomić gotowe sześć testów SAF, gdy będzie dostępny runtime Android;
    oddzielnie sprawdzić picker, cykl uprawnień i wybór nagrań. Brak emulatora
    w obecnym środowisku jest obserwowaną blokadą, nie dowodem błędu aplikacji.
@@ -169,3 +169,9 @@ projekcje. Surowe opaque pola pozostają zachowane. `docs/WAVE10_QA.md`.
 357 JVM i APK przeszły; 20 nowych testów potwierdziło uporządkowanie
 anulowania z publikacją cache. Ponownie skompilowano6 testów SAF offline
 z aktualnym kodem; wykonanych runtime nadal0. `docs/WAVE11_QA.md`.
+
+## Odbiór fali 12
+
+429 backend i588 podtestów,379 JVM i2 CLI przeszły. CSV zachowuje dokładne
+surowe rekordy mimo separatorów Unicode. XLSX nie dokleja fonetycznych
+adnotacji do tekstu bazowego i jawnie opisuje pominięcie. `docs/WAVE12_QA.md`.

@@ -4,13 +4,13 @@
   "branch": "codex/ageds-night-20261001",
   "base_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2",
   "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate; user 01:33 Europe/Amsterdam explicitly requests continuous progression while useful work remains, without ending after a checkpoint",
-  "updated_at": "2026-10-01T01:43:20.382856+00:00",
+  "updated_at": "2026-10-01T01:55:28.415211+00:00",
   "coordinator": {
-    "owner": "root-wave12-20261001T0342",
+    "owner": "root-wave13-20261001T0354",
     "status": "active",
-    "claimed_at": "2026-10-01T01:43:20.382856+00:00",
-    "lease_expires_at": "2026-10-01T02:38:20.382856+00:00",
-    "based_on_remote_head": "c2df0513d85437d1e745b187a097887d9e75fc1d"
+    "claimed_at": "2026-10-01T01:55:28.415211+00:00",
+    "lease_expires_at": "2026-10-01T02:50:28.415211+00:00",
+    "based_on_remote_head": "4c6f73f128d58c43cf0a950f0c3e4b55b8295e3b"
   },
   "tasks": [
     {
@@ -1367,13 +1367,20 @@
         "server/app/scanner.py",
         "new owner CSV tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "compact synthetic reproductions",
         "raw identity preserved with explicit omission",
         "source unchanged",
         "independent real parser tests"
-      ]
+      ],
+      "result": {
+        "report": "docs/WAVE12_QA.md",
+        "backend_tests": 429,
+        "backend_subtests": 588,
+        "integrated_jvm_tests": 379,
+        "actual_cli_scans": 2
+      }
     },
     {
       "id": "AGEDS-20261001-N74",
@@ -1383,13 +1390,20 @@
         "SourceWorkbookParser.kt",
         "new owner XLSX tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "compact synthetic reproductions",
         "raw identity preserved with explicit omission",
         "source unchanged",
         "independent real parser tests"
-      ]
+      ],
+      "result": {
+        "report": "docs/WAVE12_QA.md",
+        "backend_tests": 429,
+        "backend_subtests": 588,
+        "integrated_jvm_tests": 379,
+        "actual_cli_scans": 2
+      }
     },
     {
       "id": "AGEDS-20261001-N75",
@@ -1398,13 +1412,20 @@
       "scope": [
         "new backend CSV tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "compact synthetic reproductions",
         "raw identity preserved with explicit omission",
         "source unchanged",
         "independent real parser tests"
-      ]
+      ],
+      "result": {
+        "report": "docs/WAVE12_QA.md",
+        "backend_tests": 429,
+        "backend_subtests": 588,
+        "integrated_jvm_tests": 379,
+        "actual_cli_scans": 2
+      }
     },
     {
       "id": "AGEDS-20261001-N76",
@@ -1413,13 +1434,20 @@
       "scope": [
         "new JVM XLSX tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "compact synthetic reproductions",
         "raw identity preserved with explicit omission",
         "source unchanged",
         "independent real parser tests"
-      ]
+      ],
+      "result": {
+        "report": "docs/WAVE12_QA.md",
+        "backend_tests": 429,
+        "backend_subtests": 588,
+        "integrated_jvm_tests": 379,
+        "actual_cli_scans": 2
+      }
     },
     {
       "id": "AGEDS-20261001-N77",
@@ -1428,13 +1456,20 @@
       "scope": [
         "new CSV CLI script/report"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "compact synthetic reproductions",
         "raw identity preserved with explicit omission",
         "source unchanged",
         "independent real parser tests"
-      ]
+      ],
+      "result": {
+        "report": "docs/WAVE12_QA.md",
+        "backend_tests": 429,
+        "backend_subtests": 588,
+        "integrated_jvm_tests": 379,
+        "actual_cli_scans": 2
+      }
     },
     {
       "id": "AGEDS-20261001-N78",
@@ -1443,12 +1478,119 @@
       "scope": [
         "new engine/cache XLSX tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "compact synthetic reproductions",
         "raw identity preserved with explicit omission",
         "source unchanged",
         "independent real parser tests"
+      ],
+      "result": {
+        "report": "docs/WAVE12_QA.md",
+        "backend_tests": 429,
+        "backend_subtests": 588,
+        "integrated_jvm_tests": 379,
+        "actual_cli_scans": 2
+      }
+    },
+    {
+      "id": "AGEDS-20261001-N79",
+      "owner": "android_qa",
+      "title": "Browser validates created citation against immutable selection",
+      "scope": [
+        "citations.mjs",
+        "new browser save helper",
+        "owner node tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "snapshot before await",
+        "exact selected occurrence and canonical selector metadata",
+        "ties-even numeric semantics",
+        "no changes to history/API schema",
+        "actual available tests"
+      ]
+    },
+    {
+      "id": "AGEDS-20261001-N80",
+      "owner": "android_contract",
+      "title": "Core exact selected projection response contract",
+      "scope": [
+        "CitationSelection.kt",
+        "new core matcher and owner tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "snapshot before await",
+        "exact selected occurrence and canonical selector metadata",
+        "ties-even numeric semantics",
+        "no changes to history/API schema",
+        "actual available tests"
+      ]
+    },
+    {
+      "id": "AGEDS-20261001-N81",
+      "owner": "android_citations",
+      "title": "Native workspace uses exact save response validation",
+      "scope": [
+        "CitationWorkspace.kt",
+        "workspace save tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "snapshot before await",
+        "exact selected occurrence and canonical selector metadata",
+        "ties-even numeric semantics",
+        "no changes to history/API schema",
+        "actual available tests"
+      ]
+    },
+    {
+      "id": "AGEDS-20261001-N82",
+      "owner": "exchange_qa",
+      "title": "Independent Node response/selector/rounding boundaries",
+      "scope": [
+        "new Node adversarial tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "snapshot before await",
+        "exact selected occurrence and canonical selector metadata",
+        "ties-even numeric semantics",
+        "no changes to history/API schema",
+        "actual available tests"
+      ]
+    },
+    {
+      "id": "AGEDS-20261001-N83",
+      "owner": "exchange_consumer",
+      "title": "Actual browser wrong occurrence response rejection",
+      "scope": [
+        "browser acceptance script/fixtures/receipt"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "snapshot before await",
+        "exact selected occurrence and canonical selector metadata",
+        "ties-even numeric semantics",
+        "no changes to history/API schema",
+        "actual available tests"
+      ]
+    },
+    {
+      "id": "AGEDS-20261001-N84",
+      "owner": "exchange_core",
+      "title": "Independent Kotlin response selector/time contract acceptance",
+      "scope": [
+        "new core adversarial tests"
+      ],
+      "status": "in_progress",
+      "acceptance": [
+        "snapshot before await",
+        "exact selected occurrence and canonical selector metadata",
+        "ties-even numeric semantics",
+        "no changes to history/API schema",
+        "actual available tests"
       ]
     }
   ],
@@ -1504,6 +1646,11 @@
     "wave11_content_commits": [
       "c614a0845528f07866d75c7590547600f6dd8779",
       "c2df0513d85437d1e745b187a097887d9e75fc1d"
+    ],
+    "wave12_content_commits": [
+      "7aa49117bf90f9a9e6cb05e7812d1a973d138220",
+      "12bb9627a8773822c9b5597720f1b6cc7d58f55f",
+      "4c6f73f128d58c43cf0a950f0c3e4b55b8295e3b"
     ]
   },
   "next_queue": [
@@ -1518,24 +1665,24 @@
     "window": "2026-10-01 01:00 through 06:00 hourly flexible, six occurrences",
     "guard": "fresh active coordinator claim prevents duplicate takeover"
   },
-  "accepted_code_commit": "c2df0513d85437d1e745b187a097887d9e75fc1d",
+  "accepted_code_commit": "4c6f73f128d58c43cf0a950f0c3e4b55b8295e3b",
   "validation": {
-    "backend_tests": 417,
-    "backend_subtests": 523,
+    "backend_tests": 429,
+    "backend_subtests": 588,
     "backend_failures": 0,
     "existing_deprecation_warnings": 3,
     "node_fake_audio_tests": 14,
     "actual_chromium_tests": 21,
-    "android_jvm_tests": 246,
+    "android_jvm_tests": 268,
     "desktop_jvm_tests": 111,
     "gradle_tasks_executed": 57,
-    "build_inputs_verified": 88,
+    "build_inputs_verified": 91,
     "instrumentation_tests_compiled": 6,
     "instrumentation_runtime_tests": 0,
     "phone_saf_test": "not_performed_no_runtime",
     "real_asr": "passed_offline_tiny_en_verified_seekable_input_generated_speech",
     "source_data": "synthetic",
-    "apk_sha256": "972a1f99b212dc58febe98b33ca7ced47ce3cbe02ac3644d0392aef246e63073",
+    "apk_sha256": "ab1ab5453fba73255cc8779cf342d1059e9bb7af2cd9e035a9ae7e0b693655fb",
     "node_identifier_tests": 9,
     "node_history_page_tests": 11,
     "node_history_payload_tests": 15,
@@ -1548,9 +1695,10 @@
     "wave9_rerun_scope": "337 JVM tests and actual Android build; backend/browser/ASR unchanged",
     "wave10_rerun_scope": "full backend and9 actual CLI calls; Android/browser/ASR unchanged",
     "archive_cli_checks": 9,
-    "wave11_rerun_scope": "357JVM+APK and six instrumentation tests compiled offline; runtime0; backend/browser/ASR unchanged"
+    "wave11_rerun_scope": "357JVM+APK and six instrumentation tests compiled offline; runtime0; backend/browser/ASR unchanged",
+    "wave12_rerun_scope": "fullbackend,2actualCSVCLI scans,379JVM+APK; browser/ASR unchanged"
   },
-  "current_wave": 12,
+  "current_wave": 13,
   "wave1_validation": {
     "backend_tests": 182,
     "backend_subtests": 207,
@@ -1566,18 +1714,19 @@
     "source_data": "synthetic"
   },
   "next_concrete_step": {
-    "id": "AGEDS-20261001-N73",
+    "id": "AGEDS-20261001-N79",
     "status": "in_progress",
-    "observed_gap": "Server CSV splitlines splits U+2028 unlike csv.reader, shifting raw_record while marking complete; native XLSX code includes rPh phonetic text into base cell value (execution pending).",
+    "observed_gap": "Browser accepts same artifact/version/quote with altered word refs/time; native compares time but omits selector. Repeated text can name a different occurrence. Backend production of invalid anchors not demonstrated.",
     "scope": [
-      "CSV physical-line mapping",
-      "XLSX base text vs phonetic annotations"
+      "created response matches immutable expected selector/range",
+      "shared numeric semantics",
+      "native workspace and real browser acceptance"
     ],
     "acceptance": [
-      "before/after fixture proof",
-      "exact CSV raw records",
-      "explicit XLSX phonetic omission",
-      "actual CLI and native build"
+      "wrong occurrence rejected before success/history/playback",
+      "strict booleans/strings rejection",
+      "half-ms ties-even",
+      "stale async result behavior explicit"
     ]
   },
   "coordinator_history": [
@@ -1660,6 +1809,14 @@
       "lease_expires_at": "2026-10-01T01:43:20.382856+00:00",
       "based_on_remote_head": "ad46ef0ed35a44980ad9db92409bb15e1d9f1352",
       "completed_at": "2026-10-01T01:43:20.382856+00:00"
+    },
+    {
+      "owner": "root-wave12-20261001T0342",
+      "status": "completed",
+      "claimed_at": "2026-10-01T01:43:20.382856+00:00",
+      "lease_expires_at": "2026-10-01T01:55:28.415211+00:00",
+      "based_on_remote_head": "c2df0513d85437d1e745b187a097887d9e75fc1d",
+      "completed_at": "2026-10-01T01:55:28.415211+00:00"
     }
   ],
   "wave2_validation": {
@@ -1866,5 +2023,36 @@
     "wave9_rerun_scope": "337 JVM tests and actual Android build; backend/browser/ASR unchanged",
     "wave10_rerun_scope": "full backend and9 actual CLI calls; Android/browser/ASR unchanged",
     "archive_cli_checks": 9
+  },
+  "wave11_validation": {
+    "backend_tests": 417,
+    "backend_subtests": 523,
+    "backend_failures": 0,
+    "existing_deprecation_warnings": 3,
+    "node_fake_audio_tests": 14,
+    "actual_chromium_tests": 21,
+    "android_jvm_tests": 246,
+    "desktop_jvm_tests": 111,
+    "gradle_tasks_executed": 57,
+    "build_inputs_verified": 88,
+    "instrumentation_tests_compiled": 6,
+    "instrumentation_runtime_tests": 0,
+    "phone_saf_test": "not_performed_no_runtime",
+    "real_asr": "passed_offline_tiny_en_verified_seekable_input_generated_speech",
+    "source_data": "synthetic",
+    "apk_sha256": "972a1f99b212dc58febe98b33ca7ced47ce3cbe02ac3644d0392aef246e63073",
+    "node_identifier_tests": 9,
+    "node_history_page_tests": 11,
+    "node_history_payload_tests": 15,
+    "node_total_tests": 49,
+    "wave7_rerun_scope": "Android/core JVM and APK; backend/Node/browser/ASR unchanged since wave6",
+    "wave8_rerun_scope": "full backend, actual CLI source scan, both production WAV parsers; Android APK/browser/ASR unchanged",
+    "wav_cross_runtime_cases": 24,
+    "wav_cross_runtime_field_comparisons": 408,
+    "actual_cli_wav_fixtures": 5,
+    "wave9_rerun_scope": "337 JVM tests and actual Android build; backend/browser/ASR unchanged",
+    "wave10_rerun_scope": "full backend and9 actual CLI calls; Android/browser/ASR unchanged",
+    "archive_cli_checks": 9,
+    "wave11_rerun_scope": "357JVM+APK and six instrumentation tests compiled offline; runtime0; backend/browser/ASR unchanged"
   }
 }

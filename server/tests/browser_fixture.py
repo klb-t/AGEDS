@@ -38,8 +38,17 @@ def main():
         with db.session() as connection:
             connection.executemany('INSERT INTO annotations(artifact_id,derived_text_id,kind,body) VALUES (?,?,?,?)',
                 [(history_artifact, v, 'note', f'Note {i} ' + literal) for i, v in enumerate(history_versions)])
+        budget_artifact = None
+        if os.environ.get('AGEDS_BROWSER_BUDGET_FIXTURE') == '1':
+            budget_artifact = evidence.ingest_file(path, source_id=evidence.ensure_source('synthetic', 'payload budget fixture'),
+                                                  source_locator='synthetic:payload-budget')
+            for index in range(6):
+                raw = f'budget-{index} ' + ('x' * 900_000)
+                version_id = evidence.add_derived_text(budget_artifact, 'transcript', raw,
+                    segments=[{'start': .2, 'end': 1.2, 'text': raw}])
+                citations.create_citation(budget_artifact, version_id, [0])
         print(json.dumps({'artifact': artifact, 'old': old, 'new': new, 'literal': literal,
-                          'historyArtifact': history_artifact, 'historyVersions': history_versions}), flush=True)
+                          'historyArtifact': history_artifact, 'historyVersions': history_versions, 'budgetArtifact': budget_artifact}), flush=True)
         uvicorn.run('server.app.main:app', host='127.0.0.1', port=int(os.environ['AGEDS_BROWSER_PORT']), log_level='warning')
 
 

@@ -34,8 +34,11 @@ class CitationPages<T>(
     private val scope: CoroutineScope,
     private val idOf: (T) -> Long,
     private val artifactIdOf: (T) -> Long?,
+    private val rowSizeOf: (T) -> Long,
 ) {
     val items = mutableStateListOf<T>()
+    val retainedPayloadBytes = mutableStateOf(0L)
+    val reachedPayloadLimit = mutableStateOf(false)
     val loading = mutableStateOf(false)
     val error = mutableStateOf<String?>(null)
     val canLoadMore = mutableStateOf(false)
@@ -47,7 +50,8 @@ class CitationPages<T>(
     fun cancel() { epoch.invalidate(); work?.cancel(); work = null; loading.value = false }
     fun reset(id: Long?) {
         cancel(); items.clear(); error.value = null
-        chain = id?.let { ArtifactPageChain(artifactId = it, limit = 100, maxItems = 1000, idOf = idOf, artifactIdOf = artifactIdOf) }
+        retainedPayloadBytes.value = 0L; reachedPayloadLimit.value = false
+        chain = id?.let { ArtifactPageChain(artifactId = it, limit = 100, maxItems = 1000, idOf = idOf, artifactIdOf = artifactIdOf, rowSizeOf = rowSizeOf) }
         canLoadMore.value = id != null; coverage.value = "Nie odczytano listy."
     }
     fun load(fetch: suspend (Int, Long?, Long?) -> ArtifactPage<T>, onAccepted: () -> Unit = {}) {
@@ -61,8 +65,11 @@ class CitationPages<T>(
                 val next = previous.append(page)
                 if (epoch.accepts(token)) {
                     chain = next; items.clear(); items.addAll(next.items)
+                    retainedPayloadBytes.value = next.retainedPayloadBytes
+                    reachedPayloadLimit.value = next.reachedPayloadLimit
                     canLoadMore.value = next.canLoadMore
                     coverage.value = when {
+                        next.reachedPayloadLimit -> "Pokazano ${items.size} wpisów (${next.retainedPayloadBytes} bajtów JSON UTF-8). Osiągnięto budżet treści 4 MiB; dalsze wpisy pominięto, wczytywanie zatrzymane. To limit zakodowanych danych, nie pamięci aplikacji. Odśwież, aby zacząć nowy snapshot."
                         next.reachedClientLimit -> "Pokazano ${items.size} wpisów. Osiągnięto limit klienta 1000; starsze wpisy nie są widoczne. Odświeżenie rozpoczyna nowy snapshot."
                         next.hasMore -> "Pokazano ${items.size} wpisów; istnieją starsze. Snapshot do ID ${next.snapshotMaxId}."
                         else -> "Pokazano ${items.size} wpisów — koniec tego snapshotu (do ID ${next.snapshotMaxId}). Nowe wpisy wymagają odświeżenia."
@@ -83,9 +90,9 @@ class CitationWorkspace(
     private val audio: RangePlaybackController = RangePlaybackController { AndroidRangeAudio() },
 ) {
     val transcript = mutableStateOf<Transcript?>(null)
-    val versionPages = CitationPages<TranscriptVersion>(scope, { it.id }, { it.artifactId })
-    val citationPages = CitationPages<Citation>(scope, { it.id }, { it.artifactId })
-    val annotationPages = CitationPages<EvidenceAnnotation>(scope, { it.id }, { it.artifactId })
+    val versionPages = CitationPages<TranscriptVersion>(scope, { it.id }, { it.artifactId }, { serializedHistoryRowBytes(TranscriptVersion.serializer(), it) })
+    val citationPages = CitationPages<Citation>(scope, { it.id }, { it.artifactId }, { serializedHistoryRowBytes(Citation.serializer(), it) })
+    val annotationPages = CitationPages<EvidenceAnnotation>(scope, { it.id }, { it.artifactId }, { serializedHistoryRowBytes(EvidenceAnnotation.serializer(), it) })
     val versions get() = versionPages.items
     val citations get() = citationPages.items
     val annotations get() = annotationPages.items

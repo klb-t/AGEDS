@@ -41,6 +41,14 @@ export function validatePacketPath(path, artifactId, citationId) {
 }
 
 export const HISTORY_CAP = 1000;
+export const HISTORY_PAYLOAD_BYTES = 4 * 1024 * 1024;
+
+/** Retained row JSON UTF-8 bytes; explicitly not a JavaScript heap estimate. */
+export function historyRowBytes(row) {
+  const json = JSON.stringify(row);
+  if (typeof json !== 'string') throw new Error('Nie można zmierzyć zakodowanych danych wpisu.');
+  return new TextEncoder().encode(json).byteLength;
+}
 const PAGE_KEYS = ['artifactId', 'items', 'nextBeforeId', 'snapshotMaxId', 'hasMore', 'limit'];
 const pageError = () => new Error('Nieprawidłowa strona historii: identyfikatory, kolejność lub kursor nie są zgodne. Nic nie dodano.');
 
@@ -87,35 +95,62 @@ export function validateHistoryPage(body, {kind, artifactId, beforeId = null, sn
 }
 
 /** Stateful but DOM-independent cursor ownership; all pages validate before mutation. */
-export function createHistoryPager(kind, artifactId, initial) {
+export function createHistoryPager(kind, artifactId, initial, {maxPayloadBytes = HISTORY_PAYLOAD_BYTES} = {}) {
   requireApiId(artifactId);
+  if (!Number.isSafeInteger(maxPayloadBytes) || maxPayloadBytes < 1 || maxPayloadBytes > HISTORY_PAYLOAD_BYTES) throw pageError();
   validateHistoryPage(initial, {kind, artifactId});
-  const seen = new Set(initial.items.map(item => item.id));
-  let cursor = initial.nextBeforeId, more = initial.hasMore, token = 0, active = null, closed = false;
-  const snapshot = initial.snapshotMaxId;
+  const pageLimit = initial.limit, snapshot = initial.snapshotMaxId;
+  const initialCosts = initial.items.map(historyRowBytes);
+  let bytes = 0, byteBlocked = false;
+  const admittedInitial = [];
+  for (let i = 0; i < initial.items.length; i++) {
+    if (initialCosts[i] > maxPayloadBytes - bytes) { byteBlocked = true; break; }
+    bytes += initialCosts[i]; admittedInitial.push(initial.items[i]);
+  }
+  const seen = new Set(admittedInitial.map(item => item.id));
+  let cursor = byteBlocked ? (admittedInitial.at(-1)?.id ?? null) : initial.nextBeforeId;
+  let more = initial.hasMore || byteBlocked, token = 0, active = null, closed = false;
+  const bytesReached = () => byteBlocked || (bytes === maxPayloadBytes && more);
   return {
+    get initialItems() { return admittedInitial.slice(); },
+    get retainedPayloadBytes() { return bytes; },
+    get reachedPayloadLimit() { return bytesReached(); },
     get count() { return seen.size; },
     get capped() { return more && seen.size >= HISTORY_CAP; },
     get hasMore() { return more; },
     get busy() { return active !== null; },
     begin() {
-      if (closed || active !== null || !more || seen.size >= HISTORY_CAP) return null;
-      active = Object.freeze({token: ++token, beforeId: cursor, snapshotMaxId: snapshot, limit: Math.min(initial.limit, HISTORY_CAP - seen.size)});
+      if (closed || active !== null || !more || seen.size >= HISTORY_CAP || bytesReached()) return null;
+      active = Object.freeze({token: ++token, beforeId: cursor, snapshotMaxId: snapshot, limit: Math.min(pageLimit, HISTORY_CAP - seen.size)});
       return active;
     },
     accept(request, page) {
       if (closed || active !== request) return null;
       validateHistoryPage(page, {kind, artifactId, beforeId: request.beforeId, snapshotMaxId: snapshot, limit: request.limit, seen});
+      const costs = page.items.map(historyRowBytes);
       if (seen.size + page.items.length > HISTORY_CAP) throw pageError();
-      for (const item of page.items) seen.add(item.id);
-      cursor = page.nextBeforeId; more = page.hasMore; active = null;
-      return page.items;
+      const admitted = [];
+      for (let i = 0; i < page.items.length; i++) {
+        if (bytesReached() || costs[i] > maxPayloadBytes - bytes) { byteBlocked = true; break; }
+        bytes += costs[i]; admitted.push(page.items[i]); seen.add(page.items[i].id);
+      }
+      const omitted = admitted.length < page.items.length;
+      // The first unfit row closes the chain. Never skip it and fetch below it.
+      if (admitted.length) cursor = admitted.at(-1).id;
+      more = page.hasMore || omitted || byteBlocked;
+      if (!more) cursor = null;
+      active = null;
+      return admitted;
     },
     fail(request) { if (active === request) active = null; },
     addNew(item) {
+      if (closed) return false;
       validateHistoryItem(item, kind, artifactId);
-      if (seen.has(item.id) || seen.size >= HISTORY_CAP) return false;
-      seen.add(item.id); return true;
+      const cost = historyRowBytes(item);
+      if (seen.has(item.id)) return false;
+      if (seen.size >= HISTORY_CAP) return false;
+      if (bytesReached() || cost > maxPayloadBytes - bytes) { byteBlocked = true; more = true; return false; }
+      bytes += cost; seen.add(item.id); return true;
     },
     close() { closed = true; active = null; token += 1; },
   };
@@ -280,7 +315,7 @@ if (root) {
       if (request === generation) show(`Zapisano cytat #${result.id}, wersja #${pinnedId}, ${result.start_ms}–${result.end_ms} ms. Zgodność z transkryptem sprawdzona; odsłuch nie został potwierdzony.`);
       const pager = historyPagers.get('citations');
       if (!pager || !pager.addNew(result)) {
-        show(`Zapisano cytat #${result.id}. Lista osiągnęła limit ${HISTORY_CAP} lub cytat już jest widoczny; odśwież widok, aby wczytać najnowsze cytaty.`);
+        show(`Zapisano cytat #${result.id}. Lista osiągnęła limit ${HISTORY_CAP} wpisów / 4 MiB zakodowanych danych albo cytat już jest widoczny; odśwież widok, aby wczytać najnowsze cytaty.`);
       } else {
         $('saved').prepend(citationArticle(result));
       }
@@ -342,8 +377,8 @@ if (root) {
     const pager = historyPagers.get(name), button = document.querySelector(`[data-history-more="${name}"]`);
     const message = document.querySelector(`[data-history-status="${name}"]`);
     if (!pager) { button.disabled = true; if (error) message.textContent = error; return; }
-    button.disabled = historyClosed || pager.busy || pager.capped || !pager.hasMore;
-    message.textContent = error || (pager.capped ? `Wyświetlono limit ${HISTORY_CAP} pozycji. Dalsze wczytywanie w tym widoku zatrzymano; odśwież stronę, aby zacząć od najnowszych.` :
+    button.disabled = historyClosed || pager.busy || pager.capped || pager.reachedPayloadLimit || !pager.hasMore;
+    message.textContent = error || (pager.reachedPayloadLimit ? `Pokazano ${pager.count} pozycji (${pager.retainedPayloadBytes} bajtów JSON UTF-8). Osiągnięto budżet treści 4 MiB; dalsze wpisy pominięto, wczytywanie zatrzymane. To nie jest limit pamięci przeglądarki. Odśwież widok, aby zacząć od najnowszych.` : pager.capped ? `Wyświetlono limit ${HISTORY_CAP} pozycji. Dalsze wczytywanie w tym widoku zatrzymano; odśwież stronę, aby zacząć od najnowszych.` :
       pager.busy ? 'Wczytuję starsze pozycje…' : `${pager.count} pozycji. ${pager.hasMore ? 'Starsze pozycje są dostępne.' : 'Koniec historii w tej migawce.'}`);
   }
   try {
@@ -353,6 +388,19 @@ if (root) {
       try {
         const pager = createHistoryPager(name, artifactId, bootstrap[name]);
         historyPagers.set(name, pager);
+        // Initial HTML and bootstrap are independently bounded by server pages.
+        // If a smaller client budget admits only a prefix, remove all omitted
+        // rendered rows/options rather than leaving them outside accounting.
+        const retained = new Set(pager.initialItems.map(item => item.id));
+        if (name === 'versions') {
+          for (const select of [version, document.querySelector('[data-annotation-version]')]) {
+            for (const option of [...select.options]) if (option.value && !retained.has(parseDomId(option.value))) option.remove();
+          }
+          [...document.querySelector('[data-version-summaries]').children].forEach((node, index) => { if (index >= pager.count) node.remove(); });
+        } else {
+          const container = name === 'citations' ? $('saved') : document.querySelector('[data-annotation-history]');
+          [...container.children].forEach((node, index) => { if (index >= pager.count) node.remove(); });
+        }
         const button = document.querySelector(`[data-history-more="${name}"]`);
         button.addEventListener('click', async () => {
           const request = pager.begin();
@@ -379,6 +427,7 @@ if (root) {
       } catch (error) { refreshHistory(name, error.message); }
     }
   } catch (error) { for (const name of ['versions', 'citations', 'annotations']) refreshHistory(name, error.message); }
+  document.querySelector('[data-history-pages]')?.remove();
   window.addEventListener('pagehide', () => {
     historyClosed = true;
     for (const pager of historyPagers.values()) pager.close();

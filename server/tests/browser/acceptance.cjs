@@ -17,7 +17,7 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
   let stderr = ''; server.stderr.on('data', d => stderr += d);
   let browser;
   const fingerprint = file => createHash('sha256').update(fs.readFileSync(path.join(repo, file))).digest('hex');
-  const receipt = {git_head: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: repo, encoding: 'utf8'}).trim(), playwright: require('playwright/package.json').version, source_sha256: Object.fromEntries(['server/app/main.py', 'server/app/db.py', 'server/app/static/citations.mjs', 'server/app/static/range-player.mjs', 'server/app/templates/artifact.html', 'server/app/templates/index.html', 'server/app/exchange.py', 'server/app/exchange_consumer.py', 'server/app/verified_media.py', 'server/app/search.py', 'server/app/read_pages.py', 'server/tests/browser/acceptance.cjs', 'server/tests/browser_fixture.py'].map(file => [file, fingerprint(file)])), task: 'AGEDS-20261001-N35-browser', baseline_task: 'AGEDS-20261001-N12', started_at: new Date().toISOString(), fixture: 'generated 4s mono PCM WAV; temporary SQLite; synthetic transcript versions', cases: []};
+  const receipt = {git_head: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: repo, encoding: 'utf8'}).trim(), playwright: require('playwright/package.json').version, source_sha256: Object.fromEntries(['server/app/main.py', 'server/app/db.py', 'server/app/static/citations.mjs', 'server/app/static/range-player.mjs', 'server/app/templates/artifact.html', 'server/app/templates/index.html', 'server/app/exchange.py', 'server/app/exchange_consumer.py', 'server/app/verified_media.py', 'server/app/search.py', 'server/app/read_pages.py', 'server/tests/browser/acceptance.cjs', 'server/tests/browser_fixture.py'].map(file => [file, fingerprint(file)])), task: 'AGEDS-20261001-N40-browser', baseline_task: 'AGEDS-20261001-N12', started_at: new Date().toISOString(), fixture: 'generated 4s mono PCM WAV; temporary SQLite; synthetic transcript versions', cases: []};
   try {
     const fixture = await new Promise((resolve, reject) => {
       let buf = ''; server.stdout.on('data', d => {buf += d; if (buf.includes('\n')) {try {resolve(JSON.parse(buf.split('\n')[0]));} catch(e) {reject(e);}}});
@@ -309,6 +309,23 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
       await page.waitForFunction(() => document.querySelector('[data-history-status="citations"]').textContent.includes('Nic nie dodano'));
       assert.equal(await page.locator('[data-saved] article').count(), 50);
       await page.unroute(pattern);
+    });
+    if (fixture.budgetArtifact !== null) await test('aggregate payload cap stops older quotes with explicit omission', async () => {
+      await page.goto(`${base}/artifact/${fixture.budgetArtifact}`);
+      await page.waitForFunction(() => document.querySelector('[data-status]').textContent.includes('Wersja #'));
+      assert.equal(await page.locator('[data-saved] article').count(), 2);
+      const more = page.locator('[data-history-more="citations"]');
+      await more.click(); await page.waitForFunction(() => document.querySelectorAll('[data-saved] article').length === 4);
+      await more.click();
+      await page.waitForFunction(() => /budżet treści/.test(document.querySelector('[data-history-status="citations"]').textContent));
+      assert.equal(await more.isDisabled(), true);
+      assert.equal(await page.locator('[data-saved] article').count(), 4);
+      const coverage = await page.locator('[data-history-status="citations"]').textContent();
+      assert.doesNotMatch(coverage, /Koniec historii/);
+      assert.match(coverage, /limit|budżet/i);
+      const bytes = await page.locator('[data-saved] .transcript').evaluateAll(items => items.reduce((sum, item) => sum + new TextEncoder().encode(item.textContent).length, 0));
+      assert.ok(bytes <= 4 * 1024 * 1024);
+      receipt.payload_budget = {retained_quotes: 4, source_quotes: 6, retained_quote_text_bytes: bytes, encoded_payload_cap: 4 * 1024 * 1024, coverage};
     });
     assert.deepEqual(pageErrors, []); receipt.page_errors = pageErrors; receipt.status = 'passed';
   } catch (error) {receipt.status = 'failed'; receipt.error = error.stack; process.exitCode = 1; console.error(error);}

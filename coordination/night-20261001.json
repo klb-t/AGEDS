@@ -4,14 +4,13 @@
   "branch": "codex/ageds-night-20261001",
   "base_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2",
   "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate; user 01:33 Europe/Amsterdam explicitly requests continuous progression while useful work remains, without ending after a checkpoint",
-  "updated_at": "2026-10-01T03:03:51.575738+00:00",
+  "updated_at": "2026-10-01T04:03:33+00:00",
   "coordinator": {
-    "owner": "root-resume-wave13-20261001T0457",
-    "status": "released",
-    "claimed_at": "2026-10-01T02:58:23.172517+00:00",
-    "lease_expires_at": "2026-10-01T03:03:51.575738+00:00",
-    "based_on_remote_head": "e38471fc7d5baf411177d0160ddac0738c628c67",
-    "completed_at": "2026-10-01T03:03:51.575738+00:00"
+    "owner": "root-native-wave13-20261001T0603",
+    "status": "active",
+    "claimed_at": "2026-10-01T04:03:33+00:00",
+    "lease_expires_at": "2026-10-01T04:58:33+00:00",
+    "based_on_remote_head": "2e8f3d8e4979b94d2a65377708307833b1107497"
   },
   "tasks": [
     {
@@ -1525,7 +1524,7 @@
         "CitationSelection.kt",
         "new core matcher and owner tests"
       ],
-      "status": "ready",
+      "status": "in_progress",
       "acceptance": [
         "snapshot before await",
         "exact selected occurrence and canonical selector metadata",
@@ -1542,7 +1541,7 @@
         "CitationWorkspace.kt",
         "workspace save tests"
       ],
-      "status": "ready",
+      "status": "in_progress",
       "acceptance": [
         "snapshot before await",
         "exact selected occurrence and canonical selector metadata",
@@ -1604,7 +1603,7 @@
       "scope": [
         "new core adversarial tests"
       ],
-      "status": "ready",
+      "status": "in_progress",
       "acceptance": [
         "snapshot before await",
         "exact selected occurrence and canonical selector metadata",

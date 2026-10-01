@@ -32,6 +32,84 @@ export function validateCitationIdentity(body, artifactId, transcriptId, expecte
   return body;
 }
 
+const selectionError = () => new Error('Odpowiedź zapisu nie wskazuje dokładnie wybranego wystąpienia i zakresu. Nie udostępniono odsłuchu ani eksportu.');
+
+/** Same binary-number multiplication and ties-to-even rounding as Python round(seconds * 1000).
+ * This view refuses milliseconds outside JavaScript's exact integer range.
+ */
+export function citationMilliseconds(seconds) {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 0) throw selectionError();
+  const scaled = seconds * 1000, lower = Math.floor(scaled);
+  if (!Number.isSafeInteger(lower)) throw selectionError();
+  const fraction = scaled - lower;
+  const rounded = fraction < 0.5 ? lower : fraction > 0.5 ? lower + 1 : lower + (lower % 2);
+  if (!Number.isSafeInteger(rounded)) throw selectionError();
+  return rounded === 0 ? 0 : rounded;
+}
+
+function freezeSelection(value) {
+  if (value && typeof value === 'object') {
+    for (const child of Object.values(value)) freezeSelection(child);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+/** Capture only copied scalar values and ordered references before the asynchronous POST.
+ * The current selection and response cannot change this request's expectation.
+ */
+export function snapshotCitationSelection({artifactId, transcriptId, kind, picked}) {
+  requireApiId(artifactId); requireApiId(transcriptId);
+  if (!['segments', 'words'].includes(kind) || !Array.isArray(picked) || !picked.length || picked.length > 10000) throw selectionError();
+  const indices = [], refs = [], texts = [];
+  let previous = null;
+  for (const unit of picked) {
+    if (!unit || typeof unit.text !== 'string' || !Number.isSafeInteger(unit.segmentIndex) || unit.segmentIndex < 0) throw selectionError();
+    citationMilliseconds(unit.start); citationMilliseconds(unit.end);
+    if (unit.end < unit.start || (previous && unit.start < previous.end)) throw selectionError();
+    if (kind === 'words') {
+      if (!Number.isSafeInteger(unit.wordIndex) || unit.wordIndex < 0) throw selectionError();
+      if (previous && !((unit.segmentIndex === previous.segmentIndex && unit.wordIndex === previous.wordIndex + 1) ||
+        (unit.segmentIndex === previous.segmentIndex + 1 && unit.wordIndex === 0))) throw selectionError();
+      refs.push({segment_index: unit.segmentIndex, word_index: unit.wordIndex});
+    } else {
+      if (previous && unit.segmentIndex !== previous.segmentIndex + 1) throw selectionError();
+      indices.push(unit.segmentIndex);
+    }
+    texts.push(unit.text);
+    previous = unit;
+  }
+  const quoteText = texts.join('');
+  const selector = {kind, ...(kind === 'words' ? {word_refs: refs} : {indices}),
+    text_join: 'concatenate_exact', time_unit: 'seconds', stored_time_unit: 'milliseconds',
+    rounding: 'nearest_ms', precision: kind === 'words' ? 'word_asr' : 'segment'};
+  if (kind === 'words') Object.assign(selector, {source_start: picked[0].start,
+    source_end: picked.at(-1).end, alignment_verification: 'not_performed'});
+  const requestBody = {derivedTextId: transcriptId, quoteText,
+    ...(kind === 'words' ? {wordRefs: refs} : {segmentIndices: indices})};
+  return freezeSelection({artifactId, transcriptId, quoteText,
+    startMs: citationMilliseconds(picked[0].start), endMs: citationMilliseconds(picked.at(-1).end), selector, requestBody});
+}
+
+// Compare only the small expected shape: object order is irrelevant, array order and
+// scalar types are exact. JSON numeric spellings 0 and 0.0 have the same numeric value.
+function matchesSelection(actual, expected) {
+  if (expected === null || typeof expected !== 'object') return actual === expected;
+  if (!actual || typeof actual !== 'object' || Array.isArray(actual) !== Array.isArray(expected)) return false;
+  const keys = Object.keys(expected);
+  if (Object.keys(actual).length !== keys.length || (Array.isArray(expected) && actual.length !== expected.length)) return false;
+  return keys.every(key => Object.hasOwn(actual, key) && matchesSelection(actual[key], expected[key]));
+}
+
+/** Create-response consistency only; history reads retain their existing contract. */
+export function validateCreatedCitation(body, expected) {
+  validateCitationIdentity(body, expected.artifactId, expected.transcriptId, expected.quoteText);
+  if (!Number.isSafeInteger(body.start_ms) || !Number.isSafeInteger(body.end_ms) ||
+      body.start_ms !== expected.startMs || body.end_ms !== expected.endMs ||
+      !matchesSelection(body.selector, expected.selector)) throw selectionError();
+  return body;
+}
+
 export function validatePacketPath(path, artifactId, citationId) {
   const match = typeof path === 'string' && /^\/api\/artifacts\/([1-9][0-9]*)\/citations\/([1-9][0-9]*)\/packet$/.exec(path);
   if (!match || parseDomId(match[1]) !== requireApiId(artifactId) || parseDomId(match[2]) !== requireApiId(citationId)) {
@@ -296,26 +374,27 @@ if (root) {
   save.addEventListener('click', async () => {
     const picked = selection();
     if (!transcript || !picked.length || saving) return;
-    let identity;
+    let identity, expected;
     try {
       identity = workspaceIdentity();
       validateTranscriptIdentity(transcript, identity.artifactId, identity.transcriptId);
+      expected = snapshotCitationSelection({...identity, kind: kind.value, picked});
     } catch (error) { stopPlayback(); show(error.message); return; }
     const request = generation, pinnedId = identity.transcriptId;
-    const body = {derivedTextId: pinnedId, quoteText: picked.map(x => x.text).join('')};
-    if (kind.value === 'words') body.wordRefs = picked.map(x => ({segment_index: x.segmentIndex, word_index: x.wordIndex}));
-    else body.segmentIndices = picked.map(x => x.segmentIndex);
+    const body = expected.requestBody;
     saving = true; refresh();
     try {
       const response = await fetch(`/api/artifacts/${identity.artifactId}/citations`, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
       const result = await response.json();
       if (!response.ok) throw new Error(typeof result.detail === 'string' ? result.detail : `Nie można zapisać cytatu: HTTP ${response.status}`);
-      validateCitationIdentity(result, identity.artifactId, pinnedId, body.quoteText);
+      validateCreatedCitation(result, expected);
       if (parseDomId(root.dataset.artifactId) !== identity.artifactId) throw new Error('Artefakt widoku zmienił się podczas zapisu. Operację wstrzymano.');
       if (request === generation) show(`Zapisano cytat #${result.id}, wersja #${pinnedId}, ${result.start_ms}–${result.end_ms} ms. Zgodność z transkryptem sprawdzona; odsłuch nie został potwierdzony.`);
+      // A valid late response remains part of this artifact's history, but must
+      // not replace status or selection belonging to a newly selected version.
       const pager = historyPagers.get('citations');
       if (!pager || !pager.addNew(result)) {
-        show(`Zapisano cytat #${result.id}. Lista osiągnęła limit ${HISTORY_CAP} wpisów / 4 MiB zakodowanych danych albo cytat już jest widoczny; odśwież widok, aby wczytać najnowsze cytaty.`);
+        if (request === generation) show(`Zapisano cytat #${result.id}. Lista osiągnęła limit ${HISTORY_CAP} wpisów / 4 MiB zakodowanych danych albo cytat już jest widoczny; odśwież widok, aby wczytać najnowsze cytaty.`);
       } else {
         $('saved').prepend(citationArticle(result));
       }

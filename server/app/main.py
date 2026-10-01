@@ -4,17 +4,18 @@ from pathlib import Path
 from typing import Annotated
 from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi import Path as PathParameter
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from .db import init_db, session
 from .config import settings
-from .evidence import IntegrityError, ensure_source, ingest_file, sha256_file
+from .evidence import IntegrityError, ensure_source, ingest_file
 from .citations import anchor_payload, create_citation, loads_transcript_segments, milliseconds
 from .importers.sms_backup import import_sms_backup
 from .importers.whatsapp import import_whatsapp_txt
-from .search import search as fts_search
+from .search import SearchQueryError, SearchWorkLimitError, search_page
+from .verified_media import MediaUnavailable, MediaIntegrityError, MediaLimitError, verified_media_response
 from .transcription import queue_all_audio, queue_transcription, word_timing_capabilities
 
 app=FastAPI(title='AGEDS Evidence Workbench',version='0.2.0')
@@ -96,8 +97,19 @@ def home(request:Request,q:str='',kind:str=''):
     with session() as db:
         recent=[dict(r) for r in db.execute("SELECT id,original_name,mime_type,size_bytes,sha256,created_at FROM artifacts ORDER BY id DESC LIMIT 30")]
         events=[dict(r) for r in db.execute("SELECT id,event_type,ts_start,direction,contact_label,phone_or_address,subject,substr(body,1,240) body FROM events ORDER BY COALESCE(ts_start,created_at) DESC LIMIT 30")]
-    results=fts_search(q,100) if q else []
-    return templates.TemplateResponse(request,'index.html',{'counts':dashboard_counts(),'recent':recent,'events':events,'results':results,'q':q})
+    search_error = None
+    search_status = 200
+    page = {'results': [], 'has_more': False, 'complete': True, 'limit': 100}
+    try:
+        page = search_page(q, 100)
+    except SearchQueryError as exc:
+        search_error, search_status = str(exc), 422
+    except SearchWorkLimitError:
+        search_error, search_status = 'Przekroczono limit pracy wyszukiwania. Zawęź zapytanie.', 503
+    return templates.TemplateResponse(request,'index.html',{
+        'counts':dashboard_counts(),'recent':recent,'events':events,
+        'results':page['results'],'q':q,'search_error':search_error,
+        'search_has_more':page['has_more'],'search_limit':page['limit']}, status_code=search_status)
 
 @app.post('/upload')
 async def upload(file:UploadFile=File(...),source_label:str=Form('Manual upload')):
@@ -152,7 +164,18 @@ def transcribe(artifact_id:SqlPathId): return api_queue_transcription(artifact_i
 def transcribe_all(): return {'queued_artifacts':queue_all_audio()}
 
 @app.get('/api/search')
-def api_search(q:str): return fts_search(q,200)
+def api_search(q:str):
+    try:
+        page = search_page(q, 200)
+    except SearchQueryError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except SearchWorkLimitError as exc:
+        raise HTTPException(503, 'Search work limit exceeded; narrow the query.') from exc
+    return JSONResponse(page['results'], headers={
+        'X-AGEDS-Search-Limit': str(page['limit']),
+        'X-AGEDS-Search-Has-More': str(page['has_more']).lower(),
+        'X-AGEDS-Search-Complete': str(page['complete']).lower(),
+    })
 
 @app.get('/api/timeline')
 def timeline(limit:int=Query(500,ge=1,le=10000),phone:str|None=None,event_type:str|None=None):
@@ -301,18 +324,28 @@ def api_source_observations(artifact_id:SqlPathId):
     with session() as db:
         return [dict(r) for r in db.execute('SELECT * FROM source_observations WHERE artifact_id=? ORDER BY id',(artifact_id,))]
 
-@app.get('/api/artifacts/{artifact_id}/content')
-def api_artifact_content(artifact_id:SqlPathId):
+@app.api_route('/api/artifacts/{artifact_id}/content', methods=['GET', 'HEAD'])
+def api_artifact_content(request:Request, artifact_id:SqlPathId):
     with session() as db:
         row = db.execute('SELECT * FROM artifacts WHERE id=?',(artifact_id,)).fetchone()
     if not row:
         raise HTTPException(404, 'artifact not found')
-    path = Path(row['stored_path']) if row['stored_path'] else None
-    if path is None or path.is_symlink() or not path.is_file() or not path.resolve().is_relative_to(settings.store_dir.resolve()):
-        raise HTTPException(409, 'stored content is unavailable or outside configured content store')
-    if sha256_file(path) != row['sha256']:
-        raise HTTPException(409, 'stored content failed SHA-256 verification')
-    return FileResponse(path, media_type=row['mime_type'] or 'application/octet-stream',filename=row['original_name'])
+    if not row['stored_path']:
+        raise HTTPException(409, 'stored content is unavailable')
+    try:
+        # This sync route runs in a worker thread. The response retains its
+        # verified descriptor and rechecks each buffered chunk before sending.
+        return verified_media_response(
+            row['stored_path'], row['sha256'], row['size_bytes'],
+            media_type=row['mime_type'], filename=row['original_name'],
+            range_header=request.headers.get('range'),
+            if_range=request.headers.get('if-range'), head=request.method == 'HEAD',
+            store_root=settings.store_dir,
+        )
+    except MediaLimitError as exc:
+        raise HTTPException(413, 'Stored content exceeds the verified serving limit.') from exc
+    except (MediaUnavailable, MediaIntegrityError) as exc:
+        raise HTTPException(409, 'Stored content is unavailable or failed byte identity verification.') from exc
 
 @app.post('/api/artifacts/{artifact_id}/citations')
 def api_citation_create(artifact_id:SqlPathId,a:CitationIn):

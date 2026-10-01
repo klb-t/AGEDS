@@ -102,19 +102,22 @@ class ExchangeAcceptanceTests(unittest.TestCase):
 
     def test_http_and_cli_export_same_version_and_literal_payload(self):
         from server.app.main import app
-        before = self.settings.db_path.read_bytes()
         with TestClient(app) as client:
+            # Startup may legitimately migrate/checkpoint the SQLite store.
+            # Measure only export operations within the running-app lifecycle;
+            # context teardown/checkpoint timing is not a producer mutation.
+            before = self.settings.db_path.read_bytes()
             response = client.get(f'/api/artifacts/{self.aid}/citations/{self.anchor["id"]}/packet')
             self.assertEqual(response.status_code, 200, response.text)
-        output = self.root/'packet.json'
-        process = self.command('citation-export', self.aid, self.anchor['id'], output)
-        self.assertEqual(process.returncode, 0, process.stderr)
-        self.assertEqual(json.loads(output.read_bytes()), response.json())
-        self.assertEqual(response.json(), self.packet())
-        self.assertEqual(self.settings.db_path.read_bytes(), before)
-        inspected = self.command('citation-inspect', output)
-        self.assertEqual(inspected.returncode, 0, inspected.stderr + inspected.stdout)
-        self.assertEqual(json.loads(inspected.stdout)['verification'], 'matches_included_pinned_transcript')
+            output = self.root/'packet.json'
+            process = self.command('citation-export', self.aid, self.anchor['id'], output)
+            self.assertEqual(process.returncode, 0, process.stderr)
+            self.assertEqual(json.loads(output.read_bytes()), response.json())
+            self.assertEqual(response.json(), self.packet())
+            self.assertEqual(self.settings.db_path.read_bytes(), before)
+            inspected = self.command('citation-inspect', output)
+            self.assertEqual(inspected.returncode, 0, inspected.stderr + inspected.stdout)
+            self.assertEqual(json.loads(inspected.stdout)['verification'], 'matches_included_pinned_transcript')
 
     def test_cli_export_no_clobber_or_missing_database_creation(self):
         output = self.root/'existing.json'

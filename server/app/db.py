@@ -1,7 +1,7 @@
 from __future__ import annotations
 import json
 import sqlite3
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from pathlib import Path
 from .config import settings
 
@@ -328,7 +328,9 @@ def migrate_db(db: sqlite3.Connection) -> None:
 
 
 def init_db() -> None:
-    with connect() as db:
+    # sqlite3's connection context commits/rolls back but does not close. A
+    # leaked startup connection keeps WAL state alive until nondeterministic GC.
+    with closing(connect()) as db, db:
         db.executescript(SCHEMA)
         row = db.execute("SELECT id FROM cases ORDER BY id LIMIT 1").fetchone()
         if not row:

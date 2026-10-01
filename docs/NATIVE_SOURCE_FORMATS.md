@@ -63,3 +63,15 @@ when EOF is observed. Duration is a supported header declaration, not measured
 playback or validation of audio samples. Provider/actual EOF size conflicts and
 unsupported layouts stay explicit. See `WAV_HEADER_PROBE.md`,
 `WAVE7_STREAM_QA.md` and `ANDROID_WAVE7_BUILD_RECEIPT.json`.
+
+## Fala 12: tekst bazowy XLSX i adnotacje fonetyczne
+
+Rzeczywisty fixture ujawnił, że rPh było wcześniej doklejane do tekstu
+bazowego w sharedStrings i inlineStr. Parser oddziela teraz wskazówki wymowy,
+zachowuje bazowy/rich text, whitespace, indeks shared string i cache formuły.
+Adnotacje fonetyczne nie są zachowywane w projekcji: jawny
+`xlsx_phonetic_omitted` powoduje częściowe pokrycie. Oryginał pozostaje
+niezmieniony i wskazywany przez URI oraz hash odczytanych bajtów. Zliczanie
+znaków obejmuje także pomijany tekst, aby nie osłabiać dotychczasowego limitu.
+Szczegóły i reprodukcja: `XLSX_PHONETIC_PROJECTION.md`; niezależny odbiór:
+`WAVE12_XLSX_QA.md` i `WAVE12_XLSX_ENGINE_QA.md`.

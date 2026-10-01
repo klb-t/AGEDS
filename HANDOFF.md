@@ -3,10 +3,10 @@
 Stan bieżący: nocny przyrost 2026-10-01. Fundament PR #2 scalono w `main`
 w commicie `b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2`.
 PR #3 scalono w main (`8c3efb9e65999dd4931b22b555329da76379c31e`).
-Bieżący opublikowany checkpoint: fala 12. branch `codex/ageds-night-20261001`, PR #4 (otwarty).
-Kod fali 12 opublikowany i sprawdzony; nie wykonano scalenia PR #4 do main.
-Trwa fala 13: sprawdzanie odpowiedzi zapisu cytatu wobec zamrożonego
-selektora i zakresu w obu klientach. Szczegóły przydziałów w indeksie.
+Bieżący opublikowany checkpoint: fala 13 (klient webowy). branch `codex/ageds-night-20261001`, PR #4 (otwarty).
+Kod fali 13 dla web opublikowany i sprawdzony; PR #4 nie scalono do main.
+Koordynator zwolnił claim. Native N80/N81/N84 pozostają gotowe do podjęcia;
+N83 Chromium wymaga brakującego runtime. Szczegóły i granice w indeksie.
 **Najświeższy odbiór i kolejka: `coordination/night-20261001.json`.**
 Procedura wznowienia: `coordination/NIGHT_WORK.md`.
 `coordination/state.json` zachowuje odbiór fundamentu i odsyła do nowego etapu.
@@ -70,8 +70,9 @@ nie są fizycznym WORM ani kryptograficznym podpisem łańcucha pochodzenia.
 
 ## Następny zakres wykonawczy
 
-1. Aktywna fala 13: odpowiedź zapisu cytatu musi wskazywać dokładnie wybrane
-   wystąpienie słów/segmentów, nie tylko ten sam tekst i wersję.
+1. Dokończyć natywną część fali 13 (N80/N81/N84): selektor odpowiedzi zapisu
+   musi wskazywać wybrane wystąpienie. Web ma wykonany odbiór Node;
+   przygotowane cztery nowe testy Chromium wymagają runtime.
 2. Uruchomić gotowe sześć testów SAF, gdy będzie dostępny runtime Android;
    oddzielnie sprawdzić picker, cykl uprawnień i wybór nagrań. Brak emulatora
    w obecnym środowisku jest obserwowaną blokadą, nie dowodem błędu aplikacji.
@@ -175,3 +176,11 @@ z aktualnym kodem; wykonanych runtime nadal0. `docs/WAVE11_QA.md`.
 429 backend i588 podtestów,379 JVM i2 CLI przeszły. CSV zachowuje dokładne
 surowe rekordy mimo separatorów Unicode. XLSX nie dokleja fonetycznych
 adnotacji do tekstu bazowego i jawnie opisuje pominięcie. `docs/WAVE12_QA.md`.
+
+## Odbiór fali 13 — klient webowy
+
+85 testów Node przeszło, w tym6 produkcyjnego handlera ze sztucznym DOM
+i porównanie z Pythonem dla3008 przypadków czasu oraz2 projekcji.
+Zamrożony selektor chroni przed zaakceptowaniem innego wystąpienia.
+`docs/WAVE13_QA.md` i receipt oddzielają ten odbiór od Chromium, Androida
+i wcześniejszych wyników. Native pozostaje gotowe; claim zwolniony.

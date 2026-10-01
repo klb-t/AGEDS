@@ -4,13 +4,14 @@
   "branch": "codex/ageds-night-20261001",
   "base_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2",
   "authority": "User 2026-10-01 Europe/Amsterdam: maximize autonomous overnight work, no questions; earlier explicit multi-agent mandate; user 01:33 Europe/Amsterdam explicitly requests continuous progression while useful work remains, without ending after a checkpoint",
-  "updated_at": "2026-10-01T02:58:23.172517+00:00",
+  "updated_at": "2026-10-01T03:03:51.575738+00:00",
   "coordinator": {
     "owner": "root-resume-wave13-20261001T0457",
-    "status": "active",
+    "status": "released",
     "claimed_at": "2026-10-01T02:58:23.172517+00:00",
-    "lease_expires_at": "2026-10-01T03:53:23.172517+00:00",
-    "based_on_remote_head": "e38471fc7d5baf411177d0160ddac0738c628c67"
+    "lease_expires_at": "2026-10-01T03:03:51.575738+00:00",
+    "based_on_remote_head": "e38471fc7d5baf411177d0160ddac0738c628c67",
+    "completed_at": "2026-10-01T03:03:51.575738+00:00"
   },
   "tasks": [
     {
@@ -1502,14 +1503,19 @@
         "new browser save helper",
         "owner node tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "snapshot before await",
         "exact selected occurrence and canonical selector metadata",
         "ties-even numeric semantics",
         "no changes to history/API schema",
         "actual available tests"
-      ]
+      ],
+      "result": {
+        "published_commit": "346425bd66611505ce52b20bca01e5779e73d620",
+        "independent_acceptance": "passed",
+        "report": "docs/WAVE13_QA.md"
+      }
     },
     {
       "id": "AGEDS-20261001-N80",
@@ -1552,14 +1558,19 @@
       "scope": [
         "new Node adversarial tests"
       ],
-      "status": "in_progress",
+      "status": "accepted",
       "acceptance": [
         "snapshot before await",
         "exact selected occurrence and canonical selector metadata",
         "ties-even numeric semantics",
         "no changes to history/API schema",
         "actual available tests"
-      ]
+      ],
+      "result": {
+        "published_commit": "346425bd66611505ce52b20bca01e5779e73d620",
+        "independent_acceptance": "passed",
+        "report": "docs/WAVE13_QA.md"
+      }
     },
     {
       "id": "AGEDS-20261001-N83",
@@ -1568,14 +1579,23 @@
       "scope": [
         "browser acceptance script/fixtures/receipt"
       ],
-      "status": "in_progress",
+      "status": "blocked",
       "acceptance": [
         "snapshot before await",
         "exact selected occurrence and canonical selector metadata",
         "ties-even numeric semantics",
         "no changes to history/API schema",
         "actual available tests"
-      ]
+      ],
+      "result": {
+        "published_commit": "4c34aa3e67037d840bc08341f66cf2bddf3c8252",
+        "production_handler_fake_dom_tests": 6,
+        "baseline_failures": 4,
+        "chromium_cases_prepared": 4,
+        "chromium_cases_executed": 0,
+        "blocker": "Chromium executable and FastAPI/uvicorn unavailable in renewed environment",
+        "report": "docs/WAVE13_BROWSER_RUNTIME_QA.md"
+      }
     },
     {
       "id": "AGEDS-20261001-N84",
@@ -1651,13 +1671,18 @@
       "7aa49117bf90f9a9e6cb05e7812d1a973d138220",
       "12bb9627a8773822c9b5597720f1b6cc7d58f55f",
       "4c6f73f128d58c43cf0a950f0c3e4b55b8295e3b"
+    ],
+    "wave13_content_commits": [
+      "346425bd66611505ce52b20bca01e5779e73d620",
+      "4c34aa3e67037d840bc08341f66cf2bddf3c8252"
     ]
   },
   "next_queue": [
+    "N80/N81/N84: implement native exact frozen selector create-response validation and independent JVM acceptance after Android/Kotlin toolchain availability is established",
+    "N83-runtime: execute four prepared Chromium cases plus existing browser acceptance with a new receipt; browser executable and HTTP dependencies absent in renewed environment",
     "N10-runtime: Execute six compiled synthetic SAF-provider tests only when a device/emulator is available; picker/grant lifecycle and recording selection remain distinct",
     "N17: Once disk capacity permits, verify a wholly clean ASR dependency installation using the new explicit pins; current corrected runtime passed actual inference",
-    "N18: Extend native workbook/text formats only against concrete unsupported source patterns with bounded independent fixtures; maintain partial coverage and source preservation",
-    "Browser citation response consistency: same artifact/version/quote but different word refs and interval accepted; compact Node proof exists. Snapshot expected selector/range at save, reject mismatches before history/playback. Backend wrong-anchor production not demonstrated."
+    "N18: Extend native workbook/text formats only against concrete unsupported source patterns with bounded independent fixtures; maintain partial coverage and source preservation"
   ],
   "automation": {
     "created": true,
@@ -1665,7 +1690,7 @@
     "window": "2026-10-01 01:00 through 06:00 hourly flexible, six occurrences",
     "guard": "fresh active coordinator claim prevents duplicate takeover"
   },
-  "accepted_code_commit": "4c6f73f128d58c43cf0a950f0c3e4b55b8295e3b",
+  "accepted_code_commit": "4c34aa3e67037d840bc08341f66cf2bddf3c8252",
   "validation": {
     "backend_tests": 429,
     "backend_subtests": 588,
@@ -1686,7 +1711,7 @@
     "node_identifier_tests": 9,
     "node_history_page_tests": 11,
     "node_history_payload_tests": 15,
-    "node_total_tests": 49,
+    "node_total_tests": 85,
     "wave7_rerun_scope": "Android/core JVM and APK; backend/Node/browser/ASR unchanged since wave6",
     "wave8_rerun_scope": "full backend, actual CLI source scan, both production WAV parsers; Android APK/browser/ASR unchanged",
     "wav_cross_runtime_cases": 24,
@@ -1696,7 +1721,8 @@
     "wave10_rerun_scope": "full backend and9 actual CLI calls; Android/browser/ASR unchanged",
     "archive_cli_checks": 9,
     "wave11_rerun_scope": "357JVM+APK and six instrumentation tests compiled offline; runtime0; backend/browser/ASR unchanged",
-    "wave12_rerun_scope": "fullbackend,2actualCSVCLI scans,379JVM+APK; browser/ASR unchanged"
+    "wave12_rerun_scope": "fullbackend,2actualCSVCLI scans,379JVM+APK; browser/ASR unchanged",
+    "wave13_rerun_scope": "85 Node including actual Python parity and synthetic DOM; fixture SQLite initialization only; no HTTP/browser/Android/ASR rerun"
   },
   "current_wave": 13,
   "wave1_validation": {
@@ -1714,19 +1740,17 @@
     "source_data": "synthetic"
   },
   "next_concrete_step": {
-    "id": "AGEDS-20261001-N79",
-    "status": "in_progress",
-    "observed_gap": "Browser accepts same artifact/version/quote with altered word refs/time; native compares time but omits selector. Repeated text can name a different occurrence. Backend production of invalid anchors not demonstrated.",
+    "id": "AGEDS-20261001-N80",
+    "status": "ready",
     "scope": [
-      "created response matches immutable expected selector/range",
-      "shared numeric semantics",
-      "native workspace and real browser acceptance"
+      "core immutable expected selector and response matcher",
+      "CitationWorkspace save integration",
+      "independent JVM selector/timing tests"
     ],
     "acceptance": [
-      "wrong occurrence rejected before success/history/playback",
-      "strict booleans/strings rejection",
-      "half-ms ties-even",
-      "stale async result behavior explicit"
+      "same text/time with different occurrence refused",
+      "numeric JSON0/0.0 supported without bool/string coercion",
+      "actual JVM compilation and tests; no assumed APK rebuild"
     ]
   },
   "coordinator_history": [
@@ -2063,5 +2087,18 @@
     "archive_cli_checks": 9,
     "wave11_rerun_scope": "357JVM+APK and six instrumentation tests compiled offline; runtime0; backend/browser/ASR unchanged"
   },
-  "resume_note": "Remote HEAD unchanged since prior claim; prior scratch absent. Resume browser N79/N82/N83 first with local Node and available browser runtime. Native N80/N81/N84 remain pending until toolchain can be verified."
+  "resume_note": "Browser subset completed with independent local acceptance and durable publication. Coordinator released; native subset remains ready and real Chromium execution explicitly blocked in this environment.",
+  "wave13_validation": {
+    "node_tests": 85,
+    "node_failures": 0,
+    "python_numeric_comparisons": 3008,
+    "python_canonical_projections": 2,
+    "fake_dom_handler_tests": 6,
+    "actual_chromium_tests": 0,
+    "android_build": false,
+    "backend_full_suite_rerun": false,
+    "receipt": "docs/WAVE13_BROWSER_RECEIPT.json",
+    "code_commit": "346425bd66611505ce52b20bca01e5779e73d620",
+    "qa_commit": "4c34aa3e67037d840bc08341f66cf2bddf3c8252"
+  }
 }

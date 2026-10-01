@@ -77,18 +77,14 @@ object SourceXlsParser {
             val sstIndex = globals.indexOfFirst { it.id == 0x00fc }
             if (globals.count { it.id == 0x00fc } > 1) fail("Duplicate shared string table")
             if (sstIndex >= 0) {
-                if (globals.getOrNull(sstIndex + 1)?.id == 0x003c) {
-                    issue("xls_sst_continue_unsupported", "Continued shared string table omitted; LABELSST indices remain raw")
-                } else {
-                    val data = globals[sstIndex].data
-                    if (data.size < 8) fail("Truncated SST")
-                    val count = data.uint(4)
-                    if (count > limits.maxCellsPerFile) bound("shared_strings_limit")
-                    var p = 8
-                    repeat(count.toInt()) {
-                        val decoded = unicode(data, p, limits); strings += decoded.first; p = decoded.second
-                    }
-                    if (p != data.size) fail("Unexpected SST trailing bytes")
+                var end = sstIndex + 1
+                while (end < globals.size && globals[end].id == 0x003c) end++
+                try {
+                    // Publish the table only after all declared strings and boundaries validate.
+                    strings += sharedStrings(globals.subList(sstIndex, end), limits, checkCancelled)
+                } catch (e: Stop) {
+                    if (e.code !in setOf("invalid_xls", "unsupported_xls")) throw e
+                    issue(e.code, "Shared string table omitted: ${e.message}")
                 }
             }
             val offsets = records.withIndex().associate { it.value.offset to it.index }
@@ -197,19 +193,68 @@ object SourceXlsParser {
         val n = if (value and 2 != 0) (value shr 2).toDouble() else java.lang.Double.longBitsToDouble((value.toLong() and 0xfffffffcL) shl 32)
         return (if (value and 1 != 0) n / 100 else n).toString()
     }
-    private fun unicode(data: ByteArray, start: Int, limits: SourceScanLimits): Pair<String, Int> {
-        val length = data.u16(start)
-        if (length > limits.maxCellChars) bound("cell_chars_limit")
-        if (start + 2 >= data.size) fail("Truncated Unicode string")
-        val flags = data[start + 2].toInt() and 255
-        if (flags and 0xf2 != 0) fail("Invalid Unicode flags")
-        var p = start + 3
-        val runs = if (flags and 8 != 0) data.u16(p).also { p += 2 } else 0
-        val ext = if (flags and 4 != 0) data.uint(p).also { p += 4 } else 0L
-        val end = p.toLong() + length * (if (flags and 1 != 0) 2 else 1)
-        val total = end + runs * 4L + ext
-        if (total > data.size) fail("Truncated Unicode string")
-        return text(data.copyOfRange(p, end.toInt()), flags and 1 != 0) to total.toInt()
+    /** SST headers remain atomic; only character data consumes a continuation width byte. */
+    private fun sharedStrings(records: List<Record>, limits: SourceScanLimits, cancelled: () -> Unit): List<String> {
+        val first = records.first().data
+        if (first.size < 8) fail("Truncated SST header")
+        val count = first.uint(4)
+        if (count > first.uint(0)) fail("SST unique count exceeds total count")
+        if (count > limits.maxCellsPerFile) bound("shared_strings_limit")
+        var recordIndex = 0
+        var data = first
+        var p = 8
+        var decodedChars = 0L
+        fun nextRecord() {
+            cancelled()
+            recordIndex++
+            data = records.getOrNull(recordIndex)?.data ?: fail("Truncated SST continuation")
+            p = 0
+            if (data.isEmpty()) fail("Empty SST continuation")
+        }
+        val result = ArrayList<String>(count.toInt())
+        repeat(count.toInt()) {
+            cancelled()
+            if (p == data.size) nextRecord() // New string: full header, no width prefix.
+            if (data.size - p < 3) fail("SST string header split or truncated")
+            val length = data.u16(p)
+            val flags = data[p + 2].toInt() and 255
+            if (flags and 0xf2 != 0) fail("Invalid Unicode flags")
+            val headerSize = 3 + (if (flags and 8 != 0) 2 else 0) + (if (flags and 4 != 0) 4 else 0)
+            if (data.size - p < headerSize) fail("SST string header split or truncated")
+            if (length > limits.maxCellChars) bound("cell_chars_limit")
+            decodedChars += length
+            if (decodedChars > limits.maxExpandedBytes) bound("shared_string_chars_limit")
+            p += 3
+            val runs = if (flags and 8 != 0) data.u16(p).also { p += 2 } else 0
+            val ext = if (flags and 4 != 0) data.i32(p).also { p += 4 } else 0
+            if (ext < 0) fail("Negative phonetic string size")
+            var wide = flags and 1 != 0
+            val utf16 = ByteArrayOutputStream(length * 2)
+            repeat(length) { character ->
+                if (character % 1024 == 0) cancelled()
+                if (p == data.size) {
+                    nextRecord()
+                    val continuationFlags = data[p++].toInt() and 255
+                    if (continuationFlags !in 0..1) fail("Invalid SST continuation compression flag")
+                    wide = continuationFlags == 1
+                }
+                val width = if (wide) 2 else 1
+                if (data.size - p < width) fail("Split or truncated SST character")
+                utf16.write(data[p++].toInt() and 255)
+                utf16.write(if (wide) data[p++].toInt() and 255 else 0)
+            }
+            val tail = runs * 4L + ext
+            if (tail > data.size - p) {
+                if (recordIndex + 1 < records.size) unsupported("Continued SST rich-text/phonetic metadata is not decoded")
+                fail("Truncated SST rich-text/phonetic metadata")
+            }
+            p += tail.toInt()
+            // Decode once, so a surrogate pair may straddle records without replacement.
+            result += try { text(utf16.toByteArray(), true) }
+                catch (_: java.nio.charset.CharacterCodingException) { fail("Invalid SST UTF-16") }
+        }
+        if (p != data.size || recordIndex != records.lastIndex) fail("Unexpected SST trailing bytes or continuation")
+        return result
     }
 
     private class Compound(val bytes: ByteArray, val limits: SourceScanLimits, val cancelled: () -> Unit) {

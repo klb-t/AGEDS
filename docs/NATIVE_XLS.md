@@ -11,7 +11,7 @@ This is a small dependency-free Android/JVM adapter, **not full XLS support**.
   root-level `Workbook`/`Book` stream, normal FAT and 64-byte MiniFAT streams.
 - BIFF8 workbook globals and BoundSheet8 worksheet references; sheet ordinal,
   raw decoded sheet name, row index and BIFF stream offset in row locators.
-- NUMBER, RK, MULRK, LABELSST with a noncontinued shared-string table, BOOLERR,
+- NUMBER, RK, MULRK, LABELSST with a bounded shared-string table and character continuations, BOOLERR,
   BLANK, and FORMULA numeric/Boolean/error/empty cached results.
 - BIFF8 compressed Unicode and UTF-16LE strings, retaining whitespace and
   original decoded text. Rich-text run/phonetic metadata is not projected.
@@ -37,8 +37,17 @@ report `invalid_xls`. This is not a full CFB conformance validator: unrelated st
 nested storage, directory sorting/color constraints and unconsumed allocation are
 not validated. Chart/macro/non-worksheet streams are omitted with an issue.
 
-Continued SST data is not decoded: all related LABELSST cells retain their index
-as value plus an unresolved-string diagnostic. Formula string caches are omitted
+SST character data may cross successive CONTINUE records and switch compressed /
+UTF-16LE encoding at each boundary. A continuation within characters consumes one
+0/1 compression byte; a new string at a record boundary begins with its full
+header instead. Fixed string headers cannot split, nor can a UTF-16 code unit.
+Surrogate pairs may cross records and are decoded together without replacement.
+Rich-text/phonetic tails wholly within a record are skipped as before; tails
+crossing records remain explicitly unsupported. Their precise continuation
+semantics and full formatting/phonetic validation are outside this increment.
+An invalid or unsupported SST is discarded as a whole before publication;
+LABELSST cells retain their raw index as value with an unresolved-string issue.
+Thus a valid prefix is never reported as the complete stored string/table. Formula string caches are omitted
 with an issue; the formula's raw payload and tokens remain. LABEL, MULBLANK and
 RSTRING cell records are explicitly reported as omitted. Other BIFF records,
 styles, comments, dates, links, drawing objects, macros and formatting are outside
@@ -59,7 +68,8 @@ Budget/error results retain only previously admitted cells and explicit issues.
 `SourceXlsParserTest` generates normal FAT and MiniFAT containers in memory:
 scalars, Unicode, raw bytes/locators, formulas, unsupported continuations/encryption,
 malformed/cyclic/out-of-range chains, invalid BIFF framing, limits, cancellation and
-unchanged input. `SourceAdversarialXlsTest` (N15 owner) adds independent boundary
+unchanged input. The formerly unsupported malformed-continuation fixture now
+expects `invalid_xls`; its bytes remain unchanged. `SourceAdversarialXlsTest` (N15 owner) adds independent boundary
 regressions. No private corpus or binary fixtures are checked in. The current parser and source models were compiled with the cached Kotlin 2.4.20
 compiler on JDK 21, then all **34 JUnit tests passed** (14 N9 and 20 N15; 0.367 s).
 This standalone run avoided a shared Gradle cache lock. It does not validate
@@ -98,3 +108,27 @@ Microsoft's specifications checked during implementation:
 - [MS-CFB MiniFAT](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-cfb/c5d235f7-b73c-4ec5-bf8d-5c08306cd023)
 - [MS-XLS RK encoding](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xls/04fa5340-122f-49db-93ea-00cc75501efc)
 - [Microsoft Excel 97–2007 Binary File Format specification](https://download.microsoft.com/download/5/0/1/501ED102-E53F-4CE0-AA6B-B0F93629DDC6/Office/Excel97-2007BinaryFileFormat%28xls%29Specification.pdf)
+
+
+## N25 SST continuation increment
+
+`SourceXlsContinuationTest` constructs compressed, wide, mixed-width, multi-record,
+empty-string, boundary-header, surrogate-pair, rich-tail and malformed tables in
+memory. Tests cover exact decoded whitespace, unchanged raw LABELSST payloads,
+late-error atomic omission and cell/string-count budgets. No new dependency,
+corpus, binary fixture or formula execution was added. Current execution results
+are recorded separately by independent QA and the integrated build receipt;
+older test counts above describe the earlier parser revision.
+
+SST decoding also bounds cumulative decoded characters by `maxExpandedBytes`,
+in addition to the original CFB/input, record, count, per-string and output
+budgets. Cancellation is checked at string/record transitions and every 1024
+characters. Record boundaries are preserved during parsing, not flattened away.
+
+Primary format contract checked for this increment:
+
+- [MS-XLS 2.5.293 XLUnicodeRichExtendedString](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xls/173d9f51-e5d3-43da-8de2-be7f22e119b9): fixed headers, character width and double-byte boundaries.
+- [MS-XLS 2.4.58 Continue](https://learn.microsoft.com/en-us/openspecs/office_file_formats/ms-xls/999fae21-d3d9-42e8-8290-639782460c67): successive record payloads and 8224-byte record cap.
+
+This is still an explicitly partial read-only cell projection, not full BIFF8
+conformance or preservation of rich formatting in the projected cell model.

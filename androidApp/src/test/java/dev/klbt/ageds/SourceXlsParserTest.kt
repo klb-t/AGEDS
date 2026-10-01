@@ -44,12 +44,13 @@ class SourceXlsParserTest {
         assertEquals(" ąć! ", result.rows.single().cells.single().value)
         assertEquals("00000000000000000000", result.rows.single().cells.single().raw)
     }
-    @Test fun continuationNeverPretendsToDecodeSst() {
+    @Test fun malformedContinuationNeverPretendsToDecodeSst() {
         val sst = XlsFixture.record(0xfc, XlsFixture.le32(1) + XlsFixture.le32(1)) + XlsFixture.record(0x3c, byteArrayOf(0))
         val cell = XlsFixture.record(0xfd, XlsFixture.cellHeader(0, 0) + XlsFixture.le32(0))
         val result = parse(XlsFixture.cfb(XlsFixture.workbook(cell, sst)))
         assertEquals("0", result.rows.single().cells.single().value)
-        assertTrue(result.issues.any { it.code == "xls_sst_continue_unsupported" })
+        // Previously any CONTINUE was unsupported; this unchanged fixture has a truncated string header.
+        assertTrue(result.issues.any { it.code == "invalid_xls" })
         assertTrue(result.issues.any { it.code == "xls_unresolved_shared_string" })
     }
     @Test fun formulaReturnsCachedNumberAndOpaqueTokens() {

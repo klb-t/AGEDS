@@ -16,15 +16,16 @@ import stat
 import sys
 import tempfile
 import unicodedata
-import wave
 import zipfile
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, time, timezone
 from pathlib import Path
 from typing import Any
 
+from .wav_header import MAX_PREFIX_BYTES, probe_wav_header
+
 SCHEMA_VERSION = "ageds.source-scan/v1"
-SCANNER_VERSION = "1.0.0"
+SCANNER_VERSION = "1.1.0"
 _AUDIO = {".wav", ".mp3", ".m4a", ".aac", ".ogg", ".opus", ".flac", ".amr", ".wma"}
 _VIDEO = {".mp4", ".mov", ".mkv", ".avi", ".webm"}
 
@@ -47,10 +48,14 @@ class ScanLimits:
     max_total_cell_characters: int = 2_000_000
     max_observations: int = 50000
     max_candidate_links: int = 10000
+    max_wav_header_bytes: int = MAX_PREFIX_BYTES
+    max_total_wav_header_bytes: int = 8 * 1024 * 1024
 
     def __post_init__(self):
         if any(not isinstance(v, int) or isinstance(v, bool) or v < 1 for v in asdict(self).values()):
             raise ValueError("Every scan limit must be a positive integer")
+        if self.max_wav_header_bytes > MAX_PREFIX_BYTES:
+            raise ValueError("WAV header per-file limit must not exceed 65536 bytes")
 
 
 def _id(*parts: Any) -> str:
@@ -122,6 +127,7 @@ class _Scan:
     def __init__(self, root: Path, limits: ScanLimits):
         self.root, self.limits = root, limits
         self.hash_bytes = self.rows = self.cell_characters = 0
+        self.wav_header_bytes = 0
         self.file_rows: dict[str, int] = {}
         self.entries_enumerated = 0
         self.manifest = {
@@ -139,11 +145,14 @@ class _Scan:
                 "csv_header": "first_record_as_header_hypothesis", "filename_metadata": "unverified_hypotheses",
                 "identities": "no_automatic_merge", "hash_scope": "complete_file_or_unknown; never_partial_digest",
                 "filesystem_time": "filesystem_observation_not_event_time",
+                "wav_header_scope": "bounded_prefix; declared duration only; audio body not validated",
+                "wav_header_size_basis": "fstat_of_same_open_descriptor",
+                "wav_header_budget": "separate_from_hash_and_table_reads",
                 "read_side_effects": "source bytes are not written; OS may update access timestamps",
                 "limits": asdict(limits),
             },
             "files": [], "tables": [], "observations": [], "candidate_links": [], "conflicts": [],
-            "issues": [], "coverage": {"complete": True, "directories_seen": 0, "entries_seen": 0, "files_seen": 0, "files_hashed": 0, "rows_captured": 0, "cell_characters_captured": 0},
+            "issues": [], "coverage": {"complete": True, "directories_seen": 0, "entries_seen": 0, "files_seen": 0, "files_hashed": 0, "wav_header_bytes_read": 0, "rows_captured": 0, "cell_characters_captured": 0},
         }
         self._stop = False
         self._reported_limits: set[tuple] = set()
@@ -255,10 +264,19 @@ class _Scan:
         self.filename_observations(file)
         try:
             fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory_fd)
-            with os.fdopen(fd, "rb") as handle:
+            try:
+                handle = os.fdopen(fd, "rb", buffering=0 if ext == ".wav" else -1)
+            except BaseException:
+                os.close(fd)
+                raise
+            with handle:
                 before = os.fstat(handle.fileno())
-                if not stat.S_ISREG(before.st_mode) or (before.st_ino, before.st_dev) != (st.st_ino, st.st_dev):
-                    self.issue("source_changed_before_read", rel); file["hash_status"] = "unstable"; return
+                if (not stat.S_ISREG(before.st_mode) or
+                        (before.st_ino, before.st_dev, before.st_size, before.st_mtime_ns, before.st_ctime_ns) !=
+                        (st.st_ino, st.st_dev, st.st_size, st.st_mtime_ns, st.st_ctime_ns)):
+                    self.issue("source_changed_before_read", rel)
+                    self._invalidate_file(file, "unstable", "source_changed_before_read")
+                    return
                 if st.st_size > self.limits.max_hash_bytes or self.hash_bytes + st.st_size > self.limits.max_total_hash_bytes:
                     self.issue("hash_size_limit", rel, size_bytes=st.st_size)
                 else:
@@ -286,21 +304,93 @@ class _Scan:
                         else:
                             self.parse_table(file, raw)
                 elif ext == ".wav":
-                    try:
-                        with wave.open(handle, "rb") as audio:
-                            seconds = audio.getnframes() / audio.getframerate()
-                            file["audio_metadata"] = {"frames": audio.getnframes(), "sample_rate": audio.getframerate(), "channels": audio.getnchannels(), "sample_width_bytes": audio.getsampwidth(), "duration_seconds": seconds}
-                            self.observe(file, "duration", seconds, locator={"kind": "wav_header"}, basis="wav_header", header="durationseconds")
-                            file["parse_status"] = "metadata_only"
-                    except (wave.Error, EOFError, OSError, ZeroDivisionError) as exc:
-                        file["parse_status"] = "failed"; self.issue("audio_metadata_failed", rel, error=str(exc))
+                    self.wav_header(file, handle, os.fstat(handle.fileno()).st_size)
                 after = os.fstat(handle.fileno())
                 if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (after.st_size, after.st_mtime_ns, after.st_ctime_ns):
-                    file.update(sha256=None, hash_status="unstable", parse_status="unstable")
+                    self._invalidate_file(file, "unstable", "source_changed_during_read")
                     self.issue("source_changed_during_read", rel)
+                elif "audio_metadata" in file:
+                    file["audio_metadata"]["source_stability"] = "descriptor_stat_unchanged"
         except OSError as exc:
-            file.update(hash_status="unreadable", parse_status="unreadable")
+            self._invalidate_file(file, "unreadable", "source_unreadable")
             self.issue("file_unreadable", rel, error=str(exc))
+
+    def _invalidate_file(self, file: dict, status: str, reason: str):
+        """Revoke accepted projections without erasing captured raw header declarations."""
+        if file["hash_status"] == "complete":
+            self.manifest["coverage"]["files_hashed"] -= 1
+        file.update(sha256=None, hash_status=status, parse_status=status)
+        if "audio_metadata" in file:
+            metadata = file["audio_metadata"]
+            metadata["source_stability"] = reason
+            for key in ("frames", "sample_rate", "channels", "sample_width_bytes", "duration_seconds"):
+                metadata.pop(key, None)
+            report = metadata["header_probe"]
+            if report["status"] == "observed":
+                report["status"] = "partial"
+            report.update(declared_duration_sec=None, duration_basis=None)
+            report["issues"].append({"code": reason, "message": "Source stability check failed; raw declarations retained", "locator": None})
+            for observation in self.manifest["observations"]:
+                if observation["file_id"] == file["file_id"] and observation["locator"]["kind"] == "wav_header":
+                    observation.update(seconds=None, status=reason)
+
+    def wav_header(self, file: dict, handle, descriptor_size: int):
+        """Inspect a bounded prefix on the already-owned, unbuffered descriptor.
+
+        Short reads are not EOF. Accounting advances before parsing and remains
+        charged if a later read fails. This budget is separate from full hashing.
+        """
+        rel = file["relative_path"]
+        remaining = max(0, self.limits.max_total_wav_header_bytes - self.wav_header_bytes)
+        cap = min(self.limits.max_wav_header_bytes, remaining)
+        prefix = bytearray()
+        eof = False
+        read_error = None
+        try:
+            while len(prefix) < cap:
+                requested = min(8192, cap - len(prefix))
+                chunk = handle.read(requested)
+                if chunk == b"":
+                    eof = True
+                    break
+                if not isinstance(chunk, bytes) or not 0 < len(chunk) <= requested:
+                    raise OSError("WAV stream returned invalid read progress")
+                self.wav_header_bytes += len(chunk)
+                self.manifest["coverage"]["wav_header_bytes_read"] = self.wav_header_bytes
+                prefix.extend(chunk)
+        except OSError as error:
+            read_error = str(error)[:200]
+            self.issue("audio_metadata_failed", rel, error=read_error, header_bytes_read=len(prefix))
+        if not eof and read_error is None:
+            code = "wav_header_total_bytes_limit" if remaining <= self.limits.max_wav_header_bytes else "wav_header_bytes_limit"
+            self.limit(code, rel, header_bytes_read=len(prefix), limit_bytes=cap)
+        report = probe_wav_header(bytes(prefix), provider_size_bytes=descriptor_size, end_of_input=eof)
+        if report["riff_declared_bytes"] is not None and report["riff_declared_bytes"] != descriptor_size:
+            if report["status"] not in {"malformed", "unsupported"}:
+                report["status"] = "size_mismatch"
+            report.update(declared_duration_sec=None, duration_basis=None)
+            report["issues"].append({"code": "wav_descriptor_size_mismatch",
+                "message": f"RIFF declared size differs from {descriptor_size} bytes observed by fstat", "locator": None})
+        if read_error is not None:
+            report.update(status="partial", declared_duration_sec=None, duration_basis=None)
+        file["audio_metadata"] = {
+            "source": "same_descriptor_riff_header", "scope": "header_prefix_only", "body_validated": False,
+            "size_basis": "fstat_same_descriptor", "observed_file_size_bytes": descriptor_size,
+            "header_bytes_read": len(prefix), "header_probe": report, "source_stability": "not_checked",
+        }
+        for issue in report["issues"]:
+            self.issue(issue["code"], rel, message=issue["message"])
+        file["parse_status"] = ("failed" if read_error is not None else
+            {"observed": "metadata_only", "partial": "limited", "malformed": "failed",
+             "size_mismatch": "failed", "unsupported": "unsupported"}[report["status"]])
+        if report["status"] == "observed" and read_error is None:
+            seconds = report["declared_duration_sec"]
+            file["audio_metadata"].update(frames=report["data_declared_bytes"] // report["block_align_bytes"],
+                sample_rate=report["sample_rate_hz"], channels=report["channels"],
+                sample_width_bytes=report["bits_per_sample"] // 8, duration_seconds=seconds)
+            self.observe(file, "duration", seconds, locator={"kind": "wav_header"}, basis="wav_header",
+                header="durationseconds", duration_basis=report["duration_basis"], scope="header_prefix_only",
+                body_validated=False, source="same_descriptor_riff_header")
 
     def add_row(self, file: dict, table: dict, row_index: int, values: list, headers: list | None, *, cells: list | None = None, raw_record: str | None = None, start_line: int | None = None) -> bool:
         if self.file_rows.get(file["file_id"], 0) >= self.limits.max_rows_per_file or self.rows >= self.limits.max_total_rows:
@@ -541,7 +631,7 @@ def scan_sources(root: str | Path, *, limits: ScanLimits | None = None) -> dict:
     finally:
         os.close(root_fd)
     scan.correlate()
-    scan.manifest["coverage"].update(rows_captured=scan.rows, cell_characters_captured=scan.cell_characters, hash_bytes_read=scan.hash_bytes,
+    scan.manifest["coverage"].update(rows_captured=scan.rows, cell_characters_captured=scan.cell_characters, hash_bytes_read=scan.hash_bytes, wav_header_bytes_read=scan.wav_header_bytes,
                                        entries_enumerated=scan.entries_enumerated, inventory_files=len(scan.manifest["files"]), tables=len(scan.manifest["tables"]), observations=len(scan.manifest["observations"]))
     return scan.manifest
 

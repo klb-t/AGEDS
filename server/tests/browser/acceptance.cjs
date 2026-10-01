@@ -17,7 +17,7 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
   let stderr = ''; server.stderr.on('data', d => stderr += d);
   let browser;
   const fingerprint = file => createHash('sha256').update(fs.readFileSync(path.join(repo, file))).digest('hex');
-  const receipt = {git_head: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: repo, encoding: 'utf8'}).trim(), playwright: require('playwright/package.json').version, source_sha256: Object.fromEntries(['server/app/main.py', 'server/app/static/citations.mjs', 'server/app/static/range-player.mjs', 'server/app/templates/artifact.html', 'server/app/templates/index.html', 'server/app/exchange.py', 'server/app/exchange_consumer.py', 'server/tests/browser/acceptance.cjs', 'server/tests/browser_fixture.py'].map(file => [file, fingerprint(file)])), task: 'AGEDS-20261001-N21-browser', baseline_task: 'AGEDS-20261001-N12', started_at: new Date().toISOString(), fixture: 'generated 4s mono PCM WAV; temporary SQLite; synthetic transcript versions', cases: []};
+  const receipt = {git_head: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: repo, encoding: 'utf8'}).trim(), playwright: require('playwright/package.json').version, source_sha256: Object.fromEntries(['server/app/main.py', 'server/app/db.py', 'server/app/static/citations.mjs', 'server/app/static/range-player.mjs', 'server/app/templates/artifact.html', 'server/app/templates/index.html', 'server/app/exchange.py', 'server/app/exchange_consumer.py', 'server/app/verified_media.py', 'server/app/search.py', 'server/tests/browser/acceptance.cjs', 'server/tests/browser_fixture.py'].map(file => [file, fingerprint(file)])), task: 'AGEDS-20261001-N28-browser', baseline_task: 'AGEDS-20261001-N12', started_at: new Date().toISOString(), fixture: 'generated 4s mono PCM WAV; temporary SQLite; synthetic transcript versions', cases: []};
   try {
     const fixture = await new Promise((resolve, reject) => {
       let buf = ''; server.stdout.on('data', d => {buf += d; if (buf.includes('\n')) {try {resolve(JSON.parse(buf.split('\n')[0]));} catch(e) {reject(e);}}});
@@ -199,6 +199,70 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
       await page.goto(`${base}/?q=${encodeURIComponent('gęślą')}`);
       assert.ok((await page.locator('body').textContent()).includes('<img src=x onerror='));
       assert.equal(await page.locator('img').count(), 0); assert.equal(await page.evaluate(() => window.__sourceExecuted), undefined);
+    });
+    await test('verified media endpoint supports exact ranges and HEAD in Chromium context', async () => {
+      const url = `${base}/api/artifacts/${fixture.artifact}/content`;
+      const full = await context.request.get(url);
+      assert.equal(full.status(), 200);
+      const all = await full.body();
+      const range = await context.request.get(url, {headers: {Range: 'bytes=32-79'}});
+      assert.equal(range.status(), 206);
+      assert.deepEqual(await range.body(), all.subarray(32, 80));
+      assert.equal(range.headers()['content-range'], `bytes 32-79/${all.length}`);
+      assert.equal(range.headers()['cache-control'], 'no-store');
+      const head = await context.request.head(url, {headers: {Range: 'bytes=32-79'}});
+      assert.equal(head.status(), 200);
+      assert.equal((await head.body()).length, 0);
+      assert.equal(head.headers()['content-length'], String(all.length));
+      const mismatch = await context.request.get(url, {headers: {Range: 'bytes=32-79', 'If-Range': '"different"'}});
+      assert.equal(mismatch.status(), 200);
+      assert.deepEqual(await mismatch.body(), all);
+      receipt.verified_media = {full_bytes: all.length, range_bytes: 48, head_body_bytes: 0};
+    });
+    await test('unsafe DOM artifact ID refuses transcript requests before rounding', async () => {
+      let transcriptRequests = 0;
+      const watch = request => {if (request.url().includes('/transcript?')) transcriptRequests++;};
+      const pattern = `${base}/artifact/${fixture.artifact}`;
+      await page.route(pattern, async route => {
+        const response = await route.fetch();
+        const html = (await response.text()).replace(`data-artifact-id="${fixture.artifact}"`, 'data-artifact-id="9007199254740993"');
+        await route.fulfill({response, body: html});
+      });
+      page.on('request', watch);
+      await page.goto(pattern);
+      await page.waitForFunction(() => document.querySelector('[data-status]').textContent.includes('nie zostanie zaokrąglone'));
+      assert.equal(transcriptRequests, 0);
+      assert.ok(await sel('save').isDisabled()); assert.ok(await sel('play').isDisabled());
+      assert.equal(await page.locator('[data-citation-packet][href]').count(), 0);
+      page.off('request', watch); await page.unroute(pattern);
+    });
+    await test('unsafe DOM transcript ID refuses fetch and preserves exact unsupported ID', async () => {
+      await page.goto(`${base}/artifact/${fixture.artifact}`); await version(fixture.new);
+      let transcriptRequests = 0;
+      const watch = request => {if (request.url().includes('/transcript?')) transcriptRequests++;};
+      page.on('request', watch);
+      await sel('version').evaluate(select => {
+        const option = document.createElement('option'); option.value = '9007199254740993'; option.textContent = '#9007199254740993';
+        select.append(option); select.value = option.value; select.dispatchEvent(new Event('change', {bubbles: true}));
+      });
+      await page.waitForFunction(() => document.querySelector('[data-status]').textContent.includes('nie zostanie zaokrąglone'));
+      assert.equal(transcriptRequests, 0); assert.equal(await sel('version').inputValue(), '9007199254740993');
+      assert.ok(await sel('save').isDisabled()); assert.ok(await sel('play').isDisabled());
+      page.off('request', watch);
+    });
+    await test('unsafe or mismatched API version identity never enables quote actions', async () => {
+      for (const badId of [9007199254740992, fixture.old]) {
+        const pattern = '**/transcript?*';
+        await page.route(pattern, async route => {
+          const response = await route.fetch(); const body = await response.json(); body.id = badId;
+          await route.fulfill({response, json: body});
+        });
+        await page.goto(`${base}/artifact/${fixture.artifact}`);
+        await page.waitForFunction(() => document.querySelector('[data-status]').textContent.includes('Operację wstrzymano'));
+        assert.ok(await sel('save').isDisabled()); assert.ok(await sel('play').isDisabled());
+        assert.equal(await sel('preview').textContent(), '');
+        await page.unroute(pattern);
+      }
     });
     assert.deepEqual(pageErrors, []); receipt.page_errors = pageErrors; receipt.status = 'passed';
   } catch (error) {receipt.status = 'failed'; receipt.error = error.stack; process.exitCode = 1; console.error(error);}

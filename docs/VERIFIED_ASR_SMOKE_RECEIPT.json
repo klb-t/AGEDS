@@ -1,0 +1,526 @@
+{
+  "schema_version": 1,
+  "task_id": "AGEDS-20261001-N39",
+  "started_at": "2026-10-01T00:30:10.583106+00:00",
+  "status": "passed",
+  "actual_inference_completed": true,
+  "input_kind": "generated_synthetic_speech",
+  "expected_text": "The quick brown fox jumps over the lazy dog. This is a test of local speech recognition.",
+  "model": {
+    "repository": "Systran/faster-whisper-tiny.en",
+    "acquisition_revision": "0d3d19a32d3338f10357c0889762bd8d64bbdeba",
+    "file_sha256": {
+      "config.json": "14b1b421a90349bc551b881461426b561a874049cb9e4c4864f2ca384f6a7cc5",
+      "tokenizer.json": "929c5252409436dce1b38a75d1abbcb5e132d170d8e324e4e04ed915fa2d22df",
+      "vocabulary.txt": "ff77588746d3a2595d32ab5b69ffd7b95ce2441ac57533cb66fc3eb575a115cf",
+      "model.bin": "1a5afae06a4db91c975c9a9d78be5cc110ee4ea022ad57d55492e4550e936b2a"
+    },
+    "file_bytes": {
+      "config.json": 2317,
+      "tokenizer.json": 2128466,
+      "vocabulary.txt": 422309,
+      "model.bin": 75537502
+    },
+    "matches_previous_accepted_hashes": true
+  },
+  "environment": {
+    "python": "3.12.14",
+    "platform": "Linux-6.18.44-x86_64-with-glibc2.39",
+    "cpu_count": 9,
+    "packages": {
+      "faster-whisper": "1.2.0",
+      "ctranslate2": "4.8.2",
+      "onnxruntime": "1.30.0",
+      "av": "16.1.0",
+      "numpy": "2.5.3",
+      "tokenizers": "0.23.2",
+      "huggingface-hub": "1.33.0",
+      "requests": "2.34.2"
+    }
+  },
+  "limitations": [
+    "Single generated English utterance; not human corpus quality evaluation.",
+    "No manual listening or acoustic alignment verification.",
+    "Model revision is recorded by this harness; production adapter reports unknown.",
+    "Metadata archive excludes audio and model bytes; not replay or live restore."
+  ],
+  "offline_environment": {
+    "HF_HUB_OFFLINE": "1",
+    "model_path": "/workspace/scratch/773725428b88/review/asr-model"
+  },
+  "code_sha256": {
+    "server/app/worker.py": "7bba0475bf2dd219dc82376c01b93049b17610a91baec10ea0b5ce2bb7b7261a",
+    "server/app/jobs.py": "20800c6e8e32967f5d35862c1beabfe36837c0914198f1f2e0ea4ec904b37b9d",
+    "server/app/citations.py": "6a2780c9c7e18a62d425f9a413217ccfb84bd6091de300a3587a373fc44543bf",
+    "server/app/packages.py": "9eebc973e3fc015a1e9dd01080b7525f448d0846a6660f57c530e64e56825e2b",
+    "server/app/verified_media.py": "90308d9bc8061391c1f8772f027652fe45087f5fe80029d83d02b2a08590cd4d",
+    "server/requirements-whisper.txt": "932e83adc48fcde8191e96c1e502ac3bf832425710448e82fa4552ba0ab22dab",
+    "server/app/verified_reader.py": "77c63e45521ce1f215627986d0b408c575d992d55a2d7442a65b57f20b06a231",
+    "scripts/verified_asr_smoke.py": "115616c055f7af09433a6391c065a0db45411d5f6d72ab8578ae485fc0138f0b"
+  },
+  "synthesis": {
+    "command": [
+      "ffmpeg",
+      "-nostdin",
+      "-v",
+      "error",
+      "-f",
+      "lavfi",
+      "-i",
+      "flite=text=The quick brown fox jumps over the lazy dog. This is a test of local speech recognition.:voice=slt",
+      "-ar",
+      "16000",
+      "-ac",
+      "1",
+      "/workspace/scratch/773725428b88/review/verified-asr-wave6-final/synthetic.wav"
+    ],
+    "ffmpeg_version": "ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers",
+    "sha256": "f9495cb6cd1a94a13e916d33ec07bfc5244084ce9ed52a0f91193411ac5ab2af",
+    "duration_seconds": 5.43
+  },
+  "stored_artifact": {
+    "id": 1,
+    "source_id": 1,
+    "parent_artifact_id": null,
+    "sha256": "f9495cb6cd1a94a13e916d33ec07bfc5244084ce9ed52a0f91193411ac5ab2af",
+    "original_name": "synthetic.wav",
+    "mime_type": "audio/x-wav",
+    "size_bytes": 173838,
+    "source_locator": "synthetic://n39/flite-slt",
+    "source_created_at": null,
+    "source_modified_at": null,
+    "captured_at": null,
+    "stored_path": "/workspace/scratch/773725428b88/review/verified-asr-wave6-final/store/f9/49/f9495cb6cd1a94a13e916d33ec07bfc5244084ce9ed52a0f91193411ac5ab2af.wav",
+    "is_raw": 1,
+    "confidence": null,
+    "metadata_json": "{}",
+    "created_at": "2026-10-01 00:30:11"
+  },
+  "decoder_inputs": [
+    {
+      "python_type": "VerifiedReader",
+      "python_module": "server.app.verified_reader",
+      "object_identity": 140045907239472,
+      "function_file": "/workspace/scratch/773725428b88/review/asr-deps/faster_whisper/audio.py",
+      "private_retained_descriptor": 4,
+      "descriptor_target": "/workspace/scratch/773725428b88/review/verified-asr-wave6-final/store/f9/49/f9495cb6cd1a94a13e916d33ec07bfc5244084ce9ed52a0f91193411ac5ab2af.wav",
+      "device": 27,
+      "inode": 1226461,
+      "size_bytes": 173838
+    }
+  ],
+  "verified_reader_events": {
+    "read_calls": [
+      {
+        "size": 32768,
+        "object_identity": 140045907239472
+      },
+      {
+        "size": 32846,
+        "object_identity": 140045907239472
+      },
+      {
+        "size": 32768,
+        "object_identity": 140045907239472
+      },
+      {
+        "size": 32768,
+        "object_identity": 140045907239472
+      },
+      {
+        "size": 32768,
+        "object_identity": 140045907239472
+      },
+      {
+        "size": 32768,
+        "object_identity": 140045907239472
+      },
+      {
+        "size": 32768,
+        "object_identity": 140045907239472
+      },
+      {
+        "size": 32768,
+        "object_identity": 140045907239472
+      },
+      {
+        "size": 32768,
+        "object_identity": 140045907239472
+      },
+      {
+        "size": 32768,
+        "object_identity": 140045907239472
+      }
+    ],
+    "returned_bytes": [
+      32768,
+      32846,
+      32768,
+      32768,
+      32768,
+      32768,
+      32768,
+      9920,
+      0,
+      0
+    ],
+    "verification_calls": 1,
+    "verification_returns": 1
+  },
+  "reader_descriptor_closed_after_worker": true,
+  "worker_seconds": 3.689599803001329,
+  "processing_runs": [
+    {
+      "id": 1,
+      "job_id": 1,
+      "artifact_id": 1,
+      "lease_token": "b7f77e52bbaa454f8f4b60a709f7b49b",
+      "status": "done",
+      "started_at": "2026-10-01T00:30:11.561669+00:00",
+      "finished_at": "2026-10-01T00:30:15.249209+00:00",
+      "tool": "faster-whisper",
+      "tool_version": "1.2.0",
+      "provider": "local",
+      "model": "/workspace/scratch/773725428b88/review/asr-model",
+      "model_version": "unknown",
+      "parameters_json": "{\"compute_type\": \"int8\", \"device\": \"cpu\", \"unspecified_options\": \"library defaults; effective transcription options recorded in result\", \"vad_filter\": true, \"word_timestamps\": true}",
+      "provenance_json": "{\"artifact_id\": 1, \"attempt\": 1, \"input_hash_recorded\": \"f9495cb6cd1a94a13e916d33ec07bfc5244084ce9ed52a0f91193411ac5ab2af\", \"input_mode\": \"verified_seekable_filelike\", \"input_sha256\": \"f9495cb6cd1a94a13e916d33ec07bfc5244084ce9ed52a0f91193411ac5ab2af\", \"input_size_recorded\": 173838, \"input_verification\": {\"decoder_read_coverage\": \"not_measured\", \"final_same_descriptor\": \"passed\", \"initial_full_sha256\": \"passed\", \"input_mode\": \"verified_seekable_filelike\", \"limitations\": [\"byte identity does not establish authenticity, alignment or transcript accuracy\", \"same descriptor and verified read buffers are not filesystem immutability\", \"adapter is trusted to use the supplied stream; input consumption is not attested\"], \"limits\": {\"max_media_bytes\": 4294967296, \"max_read_bytes\": 1048576, \"verification_chunk_bytes\": 262144}, \"read_policy\": \"verify_covering_chunks_before_return\", \"worker_media_copy\": false, \"worker_path_reopen\": false}, \"job_id\": 1, \"pipeline\": \"AGEDS transcription worker\", \"pipeline_version\": \"unknown\", \"source_id\": 1, \"source_locator\": \"synthetic://n39/flite-slt\", \"worker_id\": \"verified-real-asr-smoke\"}",
+      "metadata_json": "{\"ctranslate2_version\": \"4.8.2\", \"model_revision\": \"unknown\", \"python_version\": \"3.12.14\", \"seed\": \"unknown\"}",
+      "error": null
+    }
+  ],
+  "jobs": [
+    {
+      "id": 1,
+      "kind": "transcribe",
+      "artifact_id": 1,
+      "status": "done",
+      "priority": 0,
+      "attempts": 1,
+      "payload_json": "{}",
+      "error": null,
+      "created_at": "2026-10-01 00:30:11",
+      "started_at": "2026-10-01T00:30:11.561669+00:00",
+      "finished_at": "2026-10-01T00:30:15.249209+00:00",
+      "lease_token": "b7f77e52bbaa454f8f4b60a709f7b49b",
+      "lease_expires_at": null,
+      "heartbeat_at": "2026-10-01T00:30:11.561669+00:00",
+      "worker_id": "verified-real-asr-smoke"
+    }
+  ],
+  "transcript": {
+    "id": 1,
+    "artifact_id": 1,
+    "kind": "transcript",
+    "model": "/workspace/scratch/773725428b88/review/asr-model",
+    "language": "en",
+    "text": "The quick brown fox jumps over the lazy dog, this is a test of locals' peach recognition.",
+    "segments_json": "[{\"start\": 0.0, \"end\": 5.02, \"text\": \" The quick brown fox jumps over the lazy dog, this is a test of locals' peach recognition.\", \"words\": [{\"start\": 0.0, \"end\": 0.42, \"word\": \" The\", \"probability\": 0.6262677907943726}, {\"start\": 0.42, \"end\": 0.66, \"word\": \" quick\", \"probability\": 0.6658167243003845}, {\"start\": 0.66, \"end\": 1.02, \"word\": \" brown\", \"probability\": 0.8637793064117432}, {\"start\": 1.02, \"end\": 1.32, \"word\": \" fox\", \"probability\": 0.8854045867919922}, {\"start\": 1.32, \"end\": 1.7, \"word\": \" jumps\", \"probability\": 0.765833854675293}, {\"start\": 1.7, \"end\": 2.04, \"word\": \" over\", \"probability\": 0.9984363913536072}, {\"start\": 2.04, \"end\": 2.28, \"word\": \" the\", \"probability\": 0.9918236136436462}, {\"start\": 2.28, \"end\": 2.54, \"word\": \" lazy\", \"probability\": 0.9613946676254272}, {\"start\": 2.54, \"end\": 2.9, \"word\": \" dog,\", \"probability\": 0.9750102758407593}, {\"start\": 3.06, \"end\": 3.2, \"word\": \" this\", \"probability\": 0.819684624671936}, {\"start\": 3.2, \"end\": 3.34, \"word\": \" is\", \"probability\": 0.9860469698905945}, {\"start\": 3.34, \"end\": 3.46, \"word\": \" a\", \"probability\": 0.9700666666030884}, {\"start\": 3.46, \"end\": 3.66, \"word\": \" test\", \"probability\": 0.9967603087425232}, {\"start\": 3.66, \"end\": 3.86, \"word\": \" of\", \"probability\": 0.996325671672821}, {\"start\": 3.86, \"end\": 4.22, \"word\": \" locals'\", \"probability\": 0.4923376739025116}, {\"start\": 4.5, \"end\": 4.58, \"word\": \" peach\", \"probability\": 0.5271578431129456}, {\"start\": 4.58, \"end\": 5.02, \"word\": \" recognition.\", \"probability\": 0.995010495185852}]}]",
+    "confidence": null,
+    "created_at": "2026-10-01 00:30:15",
+    "run_id": 1,
+    "metadata_json": "{\"language_probability\": 1, \"language_probability_meaning\": \"language identification probability; not transcript correctness\", \"transcript_confidence\": \"unknown\", \"effective_transcription_options\": {\"beam_size\": 5, \"best_of\": 5, \"patience\": 1, \"length_penalty\": 1, \"repetition_penalty\": 1, \"no_repeat_ngram_size\": 0, \"log_prob_threshold\": -1.0, \"no_speech_threshold\": 0.6, \"compression_ratio_threshold\": 2.4, \"condition_on_previous_text\": true, \"prompt_reset_on_temperature\": 0.5, \"temperatures\": [0.0, 0.2, 0.4, 0.6, 0.8, 1.0], \"initial_prompt\": null, \"prefix\": null, \"suppress_blank\": true, \"suppress_tokens\": [1, 2, 7, 8, 9, 10, 14, 25, 26, 27, 28, 29, 31, 58, 59, 60, 61, 62, 63, 90, 91, 92, 93, 357, 366, 438, 532, 685, 705, 796, 930, 1058, 1220, 1267, 1279, 1303, 1343, 1377, 1391, 1635, 1782, 1875, 2162, 2361, 2488, 3467, 4008, 4211, 4600, 4808, 5299, 5855, 6329, 7203, 9609, 9959, 10563, 10786, 11420, 11709, 11907, 13163, 13697, 13700, 14808, 15306, 16410, 16791, 17992, 19203, 19510, 20724, 22305, 22935, 27007, 30109, 30420, 33409, 34949, 40283, 40493, 40549, 47282, 49146, 50257, 50357, 50358, 50359, 50360], \"without_timestamps\": false, \"max_initial_timestamp\": 1.0, \"word_timestamps\": true, \"prepend_punctuations\": \"\\\"'“¿([{-\", \"append_punctuations\": \"\\\"'.。,，!！?？:：”)]}、\", \"multilingual\": false, \"max_new_tokens\": null, \"clip_timestamps\": [0.0], \"hallucination_silence_threshold\": null, \"hotwords\": null}, \"input_sha256\": \"f9495cb6cd1a94a13e916d33ec07bfc5244084ce9ed52a0f91193411ac5ab2af\", \"input_mode\": \"verified_seekable_filelike\", \"input_verification\": {\"initial_full_sha256\": \"passed\", \"final_same_descriptor\": \"passed\", \"read_policy\": \"verify_covering_chunks_before_return\", \"input_mode\": \"verified_seekable_filelike\", \"decoder_read_coverage\": \"not_measured\", \"limits\": {\"max_media_bytes\": 4294967296, \"max_read_bytes\": 1048576, \"verification_chunk_bytes\": 262144}, \"worker_path_reopen\": false, \"worker_media_copy\": false, \"limitations\": [\"byte identity does not establish authenticity, alignment or transcript accuracy\", \"same descriptor and verified read buffers are not filesystem immutability\", \"adapter is trusted to use the supplied stream; input consumption is not attested\"]}, \"word_timing\": {\"schema_version\": 1, \"kind\": \"asr_word_timing\", \"source_time_unit\": \"seconds\", \"anchor_time_unit\": \"milliseconds\", \"anchor_rounding\": \"nearest_ms\", \"source_resolution\": \"as_supplied_by_asr\", \"alignment_verification\": \"not_performed\", \"audio_verification\": \"not_performed\", \"raw_words_modified\": false, \"segments\": [{\"segment_index\": 0, \"word_selection_available\": true, \"word_count\": 17}], \"status\": \"available\", \"coverage_complete\": true, \"total_segments\": 1, \"examined_segments\": 1, \"available_segments\": 1}}"
+  },
+  "verified_reader_acceptance": {
+    "transcript_metadata": {
+      "language_probability": 1,
+      "language_probability_meaning": "language identification probability; not transcript correctness",
+      "transcript_confidence": "unknown",
+      "effective_transcription_options": {
+        "beam_size": 5,
+        "best_of": 5,
+        "patience": 1,
+        "length_penalty": 1,
+        "repetition_penalty": 1,
+        "no_repeat_ngram_size": 0,
+        "log_prob_threshold": -1.0,
+        "no_speech_threshold": 0.6,
+        "compression_ratio_threshold": 2.4,
+        "condition_on_previous_text": true,
+        "prompt_reset_on_temperature": 0.5,
+        "temperatures": [
+          0.0,
+          0.2,
+          0.4,
+          0.6,
+          0.8,
+          1.0
+        ],
+        "initial_prompt": null,
+        "prefix": null,
+        "suppress_blank": true,
+        "suppress_tokens": [
+          1,
+          2,
+          7,
+          8,
+          9,
+          10,
+          14,
+          25,
+          26,
+          27,
+          28,
+          29,
+          31,
+          58,
+          59,
+          60,
+          61,
+          62,
+          63,
+          90,
+          91,
+          92,
+          93,
+          357,
+          366,
+          438,
+          532,
+          685,
+          705,
+          796,
+          930,
+          1058,
+          1220,
+          1267,
+          1279,
+          1303,
+          1343,
+          1377,
+          1391,
+          1635,
+          1782,
+          1875,
+          2162,
+          2361,
+          2488,
+          3467,
+          4008,
+          4211,
+          4600,
+          4808,
+          5299,
+          5855,
+          6329,
+          7203,
+          9609,
+          9959,
+          10563,
+          10786,
+          11420,
+          11709,
+          11907,
+          13163,
+          13697,
+          13700,
+          14808,
+          15306,
+          16410,
+          16791,
+          17992,
+          19203,
+          19510,
+          20724,
+          22305,
+          22935,
+          27007,
+          30109,
+          30420,
+          33409,
+          34949,
+          40283,
+          40493,
+          40549,
+          47282,
+          49146,
+          50257,
+          50357,
+          50358,
+          50359,
+          50360
+        ],
+        "without_timestamps": false,
+        "max_initial_timestamp": 1.0,
+        "word_timestamps": true,
+        "prepend_punctuations": "\"'“¿([{-",
+        "append_punctuations": "\"'.。,，!！?？:：”)]}、",
+        "multilingual": false,
+        "max_new_tokens": null,
+        "clip_timestamps": [
+          0.0
+        ],
+        "hallucination_silence_threshold": null,
+        "hotwords": null
+      },
+      "input_sha256": "f9495cb6cd1a94a13e916d33ec07bfc5244084ce9ed52a0f91193411ac5ab2af",
+      "input_mode": "verified_seekable_filelike",
+      "input_verification": {
+        "initial_full_sha256": "passed",
+        "final_same_descriptor": "passed",
+        "read_policy": "verify_covering_chunks_before_return",
+        "input_mode": "verified_seekable_filelike",
+        "decoder_read_coverage": "not_measured",
+        "limits": {
+          "max_media_bytes": 4294967296,
+          "max_read_bytes": 1048576,
+          "verification_chunk_bytes": 262144
+        },
+        "worker_path_reopen": false,
+        "worker_media_copy": false,
+        "limitations": [
+          "byte identity does not establish authenticity, alignment or transcript accuracy",
+          "same descriptor and verified read buffers are not filesystem immutability",
+          "adapter is trusted to use the supplied stream; input consumption is not attested"
+        ]
+      },
+      "word_timing": {
+        "schema_version": 1,
+        "kind": "asr_word_timing",
+        "source_time_unit": "seconds",
+        "anchor_time_unit": "milliseconds",
+        "anchor_rounding": "nearest_ms",
+        "source_resolution": "as_supplied_by_asr",
+        "alignment_verification": "not_performed",
+        "audio_verification": "not_performed",
+        "raw_words_modified": false,
+        "segments": [
+          {
+            "segment_index": 0,
+            "word_selection_available": true,
+            "word_count": 17
+          }
+        ],
+        "status": "available",
+        "coverage_complete": true,
+        "total_segments": 1,
+        "examined_segments": 1,
+        "available_segments": 1
+      }
+    },
+    "run_provenance": {
+      "artifact_id": 1,
+      "attempt": 1,
+      "input_hash_recorded": "f9495cb6cd1a94a13e916d33ec07bfc5244084ce9ed52a0f91193411ac5ab2af",
+      "input_mode": "verified_seekable_filelike",
+      "input_sha256": "f9495cb6cd1a94a13e916d33ec07bfc5244084ce9ed52a0f91193411ac5ab2af",
+      "input_size_recorded": 173838,
+      "input_verification": {
+        "decoder_read_coverage": "not_measured",
+        "final_same_descriptor": "passed",
+        "initial_full_sha256": "passed",
+        "input_mode": "verified_seekable_filelike",
+        "limitations": [
+          "byte identity does not establish authenticity, alignment or transcript accuracy",
+          "same descriptor and verified read buffers are not filesystem immutability",
+          "adapter is trusted to use the supplied stream; input consumption is not attested"
+        ],
+        "limits": {
+          "max_media_bytes": 4294967296,
+          "max_read_bytes": 1048576,
+          "verification_chunk_bytes": 262144
+        },
+        "read_policy": "verify_covering_chunks_before_return",
+        "worker_media_copy": false,
+        "worker_path_reopen": false
+      },
+      "job_id": 1,
+      "pipeline": "AGEDS transcription worker",
+      "pipeline_version": "unknown",
+      "source_id": 1,
+      "source_locator": "synthetic://n39/flite-slt",
+      "worker_id": "verified-real-asr-smoke"
+    },
+    "same_reader_observed_by_decoder": true,
+    "actual_read_events_observed": 10
+  },
+  "citation": {
+    "id": 1,
+    "artifact_id": 1,
+    "derived_text_id": 1,
+    "start_ms": 0,
+    "end_ms": 1020,
+    "quote_text": " The quick brown",
+    "quote_sha256": "fe4a691ab74d6c5d9973ab11fdcba731d0a57ef825778404938ae5cfb72cd923",
+    "created_at": "2026-10-01 00:30:15",
+    "selector": {
+      "alignment_verification": "not_performed",
+      "kind": "words",
+      "precision": "word_asr",
+      "rounding": "nearest_ms",
+      "source_end": 1.02,
+      "source_start": 0.0,
+      "stored_time_unit": "milliseconds",
+      "text_join": "concatenate_exact",
+      "time_unit": "seconds",
+      "word_refs": [
+        {
+          "segment_index": 0,
+          "word_index": 0
+        },
+        {
+          "segment_index": 0,
+          "word_index": 1
+        },
+        {
+          "segment_index": 0,
+          "word_index": 2
+        }
+      ]
+    },
+    "validation": "matches_stored_transcript_version",
+    "audio_verification": "not_performed"
+  },
+  "export": {
+    "validation": {
+      "valid": true,
+      "digest_valid": true,
+      "relationships_valid": true,
+      "anchors_valid": true,
+      "errors": [],
+      "warnings": [
+        {
+          "code": "unsigned_metadata_only",
+          "path": "$",
+          "message": "Digest is not authentication; source bytes and replay are not included or verified."
+        }
+      ],
+      "counts": {
+        "cases": 1,
+        "sources": 1,
+        "artifacts": 1,
+        "source_observations": 1,
+        "events": 0,
+        "processing_runs": 1,
+        "derived_text": 1,
+        "annotations": 0,
+        "evidence_anchors": 1,
+        "tags": 0,
+        "artifact_tags": 0,
+        "event_tags": 0,
+        "links": 0,
+        "jobs": 1,
+        "audit_log": 6,
+        "schema_migrations": 1
+      }
+    },
+    "archive_receipt": {
+      "archive_schema": "ageds.inert-metadata-archive/v1",
+      "package_schema": "ageds.metadata-package/v1",
+      "package_sha256": "9ce01b2ba52edbe16b9b420342d23ca9346c9738ebe85c4ca56c82f8408bf6bb",
+      "payload_sha256": "2f14b7c4893152c749225dcb839dcd3defd5aae3b9a8659f2ce7c5e33fe6a755",
+      "row_count": 15,
+      "inert": true,
+      "live_restore_supported": false,
+      "jobs_resumed": false,
+      "source_bytes_included": false,
+      "replay_supported": false,
+      "signed": false
+    },
+    "canonical_roundtrip_equal": true,
+    "metadata_sha256": "e9f2e22e5717d7885cd8c33a6a625ab3c76bbb14133f941a4f4c3f1f225c20d1"
+  },
+  "source_unchanged": true,
+  "total_seconds": 4.559936468998785,
+  "finished_at": "2026-10-01T00:30:15.356234+00:00"
+}

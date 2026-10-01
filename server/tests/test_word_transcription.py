@@ -111,16 +111,20 @@ class WorkerWordTimingTests(unittest.TestCase):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name)
-        config = replace(db.settings, db_path=self.root / 'evidence.db')
+        config = replace(db.settings, db_path=self.root / 'evidence.db', store_dir=self.root / 'store')
+        config.store_dir.mkdir()
         patcher = patch.object(db, 'settings', config)
         patcher.start()
         self.addCleanup(patcher.stop)
+        worker_patcher = patch.object(worker, 'settings', config)
+        worker_patcher.start()
+        self.addCleanup(worker_patcher.stop)
         db.init_db()
-        audio = self.root / 'synthetic.wav'
+        audio = config.store_dir / 'synthetic.wav'
         audio.write_bytes(b'not a decoded recording')
         with db.session() as conn:
-            self.aid = conn.execute('INSERT INTO artifacts(original_name,mime_type,stored_path,sha256) VALUES (?,?,?,?)',
-                ('synthetic.wav', 'audio/wav', str(audio), hashlib.sha256(audio.read_bytes()).hexdigest())).lastrowid
+            self.aid = conn.execute('INSERT INTO artifacts(original_name,mime_type,stored_path,sha256,size_bytes) VALUES (?,?,?,?,?)',
+                ('synthetic.wav', 'audio/wav', str(audio), hashlib.sha256(audio.read_bytes()).hexdigest(), audio.stat().st_size)).lastrowid
 
     def run_result(self, data):
         class Adapter:

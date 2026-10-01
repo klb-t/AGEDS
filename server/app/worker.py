@@ -9,10 +9,10 @@ import time
 import traceback
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from pathlib import Path
+from typing import BinaryIO
 from .config import settings
 from .db import init_db, session
-from .evidence import sha256_file
+from .verified_reader import CHUNK_SIZE, MAX_MEDIA_BYTES, MAX_READ_BYTES, VerifiedReader
 from .transcription import word_timing_capabilities
 from .jobs import (DEFAULT_LEASE_SECONDS, LeaseLost, claim_job, finish_job,
                    publish_transcript, renew_lease, update_run_metadata)
@@ -59,14 +59,19 @@ class FasterWhisperAdapter:
                          "model_revision": "unknown", "seed": "unknown"},
         }
 
-    def transcribe(self, path: str) -> TranscriptionResult:
+    def transcribe(self, audio: str | BinaryIO) -> TranscriptionResult:
+        """Exhaust ASR while the caller owns audio's lifetime.
+
+        Low-level direct callers may still supply a path for compatibility. The
+        worker always supplies a verified seekable stream, never a pathname.
+        """
         try:
             from faster_whisper import WhisperModel
         except ImportError as e:
             raise RuntimeError("Install requirements-whisper.txt to enable transcription") from e
         model = WhisperModel(settings.whisper_model, device=settings.whisper_device,
                              compute_type=settings.whisper_compute_type)
-        segments, info = model.transcribe(path, word_timestamps=True, vad_filter=True)
+        segments, info = model.transcribe(audio, word_timestamps=True, vad_filter=True)
         out, texts = [], []
         for segment in segments:
             words = [{"start": _json_number(word.start), "end": _json_number(word.end), "word": word.word,
@@ -116,24 +121,53 @@ def run_transcribe(job: dict, adapter=None) -> int:
         if not artifact:
             raise RuntimeError("artifact missing")
         artifact = dict(artifact)
-    path = Path(artifact["stored_path"])
-    input_sha256 = sha256_file(path)
-    if artifact["sha256"] and artifact["sha256"] != input_sha256:
-        raise RuntimeError("stored artifact SHA-256 mismatch; transcription refused")
     metadata = adapter.describe()
-    metadata.setdefault("provenance", {}).update({"input_sha256": input_sha256,
-        "input_hash_recorded": artifact["sha256"] or "unknown", "source_id": artifact["source_id"],
-        "source_locator": artifact["source_locator"] or "unknown"})
+    verification = {
+        "initial_full_sha256": "not_completed",
+        "final_same_descriptor": "not_performed",
+        "read_policy": "verify_covering_chunks_before_return",
+        "input_mode": "verified_seekable_filelike",
+        "decoder_read_coverage": "not_measured",
+        "limits": {"max_media_bytes": MAX_MEDIA_BYTES, "max_read_bytes": MAX_READ_BYTES,
+                   "verification_chunk_bytes": CHUNK_SIZE},
+        "worker_path_reopen": False,
+        "worker_media_copy": False,
+        "limitations": [
+            "byte identity does not establish authenticity, alignment or transcript accuracy",
+            "same descriptor and verified read buffers are not filesystem immutability",
+            "adapter is trusted to use the supplied stream; input consumption is not attested",
+        ],
+    }
+    provenance = metadata.setdefault("provenance", {})
+    provenance.update({"input_hash_recorded": artifact["sha256"] or "unknown",
+        "input_size_recorded": artifact["size_bytes"], "source_id": artifact["source_id"],
+        "source_locator": artifact["source_locator"] or "unknown",
+        "input_mode": "verified_seekable_filelike", "input_verification": verification})
     update_run_metadata(job, metadata)
-    result = adapter.transcribe(str(path))
-    if sha256_file(path) != input_sha256:
-        raise RuntimeError("stored artifact changed during transcription; result refused")
-    result_metadata = dict(result.metadata)
-    result_metadata["transcript_confidence"] = "unknown"
-    result_metadata["input_sha256"] = input_sha256
-    result_metadata["word_timing"] = word_timing_capabilities(result.segments)
-    return publish_transcript(job, text=result.text, model=metadata.get("model") or "unknown", language=result.language,
-                              segments=result.segments, metadata=result_metadata)
+    # Retain one descriptor across decoding and lazy segment consumption. There
+    # is deliberately no pathname, temporary-file, copy or unverified fallback.
+    with VerifiedReader(artifact["stored_path"], artifact["sha256"], artifact["size_bytes"],
+                        store_root=settings.store_dir) as audio:
+        verification["initial_full_sha256"] = "passed"
+        provenance["input_sha256"] = artifact["sha256"]
+        update_run_metadata(job, metadata)
+        result = adapter.transcribe(audio)
+        try:
+            audio.verify_unchanged()
+        except Exception:
+            verification["final_same_descriptor"] = "failed"
+            update_run_metadata(job, metadata)
+            raise
+        verification["final_same_descriptor"] = "passed"
+        update_run_metadata(job, metadata)
+        result_metadata = dict(result.metadata)
+        result_metadata["transcript_confidence"] = "unknown"
+        result_metadata["input_sha256"] = artifact["sha256"]
+        result_metadata["input_mode"] = "verified_seekable_filelike"
+        result_metadata["input_verification"] = verification
+        result_metadata["word_timing"] = word_timing_capabilities(result.segments)
+        return publish_transcript(job, text=result.text, model=metadata.get("model") or "unknown", language=result.language,
+                                  segments=result.segments, metadata=result_metadata)
 
 def finish(job_id: int, status: str, error: str | None = None, *, lease_token: str | None = None) -> bool:
     if not lease_token:

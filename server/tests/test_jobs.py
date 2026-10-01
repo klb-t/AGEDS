@@ -11,7 +11,8 @@ from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
-from server.app import db
+from server.app import db, worker
+from server.app.verified_media import MediaIntegrityError
 from server.app.jobs import (LeaseLost, claim_job, finish_job, publish_transcript,
                              recover_expired_jobs, renew_lease, update_run_metadata)
 from server.app.transcription import queue_all_audio, queue_transcription
@@ -37,18 +38,22 @@ class JobsTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.path = Path(self.tmp.name)
-        self.settings = replace(db.settings, db_path=self.path / "evidence.db")
+        self.settings = replace(db.settings, db_path=self.path / "evidence.db", store_dir=self.path / "store")
+        self.settings.store_dir.mkdir()
         self.config_patch = patch.object(db, "settings", self.settings)
         self.config_patch.start()
+        self.worker_config_patch = patch.object(worker, "settings", self.settings)
+        self.worker_config_patch.start()
         db.init_db()
-        self.audio = self.path / "fake.wav"
+        self.audio = self.settings.store_dir / "fake.wav"
         self.audio.write_bytes(b"synthetic bytes, not a recording")
         with db.session() as conn:
-            cur = conn.execute("INSERT INTO artifacts(original_name,mime_type,stored_path,sha256) VALUES (?,?,?,?)",
-                               ("fake.wav", "audio/wav", str(self.audio), hashlib.sha256(self.audio.read_bytes()).hexdigest()))
+            cur = conn.execute("INSERT INTO artifacts(original_name,mime_type,stored_path,sha256,size_bytes) VALUES (?,?,?,?,?)",
+                               ("fake.wav", "audio/wav", str(self.audio), hashlib.sha256(self.audio.read_bytes()).hexdigest(), self.audio.stat().st_size))
             self.artifact_id = int(cur.lastrowid)
 
     def tearDown(self):
+        self.worker_config_patch.stop()
         self.config_patch.stop()
         self.tmp.cleanup()
 
@@ -249,8 +254,8 @@ class JobsTests(unittest.TestCase):
     def test_changed_input_is_refused(self):
         job = self.queue_claim()
         adapter = FakeASR()
-        self.audio.write_bytes(b"modified source")
-        with self.assertRaisesRegex(RuntimeError, "SHA-256 mismatch"):
+        self.audio.write_bytes(b"X" * self.audio.stat().st_size)
+        with self.assertRaisesRegex(MediaIntegrityError, "SHA256"):
             process_job(job, adapter)
         self.assertEqual(0, adapter.calls)
         self.assertEqual([], self.rows("derived_text"))

@@ -7,10 +7,10 @@ import kotlinx.coroutines.*
 
 /** All requests capture their endpoint and version before suspension. */
 interface CitationService {
-    suspend fun transcriptVersions(id: Long): List<TranscriptVersion>
+    suspend fun transcriptVersionsPage(id: Long, limit: Int = 100, beforeId: Long? = null, snapshotMaxId: Long? = null): ArtifactPage<TranscriptVersion>
     suspend fun transcript(id: Long, versionId: Long): Transcript?
-    suspend fun citations(id: Long): List<Citation>
-    suspend fun annotations(id: Long): List<EvidenceAnnotation>
+    suspend fun citationsPage(id: Long, limit: Int = 100, beforeId: Long? = null, snapshotMaxId: Long? = null): ArtifactPage<Citation>
+    suspend fun annotationsPage(id: Long, limit: Int = 100, beforeId: Long? = null, snapshotMaxId: Long? = null): ArtifactPage<EvidenceAnnotation>
     suspend fun createCitation(id: Long, request: CitationCreate): Citation
     suspend fun annotate(id: Long, request: AnnotationCreate): EvidenceAnnotation
     fun contentUrl(id: Long): String
@@ -19,14 +19,62 @@ interface CitationService {
 
 private class HttpCitationService(url: String) : CitationService {
     private val api = EvidenceApi(url)
-    override suspend fun transcriptVersions(id: Long) = api.transcriptVersions(id)
+    override suspend fun transcriptVersionsPage(id: Long, limit: Int, beforeId: Long?, snapshotMaxId: Long?) = api.transcriptVersionsPage(id, limit, beforeId, snapshotMaxId)
     override suspend fun transcript(id: Long, versionId: Long) = api.transcript(id, versionId)
-    override suspend fun citations(id: Long) = api.citations(id)
-    override suspend fun annotations(id: Long) = api.annotations(id)
+    override suspend fun citationsPage(id: Long, limit: Int, beforeId: Long?, snapshotMaxId: Long?) = api.citationsPage(id, limit, beforeId, snapshotMaxId)
+    override suspend fun annotationsPage(id: Long, limit: Int, beforeId: Long?, snapshotMaxId: Long?) = api.annotationsPage(id, limit, beforeId, snapshotMaxId)
     override suspend fun createCitation(id: Long, request: CitationCreate) = api.createCitation(id, request)
     override suspend fun annotate(id: Long, request: AnnotationCreate) = api.annotate(id, request)
     override fun contentUrl(id: Long) = api.contentUrl(id)
     override fun close() = api.close()
+}
+
+/** A separate bounded snapshot/cancellation fence for each collection. */
+class CitationPages<T>(
+    private val scope: CoroutineScope,
+    private val idOf: (T) -> Long,
+    private val artifactIdOf: (T) -> Long?,
+) {
+    val items = mutableStateListOf<T>()
+    val loading = mutableStateOf(false)
+    val error = mutableStateOf<String?>(null)
+    val canLoadMore = mutableStateOf(false)
+    val coverage = mutableStateOf("Nie odczytano listy.")
+    private val epoch = RequestEpoch()
+    private var work: Job? = null
+    private var chain: ArtifactPageChain<T>? = null
+
+    fun cancel() { epoch.invalidate(); work?.cancel(); work = null; loading.value = false }
+    fun reset(id: Long?) {
+        cancel(); items.clear(); error.value = null
+        chain = id?.let { ArtifactPageChain(artifactId = it, limit = 100, maxItems = 1000, idOf = idOf, artifactIdOf = artifactIdOf) }
+        canLoadMore.value = id != null; coverage.value = "Nie odczytano listy."
+    }
+    fun load(fetch: suspend (Int, Long?, Long?) -> ArtifactPage<T>, onAccepted: () -> Unit = {}) {
+        val previous = chain ?: return
+        if (loading.value || !previous.canLoadMore) return
+        val token = epoch.invalidate()
+        loading.value = true; error.value = null
+        work = scope.launch {
+            try {
+                val page = fetch(100, previous.nextBeforeId, previous.snapshotMaxId)
+                val next = previous.append(page)
+                if (epoch.accepts(token)) {
+                    chain = next; items.clear(); items.addAll(next.items)
+                    canLoadMore.value = next.canLoadMore
+                    coverage.value = when {
+                        next.reachedClientLimit -> "Pokazano ${items.size} wpisów. Osiągnięto limit klienta 1000; starsze wpisy nie są widoczne. Odświeżenie rozpoczyna nowy snapshot."
+                        next.hasMore -> "Pokazano ${items.size} wpisów; istnieją starsze. Snapshot do ID ${next.snapshotMaxId}."
+                        else -> "Pokazano ${items.size} wpisów — koniec tego snapshotu (do ID ${next.snapshotMaxId}). Nowe wpisy wymagają odświeżenia."
+                    }
+                    onAccepted()
+                }
+            } catch (t: Exception) {
+                if (t is CancellationException) throw t
+                if (epoch.accepts(token)) error.value = "Odczyt strony: ${t.message}. Lista pozostaje częściowa. Spróbuj ponownie lub odśwież widok."
+            } finally { if (epoch.accepts(token)) loading.value = false }
+        }
+    }
 }
 
 class CitationWorkspace(
@@ -35,9 +83,12 @@ class CitationWorkspace(
     private val audio: RangePlaybackController = RangePlaybackController { AndroidRangeAudio() },
 ) {
     val transcript = mutableStateOf<Transcript?>(null)
-    val versions = mutableStateListOf<TranscriptVersion>()
-    val citations = mutableStateListOf<Citation>()
-    val annotations = mutableStateListOf<EvidenceAnnotation>()
+    val versionPages = CitationPages<TranscriptVersion>(scope, { it.id }, { it.artifactId })
+    val citationPages = CitationPages<Citation>(scope, { it.id }, { it.artifactId })
+    val annotationPages = CitationPages<EvidenceAnnotation>(scope, { it.id }, { it.artifactId })
+    val versions get() = versionPages.items
+    val citations get() = citationPages.items
+    val annotations get() = annotationPages.items
     val preview = mutableStateOf<SelectedCitation?>(null)
     val busy = mutableStateOf(false)
     val error = mutableStateOf<String?>(null)
@@ -50,13 +101,15 @@ class CitationWorkspace(
 
     fun stopAudio() { audio.stop(); audioStatus.value = audio.status }
     fun tickAudio() { audio.tick(); audioStatus.value = audio.status }
+    private fun cancelPages() { versionPages.cancel(); citationPages.cancel(); annotationPages.cancel() }
+    private fun resetPages(id: Long?) { versionPages.reset(id); citationPages.reset(id); annotationPages.reset(id) }
     fun deactivate() {
-        epoch.invalidate(); work?.cancel(); work = null; busy.value = false; stopAudio()
+        epoch.invalidate(); work?.cancel(); work = null; busy.value = false; stopAudio(); cancelPages()
     }
     fun clear() {
         epoch.invalidate(); work?.cancel(); work = null
         stopAudio(); api?.close(); api = null; artifactId = null
-        transcript.value = null; versions.clear(); citations.clear(); annotations.clear()
+        transcript.value = null; resetPages(null)
         preview.value = null; busy.value = false; error.value = null; message.value = null
     }
 
@@ -64,33 +117,56 @@ class CitationWorkspace(
         clear()
         artifactId = id
         api = serviceFactory(serverUrl)
-        load(null)
+        refresh()
     }
 
-    fun load(versionId: Long?) {
+    /** Explicit refresh resets all three collection snapshots, retaining the selected version. */
+    fun refresh() {
+        val server = api ?: return
+        val id = artifactId ?: return
+        val pinnedId = transcript.value?.id
+        deactivate(); resetPages(id)
+        transcript.value = null; preview.value = null; error.value = null; message.value = null
+        versionPages.load({ limit, before, snapshot -> server.transcriptVersionsPage(id, limit, before, snapshot) }) {
+            readTranscript(pinnedId ?: versions.firstOrNull()?.id, cancelPaging = false)
+        }
+        loadOlderCitations(); loadOlderAnnotations()
+    }
+
+    fun loadOlderVersions() {
+        val server = api ?: return
+        val id = artifactId ?: return
+        versionPages.load({ limit, before, snapshot -> server.transcriptVersionsPage(id, limit, before, snapshot) }) {
+            if (transcript.value == null && !busy.value) readTranscript(versions.firstOrNull()?.id, cancelPaging = false)
+        }
+    }
+    fun loadOlderCitations() {
+        val server = api ?: return
+        val id = artifactId ?: return
+        citationPages.load({ limit, before, snapshot -> server.citationsPage(id, limit, before, snapshot) })
+    }
+    fun loadOlderAnnotations() {
+        val server = api ?: return
+        val id = artifactId ?: return
+        annotationPages.load({ limit, before, snapshot -> server.annotationsPage(id, limit, before, snapshot) })
+    }
+
+    fun load(versionId: Long?) = readTranscript(versionId ?: versions.firstOrNull()?.id, cancelPaging = true)
+
+    private fun readTranscript(versionId: Long?, cancelPaging: Boolean) {
         val server = api ?: return
         val id = artifactId ?: return
         val token = epoch.invalidate()
         work?.cancel(); stopAudio()
+        if (cancelPaging) cancelPages()
         preview.value = null; transcript.value = null; error.value = null; message.value = null
+        if (versionId == null) { busy.value = false; return }
         busy.value = true
         work = scope.launch {
             try {
-                val listed = server.transcriptVersions(id)
-                require(listed.all { it.artifactId == id }) { "Lista wersji wskazuje inny artefakt" }
-                val pinnedId = versionId ?: listed.firstOrNull()?.id
-                val text = if (pinnedId == null) null else server.transcript(id, pinnedId)
-                require(text == null || (text.id == pinnedId && text.artifactId == id)) { "Odpowiedź nie wskazuje wybranej wersji" }
-                val saved = server.citations(id)
-                require(saved.all { it.artifactId == id }) { "Lista cytatów wskazuje inny artefakt" }
-                val notes = server.annotations(id)
-                require(notes.all { it.artifactId == id }) { "Lista adnotacji wskazuje inny artefakt" }
-                if (epoch.accepts(token)) {
-                    versions.clear(); versions.addAll(listed)
-                    transcript.value = text
-                    citations.clear(); citations.addAll(saved)
-                    annotations.clear(); annotations.addAll(notes)
-                }
+                val text = server.transcript(id, versionId)
+                require(text != null && text.id == versionId && text.artifactId == id) { "Odpowiedź nie wskazuje wybranej wersji" }
+                if (epoch.accepts(token)) transcript.value = text
             } catch (t: Exception) {
                 if (t is CancellationException) throw t
                 if (epoch.accepts(token)) error.value = "Odczyt wersji: ${t.message}"
@@ -100,7 +176,7 @@ class CitationWorkspace(
 
     fun select(indices: List<Int>, words: List<WordRef>? = null) {
         // A changed selection invalidates an outstanding save's UI response as well.
-        epoch.invalidate(); work?.cancel(); busy.value = false; stopAudio()
+        epoch.invalidate(); work?.cancel(); busy.value = false; stopAudio(); cancelPages()
         error.value = null; message.value = null
         preview.value = try {
             val text = transcript.value ?: return
@@ -110,7 +186,7 @@ class CitationWorkspace(
 
     fun clearSelection() {
         epoch.invalidate(); work?.cancel(); busy.value = false
-        preview.value = null; stopAudio(); error.value = null
+        preview.value = null; stopAudio(); error.value = null; cancelPages()
     }
 
     fun save() {
@@ -127,7 +203,7 @@ class CitationWorkspace(
                     "Odpowiedź zapisu nie odpowiada wybranemu cytatowi"
                 }
                 if (epoch.accepts(token)) {
-                    citations.add(0, saved)
+                    citationPages.reset(selected.artifactId); loadOlderCitations()
                     message.value = "Zapisano cytat #${saved.id}, wersja #${saved.derivedTextId}."
                 }
             } catch (t: Exception) {
@@ -153,7 +229,11 @@ class CitationWorkspace(
                 saved.startMs == selected?.startMs && saved.endMs == selected?.endMs) {
                 "Odpowiedź zapisu nie odpowiada wybranej adnotacji"
             }
-            if (epoch.accepts(token)) { annotations.add(0, saved); true } else false
+            if (epoch.accepts(token)) {
+                annotationPages.reset(id); loadOlderAnnotations()
+                message.value = "Zapisano adnotację #${saved.id}; odświeżono snapshot adnotacji."
+                true
+            } else false
         } catch (t: Exception) {
             if (t is CancellationException) throw t
             if (epoch.accepts(token)) error.value = "Zapis adnotacji: ${t.message}"

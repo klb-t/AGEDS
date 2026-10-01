@@ -173,3 +173,14 @@ data class Citation(
     val validation: String? = null,
     @SerialName("audio_verification") val audioVerification: String? = null,
 )
+
+/** Bounded descending-ID snapshot page; item wire shapes remain endpoint-specific. */
+@Serializable
+data class ArtifactPage<T>(
+    val artifactId: Long,
+    val items: List<T>,
+    val nextBeforeId: Long?,
+    val snapshotMaxId: Long,
+    val hasMore: Boolean,
+    val limit: Int,
+)

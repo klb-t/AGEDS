@@ -34,7 +34,9 @@ fun ColumnScope.CitationPane(artifact: ArtifactSummary, workspace: CitationWorks
         onDispose { lifecycle.removeObserver(observer); workspace.deactivate() }
     }
     LaunchedEffect(workspace) {
-        if (workspace.transcript.value == null && !workspace.busy.value) workspace.load(null)
+        if (workspace.transcript.value == null && !workspace.busy.value && !workspace.versionPages.loading.value) {
+            if (workspace.versions.isEmpty()) workspace.loadOlderVersions() else workspace.load(null)
+        }
         while (true) { workspace.tickAudio(); delay(100) } }
     val wordDisplay = remember(transcript) { CitationDisplayProjection.words(transcript) }
     val flatWords = wordDisplay.words
@@ -50,13 +52,16 @@ fun ColumnScope.CitationPane(artifact: ArtifactSummary, workspace: CitationWorks
     Row {
         TextButton(onClick = onBack) { Text("← Lista") }
         Text(artifact.originalName, modifier = Modifier.weight(1f), fontWeight = FontWeight.Bold)
-        TextButton(onClick = { workspace.load(transcript?.id) }, enabled = !workspace.busy.value) { Text("Odśwież") }
+        TextButton(onClick = workspace::refresh, enabled = !workspace.busy.value) { Text("Odśwież") }
     }
     workspace.error.value?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     workspace.message.value?.let { Text(it) }
     if (workspace.busy.value) LinearProgressIndicator(Modifier.fillMaxWidth())
     LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        item { Text("Wersje transkrypcji", fontWeight = FontWeight.Bold) }
+        item {
+            Text("Wersje transkrypcji", fontWeight = FontWeight.Bold)
+            CitationPageControls(workspace.versionPages, workspace::loadOlderVersions)
+        }
         items(workspace.versions, key = { "version-${it.id}" }) { version ->
             TextButton(onClick = { workspace.load(version.id) }) {
                 Text("${if (transcript?.id == version.id) "✓ " else ""}#${version.id} · ${version.model ?: "model nieznany"} · ${version.createdAt ?: "czas nieznany"}")
@@ -101,6 +106,7 @@ fun ColumnScope.CitationPane(artifact: ArtifactSummary, workspace: CitationWorks
         } }
         item {
             HorizontalDivider(); Text("Zapisane cytaty — wszystkie wersje", fontWeight = FontWeight.Bold)
+            CitationPageControls(workspace.citationPages, workspace::loadOlderCitations)
             Text("Odsłuch jest przybliżony (seek odtwarzacza / granice ASR), bez potwierdzenia alignmentu.", style = MaterialTheme.typography.bodySmall)
             Text(workspace.audioStatus.value)
             TextButton(onClick = workspace::stopAudio) { Text("Zatrzymaj audio") }
@@ -110,7 +116,10 @@ fun ColumnScope.CitationPane(artifact: ArtifactSummary, workspace: CitationWorks
             Text(citation.quoteText)
             TextButton(onClick = { workspace.play(citation) }) { Text("Odtwórz zapisany zakres") }
         }
-        item { HorizontalDivider(); Text("Oddzielne adnotacje", fontWeight = FontWeight.Bold) }
+        item {
+            HorizontalDivider(); Text("Oddzielne adnotacje", fontWeight = FontWeight.Bold)
+            CitationPageControls(workspace.annotationPages, workspace::loadOlderAnnotations)
+        }
         items(workspace.annotations, key = { "note-${it.id}" }) { annotation ->
             Text(annotation.body)
             Text("Wersja #${annotation.derivedTextId ?: "nieprzypięta"} · ${annotation.startMs ?: "—"}–${annotation.endMs ?: "—"} ms", style = MaterialTheme.typography.bodySmall)
@@ -119,5 +128,15 @@ fun ColumnScope.CitationPane(artifact: ArtifactSummary, workspace: CitationWorks
             OutlinedTextField(note, { note = it }, label = { Text("Adnotacja do wyświetlonej wersji / zakresu") }, enabled = !workspace.busy.value, modifier = Modifier.fillMaxWidth())
             Button(onClick = { scope.launch { if (workspace.addNote(note)) note = "" } }, enabled = !workspace.busy.value && note.isNotBlank()) { Text("Zapisz adnotację") }
         }
+    }
+}
+
+@Composable
+private fun <T> CitationPageControls(pages: CitationPages<T>, onMore: () -> Unit) {
+    Text(pages.coverage.value, style = MaterialTheme.typography.bodySmall)
+    pages.error.value?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+    if (pages.loading.value) Text("Wczytywanie strony…", style = MaterialTheme.typography.bodySmall)
+    TextButton(onClick = onMore, enabled = pages.canLoadMore.value && !pages.loading.value) {
+        Text(if (pages.items.isEmpty()) "Wczytaj listę" else "Wczytaj starsze")
     }
 }

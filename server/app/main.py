@@ -15,6 +15,7 @@ from .citations import anchor_payload, create_citation, loads_transcript_segment
 from .importers.sms_backup import import_sms_backup
 from .importers.whatsapp import import_whatsapp_txt
 from .search import SearchQueryError, SearchWorkLimitError, search_page
+from .read_pages import PageInputError, PageNotFound, PageStoredError, PageLimitError, read_page
 from .verified_media import MediaUnavailable, MediaIntegrityError, MediaLimitError, verified_media_response
 from .transcription import queue_all_audio, queue_transcription, word_timing_capabilities
 
@@ -141,11 +142,17 @@ def artifact(request:Request,artifact_id:SqlPathId):
     with session() as db:
         art=db.execute("SELECT a.*,s.kind source_kind,s.label source_label FROM artifacts a LEFT JOIN sources s ON s.id=a.source_id WHERE a.id=?",(artifact_id,)).fetchone()
         if not art:raise HTTPException(404)
-        texts=[dict(r) for r in db.execute("SELECT * FROM derived_text WHERE artifact_id=? ORDER BY id DESC",(artifact_id,))]
-        anns=[dict(r) for r in db.execute("SELECT * FROM annotations WHERE artifact_id=? ORDER BY id DESC",(artifact_id,))]
-        events=[dict(r) for r in db.execute("SELECT * FROM events WHERE artifact_id=? ORDER BY ts_start",(artifact_id,))]
-        citations=[dict(r) for r in db.execute('SELECT * FROM evidence_anchors WHERE artifact_id=? ORDER BY id DESC',(artifact_id,))]
-    return templates.TemplateResponse(request,'artifact.html',{'a':dict(art),'texts':texts,'annotations':anns,'events':events,'citations':citations})
+        previews=[dict(r) for r in db.execute("SELECT id,kind,model,language,substr(text,1,4096) AS text,length(text)>4096 AS text_truncated FROM derived_text WHERE artifact_id=? AND kind!='transcript' ORDER BY id DESC LIMIT 51",(artifact_id,))]
+        events=[dict(r) for r in db.execute("SELECT id,ts_start,event_type,direction,contact_label,phone_or_address,substr(body,1,4096) AS body,substr(subject,1,4096) AS subject FROM events WHERE artifact_id=? ORDER BY ts_start LIMIT 101",(artifact_id,))]
+    version_page = _read_page_http(artifact_id, 'transcripts')
+    citation_page = _read_page_http(artifact_id, 'citations')
+    annotation_page = _read_page_http(artifact_id, 'annotations')
+    return templates.TemplateResponse(request,'artifact.html',{
+        'a':dict(art),'texts':previews[:50],'text_previews_more':len(previews)>50,
+        'annotations':annotation_page['items'],'events':events[:100],'events_more':len(events)>100,
+        'citations':citation_page['items'],'version_page':version_page,
+        'citation_page':citation_page,'annotation_page':annotation_page})
+
 
 @app.post('/artifact/{artifact_id}/annotate')
 def annotate(artifact_id:SqlPathId,body:str=Form(...),label:str=Form(''),kind:str=Form('note'),start_ms:int|None=Form(None,ge=0,le=MAX_SQL_INTEGER),end_ms:int|None=Form(None,ge=0,le=MAX_SQL_INTEGER),derived_text_id:str|None=Form(None)):
@@ -313,6 +320,39 @@ def api_transcript(artifact_id:SqlPathId,derived_text_id:int|None=Query(None,ge=
             return payload
         except (ValueError, TypeError, UnicodeError) as exc:
             raise HTTPException(409, 'Stored transcript has malformed or nonfinite JSON; original values remain preserved in metadata export.') from exc
+
+
+def _read_page_http(artifact_id, kind, *, limit=50, before_id=None, snapshot_max_id=None):
+    try:
+        return read_page(artifact_id, kind, limit=limit, before_id=before_id, snapshot_max_id=snapshot_max_id)
+    except PageInputError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except PageNotFound as exc:
+        raise HTTPException(404, 'artifact not found') from exc
+    except PageStoredError as exc:
+        raise HTTPException(409, 'Stored list metadata is invalid; original records remain unchanged.') from exc
+    except PageLimitError as exc:
+        raise HTTPException(413, 'List page exceeds the read budget; original records remain unchanged.') from exc
+    except (OSError, sqlite3.Error) as exc:
+        raise HTTPException(503, 'Evidence database is unavailable for read-only listing.') from exc
+
+@app.get('/api/artifacts/{artifact_id}/transcripts/page')
+def api_transcript_page(artifact_id:SqlPathId, limit:int=Query(50,ge=1,le=100),
+                        before_id:int|None=Query(None,ge=1,le=MAX_SQL_INTEGER),
+                        snapshot_max_id:int|None=Query(None,ge=0,le=MAX_SQL_INTEGER)):
+    return _read_page_http(artifact_id,'transcripts',limit=limit,before_id=before_id,snapshot_max_id=snapshot_max_id)
+
+@app.get('/api/artifacts/{artifact_id}/citations/page')
+def api_citation_page(artifact_id:SqlPathId, limit:int=Query(50,ge=1,le=100),
+                      before_id:int|None=Query(None,ge=1,le=MAX_SQL_INTEGER),
+                      snapshot_max_id:int|None=Query(None,ge=0,le=MAX_SQL_INTEGER)):
+    return _read_page_http(artifact_id,'citations',limit=limit,before_id=before_id,snapshot_max_id=snapshot_max_id)
+
+@app.get('/api/artifacts/{artifact_id}/annotations/page')
+def api_annotation_page(artifact_id:SqlPathId, limit:int=Query(50,ge=1,le=100),
+                        before_id:int|None=Query(None,ge=1,le=MAX_SQL_INTEGER),
+                        snapshot_max_id:int|None=Query(None,ge=0,le=MAX_SQL_INTEGER)):
+    return _read_page_http(artifact_id,'annotations',limit=limit,before_id=before_id,snapshot_max_id=snapshot_max_id)
 
 @app.get('/api/artifacts/{artifact_id}/transcripts')
 def api_transcript_versions(artifact_id:SqlPathId):

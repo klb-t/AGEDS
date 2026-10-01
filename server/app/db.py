@@ -153,6 +153,8 @@ CREATE VIRTUAL TABLE IF NOT EXISTS search_fts USING fts5(
 );
 
 CREATE INDEX IF NOT EXISTS idx_artifacts_sha ON artifacts(sha256);
+CREATE INDEX IF NOT EXISTS idx_derived_artifact_kind_id ON derived_text(artifact_id,kind,id);
+CREATE INDEX IF NOT EXISTS idx_annotations_artifact_id ON annotations(artifact_id,id);
 CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts_start);
 CREATE INDEX IF NOT EXISTS idx_events_phone ON events(phone_or_address);
 CREATE INDEX IF NOT EXISTS idx_events_thread ON events(thread_id);
@@ -262,6 +264,7 @@ CREATE TABLE IF NOT EXISTS evidence_anchors (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_anchors_version ON evidence_anchors(derived_text_id, id);
+CREATE INDEX IF NOT EXISTS idx_anchors_artifact_id ON evidence_anchors(artifact_id,id);
 CREATE TRIGGER IF NOT EXISTS evidence_anchors_no_update
   BEFORE UPDATE ON evidence_anchors BEGIN
     SELECT RAISE(ABORT, 'evidence anchors are append-only');

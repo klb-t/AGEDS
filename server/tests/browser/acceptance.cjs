@@ -17,7 +17,7 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
   let stderr = ''; server.stderr.on('data', d => stderr += d);
   let browser;
   const fingerprint = file => createHash('sha256').update(fs.readFileSync(path.join(repo, file))).digest('hex');
-  const receipt = {git_head: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: repo, encoding: 'utf8'}).trim(), playwright: require('playwright/package.json').version, source_sha256: Object.fromEntries(['server/app/main.py', 'server/app/db.py', 'server/app/static/citations.mjs', 'server/app/static/range-player.mjs', 'server/app/templates/artifact.html', 'server/app/templates/index.html', 'server/app/exchange.py', 'server/app/exchange_consumer.py', 'server/app/verified_media.py', 'server/app/search.py', 'server/tests/browser/acceptance.cjs', 'server/tests/browser_fixture.py'].map(file => [file, fingerprint(file)])), task: 'AGEDS-20261001-N28-browser', baseline_task: 'AGEDS-20261001-N12', started_at: new Date().toISOString(), fixture: 'generated 4s mono PCM WAV; temporary SQLite; synthetic transcript versions', cases: []};
+  const receipt = {git_head: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: repo, encoding: 'utf8'}).trim(), playwright: require('playwright/package.json').version, source_sha256: Object.fromEntries(['server/app/main.py', 'server/app/db.py', 'server/app/static/citations.mjs', 'server/app/static/range-player.mjs', 'server/app/templates/artifact.html', 'server/app/templates/index.html', 'server/app/exchange.py', 'server/app/exchange_consumer.py', 'server/app/verified_media.py', 'server/app/search.py', 'server/app/read_pages.py', 'server/tests/browser/acceptance.cjs', 'server/tests/browser_fixture.py'].map(file => [file, fingerprint(file)])), task: 'AGEDS-20261001-N35-browser', baseline_task: 'AGEDS-20261001-N12', started_at: new Date().toISOString(), fixture: 'generated 4s mono PCM WAV; temporary SQLite; synthetic transcript versions', cases: []};
   try {
     const fixture = await new Promise((resolve, reject) => {
       let buf = ''; server.stdout.on('data', d => {buf += d; if (buf.includes('\n')) {try {resolve(JSON.parse(buf.split('\n')[0]));} catch(e) {reject(e);}}});
@@ -263,6 +263,52 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
         assert.equal(await sel('preview').textContent(), '');
         await page.unroute(pattern);
       }
+    });
+    await test('paged versions preserve selected pin across delayed older load', async () => {
+      await page.goto(`${base}/artifact/${fixture.historyArtifact}`);
+      await version(fixture.historyVersions.at(-1));
+      assert.equal(await sel('version').locator('option').count(), 50);
+      const more = page.locator('[data-history-more="versions"]');
+      let entered, release; const arrived = new Promise(r => entered = r), held = new Promise(r => release = r);
+      const pattern = '**/transcripts/page?*';
+      await page.route(pattern, async route => {const response = await route.fetch(); entered(); await held; await route.fulfill({response});});
+      await more.click(); await arrived; const pinned = fixture.historyVersions.at(-3); await version(pinned); release();
+      await page.waitForFunction(() => document.querySelector('[data-version]').options.length === 100);
+      assert.equal(await sel('version').inputValue(), String(pinned));
+      assert.match(await sel('status').textContent(), new RegExp(`Wersja #${pinned}\\.`));
+      await page.unroute(pattern); await more.click();
+      await page.waitForFunction(() => document.querySelector('[data-version]').options.length === 125);
+      assert.ok(await more.isDisabled());
+      await version(fixture.historyVersions[0]);
+      assert.ok((await page.locator('[data-transcript-text]').textContent()).includes(' History 0 '));
+      assert.equal(await page.locator('img').count(), 0);
+    });
+    await test('citation and annotation pages expose all 125 rows without duplicates or source HTML', async () => {
+      for (const [name, target] of [['citations', '[data-saved]'], ['annotations', '[data-annotation-history]']]) {
+        assert.equal(await page.locator(`${target} article`).count(), 50);
+        const button = page.locator(`[data-history-more="${name}"]`);
+        await button.click(); await page.waitForFunction(target => document.querySelectorAll(`${target} article`).length === 100, target);
+        await button.click(); await page.waitForFunction(target => document.querySelectorAll(`${target} article`).length === 125, target);
+        assert.ok(await button.isDisabled());
+        assert.match(await page.locator(`[data-history-status="${name}"]`).textContent(), /Koniec historii/);
+      }
+      const ids = await page.locator('[data-saved] [data-citation-play]').evaluateAll(items => items.map(item => item.dataset.citationId));
+      assert.equal(new Set(ids).size, 125);
+      assert.equal(await page.locator('img').count(), 0);
+      assert.equal(await page.evaluate(() => window.__sourceExecuted), undefined);
+      receipt.history_pages = {versions: 125, citations: 125, annotations: 125, initial_limit: 50};
+    });
+    await test('mismatched history snapshot is rejected without adding rows', async () => {
+      await page.goto(`${base}/artifact/${fixture.historyArtifact}`); await version(fixture.historyVersions.at(-1));
+      const pattern = '**/citations/page?*';
+      await page.route(pattern, async route => {
+        const response = await route.fetch(), body = await response.json(); body.snapshotMaxId += 1;
+        await route.fulfill({response, json: body});
+      });
+      await page.locator('[data-history-more="citations"]').click();
+      await page.waitForFunction(() => document.querySelector('[data-history-status="citations"]').textContent.includes('Nic nie dodano'));
+      assert.equal(await page.locator('[data-saved] article').count(), 50);
+      await page.unroute(pattern);
     });
     assert.deepEqual(pageErrors, []); receipt.page_errors = pageErrors; receipt.status = 'passed';
   } catch (error) {receipt.status = 'failed'; receipt.error = error.stack; process.exitCode = 1; console.error(error);}

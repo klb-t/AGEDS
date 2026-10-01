@@ -40,6 +40,87 @@ export function validatePacketPath(path, artifactId, citationId) {
   return path;
 }
 
+export const HISTORY_CAP = 1000;
+const PAGE_KEYS = ['artifactId', 'items', 'nextBeforeId', 'snapshotMaxId', 'hasMore', 'limit'];
+const pageError = () => new Error('Nieprawidłowa strona historii: identyfikatory, kolejność lub kursor nie są zgodne. Nic nie dodano.');
+
+export function validateHistoryItem(item, kind, artifactId) {
+  if (!item || typeof item !== 'object' || Array.isArray(item)) throw pageError();
+  requireApiId(item.id);
+  const owner = kind === 'annotations' ? item.artifactId : item.artifact_id;
+  if (requireApiId(owner) !== requireApiId(artifactId)) throw pageError();
+  if (kind === 'versions') {
+    if (item.run_id !== null) requireApiId(item.run_id);
+    if (typeof item.created_at !== 'string' || ![item.model, item.language].every(x => x === null || typeof x === 'string')) throw pageError();
+    if ('text' in item || 'segments' in item || 'segments_json' in item) throw pageError();
+  } else if (kind === 'citations') {
+    validateCitationIdentity(item, artifactId, item.derived_text_id);
+    if (typeof item.quote_text !== 'string' || !Number.isSafeInteger(item.start_ms) || !Number.isSafeInteger(item.end_ms) || item.start_ms < 0 || item.end_ms < item.start_ms) throw pageError();
+  } else if (kind === 'annotations') {
+    if (item.derivedTextId !== null) requireApiId(item.derivedTextId);
+    if (![item.kind, item.body, item.createdAt].every(x => typeof x === 'string') || !(item.label === null || typeof item.label === 'string')) throw pageError();
+    if (item.startMs !== null || item.endMs !== null) {
+      if (!Number.isSafeInteger(item.startMs) || !Number.isSafeInteger(item.endMs) || item.startMs < 0 || item.endMs < item.startMs) throw pageError();
+    }
+  } else throw pageError();
+  return item;
+}
+
+export function validateHistoryPage(body, {kind, artifactId, beforeId = null, snapshotMaxId, limit, seen = new Set()}) {
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== PAGE_KEYS.length || PAGE_KEYS.some(key => !Object.hasOwn(body, key))) throw pageError();
+  if (requireApiId(body.artifactId) !== requireApiId(artifactId) || typeof body.hasMore !== 'boolean' || !Number.isSafeInteger(body.limit) || body.limit < 1 || body.limit > 100 || (limit !== undefined && body.limit !== limit)) throw pageError();
+  if (!Array.isArray(body.items) || body.items.length > body.limit) throw pageError();
+  if (body.snapshotMaxId !== 0) requireApiId(body.snapshotMaxId);
+  if (snapshotMaxId !== undefined && body.snapshotMaxId !== snapshotMaxId) throw pageError();
+  if (beforeId !== null) requireApiId(beforeId);
+  let previous = beforeId;
+  for (const item of body.items) {
+    validateHistoryItem(item, kind, artifactId);
+    if (body.snapshotMaxId === 0 || item.id > body.snapshotMaxId || (previous !== null && item.id >= previous) || seen.has(item.id)) throw pageError();
+    previous = item.id;
+  }
+  if (body.hasMore) {
+    if (!body.items.length || requireApiId(body.nextBeforeId) !== body.items.at(-1).id) throw pageError();
+  } else if (body.nextBeforeId !== null) throw pageError();
+  if (body.snapshotMaxId === 0 && (body.items.length || body.hasMore)) throw pageError();
+  return body;
+}
+
+/** Stateful but DOM-independent cursor ownership; all pages validate before mutation. */
+export function createHistoryPager(kind, artifactId, initial) {
+  requireApiId(artifactId);
+  validateHistoryPage(initial, {kind, artifactId});
+  const seen = new Set(initial.items.map(item => item.id));
+  let cursor = initial.nextBeforeId, more = initial.hasMore, token = 0, active = null, closed = false;
+  const snapshot = initial.snapshotMaxId;
+  return {
+    get count() { return seen.size; },
+    get capped() { return more && seen.size >= HISTORY_CAP; },
+    get hasMore() { return more; },
+    get busy() { return active !== null; },
+    begin() {
+      if (closed || active !== null || !more || seen.size >= HISTORY_CAP) return null;
+      active = Object.freeze({token: ++token, beforeId: cursor, snapshotMaxId: snapshot, limit: Math.min(initial.limit, HISTORY_CAP - seen.size)});
+      return active;
+    },
+    accept(request, page) {
+      if (closed || active !== request) return null;
+      validateHistoryPage(page, {kind, artifactId, beforeId: request.beforeId, snapshotMaxId: snapshot, limit: request.limit, seen});
+      if (seen.size + page.items.length > HISTORY_CAP) throw pageError();
+      for (const item of page.items) seen.add(item.id);
+      cursor = page.nextBeforeId; more = page.hasMore; active = null;
+      return page.items;
+    },
+    fail(request) { if (active === request) active = null; },
+    addNew(item) {
+      validateHistoryItem(item, kind, artifactId);
+      if (seen.has(item.id) || seen.size >= HISTORY_CAP) return false;
+      seen.add(item.id); return true;
+    },
+    close() { closed = true; active = null; token += 1; },
+  };
+}
+
 const root = typeof document === 'undefined' ? null : document.querySelector('[data-citation-workspace]');
 if (root) {
   const $ = name => root.querySelector(`[data-${name}]`);
@@ -47,6 +128,8 @@ if (root) {
   const preview = $('preview'), status = $('status'), save = $('save'), play = $('play');
   const audio = document.querySelector('[data-evidence-audio]');
   const player = audio ? createRangePlayer(audio) : null;
+  const historyPagers = new Map(), historyControllers = new Set();
+  let historyClosed = false;
   let transcript = null, units = [], generation = 0, playGeneration = 0, controller = null, saving = false;
   function stopPlayback() { playGeneration += 1; player?.stop(); }
   function show(message) { status.textContent = message; }
@@ -149,7 +232,7 @@ if (root) {
   async function load() {
     const request = ++generation;
     controller?.abort(); controller = new AbortController();
-    transcript = null; populate();
+    transcript = null; document.querySelector('[data-transcript-text]').textContent = ''; populate();
     if (!version.value) return;
     show('Wczytuję wskazaną wersję…');
     try {
@@ -158,7 +241,8 @@ if (root) {
       if (!response.ok) throw new Error(`Odczyt wersji: HTTP ${response.status}`);
       const body = await response.json();
       if (request !== generation) return;
-      transcript = validateTranscriptIdentity(body, identity.artifactId, identity.transcriptId); populate();
+      transcript = validateTranscriptIdentity(body, identity.artifactId, identity.transcriptId);
+      document.querySelector('[data-transcript-text]').textContent = typeof transcript.text === 'string' ? transcript.text : ''; populate();
     } catch (error) { if (request === generation && error.name !== 'AbortError') show(error.message); }
   }
   version.addEventListener('change', load);
@@ -194,24 +278,112 @@ if (root) {
       validateCitationIdentity(result, identity.artifactId, pinnedId, body.quoteText);
       if (parseDomId(root.dataset.artifactId) !== identity.artifactId) throw new Error('Artefakt widoku zmienił się podczas zapisu. Operację wstrzymano.');
       if (request === generation) show(`Zapisano cytat #${result.id}, wersja #${pinnedId}, ${result.start_ms}–${result.end_ms} ms. Zgodność z transkryptem sprawdzona; odsłuch nie został potwierdzony.`);
-      const article = document.createElement('article');
-      const label = document.createElement('small');
-      label.textContent = `Cytat #${result.id} · transkrypt #${pinnedId} · ${result.start_ms}–${result.end_ms} ms`;
-      const quote = document.createElement('p'); quote.className = 'transcript'; quote.textContent = result.quote_text;
-      const replay = document.createElement('button'); replay.type = 'button';
-      replay.dataset.citationPlay = ''; replay.dataset.citationId = String(result.id);
-      replay.dataset.derivedTextId = String(pinnedId);
-      replay.dataset.startMs = String(result.start_ms); replay.dataset.endMs = String(result.end_ms);
-      replay.textContent = 'Odtwórz zapisany cytat'; replay.disabled = !player || !savedBounds(replay);
-      const packet = document.createElement('a');
-      packet.href = `/api/artifacts/${identity.artifactId}/citations/${result.id}/packet`;
-      packet.textContent = 'Pobierz metadane cytatu';
-      packet.title = 'Pakiet zawiera pełną przypiętą wersję transkryptu i zapisane pochodzenie, bez nagrania.';
-      packet.dataset.citationPacket = '';
-      article.append(label, quote, replay, packet); $('saved').prepend(article);
+      const pager = historyPagers.get('citations');
+      if (!pager || !pager.addNew(result)) {
+        show(`Zapisano cytat #${result.id}. Lista osiągnęła limit ${HISTORY_CAP} lub cytat już jest widoczny; odśwież widok, aby wczytać najnowsze cytaty.`);
+      } else {
+        $('saved').prepend(citationArticle(result));
+      }
+      refreshHistory('citations');
     } catch (error) { if (request === generation) show(error.message); }
     finally { saving = false; refresh(); }
   });
-  window.addEventListener('pagehide', () => { controller?.abort(); player?.destroy(); });
+  function citationArticle(result) {
+    const identity = {artifactId: parseDomId(root.dataset.artifactId), citationId: requireApiId(result.id)};
+    validateHistoryItem(result, 'citations', identity.artifactId);
+    const article = document.createElement('article');
+    const label = document.createElement('small');
+    label.textContent = `Cytat #${result.id} · transkrypt #${result.derived_text_id} · ${result.start_ms}–${result.end_ms} ms`;
+    const quote = document.createElement('p'); quote.className = 'transcript'; quote.textContent = result.quote_text;
+    const replay = document.createElement('button'); replay.type = 'button';
+    replay.dataset.citationPlay = ''; replay.dataset.citationId = String(result.id);
+    replay.dataset.derivedTextId = String(result.derived_text_id);
+    replay.dataset.startMs = String(result.start_ms); replay.dataset.endMs = String(result.end_ms);
+    replay.textContent = 'Odtwórz zapisany cytat'; replay.disabled = !player || !savedBounds(replay);
+    const packet = document.createElement('a');
+    packet.href = validatePacketPath(`/api/artifacts/${identity.artifactId}/citations/${result.id}/packet`, identity.artifactId, result.id);
+    packet.textContent = 'Pobierz metadane cytatu';
+    packet.title = 'Pakiet zawiera pełną przypiętą wersję transkryptu i zapisane pochodzenie, bez nagrania.';
+    packet.dataset.citationPacket = '';
+    article.append(label, quote, replay, packet); return article;
+  }
+  function appendHistory(name, items) {
+    // Pages have been validated completely; source strings only enter textContent.
+    if (name === 'versions') {
+      const selected = version.value;
+      const annotationVersion = document.querySelector('[data-annotation-version]');
+      const annotationSelected = annotationVersion.value;
+      if (items.length) for (const option of version.querySelectorAll('option[value=""]')) option.remove();
+      for (const item of items) {
+        for (const select of [version, annotationVersion]) {
+          const option = document.createElement('option'); option.value = String(item.id);
+          option.textContent = `#${item.id} · ${item.model || 'model nieznany'} · ${item.created_at}`;
+          select.append(option);
+        }
+        const article = document.createElement('article');
+        article.textContent = `#${item.id} · ${item.model || 'model nieznany'} · ${item.language || ''} · ${item.created_at}`;
+        document.querySelector('[data-version-summaries]').append(article);
+      }
+      if (selected) version.value = selected;
+      annotationVersion.value = annotationSelected;
+    } else if (name === 'citations') {
+      for (const item of items) $('saved').append(citationArticle(item));
+    } else {
+      for (const item of items) {
+        const article = document.createElement('article'), label = document.createElement('small');
+        label.textContent = `${item.kind} · ${item.createdAt}${item.derivedTextId === null ? '' : ` · transkrypt #${item.derivedTextId}`}`;
+        const heading = document.createElement('h3'); heading.textContent = item.label || '';
+        const body = document.createElement('p'); body.textContent = item.body;
+        article.append(label, heading, body); document.querySelector('[data-annotation-history]').append(article);
+      }
+    }
+  }
+  function refreshHistory(name, error = null) {
+    const pager = historyPagers.get(name), button = document.querySelector(`[data-history-more="${name}"]`);
+    const message = document.querySelector(`[data-history-status="${name}"]`);
+    if (!pager) { button.disabled = true; if (error) message.textContent = error; return; }
+    button.disabled = historyClosed || pager.busy || pager.capped || !pager.hasMore;
+    message.textContent = error || (pager.capped ? `Wyświetlono limit ${HISTORY_CAP} pozycji. Dalsze wczytywanie w tym widoku zatrzymano; odśwież stronę, aby zacząć od najnowszych.` :
+      pager.busy ? 'Wczytuję starsze pozycje…' : `${pager.count} pozycji. ${pager.hasMore ? 'Starsze pozycje są dostępne.' : 'Koniec historii w tej migawce.'}`);
+  }
+  try {
+    const artifactId = parseDomId(root.dataset.artifactId);
+    const bootstrap = JSON.parse(document.querySelector('[data-history-pages]').textContent);
+    for (const name of ['versions', 'citations', 'annotations']) {
+      try {
+        const pager = createHistoryPager(name, artifactId, bootstrap[name]);
+        historyPagers.set(name, pager);
+        const button = document.querySelector(`[data-history-more="${name}"]`);
+        button.addEventListener('click', async () => {
+          const request = pager.begin();
+          if (!request) return;
+          const abort = new AbortController(); historyControllers.add(abort); refreshHistory(name);
+          try {
+            if (parseDomId(root.dataset.artifactId) !== artifactId) throw pageError();
+            const route = name === 'versions' ? 'transcripts' : name;
+            const params = new URLSearchParams({limit: String(request.limit), before_id: String(request.beforeId), snapshot_max_id: String(request.snapshotMaxId)});
+            const response = await fetch(`/api/artifacts/${artifactId}/${route}/page?${params}`, {signal: abort.signal});
+            if (!response.ok) throw new Error(`Odczyt historii: HTTP ${response.status}. Nic nie dodano.`);
+            const page = await response.json();
+            if (historyClosed) return;
+            if (parseDomId(root.dataset.artifactId) !== artifactId) throw pageError();
+            const items = pager.accept(request, page);
+            if (items !== null) appendHistory(name, items);
+            refreshHistory(name);
+          } catch (error) {
+            pager.fail(request);
+            if (!historyClosed && error.name !== 'AbortError') refreshHistory(name, error.message);
+          } finally { historyControllers.delete(abort); }
+        });
+        refreshHistory(name);
+      } catch (error) { refreshHistory(name, error.message); }
+    }
+  } catch (error) { for (const name of ['versions', 'citations', 'annotations']) refreshHistory(name, error.message); }
+  window.addEventListener('pagehide', () => {
+    historyClosed = true;
+    for (const pager of historyPagers.values()) pager.close();
+    for (const abort of historyControllers) abort.abort();
+    controller?.abort(); player?.destroy();
+  });
   void load();
 }

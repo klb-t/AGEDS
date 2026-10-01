@@ -26,6 +26,13 @@ def main():
                  {'start': 1.1, 'end': 1.8, 'word': literal}]
         old = evidence.add_derived_text(artifact, 'transcript', ''.join(w['word'] for w in words), segments=[{'start': .2, 'end': 1.8, 'text': ''.join(w['word'] for w in words), 'words': words}])
         new = evidence.add_derived_text(artifact, 'transcript', ' NEW VERSION', segments=[{'start': 2, 'end': 3, 'text': ' NEW VERSION'}])
+        repeated_artifact = evidence.ingest_file(path, source_id=evidence.ensure_source('synthetic', 'save response fixture'),
+                                               source_locator='synthetic:save-response')
+        repeated = evidence.add_derived_text(repeated_artifact, 'transcript', ' echo echo', segments=[
+            {'start': .0005, 'end': .0025, 'text': ' echo',
+             'words': [{'start': .0005, 'end': .0025, 'word': ' echo'}]} for _ in range(2)])
+        repeated_new = evidence.add_derived_text(repeated_artifact, 'transcript', ' NEW',
+                                               segments=[{'start': 1, 'end': 2, 'text': ' NEW'}])
         history_artifact = evidence.ingest_file(path, source_id=evidence.ensure_source('synthetic', 'paged history fixture'),
                                                 source_locator='synthetic:history')
         history_versions = []
@@ -48,7 +55,8 @@ def main():
                     segments=[{'start': .2, 'end': 1.2, 'text': raw}])
                 citations.create_citation(budget_artifact, version_id, [0])
         print(json.dumps({'artifact': artifact, 'old': old, 'new': new, 'literal': literal,
-                          'historyArtifact': history_artifact, 'historyVersions': history_versions, 'budgetArtifact': budget_artifact}), flush=True)
+                          'historyArtifact': history_artifact, 'historyVersions': history_versions, 'budgetArtifact': budget_artifact,
+                          'repeatedArtifact': repeated_artifact, 'repeated': repeated, 'repeatedNew': repeated_new}), flush=True)
         uvicorn.run('server.app.main:app', host='127.0.0.1', port=int(os.environ['AGEDS_BROWSER_PORT']), log_level='warning')
 
 

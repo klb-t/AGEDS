@@ -17,7 +17,7 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
   let stderr = ''; server.stderr.on('data', d => stderr += d);
   let browser;
   const fingerprint = file => createHash('sha256').update(fs.readFileSync(path.join(repo, file))).digest('hex');
-  const receipt = {git_head: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: repo, encoding: 'utf8'}).trim(), playwright: require('playwright/package.json').version, source_sha256: Object.fromEntries(['server/app/main.py', 'server/app/db.py', 'server/app/static/citations.mjs', 'server/app/static/range-player.mjs', 'server/app/templates/artifact.html', 'server/app/templates/index.html', 'server/app/exchange.py', 'server/app/exchange_consumer.py', 'server/app/verified_media.py', 'server/app/search.py', 'server/app/read_pages.py', 'server/tests/browser/acceptance.cjs', 'server/tests/browser_fixture.py'].map(file => [file, fingerprint(file)])), task: 'AGEDS-20261001-N40-browser', baseline_task: 'AGEDS-20261001-N12', started_at: new Date().toISOString(), fixture: 'generated 4s mono PCM WAV; temporary SQLite; synthetic transcript versions', cases: []};
+  const receipt = {git_head: execFileSync('git', ['rev-parse', 'HEAD'], {cwd: repo, encoding: 'utf8'}).trim(), playwright: require('playwright/package.json').version, source_sha256: Object.fromEntries(['server/app/main.py', 'server/app/db.py', 'server/app/static/citations.mjs', 'server/app/static/range-player.mjs', 'server/app/templates/artifact.html', 'server/app/templates/index.html', 'server/app/exchange.py', 'server/app/exchange_consumer.py', 'server/app/verified_media.py', 'server/app/search.py', 'server/app/read_pages.py', 'server/tests/browser/acceptance.cjs', 'server/tests/browser_fixture.py'].map(file => [file, fingerprint(file)])), task: 'AGEDS-20261001-N83-browser', baseline_task: 'AGEDS-20261001-N12', started_at: new Date().toISOString(), fixture: 'generated 4s mono PCM WAV; temporary SQLite; synthetic transcript versions', cases: []};
   try {
     const fixture = await new Promise((resolve, reject) => {
       let buf = ''; server.stdout.on('data', d => {buf += d; if (buf.includes('\n')) {try {resolve(JSON.parse(buf.split('\n')[0]));} catch(e) {reject(e);}}});
@@ -166,6 +166,56 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
       assert.equal(posted.derivedTextId, fixture.old); assert.match(await sel('saved').locator('small').first().textContent(), new RegExp(`transkrypt #${fixture.old}`));
       assert.match(await sel('status').textContent(), new RegExp(`Wersja #${fixture.new}\\.`)); await page.unroute(pattern);
     });
+    // Deliberately forged POST responses test client consistency, not a server fault.
+    function otherOccurrence(posted) {
+      const selector = {kind: posted.wordRefs ? 'words' : 'segments', text_join: 'concatenate_exact',
+        time_unit: 'seconds', stored_time_unit: 'milliseconds', rounding: 'nearest_ms',
+        precision: posted.wordRefs ? 'word_asr' : 'segment'};
+      if (posted.wordRefs) Object.assign(selector, {word_refs: [{segment_index: 1, word_index: 0}],
+        source_start: .0005, source_end: .0025, alignment_verification: 'not_performed'});
+      else selector.indices = [1];
+      return {id: 987654, artifact_id: fixture.repeatedArtifact, derived_text_id: fixture.repeated,
+        quote_text: posted.quoteText, start_ms: 0, end_ms: 2, selector};
+    }
+    for (const kind of ['words', 'segments']) await test(`forged ${kind} occurrence with same text version and rounded time is rejected before history links`, async () => {
+      await page.goto(`${base}/artifact/${fixture.repeatedArtifact}`); await version(fixture.repeated);
+      await sel('kind').selectOption(kind);
+      const pattern = '**/citations';
+      await page.route(pattern, async route => {
+        assert.equal(route.request().method(), 'POST');
+        await route.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify(otherOccurrence(route.request().postDataJSON()))});
+      });
+      const before = await sel('saved').locator('article').count();
+      await sel('save').click();
+      await page.waitForFunction(() => document.querySelector('[data-status]').textContent.includes('Nie udostępniono'));
+      assert.equal(await sel('saved').locator('article').count(), before);
+      assert.equal(await page.locator('[data-citation-play][data-citation-id="987654"]').count(), 0);
+      assert.doesNotMatch(await sel('status').textContent(), /Zapisano cytat/);
+      assert.equal(await page.locator('audio').evaluate(a => a.paused), true);
+      assert.match(await page.locator('[data-history-status="citations"]').textContent(), /^0 pozycji/);
+      await page.unroute(pattern);
+    });
+    await test('real save after rejection preserves half-millisecond ties and selected occurrence', async () => {
+      await sel('kind').selectOption('words'); await sel('save').click();
+      await page.waitForFunction(() => document.querySelector('[data-status]').textContent.startsWith('Zapisano cytat'));
+      const anchors = await (await fetch(`${base}/api/artifacts/${fixture.repeatedArtifact}/citations`)).json();
+      assert.equal(anchors.length, 1); assert.equal(anchors[0].start_ms, 0); assert.equal(anchors[0].end_ms, 2);
+      assert.deepEqual(anchors[0].selector.word_refs, [{segment_index: 0, word_index: 0}]);
+      assert.equal(await sel('saved').locator('article').count(), 1);
+    });
+    await test('late forged occurrence cannot enter history or overwrite switched version status', async () => {
+      let release, entered; const held = new Promise(r => release = r), arrived = new Promise(r => entered = r);
+      const pattern = '**/citations';
+      await page.route(pattern, async route => {const body = otherOccurrence(route.request().postDataJSON()); entered(); await held;
+        await route.fulfill({status: 200, contentType: 'application/json', body: JSON.stringify(body)});});
+      await sel('save').click(); await arrived; await sel('kind').selectOption('segments'); await version(fixture.repeatedNew);
+      const status = await sel('status').textContent(); release();
+      await page.waitForFunction(() => !document.querySelector('[data-save]').disabled);
+      assert.equal(await sel('status').textContent(), status); assert.equal(await sel('preview').textContent(), ' NEW');
+      assert.equal(await sel('saved').locator('article').count(), 1); assert.equal(await page.locator('audio').evaluate(a => a.paused), true);
+      await page.unroute(pattern);
+    });
+    await page.goto(`${base}/artifact/${fixture.artifact}`); await version(fixture.old);
     const audioState = () => page.locator('audio').evaluate(a => ({paused: a.paused, time: a.currentTime, duration: a.duration, ready: a.readyState, native: a instanceof HTMLAudioElement}));
     await test('real WAV playback seeks and stops at selected end', async () => {
       await version(fixture.old); await sel('kind').selectOption('words'); await sel('last').selectOption('1');

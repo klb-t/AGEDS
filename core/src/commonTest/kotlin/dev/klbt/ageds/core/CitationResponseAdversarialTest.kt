@@ -166,19 +166,25 @@ class CitationResponseAdversarialTest {
     }
 
     @Test fun selectionAndRequestsKeepDefensiveCopiesOfCallerLists() {
-        val indices = mutableListOf(0)
+        // A two-element toList() copy is mutable on JVM. A singleton copy may
+        // implement java.util.List while refusing clear(), so that fixture
+        // would fail before it could test independence of the returned copy.
+        val indices = mutableListOf(0, 1)
         val segment = CitationSelection.segments(segmentTranscript(), indices)
         indices[0] = 1
         (segment.request.segmentIndices as? MutableList<Int>)?.clear()
-        assertEquals(listOf(0), segment.request.segmentIndices)
-        segment.requireMatchingCreated(saved(segment, segmentSelector()))
+        assertEquals(listOf(0, 1), segment.request.segmentIndices)
+        segment.requireMatchingCreated(saved(segment, segmentSelector("[0,1]")))
 
-        val refs = mutableListOf(WordRef(0, 0))
+        val refs = mutableListOf(WordRef(0, 0), WordRef(0, 1))
         val word = CitationSelection.words(wordTranscript(), refs)
         refs[0] = WordRef(0, 1)
         (word.request.wordRefs as? MutableList<WordRef>)?.clear()
-        assertEquals(listOf(WordRef(0, 0)), word.request.wordRefs)
-        word.requireMatchingCreated(saved(word, wordSelector()))
+        assertEquals(listOf(WordRef(0, 0), WordRef(0, 1)), word.request.wordRefs)
+        word.requireMatchingCreated(saved(word, wordSelector(
+            refs = """[{"segment_index":0,"word_index":0},{"segment_index":0,"word_index":1}]""",
+            sourceEnd = "0.0004",
+        )))
     }
 
     @Test fun responseIdentityAndPositiveIdArePartOfTheFrozenContract() {

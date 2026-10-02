@@ -5,6 +5,7 @@ AGEDS_REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 export AGEDS_REPO_ROOT
 exec python3 - "$@" <<'PY'
 import hashlib
+import argparse
 import json
 import os
 from pathlib import Path
@@ -17,7 +18,12 @@ from urllib.parse import urlparse
 import xml.etree.ElementTree as ET
 
 repo = Path(os.environ['AGEDS_REPO_ROOT'])
-output = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else Path(tempfile.mkdtemp(prefix='ageds-build-result-'))
+parser = argparse.ArgumentParser(description='Verify a clean snapshot of the pinned AGEDS Android/JVM build.')
+parser.add_argument('output', nargs='?', type=Path)
+parser.add_argument('--include-instrumentation', action='store_true',
+                    help='Also compile the synthetic SAF test APK; this does not execute device tests.')
+options = parser.parse_args()
+output = options.output.resolve() if options.output else Path(tempfile.mkdtemp(prefix='ageds-build-result-'))
 output.mkdir(parents=True, exist_ok=True)
 # Do not overwrite a prior receipt or APK.
 if any(output.iterdir()):
@@ -60,6 +66,8 @@ if not trust and Path('/etc/ssl/certs/java/cacerts').is_file():
 if trust:
     args += ['-Djavax.net.ssl.trustStore=' + trust]
 tasks = [':androidApp:assembleDebug', ':androidApp:testDebugUnitTest', ':core:desktopTest']
+if options.include_instrumentation:
+    tasks.append(':androidApp:assembleDebugAndroidTest')
 args += tasks + ['--stacktrace']
 started = datetime.now(timezone.utc).isoformat()
 print('Build snapshot:', snapshot, '\nResults:', output, flush=True)
@@ -69,7 +77,10 @@ receipt = {'started_at': started, 'finished_at': datetime.now(timezone.utc).isof
            'build_exit_code': result.returncode, 'source_sha256': source_hashes,
            'source_unchanged': hashes() == source_hashes, 'tests': [],
            'checkout_commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=repo, text=True).strip(),
-           'java_version': subprocess.check_output([str(java), '-version'], stderr=subprocess.STDOUT, text=True).strip()}
+           'java_version': subprocess.check_output([str(java), '-version'], stderr=subprocess.STDOUT, text=True).strip(),
+           'instrumentation': {'compilation_requested': options.include_instrumentation,
+                               'compilation_completed': False, 'runtime_tests_executed': 0,
+                               'runtime_status': 'not_run'}}
 for suite in snapshot.glob('*/build/test-results/**/TEST-*.xml'):
     document = ET.parse(suite).getroot()
     receipt['tests'].append({'path': str(suite.relative_to(snapshot)), 'suite': document.attrib.get('name'), **{k: int(document.attrib.get(k, 0)) for k in ('tests', 'failures', 'errors', 'skipped')}})
@@ -89,12 +100,21 @@ if result.returncode == 0 and apk.is_file():
     with (output / 'apksigner.log').open('w') as log:
         verification = subprocess.run([str(signers[-1]), 'verify', '--verbose', '--print-certs', str(destination)], env=env, stdout=log, stderr=subprocess.STDOUT)
     receipt['apksigner_exit_code'] = verification.returncode
+instrumentation_apk = snapshot / 'androidApp/build/outputs/apk/androidTest/debug/androidApp-debug-androidTest.apk'
+if options.include_instrumentation and result.returncode == 0 and instrumentation_apk.is_file():
+    destination = output / 'AGEDS_saf_provider_tests.apk'
+    shutil.copy2(instrumentation_apk, destination)
+    receipt['instrumentation'].update(compilation_completed=True,
+                                     apk_sha256=hashlib.sha256(destination.read_bytes()).hexdigest(),
+                                     apk_bytes=destination.stat().st_size)
 (output / 'receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
 print(json.dumps({k: v for k, v in receipt.items() if k != 'source_sha256'}, indent=2), flush=True)
 if result.returncode or not receipt['source_unchanged'] or receipt.get('apksigner_exit_code') != 0:
     raise SystemExit(1)
 required_test_roots = ('androidApp/build/test-results/testDebugUnitTest/', 'core/build/test-results/desktopTest/')
 missing_test_roots = [root for root in required_test_roots if not any(t['path'].startswith(root) and t['tests'] > 0 for t in receipt['tests'])]
-if missing_test_roots or any(t['failures'] or t['errors'] for t in receipt['tests']):
+if missing_test_roots or any(t['failures'] or t['errors'] or t['skipped'] for t in receipt['tests']):
     raise SystemExit('Required tests did not complete successfully')
+if options.include_instrumentation and not receipt['instrumentation']['compilation_completed']:
+    raise SystemExit('Requested instrumentation compilation did not produce its APK')
 PY

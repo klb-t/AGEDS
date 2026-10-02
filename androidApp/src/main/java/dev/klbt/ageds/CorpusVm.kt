@@ -18,8 +18,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
-private val defaultPresetIds = listOf("gemeente_oss", "uwv", "susanne_walstra", "wettbewind", "acture")
-
 class CorpusVm(application: Application) : AndroidViewModel(application) {
     val corpus = mutableStateOf<CorpusSeed?>(null)
     val selectedPresetIds = mutableStateListOf<String>()
@@ -92,7 +90,8 @@ class CorpusVm(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectPriority() {
-        selectedPresetIds.clear(); selectedPresetIds.addAll(defaultPresetIds)
+        selectedPresetIds.clear()
+        selectedPresetIds.addAll(corpus.value?.priorityPresetIds().orEmpty())
         manualPhones.clear(); excludedPhones.clear()
     }
     fun clearSelection() { selectedPresetIds.clear(); manualPhones.clear(); excludedPhones.clear() }

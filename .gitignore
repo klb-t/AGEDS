@@ -6,6 +6,7 @@ local.properties
 .DS_Store
 server/.env
 server/.venv/
+.venv/
 server/data/*
 !server/data/.gitkeep
 

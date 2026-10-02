@@ -1,0 +1,328 @@
+{
+  "schema_version": 1,
+  "result_id": "AGEDS-RESULT-20261002-BROWSER-COMPLETION",
+  "completion_of": "AGEDS-20261001-N83",
+  "status": "passed",
+  "production_changes_required": false,
+  "node": {
+    "command": "node --test --test-reporter=tap server/tests/js/*.test.mjs",
+    "node_version": "v24.19.0",
+    "exit_code": 0,
+    "tests": 85,
+    "pass": 85,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "test_names": [
+      "browser milliseconds agree with actual Python projection at 3008 seeded IEEE-754 boundaries",
+      "browser segments snapshot agrees with actual Python canonical projection",
+      "browser words snapshot agrees with actual Python canonical projection",
+      "create words: positive exact raw quote, range, identity and canonical selector",
+      "create words: same text and interval at another occurrence is refused",
+      "create words: ordered selection cannot be reversed, duplicated, shortened or extended",
+      "create words: canonical metadata is exact including missing and extra keys",
+      "create words: response identities, exact raw text and range cannot change",
+      "create words: JSON object key order is irrelevant",
+      "create words: defensive snapshot does not alias mutable selection",
+      "create segments: positive exact raw quote, range, identity and canonical selector",
+      "create segments: same text and interval at another occurrence is refused",
+      "create segments: ordered selection cannot be reversed, duplicated, shortened or extended",
+      "create segments: canonical metadata is exact including missing and extra keys",
+      "create segments: response identities, exact raw text and range cannot change",
+      "create segments: JSON object key order is irrelevant",
+      "create segments: defensive snapshot does not alias mutable selection",
+      "word references reject booleans, numeric strings and extra fields without coercion",
+      "segment indices reject booleans and numeric strings without coercion",
+      "word source bounds and alignment status remain part of exact response contract",
+      "numeric JSON zero and zero-point-zero are equivalent but quoted zero is not",
+      "milliseconds use Python ties-to-even, not JavaScript Math.round",
+      "time conversion refuses unsafe milliseconds and invalid numeric inputs",
+      "half-millisecond selection validates rounded times and preserves raw bounds",
+      "create selection refuses bad kinds, empty picks and unsafe source numbers",
+      "history identity remains compatible with historical minimal selector rows",
+      "handler rejects other words occurrence before history or links; same ID remains admissible",
+      "handler rejects other segments occurrence before history or links; same ID remains admissible",
+      "handler rejects changed response range despite identical version, selector and text",
+      "pending save compares immutable pre-request selection while controls and source objects mutate",
+      "late valid save preserves new version status and retains pinned history",
+      "late mismatched save preserves new version status and does not publish history",
+      "request and exact word projection are copied before source units change",
+      "segment occurrence cannot be replaced by repeated raw text at the same interval",
+      "millisecond projection rounds the actual binary product to even without epsilon",
+      "snapshot rejects malformed selected unit identity and noncontiguous segment order",
+      "actual JSON UTF-8 cost preserves escapes, combining marks and supplementary characters",
+      "one-byte-over initial row is omitted explicitly with no smaller later-row skip",
+      "initial prefix admission stops at first unfit row and keeps exact raw text",
+      "exact terminal budget fits without false omission; continuing exact budget stops",
+      "aggregate cost includes prior pages and admits only the fitting continuation prefix",
+      "invalid row beyond fitting prefix rejects entire page before accounting mutation",
+      "local saved row during older request consumes budget before continuation admission",
+      "oversized saved row cannot bypass cap or permit a later smaller row to skip it",
+      "duplicate save costs no second allocation in retained budget",
+      "closed stale responses cannot change accounting or admit bytes into replacement pager",
+      "refresh starts a new independent budget after exhausted old pager",
+      "default real four-MiB ceiling bounds multiple actual large model rows",
+      "each concrete row shape keeps literal source strings and ownership",
+      "empty zero snapshot and terminal short page valid; null snapshots rejected",
+      "byte-limited nonterminal page may contain fewer items than requested",
+      "strict envelope schema and bounds refuse malformed responses",
+      "ownership, unsafe foreign IDs, times and literal text types checked per row kind",
+      "continuation requires fixed snapshot, decreasing cursor, exact limit and no seen IDs",
+      "invalid page has no partial state change and retries same cursor",
+      "stale, forged, duplicate and closed requests cannot replace active cursor state",
+      "1000-row cap reports omission only when more exists; exact complete boundary stays complete",
+      "new saved rows count toward cap without changing pinned older snapshot or cursor",
+      "save during older-page request cannot overflow client cap and retry shrinks requested limit",
+      "UTF8 row cost includes JSON escaping and source Unicode exactly",
+      "first unfit row stops initial prefix and no smaller later row is silently substituted",
+      "closed view refuses late save without changing measured retention",
+      "DOM canonical decimal IDs preserve both supported boundaries exactly",
+      "DOM refuses unsafe SQLite64 values before Number conversion",
+      "DOM refuses coercions, malformed and noncanonical decimal IDs",
+      "legacy API requires safe positive numeric IDs without coercion",
+      "unsafe JSON numeric response cannot alias an adjacent SQLite identity",
+      "transcript response must match captured artifact and selected version",
+      "citation result requires safe citation ID and exact artifact/version ownership",
+      "saved citation retains its captured version and exact unedited quote",
+      "packet exports only exact canonical paths matching checked IDs",
+      "validRange rejects nonnumeric, nonfinite, negative, empty and reversed ranges",
+      "timeupdate stops exactly at end and clamps a late event back to selected boundary",
+      "timer stops playback even when timeupdate is absent",
+      "seek outside either boundary stops playback, while an inside seek preserves it",
+      "invalid range stops previous playback and never invokes a new play",
+      "unknown, nonfinite or insufficient duration refuses playback",
+      "overlapping metadata requests cancel old selection and only play the newest one",
+      "explicit stop cancels a pending load and late metadata does not start playback",
+      "metadata timeout removes temporary handlers and allows a new request",
+      "rejected play clears active range without leaving a playback timer",
+      "rejection from superseded play cannot stop the new range",
+      "pause clears timer and native resume reinstates the same bounded selection",
+      "ended and error release the range, destroy removes every listener",
+      "synchronous load failure cleans temporary metadata listeners immediately"
+    ],
+    "input_sha256": {
+      "server/app/citations.py": "6a2780c9c7e18a62d425f9a413217ccfb84bd6091de300a3587a373fc44543bf",
+      "server/app/static/citations.mjs": "190d34fd5979e2f7273edd2162c92a490892e3af197e7b10aede15e4173a6885",
+      "server/app/static/range-player.mjs": "f451e2f333cf480100d29dafa9181c8c6ebae748dda03092c0bc03c0664b901c",
+      "server/tests/js/citation-python-parity.test.mjs": "f48574eb0ff15489beb54a0b9c2ef8f2b0344cd62a97804233ad7edc63094a86",
+      "server/tests/js/citation-save-contract.test.mjs": "51a51376963759c7c33737ef73e031dc26d24368b9df69ca538ed883fed42bb5",
+      "server/tests/js/citation-save-handler.test.mjs": "f453b8bae6afe4f3d23a7b2563179394ab0caa8dfbec86d39c18ef4f487a1a03",
+      "server/tests/js/citation-save-snapshot.test.mjs": "09ab7a132b96250a330b7ab9cbfcc37ac12b04a4c92be52da81e64d48c16fc83",
+      "server/tests/js/history-budget-adversarial.test.mjs": "834fb3d730bdfa1306edd5be22daafb044b6be699715d0e5b02db39960f7c3f9",
+      "server/tests/js/history-pages.test.mjs": "c105347237cc971b33d86b27623db087bc8713c961db926de30fa0bf77d52f52",
+      "server/tests/js/history-payload-owner.test.mjs": "0c84b552047a6406176c9d6e9c8295f8f71cbf71f560576949aaae7c4e190a78",
+      "server/tests/js/id-boundaries.test.mjs": "88f59686cbc196156fb6a1931303853a4717bc94f82fca20b024face0b7e7cda",
+      "server/tests/js/range-player.test.mjs": "ffe91391c10083b379354541b9cdd2810d0dff81f40907966a6b24c876c87ad6"
+    },
+    "tap_sha256": "a857ae6e1f9b3306398095e4b4d9f14e7309054511465747f890da5e73d1d785",
+    "python_command": "python3"
+  },
+  "browser": {
+    "git_head": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
+    "playwright": "1.62.1",
+    "source_sha256": {
+      "server/app/main.py": "0ae7735006c42773058c58b02bf156d6d2898c5ae0ee039e18a074523d878233",
+      "server/app/db.py": "776f0039102c91e7da63fa489b64ae6fcccd1bf925db02501d09d01ab822bdf9",
+      "server/app/static/citations.mjs": "190d34fd5979e2f7273edd2162c92a490892e3af197e7b10aede15e4173a6885",
+      "server/app/static/range-player.mjs": "f451e2f333cf480100d29dafa9181c8c6ebae748dda03092c0bc03c0664b901c",
+      "server/app/templates/artifact.html": "04aeeb303579b8e6ef08f3d3f0c88c6d2503922f7c83fec509f43cf266a84025",
+      "server/app/templates/index.html": "4d5cb3975a95d4d88bb7b9d89cc3f128b6a6cbebab41ae7a8343ecd49488e87e",
+      "server/app/exchange.py": "f1f80e17c6e8697833d0e5b910807efe0e469aa22107ed1d5cc0e6fed1e061bc",
+      "server/app/exchange_consumer.py": "95bff415061954ae8cce8ca998f06229c70cf5477c4b47e0dba2fc3b210c3049",
+      "server/app/verified_media.py": "90308d9bc8061391c1f8772f027652fe45087f5fe80029d83d02b2a08590cd4d",
+      "server/app/search.py": "14783b0a154050a09521f58a57e6600bdd14ffad5fe2f231f69d15620fbfc8cd",
+      "server/app/read_pages.py": "fc5fbc7bd57d84bd1b384d01be810ad60120ad5747d2279120e3b3bff2785a5a",
+      "server/tests/browser/acceptance.cjs": "f1a33c8423725f6a7b0aa78a0830d87510541e83c326c7b9e15be85f9052464a",
+      "server/tests/browser_fixture.py": "59eadbefaeba6d7448f69ad7bdc24ea9e24a50cf35f69e8f1265ef884057d399"
+    },
+    "task": "AGEDS-20261001-N83-browser",
+    "baseline_task": "AGEDS-20261001-N12",
+    "started_at": "2026-10-02T20:28:31.799Z",
+    "fixture": "generated 4s mono PCM WAV; temporary SQLite; synthetic transcript versions",
+    "cases": [
+      {
+        "name": "older version exact word citation and literal XSS text",
+        "status": "passed"
+      },
+      {
+        "name": "fresh saved quote replay uses old anchor while latest version selected",
+        "status": "passed"
+      },
+      {
+        "name": "fresh packet link downloads and independently verifies old version while latest selected",
+        "status": "passed"
+      },
+      {
+        "name": "persisted quote replay retains anchor and cancels on seek outside range",
+        "status": "passed"
+      },
+      {
+        "name": "persisted packet link downloads identical pinned evidence while latest selected",
+        "status": "passed"
+      },
+      {
+        "name": "stale transcript response cannot replace newer selected version",
+        "status": "passed"
+      },
+      {
+        "name": "pending save stays pinned while version switches",
+        "status": "passed"
+      },
+      {
+        "name": "forged words occurrence with same text version and rounded time is rejected before history links",
+        "status": "passed"
+      },
+      {
+        "name": "forged segments occurrence with same text version and rounded time is rejected before history links",
+        "status": "passed"
+      },
+      {
+        "name": "real save after rejection preserves half-millisecond ties and selected occurrence",
+        "status": "passed"
+      },
+      {
+        "name": "late forged occurrence cannot enter history or overwrite switched version status",
+        "status": "passed"
+      },
+      {
+        "name": "real WAV playback seeks and stops at selected end",
+        "status": "passed"
+      },
+      {
+        "name": "stop button cancels real playback without later resumption",
+        "status": "passed"
+      },
+      {
+        "name": "version change cancels audio and clears unavailable word selection",
+        "status": "passed"
+      },
+      {
+        "name": "selection change cancels native playback",
+        "status": "passed"
+      },
+      {
+        "name": "stop during delayed metadata prevents late native playback",
+        "status": "passed"
+      },
+      {
+        "name": "search snippets keep source HTML inert in actual browser",
+        "status": "passed"
+      },
+      {
+        "name": "verified media endpoint supports exact ranges and HEAD in Chromium context",
+        "status": "passed"
+      },
+      {
+        "name": "unsafe DOM artifact ID refuses transcript requests before rounding",
+        "status": "passed"
+      },
+      {
+        "name": "unsafe DOM transcript ID refuses fetch and preserves exact unsupported ID",
+        "status": "passed"
+      },
+      {
+        "name": "unsafe or mismatched API version identity never enables quote actions",
+        "status": "passed"
+      },
+      {
+        "name": "paged versions preserve selected pin across delayed older load",
+        "status": "passed"
+      },
+      {
+        "name": "citation and annotation pages expose all 125 rows without duplicates or source HTML",
+        "status": "passed"
+      },
+      {
+        "name": "mismatched history snapshot is rejected without adding rows",
+        "status": "passed"
+      },
+      {
+        "name": "aggregate payload cap stops older quotes with explicit omission",
+        "status": "passed"
+      }
+    ],
+    "browser": "141.0.7390.37",
+    "downloads": [
+      {
+        "rendering": "dynamic",
+        "filename": "ageds-citation-1-132.json",
+        "content_disposition": "attachment; filename=\"ageds-citation-1-132.json\"",
+        "bytes": 3927,
+        "sha256": "ee4dbba0b1731cbff2199fe83c9b71d74dd0ccb4241d60748d38fa3a260440fd",
+        "derived_text_id": 1,
+        "anchor_id": 132,
+        "verification": "matches_included_pinned_transcript",
+        "media_requests": 0,
+        "stored_path_included": false,
+        "source_bytes_included": false,
+        "media_bytes_included": false
+      },
+      {
+        "rendering": "persisted",
+        "filename": "ageds-citation-1-132.json",
+        "content_disposition": "attachment; filename=\"ageds-citation-1-132.json\"",
+        "bytes": 3927,
+        "sha256": "ee4dbba0b1731cbff2199fe83c9b71d74dd0ccb4241d60748d38fa3a260440fd",
+        "derived_text_id": 1,
+        "anchor_id": 132,
+        "verification": "matches_included_pinned_transcript",
+        "media_requests": 0,
+        "stored_path_included": false,
+        "source_bytes_included": false,
+        "media_bytes_included": false
+      }
+    ],
+    "playback": {
+      "playing": {
+        "paused": false,
+        "time": 0.223989,
+        "duration": 4,
+        "ready": 4,
+        "native": true
+      },
+      "stopped": {
+        "paused": true,
+        "time": 1.1,
+        "duration": 4,
+        "ready": 4,
+        "native": true
+      },
+      "tolerance_seconds": 0.03
+    },
+    "verified_media": {
+      "full_bytes": 128044,
+      "range_bytes": 48,
+      "head_body_bytes": 0
+    },
+    "history_pages": {
+      "versions": 125,
+      "citations": 125,
+      "annotations": 125,
+      "initial_limit": 50
+    },
+    "payload_budget": {
+      "retained_quotes": 4,
+      "source_quotes": 6,
+      "retained_quote_text_bytes": 3600036,
+      "encoded_payload_cap": 4194304,
+      "coverage": "Pokazano 4 pozycji (3601936 bajtów JSON UTF-8). Osiągnięto budżet treści 4 MiB; dalsze wpisy pominięto, wczytywanie zatrzymane. To nie jest limit pamięci przeglądarki. Odśwież widok, aby zacząć od najnowszych."
+    },
+    "page_errors": [],
+    "status": "passed",
+    "finished_at": "2026-10-02T20:28:42.331Z"
+  },
+  "runtime": {
+    "browser_executable": "/root/.cache/ms-playwright/chromium_headless_shell-1194/chrome-linux/headless_shell",
+    "node_modules": "$CODEX_PRIMARY_RUNTIME_NODE_MODULES",
+    "python": ".venv/bin/python",
+    "budget_fixture": true,
+    "external_costs": false,
+    "private_data_used": false
+  },
+  "limits": [
+    "Source selection and response consistency, not ASR or acoustic alignment quality.",
+    "Real browser and HTTP execution; forged-response/delay cases use explicit Playwright fault injection.",
+    "Android, SAF runtime and partner integrations were not tested in this acceptance."
+  ]
+}

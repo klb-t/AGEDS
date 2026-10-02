@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "project": "AGEDS",
+  "preserved_remote_base": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
+  "reviewed_local_head": "4725857535ff9024fd242261f3441d79cf187cc4",
+  "exact_reviewed_tree": "fa124ba76c3391586bf891634861ed55db8ed2a0",
+  "published_source_head": "469b1fba3b3dd70df66805874827c9ae09e3237f",
+  "integration_merge": "b8617575e1dce6c36586ced09623f74b97398e7e",
+  "pull_request": 5,
+  "note": "Remote commits retain the original incremental source trees. The publication commit metadata differs; mappings preserve local receipt references. Existing nightly and standalone branches remain intact.",
+  "commits": [
+    {
+      "local": "fc8387b75dfab4de67cc184da4bf7281e584c8f2",
+      "remote": "db01c5ea79b462cc08aa0970954ae656952b74cd",
+      "tree": "b6588f173075765f57bc795ad04f0e04709a6bc6"
+    },
+    {
+      "local": "ec2bf8294c40f80ec179ad89c868e839666a38d5",
+      "remote": "bee57db7f46e7678840c9088e56ce7d495721255",
+      "tree": "132fc164741b2d026aed8093aa5f42c01729a2b3"
+    },
+    {
+      "local": "9b20d0a5d8a11686ea7c1a72aaf7d7a0709fd4a0",
+      "remote": "9224cf9c19815b8b818c6e8f522984534a219372",
+      "tree": "123a0b2805feaf8994a9dea4fd0e68f38f1d994b"
+    },
+    {
+      "local": "e118733679e5374958cad93f06ba811ca2f8cbf7",
+      "remote": "375b34cf4db1458a9bc4455f5279b12959f40bc0",
+      "tree": "6aaa285fead1095ea240feb7a34457db2b11c58d"
+    },
+    {
+      "local": "38253b30152559f65c8a48eae229bcf1e780805b",
+      "remote": "a7cbe7faa5b1da4d9b80b7c368af262a42a4af10",
+      "tree": "c2c1b200b4acc224fed0defdc243594c48557017"
+    },
+    {
+      "local": "19af439958eaf905b40f8b1a91763e98edbf93d5",
+      "remote": "f9b8662527b2a4e26ecec7fa371ac846d1ab9d5e",
+      "tree": "d539a0578a7df5d6ab1e13dd9324d605d6ac7d99"
+    },
+    {
+      "local": "61d78e26d1303318e0f4fb1eb1436a8b39299601",
+      "remote": "9a3d25eff05855caae042c14729f941b856d78af",
+      "tree": "968c506e50569ee0c23d4e89817e0cfbeb6f9f8e"
+    },
+    {
+      "local": "6110f052e72eb3c040a3bb0ad39da07b73d9537d",
+      "remote": "1557177f54d014652ad183979b513531de73ea8a",
+      "tree": "ff35e4f48b1d11b812d1ebf6720f6ecce7c53339"
+    },
+    {
+      "local": "fac3d899bdb734c5bed549e4313813a2b43f46f8",
+      "remote": "6ce9d21fee82df937a572b0a7793ff0300268a43",
+      "tree": "c07e4aa46c94fec390cba861d1a61e34ac4e4600"
+    },
+    {
+      "local": "f0c23c78ce575fb9bedaaed67f8ea7941227291d",
+      "remote": "130126f08a4e6f2b7936127c5b314437acef8d65",
+      "tree": "52d8e393fcb494bf596c97d88abd79df99314980"
+    },
+    {
+      "local": "4725857535ff9024fd242261f3441d79cf187cc4",
+      "remote": "469b1fba3b3dd70df66805874827c9ae09e3237f",
+      "tree": "fa124ba76c3391586bf891634861ed55db8ed2a0"
+    }
+  ]
+}

@@ -2,10 +2,10 @@
   "schema_version": 1,
   "project": "AGEDS",
   "state_id": "AGEDS-STATE-20261002-001",
-  "updated_at": "2026-10-02T20:42:18.425496+00:00",
+  "updated_at": "2026-10-02T20:47:52.084022+00:00",
   "based_on_remote_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
-  "local_branch": "codex/ageds-completion-20261002",
-  "status_summary": "All four interrupted overnight tasks accepted; pinned411JVM/APK,25Chromium,85Node,429backend+588subtests and clean real ASR pass. Incremental recovery is locally complete, publication pending final safety review.",
+  "local_branch": "main",
+  "status_summary": "Recovery completed and merged into main via PR5; all82 overnight tasks reconciled, current checks passed, experiments and incremental history preserved. SAF device runtime remains unperformed.",
   "history": {
     "overnight_ledger": "coordination/archive/2026-09-30_2026-10-01/night-20261001.json",
     "original_tasks": 82,
@@ -32,12 +32,14 @@
     "history_is_not_active_schedule": true
   },
   "publication": {
-    "status": "local_only_pending_safety_review",
-    "changes_published": false,
-    "reviewed_local_head": "38253b30152559f65c8a48eae229bcf1e780805b",
-    "remote_main": "8c3efb9e65999dd4931b22b555329da76379c31e",
-    "remote_night": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
-    "blocker": "Public branch push initially rejected by automatic safety review for historical case-specific data; complete current-tree and new-history audit before any retry."
+    "status": "published_main",
+    "changes_published": true,
+    "accepted_source_commit": "b8617575e1dce6c36586ced09623f74b97398e7e",
+    "reviewed_local_head": "4725857535ff9024fd242261f3441d79cf187cc4",
+    "source_tree": "fa124ba76c3391586bf891634861ed55db8ed2a0",
+    "pull_request": 5,
+    "source_commit_map": "coordination/publication-20261002.json",
+    "initial_review_concern_resolved": "New-content and historical provenance review completed; matched case identifiers removed from current files, no new sensitive content found in reviewed additions. Preexisting history preserved."
   },
   "tasks": [
     {
@@ -120,7 +122,7 @@
     {
       "id": "AGEDS-TASK-20261002-005",
       "owner": "coordinator",
-      "status": "done",
+      "status": "accepted",
       "scope": [
         "HANDOFF",
         "CLAUDE",
@@ -132,7 +134,8 @@
         "Full backend/CLI acceptance;reference/hash checks;safe incremental integration."
       ],
       "result_refs": [
-        "docs/validation/BACKEND_COMPLETION_2026-10-02.json"
+        "docs/validation/BACKEND_COMPLETION_2026-10-02.json",
+        "coordination/publication-20261002.json"
       ]
     }
   ],

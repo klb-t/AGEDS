@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "reviewed_local_head": "4725857535ff9024fd242261f3441d79cf187cc4",
+  "reviewed_tree": "fa124ba76c3391586bf891634861ed55db8ed2a0",
+  "integration_merge": "b8617575e1dce6c36586ced09623f74b97398e7e",
+  "merge_tree_equals_reviewed_tree": true,
+  "new_commits_reviewed": 11,
+  "new_blobs_reviewed": 56,
+  "current_files_reviewed": 368,
+  "archive_records_exact_to_preexisting_remote": 108,
+  "known_private_or_credential_matches_in_new_blobs": 0,
+  "native_source_inputs_match": 95,
+  "browser_source_inputs_match": 13,
+  "asr_source_inputs_match": 8,
+  "limits": [
+    "Pattern-based review is not a universal privacy guarantee.",
+    "Preexisting public Git history retains historical case identifiers.",
+    "All branches and original commits preserved; no destructive history rewriting."
+  ]
+}

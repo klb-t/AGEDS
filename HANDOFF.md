@@ -8,6 +8,9 @@ The earlier PR #4 line is preserved at `b6abe86`; it contains 49 commits beyond
 the previously published main `8c3efb9`. The foundation branch is already
 integrated. The standalone branch's functional changes were incorporated by
 `1e71cf8`; it needs no duplicate cherry-pick. Keep these branches as history.
+Merged into `main` through PR #5 (`b861757`). The checked source tree is
+unchanged by the merge. [Publication mapping](coordination/publication-20261002.json)
+resolves local commit IDs in receipts to their published equivalents.
 Current publication status is recorded in `coordination/state.json`.
 
 ## Implemented workflow

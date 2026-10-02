@@ -32,7 +32,7 @@ projektowymi tam, gdzie źródło nie ustaliło szczegółów implementacji.
 | A03 / transformacje | SHOULD opisywać stratę, dodanie i odwracalność; preferencja U1/P1, operacjonalizacja projektowa. | Porównać XML→event i WAV→transcript oraz graniczny skan bez ingest. | Nowy format musi zadeklarować własną semantykę i ograniczenia. |
 | A04 / wyniki modeli | MUST przypinać run i wersję wyniku; H1 oraz konieczność audytu. | Dwie próby mają odrębne runy; brak metadanych jest `unknown`; confidence języka nie opisuje treści. | Istniejących wyników bez runu nie uzupełniać fikcyjną historią. |
 | A05 / wykonanie | MUST fenceować publikację tokenem ważnej lease; konieczność przy wielu workerach. | Równoczesny claim, odzyskanie po awarii, spóźniony worker i rollback publikacji. | SQLite/UTC jest odwracalnym wyborem tego przyrostu; nie gwarantuje odporności na dowolny skok zegara. |
-| A06 / cytaty | MUST wskazywać konkretny transcript ID i zakres; konieczność rozdzielenia wersji. | Zmiana transkrypcji nie przepina wcześniejszego cytatu; zakres i quote sprawdzane wobec wybranej wersji. | Obecny segment nie stanowi jeszcze wyboru dokładnych słów ani oceny prawdziwości wypowiedzi. |
+| A06 / cytaty | MUST wskazywać konkretny transcript ID i zakres; konieczność rozdzielenia wersji. | Zmiana transkrypcji nie przepina wcześniejszego cytatu; zakres i quote sprawdzane wobec wybranej wersji. | Cytaty segmentowe i słowne nie dowodzą prawdziwości wypowiedzi; selektor słowny wymaga zapisanych znaczników ASR. |
 | A07 / pakiety | MUST jawnie opisywać zawartość i wyłączenia; konieczność audytu. | Odbiór pakietu sprawdza wersję schematu i referencje. | Obecny eksport metadanych nie zawiera gwarancji replay, podpisu ani dokładnego restore. |
 | A08 / abstrakcje | SHOULD współdzielić mechanizm tylko przy zgodnej semantyce; U1/E1/P1. | Dwa konkretne przypadki i granica; zachowane jednostki, payload i pochodzenie. | Wspólna nazwa/graf/JSON nie dowodzi zgodnego znaczenia. |
 | A09 / integracje | MAY dodać adapter partnera po małym teście korzyści; E1 to brainstorm. | Sprawdzić dwukierunkowy przepływ i zakres dostępu bez zmiany oryginałów. | Integracja nie narzuca jednej bazy, ontologii ani jednego interfejsu. |
@@ -90,15 +90,14 @@ kontraktu partnera, nie skutkiem samej obecności w ekosystemie.
 |---|---|---|
 | Store i kolejka | SQLite + lokalne zachowane kopie; możliwa inna baza i object store. | Mierzona potrzeba współbieżności, zdalnego dostępu albo retencji wykracza poza ten kontrakt. |
 | ASR | Serwerowy faster-whisper za adapterem; native/on-device lub inny provider pozostają opcją. | Realny benchmark jakości, czasu, kosztu i dostępu do danych uzasadnia zmianę. |
-| Android | Seed chooser i przekazanie wybranych nagrań do klienta; samodzielny skan SAF bez seed to następny zakres. | Build aplikacji i test wskazanego katalogu na urządzeniu potwierdzają cały przepływ. |
-| Cytaty | Wersja + segment; później dokładne słowa i selektory. | Word timestamps oraz walidacja granic i zgodności tekstu. |
+| Android | Samodzielny skan SAF i opcjonalny katalog seed; świadomy wybór nagrań do przesłania. | Build aplikacji i test wskazanego katalogu na urządzeniu potwierdzają cały przepływ. |
+| Cytaty | Wersja + zakres segmentów lub słów; zamrożony selektor odpowiedzi zapisu. | Word timestamps oraz walidacja granic i zgodności tekstu. |
 | Pakiet | Metadane bez obietnicy odtworzenia. | Dokładny eksport/reimport zachowuje ID, relacje, wersje i błędy; media i podpis mają jawny zakres. |
 | LLM / pięć warstw | Zachowane wymagania H1 i rozumowanie H2; nieaktywne rozszerzenia. | Konkretny scenariusz i test metadanych, klasyfikacji, Live Explainer, custody oraz kontroli rozbieżności. |
 
-Najbliższy odbiór obejmuje serwerowy skan, idempotentne importy, lease, wersje
-wyników i przypięcie cytatu. Native SAF, test telefonu,
-dokładne słowa oraz restore metadanych są oddzielnymi następnymi zadaniami.
-Syntetyczny adapter ASR nie potwierdza jakości realnego rozpoznawania mowy.
+Aktualny odbiór i ograniczenia opisuje `HANDOFF.md`. Hostowe testy nie
+zastępują odbioru SAF na urządzeniu. Realny tiny.en na syntetycznym głosie
+nie potwierdza jakości na polskiej mowie ani poprawności alignmentu.
 
 ## Stan implementacji po nocnym przyroście 2026-10-01
 
@@ -117,9 +116,9 @@ Historyczne defaulty powyżej opisują decyzję fundamentu. Bieżące rozszerzen
 - UI: tekst źródła jest danymi również w wyszukiwaniu i cytatach. HTML ze
   źródła nie jest zaufanym markupem interfejsu.
 
-Weryfikacja i konkretne granice: `docs/NIGHT_QA.md`,
-`docs/ANDROID_WAVE2_BUILD_RECEIPT.json`, `docs/METADATA_ARCHIVE.md`,
-`docs/REAL_ASR_SMOKE.md` i `docs/BROWSER_NIGHT_QA.md`. Realny ASR sprawdzono
+Weryfikacja i konkretne granice: `docs/archive/2026-09-30_2026-10-01/NIGHT_QA.md`,
+`docs/archive/2026-09-30_2026-10-01/ANDROID_WAVE2_BUILD_RECEIPT.json`, `docs/METADATA_ARCHIVE.md`,
+`docs/archive/2026-09-30_2026-10-01/REAL_ASR_SMOKE.md` i `docs/archive/2026-09-30_2026-10-01/BROWSER_NIGHT_QA.md`. Realny ASR sprawdzono
 na jednym syntetycznym głosie; błędy rozpoznania zachowano bez korekty.
 Chromium sprawdził odtwarzanie zapisanych zakresów, bez weryfikacji alignmentu.
 Te rozszerzenia nie deklarują działających adapterów innych projektów.

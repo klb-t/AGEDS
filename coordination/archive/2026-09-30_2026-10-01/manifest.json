@@ -1,0 +1,42 @@
+{
+  "schema": "ageds.coordination-archive/v1",
+  "source_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
+  "records": [
+    {
+      "original_path": "HANDOFF.md",
+      "archived_path": "coordination/archive/2026-09-30_2026-10-01/HANDOFF.md",
+      "bytes": 12528,
+      "sha256": "dde22bed137a21460f737b087bb056140d5095a5ca668ebab0cb835bbcc13cbe"
+    },
+    {
+      "original_path": "coordination/state.json",
+      "archived_path": "coordination/archive/2026-09-30_2026-10-01/state.json",
+      "bytes": 17314,
+      "sha256": "13c113bd77ec585fa0037792f1185c48812e13c416f5485c91001f5fc81e4c74"
+    },
+    {
+      "original_path": "coordination/night-20261001.json",
+      "archived_path": "coordination/archive/2026-09-30_2026-10-01/night-20261001.json",
+      "bytes": 75254,
+      "sha256": "5408eb11f022bc40af6b551f0a3f45b96e2b2e70300ba90e8447bdca26186d93"
+    },
+    {
+      "original_path": "coordination/AGENT_PROGRAM.md",
+      "archived_path": "coordination/archive/2026-09-30_2026-10-01/AGENT_PROGRAM.md",
+      "bytes": 8717,
+      "sha256": "a8b19b4664ef2e52aef292643ac2d416d66881f6626232e8e1039c549eddca93"
+    },
+    {
+      "original_path": "coordination/NIGHT_WORK.md",
+      "archived_path": "coordination/archive/2026-09-30_2026-10-01/NIGHT_WORK.md",
+      "bytes": 2918,
+      "sha256": "5c5f102c03708b689c5a76f0e1bb065d4ae4f2cf3b0f4e6b9e1d420b0efc79f1"
+    },
+    {
+      "original_path": "coordination/decisions/2026-09-30.jsonl",
+      "archived_path": "coordination/archive/2026-09-30_2026-10-01/2026-09-30.jsonl",
+      "bytes": 1087,
+      "sha256": "7f37c023da5102910ff18df5c33d8f45771af5977faa0e369657c8d0821956e2"
+    }
+  ]
+}

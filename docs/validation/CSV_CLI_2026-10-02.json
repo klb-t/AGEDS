@@ -1,0 +1,101 @@
+{
+  "schema": "ageds.csv-cli-smoke/v1",
+  "executed_at": "2026-10-02T20:29:57.228721+00:00",
+  "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+  "code_sha256": {
+    "server/app/scanner.py": "711488e3e79f3dfc8f886f5a8a30da5865275677e55f6640ff90ca887d4dae95",
+    "server/app/cli.py": "2081a974c17452e76f6a07f4ffc56a2f0f0b96fd0271a9cdc79a9996ffdf7e28",
+    "server/app/wav_header.py": "71f8187cd8dcce4b58148682bcdce1208b0d953213cfb72a30a675dff93b6231",
+    "scripts/csv_cli_smoke.py": "3a08a2e889368c1a5fcea2b8f87680a5d20993665a14998520cdbe5b7a703906"
+  },
+  "code_unchanged_during_run": true,
+  "fixtures_before": {
+    "utf16be.tsv": {
+      "sha256": "26c092f623cb1009c77072d9b0ef9d6effa2b65c710450e4d373daf39ec20142",
+      "size_bytes": 224,
+      "mtime_ns": 1790972997081807454
+    },
+    "utf16le.csv": {
+      "sha256": "ade310263fed9ab03da412a12868f51db25960df78c4fd17ecbd3f974e0c53f7",
+      "size_bytes": 236,
+      "mtime_ns": 1790972997081468316
+    },
+    "utf8.csv": {
+      "sha256": "4d1dcfaf22dfddea65cf511c4f5bbea6d9421f2caee7b88e1cb8149bd7f9b4c2",
+      "size_bytes": 127,
+      "mtime_ns": 1790972997079215536
+    },
+    "utf8bom.tsv": {
+      "sha256": "1d0274be189b5cc71b4fa28fa0e162922b81d95a42e927b0a8f6f5d84fc69f87",
+      "size_bytes": 124,
+      "mtime_ns": 1790972997081519798
+    }
+  },
+  "fixtures_after": {
+    "utf16be.tsv": {
+      "sha256": "26c092f623cb1009c77072d9b0ef9d6effa2b65c710450e4d373daf39ec20142",
+      "size_bytes": 224,
+      "mtime_ns": 1790972997081807454
+    },
+    "utf16le.csv": {
+      "sha256": "ade310263fed9ab03da412a12868f51db25960df78c4fd17ecbd3f974e0c53f7",
+      "size_bytes": 236,
+      "mtime_ns": 1790972997081468316
+    },
+    "utf8.csv": {
+      "sha256": "4d1dcfaf22dfddea65cf511c4f5bbea6d9421f2caee7b88e1cb8149bd7f9b4c2",
+      "size_bytes": 127,
+      "mtime_ns": 1790972997079215536
+    },
+    "utf8bom.tsv": {
+      "sha256": "1d0274be189b5cc71b4fa28fa0e162922b81d95a42e927b0a8f6f5d84fc69f87",
+      "size_bytes": 124,
+      "mtime_ns": 1790972997081519798
+    }
+  },
+  "runs": [
+    {
+      "name": "complete",
+      "command": [
+        "/workspace/scratch/248dded521c2/AGEDS/.venv/bin/python",
+        "-m",
+        "server.app.cli",
+        "scan",
+        "/tmp/ageds-csv-cli-w98y27fc/source",
+        "--output",
+        "/tmp/ageds-csv-cli-w98y27fc/metadata/complete.json"
+      ],
+      "exit_code": 0,
+      "stderr": "",
+      "records_checked": 20,
+      "coverage_complete": true,
+      "manifest_sha256": "637e8695001042e4d50b66fa69f951042e30177eb3477d097b976dbba19866e9",
+      "manifest_bytes": 18636,
+      "source_snapshot_unchanged": true,
+      "metadata_outside_source": true
+    },
+    {
+      "name": "limited",
+      "command": [
+        "/workspace/scratch/248dded521c2/AGEDS/.venv/bin/python",
+        "-m",
+        "server.app.cli",
+        "scan",
+        "/tmp/ageds-csv-cli-w98y27fc/source",
+        "--output",
+        "/tmp/ageds-csv-cli-w98y27fc/metadata/limited.json",
+        "--max-rows-per-file",
+        "2"
+      ],
+      "exit_code": 0,
+      "stderr": "",
+      "records_checked": 8,
+      "coverage_complete": false,
+      "manifest_sha256": "b7e523cd4fd6dfcab2ec42328a84ba67c100c5f418ef48bdf1ce2c439cfee488",
+      "manifest_bytes": 11342,
+      "source_snapshot_unchanged": true,
+      "metadata_outside_source": true
+    }
+  ],
+  "scope": "Synthetic CLI CSV/TSV decoding and metadata export; no private corpus, SAF or ASR claim."
+}

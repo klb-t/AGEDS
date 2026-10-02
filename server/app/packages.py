@@ -11,6 +11,8 @@ import hashlib
 import json
 from typing import Any
 
+from .verification_budget import VerificationBudget, VerificationLimitError
+
 SCHEMA_ID = 'ageds.metadata-package/v1'
 CANONICALIZATION = 'sorted-keys-compact-utf8-no-nan/v1'
 TABLES = (
@@ -84,7 +86,7 @@ def export_metadata_package() -> dict:
         db.close()
 
 
-def validate_metadata_package(package: Any) -> dict:
+def validate_metadata_package(package: Any, *, budget: VerificationBudget | None = None) -> dict:
     """Verify hashes and the metadata graph without reading referenced paths.
 
     Return structured errors rather than mutating a database. Active jobs and
@@ -114,6 +116,13 @@ def validate_metadata_package(package: Any) -> dict:
         return {'valid': not errors, 'digest_valid': digest_valid,
                 'relationships_valid': relationships_valid, 'anchors_valid': anchors_valid,
                 'errors': errors, 'warnings': warnings, 'counts': counts}
+
+    budget = budget if budget is not None else VerificationBudget()
+    try:
+        budget.check_structure(package)
+    except VerificationLimitError as exc:
+        error('verification_limit_exceeded', '$', str(exc), 'anchors')
+        return result()
 
     if not isinstance(package, dict):
         error('invalid_package', '$', 'Package must be a JSON object.', 'digest')
@@ -294,6 +303,7 @@ def validate_metadata_package(package: Any) -> dict:
 
     # Selector validation uses only text data pinned by derived_text_id. A later
     # transcript for the same artifact has no effect on the selected quote.
+    transcript_cache = {}  # One validation call only, including failed decodes.
     for anchor in rows['evidence_anchors']:
         path = f'$.tables.evidence_anchors[id={anchor.get("id")}]'
         text = lookup('derived_text', anchor.get('derived_text_id'))
@@ -311,11 +321,27 @@ def validate_metadata_package(package: Any) -> dict:
         if type(start) is not int or type(end) is not int or start < 0 or end < start:
             error('invalid_anchor_interval', path, 'Anchor interval must be nonnegative integer milliseconds.', 'anchors')
         try:
-            selector = _strict_stored_json(anchor.get('selector_json', ''))
-            segments = _strict_stored_json(text.get('segments_json', '[]'), finite=False)
+            selector = _strict_stored_json(anchor.get('selector_json', ''), budget=budget)
+            version_id = text['id']
+            if version_id not in transcript_cache:
+                try:
+                    transcript_cache[version_id] = (True, _strict_stored_json(
+                        text.get('segments_json', '[]'), finite=False, budget=budget))
+                except VerificationLimitError:
+                    raise
+                except (ValueError, TypeError, KeyError, IndexError, OverflowError, UnicodeError, RecursionError) as exc:
+                    transcript_cache[version_id] = (False, str(exc))
+            decoded, value = transcript_cache[version_id]
+            if not decoded:
+                raise ValueError(value)
+            segments = value
+            _charge_projection_work(budget, selector, segments)
             projection = _select_quote(selector, segments)
             if (quote, anchor.get('quote_sha256'), start, end) != (projection['quote_text'],projection['quote_sha256'],projection['start_ms'],projection['end_ms']):
                 error('anchor_selector_mismatch', path, 'Quote or interval differs from the pinned selector.', 'anchors')
+        except VerificationLimitError as exc:
+            error('verification_limit_exceeded', path, str(exc), 'anchors')
+            return result()
         except (ValueError, TypeError, KeyError, IndexError, OverflowError, UnicodeError, RecursionError) as exc:
             error('invalid_anchor_selector', path, str(exc), 'anchors')
 
@@ -331,24 +357,62 @@ def validate_metadata_package(package: Any) -> dict:
     return result()
 
 
-def _strict_stored_json(raw: str, *, finite: bool = True) -> Any:
+def _strict_stored_json(raw: str, *, finite: bool = True, budget: VerificationBudget | None = None) -> Any:
     """Selectors are executable selection data; ambiguous object keys are invalid.
 
     This deliberately does not parse arbitrary raw metadata/error strings.
     """
-    def pairs(items):
-        result = {}
-        for key, value in items:
-            if key in result:
-                raise ValueError(f'Duplicate stored JSON key: {key}')
-            result[key] = value
-        return result
-    value = json.loads(raw, object_pairs_hook=pairs)
-    if finite:
-        canonical_json(value)  # Selector numbers/Unicode must be canonical.
-    # Raw segments may retain invalid historic word fields. The selected
-    # projection validates every used timestamp/text, independently of unused words.
-    return value
+    local = budget if budget is not None else VerificationBudget()
+    return local.decode_json(raw, finite=finite, start_depth=4)
+
+
+def _charge_projection_work(budget: VerificationBudget, selector: Any, segments: Any):
+    """Conservative visits before real projection, including repeated word scans.
+
+    Units: one anchor, each selector entry, each touched segment/word, and each
+    candidate text character. This bounds preflight plus repeated projection;
+    it is not an exact instruction, allocation or wall-clock measurement.
+    """
+    budget.charge_projection(1)
+    if not isinstance(selector, dict) or not isinstance(segments, list):
+        return
+    def text_charge(value, key):
+        if isinstance(value, dict) and isinstance(value.get(key), str):
+            budget.charge_projection(len(value[key]))
+    if selector.get('kind') == 'segments':
+        indices = selector.get('indices')
+        if isinstance(indices, list):
+            budget.charge_projection(len(indices))
+            for index in indices:
+                if type(index) is int and 0 <= index < len(segments):
+                    budget.charge_projection(1)
+                    text_charge(segments[index], 'text')
+    elif selector.get('kind') == 'words':
+        refs = selector.get('word_refs')
+        if not isinstance(refs, list):
+            return
+        budget.charge_projection(len(refs))
+        checked = set()
+        for ref in refs:
+            if not isinstance(ref, dict):
+                continue
+            si, wi = ref.get('segment_index'), ref.get('word_index')
+            if type(si) is not int or not 0 <= si < len(segments):
+                continue
+            segment = segments[si]
+            if not isinstance(segment, dict):
+                continue
+            words = segment.get('words')
+            if si not in checked:
+                checked.add(si)
+                budget.charge_projection(1)
+                text_charge(segment, 'text')
+                if isinstance(words, list):
+                    budget.charge_projection(len(words))
+                    for word in words:
+                        text_charge(word, 'word')
+            if isinstance(words, list) and type(wi) is int and 0 <= wi < len(words):
+                text_charge(words[wi], 'word')
 
 
 def _select_quote(selector: Any, segments: Any) -> dict:

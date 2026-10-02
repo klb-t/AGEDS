@@ -19,4 +19,9 @@ internal class SourceScanCache(context: Context) {
 
     @Synchronized
     fun write(result: SourceScanResult, beforeCommit: () -> Unit) = cache.write(json.encodeToString(result), beforeCommit)
+
+    /** Staging does not hold a cache monitor; the gate owns only final publication. */
+    fun writeGuarded(result: SourceScanResult, gate: SourceScanPublicationGate,
+                     token: SourceScanPublicationGate.Token, beforeCommit: () -> Unit = {}): Boolean =
+        cache.writeGuarded(json.encodeToString(result), gate, token, beforeCommit)
 }

@@ -1,7 +1,7 @@
 from __future__ import annotations
 import json
 import sqlite3
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from pathlib import Path
 from .config import settings
 
@@ -153,6 +153,8 @@ CREATE VIRTUAL TABLE IF NOT EXISTS search_fts USING fts5(
 );
 
 CREATE INDEX IF NOT EXISTS idx_artifacts_sha ON artifacts(sha256);
+CREATE INDEX IF NOT EXISTS idx_derived_artifact_kind_id ON derived_text(artifact_id,kind,id);
+CREATE INDEX IF NOT EXISTS idx_annotations_artifact_id ON annotations(artifact_id,id);
 CREATE INDEX IF NOT EXISTS idx_events_ts ON events(ts_start);
 CREATE INDEX IF NOT EXISTS idx_events_phone ON events(phone_or_address);
 CREATE INDEX IF NOT EXISTS idx_events_thread ON events(thread_id);
@@ -262,6 +264,7 @@ CREATE TABLE IF NOT EXISTS evidence_anchors (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 CREATE INDEX IF NOT EXISTS idx_anchors_version ON evidence_anchors(derived_text_id, id);
+CREATE INDEX IF NOT EXISTS idx_anchors_artifact_id ON evidence_anchors(artifact_id,id);
 CREATE TRIGGER IF NOT EXISTS evidence_anchors_no_update
   BEFORE UPDATE ON evidence_anchors BEGIN
     SELECT RAISE(ABORT, 'evidence anchors are append-only');
@@ -328,7 +331,9 @@ def migrate_db(db: sqlite3.Connection) -> None:
 
 
 def init_db() -> None:
-    with connect() as db:
+    # sqlite3's connection context commits/rolls back but does not close. A
+    # leaked startup connection keeps WAL state alive until nondeterministic GC.
+    with closing(connect()) as db, db:
         db.executescript(SCHEMA)
         row = db.execute("SELECT id FROM cases ORDER BY id LIMIT 1").fetchone()
         if not row:

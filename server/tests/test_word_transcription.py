@@ -77,22 +77,54 @@ class WordTimingCapabilityTests(unittest.TestCase):
         self.assertEqual(captured, {'word_timestamps': True, 'vad_filter': True})
         self.assertEqual(result.metadata['transcript_confidence'], 'unknown')
 
+    def test_model_numeric_scalars_keep_word_timing_available_before_and_after_storage(self):
+        # Models emit numpy.float64; float subclass reproduces the strict-type
+        # boundary without adding NumPy or a model to the offline test suite.
+        class ModelFloat(float):
+            pass
+        raw = fixture()[0]
+        segment = SimpleNamespace(start=ModelFloat(raw['start']), end=ModelFloat(raw['end']),
+            text=raw['text'], words=[SimpleNamespace(**{**w, 'start': ModelFloat(w['start']),
+                'end': ModelFloat(w['end']), 'probability': ModelFloat(w['probability'])
+                if w['probability'] is not None else None}) for w in raw['words']])
+        class Model:
+            def __init__(self, *args, **kwargs): pass
+            def transcribe(self, *args, **kwargs):
+                return iter([segment]), SimpleNamespace(language='pl', language_probability=ModelFloat(.9))
+        with patch.dict(sys.modules, {'faster_whisper': SimpleNamespace(WhisperModel=Model)}):
+            result = worker.FasterWhisperAdapter().transcribe('synthetic:not-read')
+        self.assertEqual(result.segments, [raw])
+        self.assertIs(type(result.segments[0]['start']), float)
+        self.assertIs(type(result.segments[0]['words'][0]['start']), float)
+        self.assertIs(type(result.metadata['language_probability']), float)
+        before = transcription.word_timing_capabilities(result.segments)
+        after = transcription.word_timing_capabilities(json.loads(json.dumps(result.segments)))
+        self.assertEqual(before['status'], 'available')
+        self.assertEqual(before, after)
+        self.assertEqual(worker._json_number(True), True)
+        self.assertIs(type(worker._json_number(True)), bool)
+        self.assertEqual(worker._json_number('0.5'), '0.5')
+
 
 class WorkerWordTimingTests(unittest.TestCase):
     def setUp(self):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         self.root = Path(temp.name)
-        config = replace(db.settings, db_path=self.root / 'evidence.db')
+        config = replace(db.settings, db_path=self.root / 'evidence.db', store_dir=self.root / 'store')
+        config.store_dir.mkdir()
         patcher = patch.object(db, 'settings', config)
         patcher.start()
         self.addCleanup(patcher.stop)
+        worker_patcher = patch.object(worker, 'settings', config)
+        worker_patcher.start()
+        self.addCleanup(worker_patcher.stop)
         db.init_db()
-        audio = self.root / 'synthetic.wav'
+        audio = config.store_dir / 'synthetic.wav'
         audio.write_bytes(b'not a decoded recording')
         with db.session() as conn:
-            self.aid = conn.execute('INSERT INTO artifacts(original_name,mime_type,stored_path,sha256) VALUES (?,?,?,?)',
-                ('synthetic.wav', 'audio/wav', str(audio), hashlib.sha256(audio.read_bytes()).hexdigest())).lastrowid
+            self.aid = conn.execute('INSERT INTO artifacts(original_name,mime_type,stored_path,sha256,size_bytes) VALUES (?,?,?,?,?)',
+                ('synthetic.wav', 'audio/wav', str(audio), hashlib.sha256(audio.read_bytes()).hexdigest(), audio.stat().st_size)).lastrowid
 
     def run_result(self, data):
         class Adapter:

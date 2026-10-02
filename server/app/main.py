@@ -1,20 +1,22 @@
 from __future__ import annotations
-import csv, io, json, shutil, tempfile
+import csv, io, json, shutil, sqlite3, tempfile
 from pathlib import Path
 from typing import Annotated
 from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi import Path as PathParameter
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from .db import init_db, session
 from .config import settings
-from .evidence import IntegrityError, ensure_source, ingest_file, sha256_file
+from .evidence import IntegrityError, ensure_source, ingest_file
 from .citations import anchor_payload, create_citation, loads_transcript_segments, milliseconds
 from .importers.sms_backup import import_sms_backup
 from .importers.whatsapp import import_whatsapp_txt
-from .search import search as fts_search
+from .search import SearchQueryError, SearchWorkLimitError, search_page
+from .read_pages import PageInputError, PageNotFound, PageStoredError, PageLimitError, read_page
+from .verified_media import MediaUnavailable, MediaIntegrityError, MediaLimitError, verified_media_response
 from .transcription import queue_all_audio, queue_transcription, word_timing_capabilities
 
 app=FastAPI(title='AGEDS Evidence Workbench',version='0.2.0')
@@ -96,8 +98,19 @@ def home(request:Request,q:str='',kind:str=''):
     with session() as db:
         recent=[dict(r) for r in db.execute("SELECT id,original_name,mime_type,size_bytes,sha256,created_at FROM artifacts ORDER BY id DESC LIMIT 30")]
         events=[dict(r) for r in db.execute("SELECT id,event_type,ts_start,direction,contact_label,phone_or_address,subject,substr(body,1,240) body FROM events ORDER BY COALESCE(ts_start,created_at) DESC LIMIT 30")]
-    results=fts_search(q,100) if q else []
-    return templates.TemplateResponse(request,'index.html',{'counts':dashboard_counts(),'recent':recent,'events':events,'results':results,'q':q})
+    search_error = None
+    search_status = 200
+    page = {'results': [], 'has_more': False, 'complete': True, 'limit': 100}
+    try:
+        page = search_page(q, 100)
+    except SearchQueryError as exc:
+        search_error, search_status = str(exc), 422
+    except SearchWorkLimitError:
+        search_error, search_status = 'Przekroczono limit pracy wyszukiwania. Zawęź zapytanie.', 503
+    return templates.TemplateResponse(request,'index.html',{
+        'counts':dashboard_counts(),'recent':recent,'events':events,
+        'results':page['results'],'q':q,'search_error':search_error,
+        'search_has_more':page['has_more'],'search_limit':page['limit']}, status_code=search_status)
 
 @app.post('/upload')
 async def upload(file:UploadFile=File(...),source_label:str=Form('Manual upload')):
@@ -129,11 +142,17 @@ def artifact(request:Request,artifact_id:SqlPathId):
     with session() as db:
         art=db.execute("SELECT a.*,s.kind source_kind,s.label source_label FROM artifacts a LEFT JOIN sources s ON s.id=a.source_id WHERE a.id=?",(artifact_id,)).fetchone()
         if not art:raise HTTPException(404)
-        texts=[dict(r) for r in db.execute("SELECT * FROM derived_text WHERE artifact_id=? ORDER BY id DESC",(artifact_id,))]
-        anns=[dict(r) for r in db.execute("SELECT * FROM annotations WHERE artifact_id=? ORDER BY id DESC",(artifact_id,))]
-        events=[dict(r) for r in db.execute("SELECT * FROM events WHERE artifact_id=? ORDER BY ts_start",(artifact_id,))]
-        citations=[dict(r) for r in db.execute('SELECT * FROM evidence_anchors WHERE artifact_id=? ORDER BY id DESC',(artifact_id,))]
-    return templates.TemplateResponse(request,'artifact.html',{'a':dict(art),'texts':texts,'annotations':anns,'events':events,'citations':citations})
+        previews=[dict(r) for r in db.execute("SELECT id,kind,model,language,substr(text,1,4096) AS text,length(text)>4096 AS text_truncated FROM derived_text WHERE artifact_id=? AND kind!='transcript' ORDER BY id DESC LIMIT 51",(artifact_id,))]
+        events=[dict(r) for r in db.execute("SELECT id,ts_start,event_type,direction,contact_label,phone_or_address,substr(body,1,4096) AS body,substr(subject,1,4096) AS subject FROM events WHERE artifact_id=? ORDER BY ts_start LIMIT 101",(artifact_id,))]
+    version_page = _read_page_http(artifact_id, 'transcripts')
+    citation_page = _read_page_http(artifact_id, 'citations')
+    annotation_page = _read_page_http(artifact_id, 'annotations')
+    return templates.TemplateResponse(request,'artifact.html',{
+        'a':dict(art),'texts':previews[:50],'text_previews_more':len(previews)>50,
+        'annotations':annotation_page['items'],'events':events[:100],'events_more':len(events)>100,
+        'citations':citation_page['items'],'version_page':version_page,
+        'citation_page':citation_page,'annotation_page':annotation_page})
+
 
 @app.post('/artifact/{artifact_id}/annotate')
 def annotate(artifact_id:SqlPathId,body:str=Form(...),label:str=Form(''),kind:str=Form('note'),start_ms:int|None=Form(None,ge=0,le=MAX_SQL_INTEGER),end_ms:int|None=Form(None,ge=0,le=MAX_SQL_INTEGER),derived_text_id:str|None=Form(None)):
@@ -152,7 +171,18 @@ def transcribe(artifact_id:SqlPathId): return api_queue_transcription(artifact_i
 def transcribe_all(): return {'queued_artifacts':queue_all_audio()}
 
 @app.get('/api/search')
-def api_search(q:str): return fts_search(q,200)
+def api_search(q:str):
+    try:
+        page = search_page(q, 200)
+    except SearchQueryError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except SearchWorkLimitError as exc:
+        raise HTTPException(503, 'Search work limit exceeded; narrow the query.') from exc
+    return JSONResponse(page['results'], headers={
+        'X-AGEDS-Search-Limit': str(page['limit']),
+        'X-AGEDS-Search-Has-More': str(page['has_more']).lower(),
+        'X-AGEDS-Search-Complete': str(page['complete']).lower(),
+    })
 
 @app.get('/api/timeline')
 def timeline(limit:int=Query(500,ge=1,le=10000),phone:str|None=None,event_type:str|None=None):
@@ -291,6 +321,39 @@ def api_transcript(artifact_id:SqlPathId,derived_text_id:int|None=Query(None,ge=
         except (ValueError, TypeError, UnicodeError) as exc:
             raise HTTPException(409, 'Stored transcript has malformed or nonfinite JSON; original values remain preserved in metadata export.') from exc
 
+
+def _read_page_http(artifact_id, kind, *, limit=50, before_id=None, snapshot_max_id=None):
+    try:
+        return read_page(artifact_id, kind, limit=limit, before_id=before_id, snapshot_max_id=snapshot_max_id)
+    except PageInputError as exc:
+        raise HTTPException(422, str(exc)) from exc
+    except PageNotFound as exc:
+        raise HTTPException(404, 'artifact not found') from exc
+    except PageStoredError as exc:
+        raise HTTPException(409, 'Stored list metadata is invalid; original records remain unchanged.') from exc
+    except PageLimitError as exc:
+        raise HTTPException(413, 'List page exceeds the read budget; original records remain unchanged.') from exc
+    except (OSError, sqlite3.Error) as exc:
+        raise HTTPException(503, 'Evidence database is unavailable for read-only listing.') from exc
+
+@app.get('/api/artifacts/{artifact_id}/transcripts/page')
+def api_transcript_page(artifact_id:SqlPathId, limit:int=Query(50,ge=1,le=100),
+                        before_id:int|None=Query(None,ge=1,le=MAX_SQL_INTEGER),
+                        snapshot_max_id:int|None=Query(None,ge=0,le=MAX_SQL_INTEGER)):
+    return _read_page_http(artifact_id,'transcripts',limit=limit,before_id=before_id,snapshot_max_id=snapshot_max_id)
+
+@app.get('/api/artifacts/{artifact_id}/citations/page')
+def api_citation_page(artifact_id:SqlPathId, limit:int=Query(50,ge=1,le=100),
+                      before_id:int|None=Query(None,ge=1,le=MAX_SQL_INTEGER),
+                      snapshot_max_id:int|None=Query(None,ge=0,le=MAX_SQL_INTEGER)):
+    return _read_page_http(artifact_id,'citations',limit=limit,before_id=before_id,snapshot_max_id=snapshot_max_id)
+
+@app.get('/api/artifacts/{artifact_id}/annotations/page')
+def api_annotation_page(artifact_id:SqlPathId, limit:int=Query(50,ge=1,le=100),
+                        before_id:int|None=Query(None,ge=1,le=MAX_SQL_INTEGER),
+                        snapshot_max_id:int|None=Query(None,ge=0,le=MAX_SQL_INTEGER)):
+    return _read_page_http(artifact_id,'annotations',limit=limit,before_id=before_id,snapshot_max_id=snapshot_max_id)
+
 @app.get('/api/artifacts/{artifact_id}/transcripts')
 def api_transcript_versions(artifact_id:SqlPathId):
     with session() as db:
@@ -301,18 +364,28 @@ def api_source_observations(artifact_id:SqlPathId):
     with session() as db:
         return [dict(r) for r in db.execute('SELECT * FROM source_observations WHERE artifact_id=? ORDER BY id',(artifact_id,))]
 
-@app.get('/api/artifacts/{artifact_id}/content')
-def api_artifact_content(artifact_id:SqlPathId):
+@app.api_route('/api/artifacts/{artifact_id}/content', methods=['GET', 'HEAD'])
+def api_artifact_content(request:Request, artifact_id:SqlPathId):
     with session() as db:
         row = db.execute('SELECT * FROM artifacts WHERE id=?',(artifact_id,)).fetchone()
     if not row:
         raise HTTPException(404, 'artifact not found')
-    path = Path(row['stored_path']) if row['stored_path'] else None
-    if path is None or path.is_symlink() or not path.is_file() or not path.resolve().is_relative_to(settings.store_dir.resolve()):
-        raise HTTPException(409, 'stored content is unavailable or outside configured content store')
-    if sha256_file(path) != row['sha256']:
-        raise HTTPException(409, 'stored content failed SHA-256 verification')
-    return FileResponse(path, media_type=row['mime_type'] or 'application/octet-stream',filename=row['original_name'])
+    if not row['stored_path']:
+        raise HTTPException(409, 'stored content is unavailable')
+    try:
+        # This sync route runs in a worker thread. The response retains its
+        # verified descriptor and rechecks each buffered chunk before sending.
+        return verified_media_response(
+            row['stored_path'], row['sha256'], row['size_bytes'],
+            media_type=row['mime_type'], filename=row['original_name'],
+            range_header=request.headers.get('range'),
+            if_range=request.headers.get('if-range'), head=request.method == 'HEAD',
+            store_root=settings.store_dir,
+        )
+    except MediaLimitError as exc:
+        raise HTTPException(413, 'Stored content exceeds the verified serving limit.') from exc
+    except (MediaUnavailable, MediaIntegrityError) as exc:
+        raise HTTPException(409, 'Stored content is unavailable or failed byte identity verification.') from exc
 
 @app.post('/api/artifacts/{artifact_id}/citations')
 def api_citation_create(artifact_id:SqlPathId,a:CitationIn):
@@ -327,6 +400,26 @@ def api_citation_create(artifact_id:SqlPathId,a:CitationIn):
 def api_citations(artifact_id:SqlPathId):
     with session() as db:
         return [anchor_payload(r) for r in db.execute('SELECT * FROM evidence_anchors WHERE artifact_id=? ORDER BY id',(artifact_id,))]
+
+@app.get('/api/artifacts/{artifact_id}/citations/{anchor_id}/packet')
+def api_citation_packet(artifact_id: SqlPathId, anchor_id: SqlPathId):
+    from .exchange import (PacketLimitError, PacketNotFound, canonical_packet_bytes,
+                           export_citation_packet)
+    try:
+        packet = export_citation_packet(artifact_id, anchor_id)
+        payload = canonical_packet_bytes(packet)
+    except PacketNotFound as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except PacketLimitError as exc:
+        raise HTTPException(413, str(exc)) from exc
+    except (ValueError, TypeError, UnicodeError) as exc:
+        raise HTTPException(409, 'Stored evidence cannot form a valid citation packet; original records remain unchanged.') from exc
+    except (OSError, sqlite3.Error) as exc:
+        raise HTTPException(503, 'Evidence database is unavailable for read-only export.') from exc
+    return Response(content=payload, media_type='application/json', headers={
+        'Content-Disposition': f'attachment; filename="ageds-citation-{artifact_id}-{anchor_id}.json"',
+        'Cache-Control': 'no-store',
+    })
 
 @app.get('/api/source-roots')
 def api_source_roots():

@@ -1,0 +1,187 @@
+{
+  "schema": "ageds.synthetic-wav-header-fixtures/v1",
+  "fixtures": [
+    {
+      "id": "pcm_mono16_complete",
+      "prefix_hex": "524946463400000057415645666d74201000000001000100401f0000803e0000020010006461746110000000000102030405060708090a0b0c0d0e0f",
+      "provider_size_bytes": 60,
+      "end_of_input": true,
+      "expected_status": "observed",
+      "expected_duration_sec": 0.001
+    },
+    {
+      "id": "ieee_float_stereo32_fmt18_complete",
+      "prefix_hex": "524946464600000057415645666d7420120000000300020080bb000000dc050008002000000064617461200000000000000000000000000000000000000000000000000000000000000000000000",
+      "provider_size_bytes": 78,
+      "end_of_input": true,
+      "expected_status": "observed",
+      "expected_duration_sec": 8.333333333333333e-05
+    },
+    {
+      "id": "pcm_header_only_unread_body",
+      "prefix_hex": "5249464624a60e0057415645666d74201000000001000100803e0000007d0000020010006461746100a60e00",
+      "provider_size_bytes": 960044,
+      "end_of_input": false,
+      "expected_status": "observed",
+      "expected_duration_sec": 30.0
+    },
+    {
+      "id": "empty_unknown_eof",
+      "prefix_hex": "",
+      "provider_size_bytes": null,
+      "end_of_input": false,
+      "expected_status": "partial"
+    },
+    {
+      "id": "eight_byte_truncated_riff_at_eof",
+      "prefix_hex": "5249464634000000",
+      "provider_size_bytes": 8,
+      "end_of_input": true,
+      "expected_status": "malformed"
+    },
+    {
+      "id": "rf64_unsupported",
+      "prefix_hex": "52463634ffffffff57415645",
+      "provider_size_bytes": null,
+      "end_of_input": false,
+      "expected_status": "unsupported"
+    },
+    {
+      "id": "riff_non_wave_form",
+      "prefix_hex": "524946460400000041564920",
+      "provider_size_bytes": 12,
+      "end_of_input": true,
+      "expected_status": "unsupported"
+    },
+    {
+      "id": "riff_extent_smaller_than_header",
+      "prefix_hex": "524946460000000057415645",
+      "provider_size_bytes": 12,
+      "end_of_input": true,
+      "expected_status": "malformed"
+    },
+    {
+      "id": "provider_size_disagrees",
+      "prefix_hex": "524946463400000057415645666d74201000000001000100401f0000803e0000020010006461746110000000000102030405060708090a0b0c0d0e0f",
+      "provider_size_bytes": 61,
+      "end_of_input": true,
+      "expected_status": "size_mismatch"
+    },
+    {
+      "id": "declared_body_missing_at_eof",
+      "prefix_hex": "5249464624a60e0057415645666d74201000000001000100803e0000007d0000020010006461746100a60e00",
+      "provider_size_bytes": 960044,
+      "end_of_input": true,
+      "expected_status": "malformed"
+    },
+    {
+      "id": "fmt_basic_fields_outside_prefix",
+      "prefix_hex": "524946463400000057415645666d74201000000001000100401f0000803e",
+      "provider_size_bytes": 60,
+      "end_of_input": false,
+      "expected_status": "partial"
+    },
+    {
+      "id": "duplicate_fmt_chunks",
+      "prefix_hex": "524946463c00000057415645666d74201000000001000100401f0000803e000002001000666d74201000000001000100401f0000803e0000020010006461746100000000",
+      "provider_size_bytes": 68,
+      "end_of_input": true,
+      "expected_status": "malformed"
+    },
+    {
+      "id": "data_before_fmt",
+      "prefix_hex": "5249464624000000574156456461746100000000666d74201000000001000100401f0000803e000002001000",
+      "provider_size_bytes": 44,
+      "end_of_input": true,
+      "expected_status": "malformed"
+    },
+    {
+      "id": "inconsistent_format_byte_rate",
+      "prefix_hex": "524946463400000057415645666d74201000000001000100401f00007f3e000002001000646174611000000000000000000000000000000000000000",
+      "provider_size_bytes": 60,
+      "end_of_input": true,
+      "expected_status": "malformed"
+    },
+    {
+      "id": "compressed_format_unsupported",
+      "prefix_hex": "524946463400000057415645666d74201000000006000100401f0000401f000001000800646174611000000000000000000000000000000000000000",
+      "provider_size_bytes": 60,
+      "end_of_input": true,
+      "expected_status": "unsupported"
+    },
+    {
+      "id": "odd_junk_padding_before_fmt",
+      "prefix_hex": "524946463e000000574156454a554e4b010000007800666d74201000000001000100401f0000803e000002001000646174611000000000000000000000000000000000000000",
+      "provider_size_bytes": 70,
+      "end_of_input": true,
+      "expected_status": "observed",
+      "expected_duration_sec": 0.001
+    },
+    {
+      "id": "missing_odd_chunk_padding",
+      "prefix_hex": "524946460d000000574156454a554e4b0100000078",
+      "provider_size_bytes": 21,
+      "end_of_input": true,
+      "expected_status": "malformed"
+    },
+    {
+      "id": "duplicate_data_chunks",
+      "prefix_hex": "524946463c00000057415645666d74201000000001000100401f0000803e0000020010006461746108000000000000000000000064617461080000000000000000000000",
+      "provider_size_bytes": 68,
+      "end_of_input": true,
+      "expected_status": "malformed"
+    },
+    {
+      "id": "nonzero_fmt_extension",
+      "prefix_hex": "524946463600000057415645666d74201200000001000100401f0000803e0000020010000200646174611000000000000000000000000000000000000000",
+      "provider_size_bytes": 62,
+      "end_of_input": true,
+      "expected_status": "unsupported"
+    },
+    {
+      "id": "unaligned_pcm_data",
+      "prefix_hex": "524946462800000057415645666d74201000000001000100401f0000803e000002001000646174610300000000000000",
+      "provider_size_bytes": 48,
+      "end_of_input": true,
+      "expected_status": "malformed"
+    },
+    {
+      "id": "unsigned32_large_declared_body",
+      "prefix_hex": "52494646e8ffffff57415645666d74201000000001000100401f0000803e00000200100064617461c4ffffff",
+      "provider_size_bytes": 4294967280,
+      "end_of_input": false,
+      "expected_status": "observed",
+      "expected_duration_sec": 268435.45225
+    },
+    {
+      "id": "prefix_limit_hides_required_headers",
+      "prefix_hex": "524946462c000100574156454a554e4b00000100",
+      "provider_size_bytes": 65588,
+      "end_of_input": true,
+      "expected_status": "partial",
+      "repeat_hex": "00",
+      "repeat_count": 65536,
+      "suffix_hex": "666d74201000000001000100401f0000803e0000020010006461746100000000"
+    },
+    {
+      "id": "exact_prefix_limit_with_unread_body",
+      "prefix_hex": "5249464624a60e0057415645666d74201000000001000100803e0000007d0000020010006461746100a60e00",
+      "provider_size_bytes": 960044,
+      "end_of_input": false,
+      "expected_status": "observed",
+      "expected_duration_sec": 30.0,
+      "repeat_hex": "00",
+      "repeat_count": 65492
+    },
+    {
+      "id": "one_over_prefix_limit_resets_eof",
+      "prefix_hex": "5249464624a60e0057415645666d74201000000001000100803e0000007d0000020010006461746100a60e00",
+      "provider_size_bytes": 960044,
+      "end_of_input": true,
+      "expected_status": "observed",
+      "expected_duration_sec": 30.0,
+      "repeat_hex": "00",
+      "repeat_count": 65493
+    }
+  ]
+}

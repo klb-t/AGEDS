@@ -1,480 +1,146 @@
 {
   "schema_version": 1,
   "project": "AGEDS",
-  "state_id": "AGEDS-STATE-20260930-001",
-  "updated_at": "2026-09-30T22:57:35.238130+00:00",
-  "based_on_remote_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0",
-  "local_branch": "codex/ageds-foundation-20260930",
-  "changes_published": true,
-  "published_commit": "ffda747b11b6fe7d527a044ff334553df71bed40",
-  "status_summary": "Fundament PR #2 scalony. Bieżący nocny etap: patrz coordination/night-20261001.json — 182 testy backend, 207 podtestów, 14 Node oraz rzeczywisty Android build z 26 testami JVM.",
-  "coordination": {
-    "transport": "repository_commits_and_stable_ids",
-    "history_search_role": "context_recall_only_not_delivery_or_order_guarantee",
-    "management_thread": "requested_not_created_or_verified",
-    "execution_lifecycle": "active_execution_plus_six_user_authorized_overnight_scheduled_resumptions; consult latest batch claim",
-    "this_session_max_concurrent_processes": 7,
-    "coordinator_processes": 1,
-    "worker_slots": 6,
-    "management_roles_rotate_within_worker_slots": true,
-    "other_threads_limit": "unknown_not_an_assumed_limit_bypass",
-    "management_responsibilities": [
-      "product_priorities",
-      "architecture_contracts",
-      "assignment_and_integration",
-      "independent_acceptance",
-      "requirements_provenance",
-      "criticism_and_experiments"
+  "state_id": "AGEDS-STATE-20261002-001",
+  "updated_at": "2026-10-02T20:42:18.425496+00:00",
+  "based_on_remote_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
+  "local_branch": "codex/ageds-completion-20261002",
+  "status_summary": "All four interrupted overnight tasks accepted; pinned411JVM/APK,25Chromium,85Node,429backend+588subtests and clean real ASR pass. Incremental recovery is locally complete, publication pending final safety review.",
+  "history": {
+    "overnight_ledger": "coordination/archive/2026-09-30_2026-10-01/night-20261001.json",
+    "original_tasks": 82,
+    "original_accepted": 78,
+    "recovered_task_ids": [
+      "AGEDS-20261001-N80",
+      "AGEDS-20261001-N81",
+      "AGEDS-20261001-N83",
+      "AGEDS-20261001-N84"
     ],
-    "state_editor": "coordinator",
-    "delivery_requires": [
-      "recipient_read_commit",
-      "explicit_task_acknowledgement"
-    ],
-    "completion_requires": [
-      "result_record",
-      "validation_evidence",
-      "coordinator_acceptance"
+    "standalone_changes_already_integrated_at": "1e71cf8",
+    "historical_paths": "docs/archive/2026-09-30_2026-10-01/manifest.json",
+    "recovered_accepted": 82,
+    "additional_queue_completed": [
+      "N17 clean ASR installation"
     ]
   },
-  "authority": {
-    "routine_decisions": "autonomous_reversible_implementation_and_validation",
-    "user_involvement": [
-      "strategic_goal_or_scope_change_beyond_authorization",
-      "irreversible_action_not_already_authorized",
-      "new_material_cost_not_authorized",
-      "external_commitment_not_authorized"
-    ],
-    "source_refs": [
-      "U1",
-      "U2",
-      "H1",
-      "H2",
-      "H3",
-      "E1",
-      "P1",
-      "C1"
-    ],
-    "source_registry": "docs/ARCHITECTURE_RULES.md",
-    "labels": [
-      "explicit",
-      "constraint",
-      "brainstorm",
-      "inferred",
-      "proposed",
-      "unresolved"
-    ]
+  "coordination": {
+    "transport": "repository_commits_and_stable_ids",
+    "state_editor": "coordinator",
+    "active_claim": null,
+    "scope": "AGEDS only",
+    "ci": "manual workflow_dispatch only",
+    "history_is_not_active_schedule": true
+  },
+  "publication": {
+    "status": "local_only_pending_safety_review",
+    "changes_published": false,
+    "reviewed_local_head": "38253b30152559f65c8a48eae229bcf1e780805b",
+    "remote_main": "8c3efb9e65999dd4931b22b555329da76379c31e",
+    "remote_night": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
+    "blocker": "Public branch push initially rejected by automatic safety review for historical case-specific data; complete current-tree and new-history audit before any retry."
   },
   "tasks": [
     {
-      "id": "AGEDS-TASK-20260930-001",
-      "title": "Integralność pozyskań i addytywna migracja",
+      "id": "AGEDS-TASK-20261002-001",
+      "owner": "native_completion",
       "status": "accepted",
-      "owner": "foundation_integrity",
       "scope": [
-        "server/app/db.py",
-        "server/app/evidence.py",
-        "server/tests/test_integrity.py"
+        "core",
+        "androidApp",
+        "scripts/build_verify.sh"
       ],
+      "based_on_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
       "acceptance": [
-        "Stara baza migruje bez utraty rekordów",
-        "Ten sam hash zachowuje odrębne pozyskania",
-        "Uszkodzona kopia nie zostaje uznana za integralną"
+        "Actual pinned JVM/build acceptance for 29 saved wave13 tests and new private-seed selection tests; keep initial failure."
       ],
-      "depends_on": [],
-      "authority": "inferred",
-      "source_refs": [
-        "H1",
-        "H3",
-        "A01",
-        "A02"
+      "result_refs": [
+        "docs/validation/NATIVE_COMPLETION_2026-10-02.json"
       ],
-      "result_id": "AGEDS-RESULT-20260930-001",
-      "integration_status": "integrated_and_accepted_locally",
-      "based_on_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0"
-    },
-    {
-      "id": "AGEDS-TASK-20260930-002",
-      "title": "Trwała kolejka, runy i fenced publikacja",
-      "status": "accepted",
-      "owner": "foundation_jobs",
-      "scope": [
-        "server/app/jobs.py",
-        "server/app/transcription.py",
-        "server/app/worker.py",
-        "server/tests/test_jobs.py"
-      ],
-      "acceptance": [
-        "Dwa workery nie claimują tej samej aktywnej pracy",
-        "Spóźniony worker nie publikuje ani nie psuje replacement run",
-        "Requeue aktualizuje jawny priorytet, bulk go zachowuje",
-        "Każda próba ma własny run i jawne unknown"
-      ],
-      "depends_on": [
-        "AGEDS-TASK-20260930-001"
-      ],
-      "authority": "inferred",
-      "source_refs": [
-        "H1",
-        "A04",
-        "A05"
-      ],
-      "result_id": "AGEDS-RESULT-20260930-002",
-      "integration_status": "integrated_and_accepted_locally",
-      "based_on_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0"
-    },
-    {
-      "id": "AGEDS-TASK-20260930-003",
-      "title": "Idempotentne importy komunikacji i niejednoznaczny czas",
-      "status": "accepted",
-      "owner": "foundation_parsers",
-      "scope": [
-        "server/app/importers/sms_backup.py",
-        "server/app/importers/whatsapp.py",
-        "server/tests/test_importers.py"
-      ],
-      "acceptance": [
-        "Ponowny import nie mnoży zdarzeń",
-        "Surowe wartości i błędy pozostają dostępne",
-        "AM/PM i brak timezone nie dają pozornej pewności"
-      ],
-      "depends_on": [
-        "AGEDS-TASK-20260930-001"
-      ],
-      "authority": "inferred",
-      "source_refs": [
-        "H3",
-        "A01",
-        "A02",
-        "A11"
-      ],
-      "result_id": "AGEDS-RESULT-20260930-003",
-      "integration_status": "integrated_and_accepted_locally",
-      "based_on_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0"
-    },
-    {
-      "id": "AGEDS-TASK-20260930-004",
-      "title": "Serwerowy skan CSV/XLS/XLSX i sprzecznych metadanych",
-      "status": "accepted",
-      "owner": "foundation_scanner",
-      "scope": [
-        "server/app/scanner.py",
-        "server/app/cli.py",
-        "server/requirements-scanner.txt",
-        "server/tests/test_scanner.py",
-        "server/tests/test_cli.py"
-      ],
-      "acceptance": [
-        "Źródła nie są zmieniane",
-        "Manifest zapisuje zakres i pominięcia",
-        "Kolizje nazw i sprzeczne numery pozostają konfliktem",
-        "Scan observations nie udają pozyskania do store"
-      ],
-      "depends_on": [],
-      "authority": "explicit",
-      "source_refs": [
-        "H3",
-        "A01",
-        "A03"
-      ],
-      "result_id": "AGEDS-RESULT-20260930-004",
-      "integration_status": "integrated_and_accepted_locally",
-      "based_on_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0"
-    },
-    {
-      "id": "AGEDS-TASK-20260930-005",
-      "title": "Cytaty przypięte do segmentu i pakiet metadanych",
-      "status": "accepted",
-      "owner": "coordinator",
-      "contributors": [
-        "foundation_integrity",
-        "foundation_parsers"
-      ],
-      "scope": [
-        "server/app/main.py",
-        "server/app/citations.py",
-        "server/app/packages.py",
-        "server/tests/test_citations.py",
-        "server/tests/test_packages.py",
-        "core/src/commonMain/kotlin/dev/klbt/ageds/core/Models.kt",
-        "androidApp/src/main/java/dev/klbt/ageds/Api.kt"
-      ],
-      "acceptance": [
-        "Cytat wskazuje konkretny derived_text_id i zakres",
-        "Niezgodna wersja/quote są odrzucane",
-        "Pakiet deklaruje wyłączenia i nie obiecuje replay/podpisu/restore"
-      ],
-      "depends_on": [
-        "AGEDS-TASK-20260930-001",
-        "AGEDS-TASK-20260930-002"
-      ],
-      "authority": "inferred",
-      "source_refs": [
-        "H1",
-        "A06",
-        "A07"
-      ],
-      "result_id": "AGEDS-RESULT-20260930-005",
-      "integration_status": "integrated_and_accepted_locally",
-      "based_on_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0"
-    },
-    {
-      "id": "AGEDS-TASK-20260930-006",
-      "title": "Android: seed chooser, kolizje nazw i przejście do klienta",
-      "status": "accepted",
-      "owner": "foundation_android",
-      "scope": [
-        "androidApp/src/main/java/dev/klbt/ageds/CorpusStore.kt",
-        "androidApp/src/main/java/dev/klbt/ageds/CorpusVm.kt",
-        "androidApp/src/main/java/dev/klbt/ageds/CorpusUi.kt",
-        "androidApp/src/main/java/dev/klbt/ageds/PendingRecordings.kt",
-        "androidApp/src/main/java/dev/klbt/ageds/MainActivity.kt",
-        "gradlew",
-        "gradlew.bat",
-        "gradle/wrapper/gradle-wrapper.jar",
-        "gradle/wrapper/gradle-wrapper.properties",
-        "docs/ANDROID_BUILD.md"
-      ],
-      "acceptance": [
-        "Dwa różne pliki o tej samej nazwie nie znikają",
-        "Wybrane nagranie trafia do klienta serwerowego",
-        "UI nie deklaruje działającego skanu bez seed"
-      ],
-      "depends_on": [],
-      "authority": "inferred",
-      "source_refs": [
-        "H3",
-        "A01",
-        "A10"
-      ],
-      "result_id": "AGEDS-RESULT-20260930-006",
-      "integration_status": "source_review_and_real_build_accepted_device_test_pending",
-      "based_on_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0"
-    },
-    {
-      "id": "AGEDS-TASK-20260930-007",
-      "title": "Protokół koordynacji i reguły architektury",
-      "status": "accepted",
-      "owner": "foundation_jobs",
-      "scope": [
-        "AGENTS.md",
-        "coordination/README.md",
-        "coordination/state.json",
-        "docs/ARCHITECTURE_RULES.md"
-      ],
-      "acceptance": [
-        "Limit siedmiu procesów jest jawny",
-        "Historia jest recall, a commit+ID służą przekazaniu",
-        "Reguły oddzielają źródła od propozycji",
-        "Straty/dodatki/granice są konkretne dla SMS/WAV/scanu"
-      ],
-      "depends_on": [],
-      "authority": "inferred",
-      "source_refs": [
-        "U1",
-        "U2",
-        "E1",
-        "C1"
-      ],
-      "result_id": "AGEDS-RESULT-20260930-007",
-      "integration_status": "integrated_and_accepted_locally",
-      "based_on_commit": "99389ba2ba1a5873b4183b592c62f7aa666276c0"
-    }
-  ],
-  "results": [
-    {
-      "id": "AGEDS-RESULT-20260930-001",
-      "task_id": "AGEDS-TASK-20260930-001",
-      "scope": "integrated_foundation_increment",
-      "commit": "ffda747b11b6fe7d527a044ff334553df71bed40",
-      "validation": {
-        "integrity_tests": 13
-      },
-      "limits": []
-    },
-    {
-      "id": "AGEDS-RESULT-20260930-002",
-      "task_id": "AGEDS-TASK-20260930-002",
-      "scope": "integrated_foundation_increment",
-      "commit": "ffda747b11b6fe7d527a044ff334553df71bed40",
-      "validation": {
-        "queue_tests": 19
-      },
-      "limits": [
-        "Synthetic ASR adapter only",
-        "Stop legacy workers before upgrade",
-        "Lease uses system wall clock"
-      ]
-    },
-    {
-      "id": "AGEDS-RESULT-20260930-003",
-      "task_id": "AGEDS-TASK-20260930-003",
-      "scope": "integrated_foundation_increment",
-      "commit": "ffda747b11b6fe7d527a044ff334553df71bed40",
-      "validation": {
-        "importer_tests": 14
-      },
-      "limits": []
-    },
-    {
-      "id": "AGEDS-RESULT-20260930-004",
-      "task_id": "AGEDS-TASK-20260930-004",
-      "scope": "integrated_foundation_increment",
-      "commit": "ffda747b11b6fe7d527a044ff334553df71bed40",
-      "validation": {
-        "scanner_tests": 21,
-        "cli_tests": 10
-      },
-      "limits": [
-        "POSIX no-follow descriptors required",
-        "Scanner field observations differ from byte-acquisition observations",
-        "Coverage bounded and explicit"
-      ]
-    },
-    {
-      "id": "AGEDS-RESULT-20260930-005",
-      "task_id": "AGEDS-TASK-20260930-005",
-      "scope": "integrated_foundation_increment",
-      "commit": "ffda747b11b6fe7d527a044ff334553df71bed40",
-      "validation": {
-        "citation_tests": 18,
-        "package_tests": 18,
-        "api_tests": 12
-      },
-      "limits": [
-        "Segment precision only",
-        "No audio verification",
-        "Unsigned metadata-only; no media, replay or restore"
-      ]
-    },
-    {
-      "id": "AGEDS-RESULT-20260930-006",
-      "task_id": "AGEDS-TASK-20260930-006",
-      "scope": "source_review_and_real_clean_snapshot_build",
-      "commit": "ffda747b11b6fe7d527a044ff334553df71bed40",
-      "validation": {
-        "command": "./gradlew :androidApp:assembleDebug :core:desktopTest",
-        "result": "BUILD SUCCESSFUL",
-        "jvm_tests": 1,
+      "results": {
+        "jvm_tests": 411,
+        "core_tests": 135,
+        "android_tests": 276,
         "failures": 0,
-        "source_hashes_match_repository": true,
-        "apk_name": "AGEDS_foundation_debug_2026-09-30.apk",
-        "apk_size_bytes": 14091343,
-        "apk_sha256": "b7d4548a12fa23ea20b76f30d13e742dc4c2c19562985418b730e9f48a57bc91",
-        "signature": "debug_v2_verified",
-        "device_test": "not_performed",
-        "report": "docs/ANDROID_BUILD.md",
-        "published_build_inputs_verified": 25,
-        "source_commit": "ffda747b11b6fe7d527a044ff334553df71bed40"
-      },
-      "limits": [
-        "Prepared JSON seed still required in Android corpus",
-        "No device UI test or actual ASR model inference"
+        "errors": 0,
+        "skipped": 0,
+        "apk_signature_exit_code": 0,
+        "instrumentation_compiled": true,
+        "device_tests_executed": 0
+      }
+    },
+    {
+      "id": "AGEDS-TASK-20261002-002",
+      "owner": "browser_completion",
+      "status": "accepted",
+      "scope": [
+        "browser/Node acceptance"
+      ],
+      "based_on_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
+      "acceptance": [
+        "25 real Chromium scenarios incl4 N83;85Node;no page errors."
+      ],
+      "result_refs": [
+        "docs/validation/BROWSER_COMPLETION_2026-10-02.json",
+        "docs/validation/BROWSER_PRIVACY_2026-10-02.json"
       ]
     },
     {
-      "id": "AGEDS-RESULT-20260930-007",
-      "task_id": "AGEDS-TASK-20260930-007",
-      "scope": "integrated_foundation_increment",
-      "commit": "ffda747b11b6fe7d527a044ff334553df71bed40",
-      "validation": {
-        "method": "source_scoped_document_review_and_json_parse"
-      },
-      "limits": [
-        "Other management thread not created or verified",
-        "No background scheduler or guaranteed chat delivery"
+      "id": "AGEDS-TASK-20261002-003",
+      "owner": "asr_environment",
+      "status": "accepted",
+      "scope": [
+        "fresh ASR environment",
+        "verified synthetic inference"
+      ],
+      "based_on_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
+      "acceptance": [
+        "Nine declared pins/imports/pipcheck;real VerifiedReader inference,citation,inert roundtrip."
+      ],
+      "result_refs": [
+        "docs/validation/ASR_COMPLETION_2026-10-02.json"
+      ]
+    },
+    {
+      "id": "AGEDS-TASK-20261002-004",
+      "owner": "docs_structure",
+      "status": "accepted",
+      "scope": [
+        "README",
+        "active docs",
+        "history archive"
+      ],
+      "based_on_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
+      "acceptance": [
+        "All experimental snapshots retained byte-for-byte;current guides distinct from archive."
+      ],
+      "result_refs": [
+        "docs/archive/2026-09-30_2026-10-01/manifest.json"
+      ]
+    },
+    {
+      "id": "AGEDS-TASK-20261002-005",
+      "owner": "coordinator",
+      "status": "done",
+      "scope": [
+        "HANDOFF",
+        "CLAUDE",
+        "coordination",
+        "integration"
+      ],
+      "based_on_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
+      "acceptance": [
+        "Full backend/CLI acceptance;reference/hash checks;safe incremental integration."
+      ],
+      "result_refs": [
+        "docs/validation/BACKEND_COMPLETION_2026-10-02.json"
       ]
     }
   ],
-  "next_tasks": [
-    {
-      "id": "AGEDS-TASK-20260930-008",
-      "status": "ready",
-      "title": "Native Android SAF: skan wskazanych źródeł bez seed",
-      "acceptance": "Natywny przepływ read-only z CSV/XLS/XLSX, lokatorami, konfliktami i zakresem pokrycia",
-      "progress": "Native bounded SAF CSV/TSV/XLSX/WAV and inventory implemented without seed; native XLS and device/provider acceptance remain. See nightly receipt."
-    },
-    {
-      "id": "AGEDS-TASK-20260930-009",
-      "status": "ready",
-      "title": "Odbiór gotowego debug APK na telefonie",
-      "acceptance": "Artefakt builda oraz sprawdzona ścieżka wyboru, uploadu, transkrypcji i cytatu",
-      "owner": "unassigned",
-      "progress": "Updated nightly APK built, signed and source-hash verified with 26 JVM tests. Device validation remains."
-    },
-    {
-      "id": "AGEDS-TASK-20260930-010",
-      "status": "accepted",
-      "title": "Word timestamps i dokładne selektory cytatów",
-      "acceptance": "Wybór słów wskazuje konkretną wersję i weryfikowany przedział",
-      "progress": "Exact word selectors, pinned version, strict raw-text/time validation and browser range playback implemented. ASR alignment/audio verification not claimed."
-    },
-    {
-      "id": "AGEDS-TASK-20260930-011",
-      "status": "accepted",
-      "title": "Dokładny metadata export/reimport",
-      "acceptance": "ID, relacje, wersje, konflikty i błędy zachowane; zakres mediów i podpisu jawny",
-      "progress": "Exact canonical metadata package roundtrip via inert SQLite archive. No live DB restore, source media, signature or job replay."
-    },
-    {
-      "id": "AGEDS-TASK-20260930-012",
-      "status": "proposed",
-      "title": "Opcjonalne zdolności LLM i pięć warstw AGEDS",
-      "acceptance": "Konkretny scenariusz i testy każdej warstwy; bez deklarowania gotowości na podstawie samego ASR"
-    }
-  ],
-  "known_limits": [
-    "Anthropic export identified but not searched: transfer unavailable",
-    "Latest source-scanner request recovered from history, not complete raw export",
-    "Ecosystem adapters are conceptual, not implemented",
-    "Native Android source scan implemented without seed; XLS and device/provider validation remain.",
-    "Exact inert metadata archive roundtrip is implemented; full live restore, source media and replay are not."
-  ],
-  "validation": {
-    "command": "python -m pytest server/tests -q",
-    "passed": 126,
-    "subtests_passed": 84,
-    "failed": 0,
-    "warnings": 3,
-    "data": "synthetic",
-    "asr": "synthetic_adapter_only",
-    "independent_api_checks_passed": 31,
-    "report": "docs/FOUNDATION_QA.md",
-    "desktop_form_probe": "artifact page plus generic/versioned notes passed; blank version is treated as generic note",
-    "secondary_branch_review": "fix/standalone-android has identical relevant blobs to main; no missing patch",
-    "android": {
-      "command": "./gradlew :androidApp:assembleDebug :core:desktopTest",
-      "result": "BUILD SUCCESSFUL",
-      "jvm_tests": 1,
-      "failures": 0,
-      "source_hashes_match_repository": true,
-      "apk_name": "AGEDS_foundation_debug_2026-09-30.apk",
-      "apk_size_bytes": 14091343,
-      "apk_sha256": "b7d4548a12fa23ea20b76f30d13e742dc4c2c19562985418b730e9f48a57bc91",
-      "signature": "debug_v2_verified",
-      "device_test": "not_performed",
-      "report": "docs/ANDROID_BUILD.md",
-      "published_build_inputs_verified": 25,
-      "source_commit": "ffda747b11b6fe7d527a044ff334553df71bed40"
-    }
-  },
-  "publication": {
-    "content_commit": "ffda747b11b6fe7d527a044ff334553df71bed40",
-    "content_tree": "c6e0fb8a566e04173b737eef7042cf753890fed4",
-    "branch": "codex/ageds-foundation-20260930",
-    "pull_request": "https://github.com/klb-t/AGEDS/pull/2",
-    "draft": false,
-    "merged": true,
-    "receipt_semantics": "This record confirms the referenced content commit; the receipt itself is stored in a later commit.",
-    "build_inputs_verified": 25,
-    "content_commits": [
-      "91529270254271b4d84c47d7e1b1b6904edb1d0f",
-      "66f906c85df8ce8bc6005e15d1a33d1240b087a2",
-      "86045f83a98c0f430057ccd49d199525a8f17584",
-      "ffda747b11b6fe7d527a044ff334553df71bed40"
-    ],
-    "merge_commit": "b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2"
-  },
-  "latest_batch_file": "coordination/night-20261001.json",
-  "latest_handoff": "coordination/NIGHT_WORK.md"
+  "remaining_boundaries": [
+    "Android SAF device/provider execution: no connected device or emulator.",
+    "Polish speech quality/acoustic alignment unmeasured.",
+    "No live restore, signed custody, source media export or connected ecosystem adapters.",
+    "No API authentication.",
+    "Public Git history retains preexisting case-specific identifiers; current-tree cleanup is not history erasure."
+  ]
 }

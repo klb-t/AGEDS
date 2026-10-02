@@ -1,7 +1,7 @@
 # AGEDS — zasady pracy agentów
 
-Najpierw przeczytaj `HANDOFF.md`, bieżący indeks wskazany w nim (obecnie
-`coordination/night-20261001.json`), `coordination/state.json`, `coordination/README.md`,
+Najpierw przeczytaj `CLAUDE.md`, `HANDOFF.md`,
+`coordination/state.json`, `coordination/README.md`,
 `docs/ARCHITECTURE_RULES.md` i `ECOSYSTEM.md`. Jeśli `HANDOFF.md` nie jest jeszcze
 dostępny, użyj pozostałych plików i jawnie odnotuj brak. Stan z historii czatu
 sprawdzaj wobec aktualnego kodu i commitów.

@@ -18,8 +18,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 
-private val defaultPresetIds = listOf("gemeente_oss", "uwv", "susanne_walstra", "wettbewind", "acture")
-
 class CorpusVm(application: Application) : AndroidViewModel(application) {
     val corpus = mutableStateOf<CorpusSeed?>(null)
     val selectedPresetIds = mutableStateListOf<String>()
@@ -43,7 +41,7 @@ class CorpusVm(application: Application) : AndroidViewModel(application) {
     private val excludedPhones = mutableStateListOf<String>()
     private val store = CorpusStore(application)
     private var scanJob: Job? = null
-    private var scanGeneration = 0
+    private val scanPublication = SourceScanPublicationGate()
     private var importing = false
     private var scanning = false
     private fun updateBusy() { busy.value = importing || scanning }
@@ -92,7 +90,8 @@ class CorpusVm(application: Application) : AndroidViewModel(application) {
     }
 
     fun selectPriority() {
-        selectedPresetIds.clear(); selectedPresetIds.addAll(defaultPresetIds)
+        selectedPresetIds.clear()
+        selectedPresetIds.addAll(corpus.value?.priorityPresetIds().orEmpty())
         manualPhones.clear(); excludedPhones.clear()
     }
     fun clearSelection() { selectedPresetIds.clear(); manualPhones.clear(); excludedPhones.clear() }
@@ -167,7 +166,8 @@ class CorpusVm(application: Application) : AndroidViewModel(application) {
     fun sourceCandidate(file: ScannedSourceFile) = asCandidate(file)
 
     fun cancelSourceScan() {
-        ++scanGeneration
+        // Invalidation shares the final-move lock; cancellation alone cannot fence a late writer.
+        scanPublication.invalidate()
         scanJob?.cancel()
         scanning = false
         sourceScanning.value = false
@@ -180,7 +180,7 @@ class CorpusVm(application: Application) : AndroidViewModel(application) {
 
     fun scanSources(treeUri: Uri, persistentAccess: Boolean = true) {
         if (importing) return
-        val generation = ++scanGeneration
+        val publicationToken = scanPublication.begin()
         scanJob?.cancel()
         selectedSourceUris.clear()
         sourceScan.value = null
@@ -202,24 +202,28 @@ class CorpusVm(application: Application) : AndroidViewModel(application) {
             error.value = null
             try {
                 val scan = withContext(Dispatchers.IO) { SourceScanner(getApplication()).scan(treeUri) }
-                if (generation != scanGeneration) return@launch
+                if (!scanPublication.isCurrent(publicationToken)) return@launch
                 installScan(scan)
                 message.value = "Skan: ${scan.files.size} plików · ${scan.scannedDirectories} folderów. Wybierz nagrania i przejrzyj ograniczenia odczytu."
                 // Snapshot output is visible even if the bounded private cache cannot be saved.
                 val saved = withContext(Dispatchers.IO) {
                     val scanContext = currentCoroutineContext()
-                    runCatching { sourceCache.write(scan) { scanContext.ensureActive() } }
+                    runCatching {
+                        sourceCache.writeGuarded(scan, scanPublication, publicationToken) { scanContext.ensureActive() }
+                    }.also { result ->
+                        result.exceptionOrNull()?.let { if (it is CancellationException) throw it }
+                    }
                 }
-                if (generation != scanGeneration) return@launch
+                if (!scanPublication.isCurrent(publicationToken) || saved.getOrNull() == false) return@launch
                 saved.onFailure {
                     sourceCacheNotice.value = "Bieżący wynik jest tylko w pamięci: ${it.message}. Poprzedni cache, jeśli istniał, pozostał niezmieniony."
                 }
                 store.saveRecordingTree(treeUri)
             } catch (t: Throwable) {
                 if (t is CancellationException) throw t
-                if (generation == scanGeneration) error.value = "Skan źródeł: ${t.message}"
+                if (scanPublication.isCurrent(publicationToken)) error.value = "Skan źródeł: ${t.message}"
             } finally {
-                if (generation == scanGeneration) {
+                if (scanPublication.isCurrent(publicationToken)) {
                     scanning = false
                     sourceScanning.value = false
                     progress.value = null
@@ -227,6 +231,13 @@ class CorpusVm(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+    }
+
+    override fun onCleared() {
+        // A move that already linearized may remain; a move after invalidation is refused.
+        scanPublication.invalidate()
+        scanJob?.cancel()
+        super.onCleared()
     }
 
     fun candidates(rec: CorpusRecording) = linkedRecordingCandidates[rec.name].orEmpty()

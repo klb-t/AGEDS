@@ -1,0 +1,167 @@
+{
+  "git_head": "4eb8c1eca00cfed5acba8c2d5b7a8794db2ea6dd",
+  "playwright": "1.62.1",
+  "source_sha256": {
+    "server/app/main.py": "0ae7735006c42773058c58b02bf156d6d2898c5ae0ee039e18a074523d878233",
+    "server/app/db.py": "776f0039102c91e7da63fa489b64ae6fcccd1bf925db02501d09d01ab822bdf9",
+    "server/app/static/citations.mjs": "aec72c429e6fa40e12abb51244bc5694e9b1ba27209db1afb70329ed09b3dcfa",
+    "server/app/static/range-player.mjs": "f451e2f333cf480100d29dafa9181c8c6ebae748dda03092c0bc03c0664b901c",
+    "server/app/templates/artifact.html": "04aeeb303579b8e6ef08f3d3f0c88c6d2503922f7c83fec509f43cf266a84025",
+    "server/app/templates/index.html": "4d5cb3975a95d4d88bb7b9d89cc3f128b6a6cbebab41ae7a8343ecd49488e87e",
+    "server/app/exchange.py": "f1f80e17c6e8697833d0e5b910807efe0e469aa22107ed1d5cc0e6fed1e061bc",
+    "server/app/exchange_consumer.py": "95bff415061954ae8cce8ca998f06229c70cf5477c4b47e0dba2fc3b210c3049",
+    "server/app/verified_media.py": "90308d9bc8061391c1f8772f027652fe45087f5fe80029d83d02b2a08590cd4d",
+    "server/app/search.py": "14783b0a154050a09521f58a57e6600bdd14ffad5fe2f231f69d15620fbfc8cd",
+    "server/app/read_pages.py": "fc5fbc7bd57d84bd1b384d01be810ad60120ad5747d2279120e3b3bff2785a5a",
+    "server/tests/browser/acceptance.cjs": "a6a192fd801f8cb8e47d1a04874cd4eceb68fa0505ad5aeb95dca1fc6bd35f20",
+    "server/tests/browser_fixture.py": "b8df1eebbaa26ffdb4ed3aeace242d9c6a12bf87fc978a985b8d165423b72e5b"
+  },
+  "task": "AGEDS-20261001-N40-browser",
+  "baseline_task": "AGEDS-20261001-N12",
+  "started_at": "2026-10-01T00:33:26.979Z",
+  "fixture": "generated 4s mono PCM WAV; temporary SQLite; synthetic transcript versions",
+  "cases": [
+    {
+      "name": "older version exact word citation and literal XSS text",
+      "status": "passed"
+    },
+    {
+      "name": "fresh saved quote replay uses old anchor while latest version selected",
+      "status": "passed"
+    },
+    {
+      "name": "fresh packet link downloads and independently verifies old version while latest selected",
+      "status": "passed"
+    },
+    {
+      "name": "persisted quote replay retains anchor and cancels on seek outside range",
+      "status": "passed"
+    },
+    {
+      "name": "persisted packet link downloads identical pinned evidence while latest selected",
+      "status": "passed"
+    },
+    {
+      "name": "stale transcript response cannot replace newer selected version",
+      "status": "passed"
+    },
+    {
+      "name": "pending save stays pinned while version switches",
+      "status": "passed"
+    },
+    {
+      "name": "real WAV playback seeks and stops at selected end",
+      "status": "passed"
+    },
+    {
+      "name": "stop button cancels real playback without later resumption",
+      "status": "passed"
+    },
+    {
+      "name": "version change cancels audio and clears unavailable word selection",
+      "status": "passed"
+    },
+    {
+      "name": "selection change cancels native playback",
+      "status": "passed"
+    },
+    {
+      "name": "stop during delayed metadata prevents late native playback",
+      "status": "passed"
+    },
+    {
+      "name": "search snippets keep source HTML inert in actual browser",
+      "status": "passed"
+    },
+    {
+      "name": "verified media endpoint supports exact ranges and HEAD in Chromium context",
+      "status": "passed"
+    },
+    {
+      "name": "unsafe DOM artifact ID refuses transcript requests before rounding",
+      "status": "passed"
+    },
+    {
+      "name": "unsafe DOM transcript ID refuses fetch and preserves exact unsupported ID",
+      "status": "passed"
+    },
+    {
+      "name": "unsafe or mismatched API version identity never enables quote actions",
+      "status": "passed"
+    },
+    {
+      "name": "paged versions preserve selected pin across delayed older load",
+      "status": "passed"
+    },
+    {
+      "name": "citation and annotation pages expose all 125 rows without duplicates or source HTML",
+      "status": "passed"
+    },
+    {
+      "name": "mismatched history snapshot is rejected without adding rows",
+      "status": "passed"
+    }
+  ],
+  "browser": "141.0.7390.37",
+  "downloads": [
+    {
+      "rendering": "dynamic",
+      "filename": "ageds-citation-1-132.json",
+      "content_disposition": "attachment; filename=\"ageds-citation-1-132.json\"",
+      "bytes": 3927,
+      "sha256": "4dd2923eb1eb9d3c1c77f5b43c71c3822439196e5b491248c8afe2a09c1439e6",
+      "derived_text_id": 1,
+      "anchor_id": 132,
+      "verification": "matches_included_pinned_transcript",
+      "media_requests": 0,
+      "stored_path_included": false,
+      "source_bytes_included": false,
+      "media_bytes_included": false
+    },
+    {
+      "rendering": "persisted",
+      "filename": "ageds-citation-1-132.json",
+      "content_disposition": "attachment; filename=\"ageds-citation-1-132.json\"",
+      "bytes": 3927,
+      "sha256": "4dd2923eb1eb9d3c1c77f5b43c71c3822439196e5b491248c8afe2a09c1439e6",
+      "derived_text_id": 1,
+      "anchor_id": 132,
+      "verification": "matches_included_pinned_transcript",
+      "media_requests": 0,
+      "stored_path_included": false,
+      "source_bytes_included": false,
+      "media_bytes_included": false
+    }
+  ],
+  "playback": {
+    "playing": {
+      "paused": false,
+      "time": 0.225203,
+      "duration": 4,
+      "ready": 4,
+      "native": true
+    },
+    "stopped": {
+      "paused": true,
+      "time": 1.1,
+      "duration": 4,
+      "ready": 4,
+      "native": true
+    },
+    "tolerance_seconds": 0.03
+  },
+  "verified_media": {
+    "full_bytes": 128044,
+    "range_bytes": 48,
+    "head_body_bytes": 0
+  },
+  "history_pages": {
+    "versions": 125,
+    "citations": 125,
+    "annotations": 125,
+    "initial_limit": 50
+  },
+  "status": "failed",
+  "error": "AssertionError [ERR_ASSERTION]: The input did not match the regular expression /limit|budżet/i. Input:\n\n'Wczytuję starsze pozycje…'\n\n    at /workspace/scratch/773725428b88/AGEDS/server/tests/browser/acceptance.cjs:324:14\n    at async test (/workspace/scratch/773725428b88/AGEDS/server/tests/browser/acceptance.cjs:38:36)\n    at async /workspace/scratch/773725428b88/AGEDS/server/tests/browser/acceptance.cjs:313:42",
+  "finished_at": "2026-10-01T00:33:42.467Z"
+}

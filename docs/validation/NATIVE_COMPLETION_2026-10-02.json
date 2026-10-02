@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "checked_at": "2026-10-02T20:41:42.845271+00:00",
+  "status": "pinned_jvm_and_android_build_passed_runtime_pending",
+  "task_ids": [
+    "AGEDS-20261001-N80",
+    "AGEDS-20261001-N81",
+    "AGEDS-20261001-N84"
+  ],
+  "build_receipt": "NATIVE_BUILD_2026-10-02.json",
+  "counts": {
+    "tests": 411,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "module_tests": {
+    "core": 135,
+    "androidApp": 276
+  },
+  "wave13_test_suites": [
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.CitationWorkspaceCreatedResponseTest.xml",
+      "suite": "dev.klbt.ageds.CitationWorkspaceCreatedResponseTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.CitationWorkspaceResponseAdversarialTest.xml",
+      "suite": "dev.klbt.ageds.CitationWorkspaceResponseAdversarialTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "core/build/test-results/desktopTest/TEST-dev.klbt.ageds.core.CitationResponseAdversarialTest.xml",
+      "suite": "CitationResponseAdversarialTest[desktop]",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "core/build/test-results/desktopTest/TEST-dev.klbt.ageds.core.CitationCreatedResponseTest.xml",
+      "suite": "CitationCreatedResponseTest[desktop]",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "core/build/test-results/desktopTest/TEST-dev.klbt.ageds.core.CitationSelectorWireCompatibilityTest.xml",
+      "suite": "CitationSelectorWireCompatibilityTest[desktop]",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "privacy_test_suites": [
+    {
+      "path": "core/build/test-results/desktopTest/TEST-dev.klbt.ageds.core.CorpusPrioritySelectionTest.xml",
+      "suite": "CorpusPrioritySelectionTest[desktop]",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "source_inputs_verified": 95,
+  "source_hashes_match_current_repository": true,
+  "toolchain": {
+    "gradle": "9.7.0",
+    "kotlin": "2.4.20",
+    "android_gradle_plugin": "9.4.0",
+    "serialization": "1.11.0",
+    "java_version": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode, sharing)",
+    "compile_sdk": 37,
+    "installed_platform": "platforms;android-37.0",
+    "installed_build_tools": [
+      "36.0.0",
+      "37.0.0"
+    ],
+    "apksigner_version": "37.0.0",
+    "gradle_distribution_sha256": "84fbba45c7f4c64abc77460e1c00f541e9f960e3c7ed2538f1ede19eacd873ae",
+    "jdk_archive_sha256": "ce79869e1307ed8ee1e2baa86a412b1eb5b75d10a01006d788a6f968bcfaee94",
+    "platform_archive_sha1": "ed8ebf7f8822a4de5686d427f237d2fa30ff7410"
+  },
+  "application_apk": {
+    "sha256": "ef53cb3cde477fdc43e1d990bef75b2d41c168e348b670dea1625b568303a83d",
+    "bytes": 14173205,
+    "signature_verification_exit_code": 0,
+    "signing": "debug"
+  },
+  "instrumentation": {
+    "compilation_requested": true,
+    "compilation_completed": true,
+    "runtime_tests_executed": 0,
+    "runtime_status": "not_run",
+    "apk_sha256": "5a30a8be97feddba2a108992a1724429288b1f6982528f5ecdf66e85e311f373",
+    "apk_bytes": 407235,
+    "prepared_test_cases": 6,
+    "signature_verification_exit_code": 0
+  },
+  "runtime_probe": {
+    "task": "AGEDS-20261001-N10",
+    "observed_at": "2026-10-02T20:36:04.718822+00:00",
+    "kvm_device_exists": false,
+    "kvm_module_exists": false,
+    "emulator_binary_exists": false,
+    "system_images": [],
+    "adb_exit_code": 0,
+    "adb_devices_output": "List of devices attached",
+    "connected_devices": [],
+    "runtime_tests_executed": 0,
+    "runtime_status": "not_requested",
+    "limitations": [
+      "Synthetic provider only; no picker UI, persisted grant lifecycle, recording selection or real provider acceptance."
+    ]
+  },
+  "first_attempt": {
+    "receipt": "NATIVE_FIRST_ATTEMPT_2026-10-02.json",
+    "build_exit_code": 1,
+    "tests": 135,
+    "failures": 1,
+    "source_unchanged": false,
+    "failed_test": "CitationResponseAdversarialTest.selectionAndRequestsKeepDefensiveCopiesOfCallerLists",
+    "cause": "Singleton List casts to MutableList on JVM but refuses clear(), so the fixture failed before checking copy independence.",
+    "fix_commit": "19af439",
+    "fix": "Use two-element segment and word selections so the returned copies are actually mutated before asserting independence.",
+    "accepted_as_final": false
+  },
+  "alternate_core_probe": {
+    "receipt": "NATIVE_CORE_FALLBACK_2026-10-02.json",
+    "compiler": "2.4.0",
+    "jvm_tests": 135,
+    "failures": 0,
+    "scope": "Actual core source tests only; not the pinned Gradle/Android build. Superseded by the pinned final acceptance."
+  },
+  "limits": [
+    "No connected Android device, emulator, system image or KVM: zero SAF instrumentation runtime tests and no phone UI acceptance.",
+    "JVM synthetic citation tests do not validate HTTP transport, ASR quality, acoustic alignment or factual accuracy.",
+    "Debug APK; no production signing or store release.",
+    "Browser, backend and real ASR are separate acceptance receipts."
+  ]
+}

@@ -1,0 +1,374 @@
+{
+  "started_at": "2026-10-01T01:14:49.800988+00:00",
+  "finished_at": "2026-10-01T01:17:32.553859+00:00",
+  "tasks": [
+    ":androidApp:assembleDebug",
+    ":androidApp:testDebugUnitTest",
+    ":core:desktopTest"
+  ],
+  "build_exit_code": 0,
+  "source_sha256": {
+    "androidApp/build.gradle.kts": "fce128076bfa897fbcbaf17d12ccf676ec8eae919db9a3ca0fb12b4ec01411bd",
+    "androidApp/src/androidTest/AndroidManifest.xml": "4dbf7f6bde07757dece14cf936e0f516a93ebc91d588e7f6700a92fe68334f72",
+    "androidApp/src/androidTest/java/dev/klbt/ageds/SourceScannerProviderTest.kt": "2615a03186f8b787a7754be0858e838462230aaf7534381f947d582a9d3898a6",
+    "androidApp/src/androidTest/java/dev/klbt/ageds/SyntheticDocumentsProvider.kt": "36c3f2e8ccc90a0ab9c6a40c80d784d3f52590c1ed6cc6a760f81950c48bd1d4",
+    "androidApp/src/debug/AndroidManifest.xml": "bf548047b3f213c426f010300b21a952d9c261f3a9459a57d1694daa17ff0a19",
+    "androidApp/src/main/AndroidManifest.xml": "3312bc332bc3f6f77f8f2b9f89a57a561b96cfbbc457b744ef087e6d9f1e6fd6",
+    "androidApp/src/main/cpp/CMakeLists.txt": "839136a66c948c63ab388ad9d6c7c4d7584034d589fd7b548a8fb0d17ff177d8",
+    "androidApp/src/main/cpp/whisper_jni.cpp": "a657b54a6f820136c19fc9a69b884a7a36304ef6d119d93f0a2152713c018da0",
+    "androidApp/src/main/java/dev/klbt/ageds/AndroidRangeAudio.kt": "465a82c61a92a421984856662a70fcb3c19c511e00bc40a545a29455c45bce65",
+    "androidApp/src/main/java/dev/klbt/ageds/Api.kt": "1c84fee60dba27d3d79cb2c70d8d353743e3bbaa3c3f2aa4f5bb194bbc6dd9cb",
+    "androidApp/src/main/java/dev/klbt/ageds/BoundedMetadataCache.kt": "a1e336762a8b629f8b514b83aeebd0bd6a97d08923b4d1765924d7b241edf659",
+    "androidApp/src/main/java/dev/klbt/ageds/CitationDisplayProjection.kt": "12e88bfcf6d71e5179e80a539ad736c4b1d568fd873e676c460c63ca7af8393e",
+    "androidApp/src/main/java/dev/klbt/ageds/CitationUi.kt": "4dadf7e6b9da7e205db66b1ef367bbe34ef114ba3dc86ececc1c826e70c028a5",
+    "androidApp/src/main/java/dev/klbt/ageds/CitationWorkspace.kt": "e464d0a0b6324cc140c61b337eca6419337bfa27b00e076be860cd45fa76bd82",
+    "androidApp/src/main/java/dev/klbt/ageds/CorpusActivity.kt": "0dc47d154855521f9d3658a0d7d484ec0f72c4e3629f54a8e14b57fb64a48e1c",
+    "androidApp/src/main/java/dev/klbt/ageds/CorpusStore.kt": "00f3a231033cae5777acefe7882e51135b68c998260e08124bebb4e58e6601ea",
+    "androidApp/src/main/java/dev/klbt/ageds/CorpusUi.kt": "b44645b323c9eb8c7edfd6d86cb7d9ad6fcb649cc34f800bb86b321c2d34e2f3",
+    "androidApp/src/main/java/dev/klbt/ageds/CorpusVm.kt": "099a72264dfef814fe52053c0146816629f6e44ff4afc76310861436ce190a3f",
+    "androidApp/src/main/java/dev/klbt/ageds/MainActivity.kt": "94d97a4293abccf1c107bdff06d7968f2dd80710049f302aaca37eaaac9603bb",
+    "androidApp/src/main/java/dev/klbt/ageds/PendingRecordings.kt": "1130db7bb0341c752fb82ef22bb74eb6cddf6b3a5419a167cf86dc28792bedeb",
+    "androidApp/src/main/java/dev/klbt/ageds/RangePlaybackController.kt": "ae3bb7ac2a5ded6b4a89a28bacdc512b51ce8a7158f58c1c9705b7a16804239a",
+    "androidApp/src/main/java/dev/klbt/ageds/SourceAudioDisplay.kt": "98bc917523e9f4bf78f15d80e14ad1aa723fab7108dbe532db2b52d121e4ae1f",
+    "androidApp/src/main/java/dev/klbt/ageds/SourceDelimitedParser.kt": "ac7a72bcee73a8663a257d018565b3b8bb4d10519183e87bbbcb5f86d41b2ed1",
+    "androidApp/src/main/java/dev/klbt/ageds/SourceScanCache.kt": "88f5a1f9bd512155f08ccff3f10bd37e50e4332c76d78353de7f30017526d73f",
+    "androidApp/src/main/java/dev/klbt/ageds/SourceScanEngine.kt": "435c38eaaaad13cb8af74611362f2aa2456add0a322000b14aafafe8b885e6a8",
+    "androidApp/src/main/java/dev/klbt/ageds/SourceScanUi.kt": "df382c18c498b791a2f65b620e9918706e70b3e27c255151fda68ae0c1f0a975",
+    "androidApp/src/main/java/dev/klbt/ageds/SourceScanner.kt": "14a13b501be58915188988098ddb14faabaa332aa4ca2181e174afcac64f510d",
+    "androidApp/src/main/java/dev/klbt/ageds/SourceWavReader.kt": "e12024acd9a7c2f328b4c7fe650a1fafce0c49a0d45c1b2c571756b643986dde",
+    "androidApp/src/main/java/dev/klbt/ageds/SourceWorkbookParser.kt": "749fbcfea0329dcf7052e96a242a1d3b992894a06245a362b9588edf23e8726f",
+    "androidApp/src/main/java/dev/klbt/ageds/SourceXlsParser.kt": "51dbafb51f66ba44c5003170a59eda750ee13ca985214096a9059c5e973a948f",
+    "androidApp/src/main/res/values/styles.xml": "6a7531a6e7b821113cdaa407e9de407df7e5d281b85584991a91b35ecccb07c6",
+    "androidApp/src/test/java/dev/klbt/ageds/BoundedMetadataCacheTest.kt": "db490f8468f8f4d88ee7e32ccb523fad8fecbb66305a36443bc6528566379563",
+    "androidApp/src/test/java/dev/klbt/ageds/CitationDisplayProjectionTest.kt": "84c20e303eaf8581c96b613bc92a46157249c4574d09bdbd93d29ba1d723246d",
+    "androidApp/src/test/java/dev/klbt/ageds/CitationPagingAdversarialTest.kt": "8cba71b754f6d48ca8d64038e69a8c25140d7ec91d8b1dabb0f61376e8995ad5",
+    "androidApp/src/test/java/dev/klbt/ageds/CitationPayloadBudgetAdversarialTest.kt": "493ca9a37cb9f066da87b21e700d821624e719abd01b1be204766e3eb9908082",
+    "androidApp/src/test/java/dev/klbt/ageds/CitationWorkspaceAdversarialTest.kt": "2f120dc87aab5b51c075cb87854884ddc8b1ab8e01077ddb2e539870c422181b",
+    "androidApp/src/test/java/dev/klbt/ageds/RangePlaybackAdversarialTest.kt": "54bba20000e397d2d13c54926053d6aea1606bc41cd2919c5a0f24df37b1c8bb",
+    "androidApp/src/test/java/dev/klbt/ageds/SourceAdversarialFormatsTest.kt": "0ea0d784a49842b1dc2e2479923fa24b4fdf753f121fcd3034f4bcc8c50eca76",
+    "androidApp/src/test/java/dev/klbt/ageds/SourceAdversarialXlsTest.kt": "3bd63577c1cfdf85a6e14d357594baa2948dbcc50e9380665ca4056f9a88c8f5",
+    "androidApp/src/test/java/dev/klbt/ageds/SourceAudioDisplayTest.kt": "cda5145cff140c6ab1b79d633961259c1715116988889c602bb5c9cb9ed6e343",
+    "androidApp/src/test/java/dev/klbt/ageds/SourceDelimitedFormatsTest.kt": "9b2ff79cc4761273ceff61f7068a48c882245c8780f8194be323dfb3a82478ce",
+    "androidApp/src/test/java/dev/klbt/ageds/SourceScanEngineCacheFlowTest.kt": "5c3662ed0ba65b60d6cf9191a199e8654698a3c27f774499f706bbf530406006",
+    "androidApp/src/test/java/dev/klbt/ageds/SourceScanEngineLifecycleTest.kt": "a78c01257f64e737ef24723ce6ee13a62afc6f280120132ccc29a9bf075f32ac",
+    "androidApp/src/test/java/dev/klbt/ageds/SourceScanEngineMixedFormatsTest.kt": "85f6623f2c28c0df217e4b9f34cd24f483b27c991ec46973c086129f3d26c2fb",
+    "androidApp/src/test/java/dev/klbt/ageds/SourceScanEnginePolicyAdversarialTest.kt": "c66c9f6dbc568f7961f5c6ddcdaaab236e80d38bc065278d4798d5661abdd113",
+    "androidApp/src/test/java/dev/klbt/ageds/SourceScanEngineTest.kt": "e33471b0f4db47988da3876b6821b1925102cff6990d8eff56d768dcd2fcd566",
+    "androidApp/src/test/java/dev/klbt/ageds/SourceWavReaderAdversarialTest.kt": "357cd4f800afe1d0b82a96bf0139415211bcadd0199e9bd53308edecbf970ae4",
+    "androidApp/src/test/java/dev/klbt/ageds/SourceWavReaderTest.kt": "0746a31a06d3fd079ab48e57728a9a45f16a9f2d43be739aa79b98b6b893aa99",
+    "androidApp/src/test/java/dev/klbt/ageds/SourceWorkbookEncodingTest.kt": "e65287a0dd7cea9d637d77adf30d2d734656c150156520009fe578982bf56780",
+    "androidApp/src/test/java/dev/klbt/ageds/SourceWorkbookParserTest.kt": "3f0d5a7a2b1da4524fc89ce0acbb6892250ee59d45dea0943d252dea5005d58f",
+    "androidApp/src/test/java/dev/klbt/ageds/SourceXlsContinuationAdversarialTest.kt": "3ce277397e52a83e39d1e278833cad135fe66b624ec376d505809df2e9d08fb8",
+    "androidApp/src/test/java/dev/klbt/ageds/SourceXlsContinuationTest.kt": "ff8e8d06c84a1cb693ed8fc538739807725b2eda1a8bb7fd8b988a44a76c6155",
+    "androidApp/src/test/java/dev/klbt/ageds/SourceXlsParserTest.kt": "ac09a3b62bcb1ee5e895bf9f4adaf2114955c0293fb84ce4a59a3004c9283d5f",
+    "androidApp/src/test/java/dev/klbt/ageds/WavMetadataCacheCompatibilityTest.kt": "7706f548f41d4998be42cd1859e003834fc8240c875ebbb8ce2e197900a553fa",
+    "build.gradle.kts": "2e08e0d90bf374556599ec6cb677a7ac89bf6edeb4d408629fd6eeabbdcc1cac",
+    "core/build.gradle.kts": "83c6817f4ca4de6be58f87bcc4241ee64a0013fd0258c9111f9fcfc4570966be",
+    "core/src/commonMain/kotlin/dev/klbt/ageds/core/ArtifactPageChain.kt": "2fa38df99f0ee398d42ddbad9d990d450ce3dec6374af87e6f99627d2eb93f30",
+    "core/src/commonMain/kotlin/dev/klbt/ageds/core/CitationSelection.kt": "e59b9ca6f9f70cdf2c7d9571401143265635e54c0bba6ac7b59b53db80c7a990",
+    "core/src/commonMain/kotlin/dev/klbt/ageds/core/CorpusModels.kt": "11f14184f74ff07335dc6679fd74504a0c964b78664653cc00a09ce5529ff7ba",
+    "core/src/commonMain/kotlin/dev/klbt/ageds/core/EvidenceInvariant.kt": "9854a1f7f352042b1f23991258ced7cfb828af39e549a37fd0c5a6e24a1348e7",
+    "core/src/commonMain/kotlin/dev/klbt/ageds/core/Models.kt": "2fac2ffd52d17a6706aa47d38e9efb105a2a6c416a8a15f885a91af2926f90a5",
+    "core/src/commonMain/kotlin/dev/klbt/ageds/core/SourceScanModels.kt": "2ed6427bb6d7f7f8c001cc703d31b936552fdcdd8a8ada37a40a427b5d7e87a5",
+    "core/src/commonMain/kotlin/dev/klbt/ageds/core/SourceTextParser.kt": "5e21ab51c93496b97bc7798aaa635aea19db08d07110d30a6b1938acc37db074",
+    "core/src/commonMain/kotlin/dev/klbt/ageds/core/WavHeaderObservation.kt": "b0b9c8192676774c8162ee52309ca2a93adc30fbd9f40a5b90d5d5a0c9513e82",
+    "core/src/commonMain/kotlin/dev/klbt/ageds/core/WavHeaderProbe.kt": "3ad9a1ada8db8ccec9c9190abb897159161745b61757397ce300150db604c8b2",
+    "core/src/commonTest/kotlin/dev/klbt/ageds/core/ArtifactPageAdversarialTest.kt": "71e6e1084eeb9c5fc16eb19ea02020c9b85c2233525b0bad6d303bdd6a4fbf80",
+    "core/src/commonTest/kotlin/dev/klbt/ageds/core/ArtifactPageChainTest.kt": "4d8369bb89b91d3c9e95df7cb28fc43360a3e49d0e619d0a29ce4e6b29bbebcd",
+    "core/src/commonTest/kotlin/dev/klbt/ageds/core/ArtifactPayloadBudgetAdversarialTest.kt": "fbd9e53212520cdf4157b605fa7efc71e856eb53a6bfe19e65a1c4cdbd7a965a",
+    "core/src/commonTest/kotlin/dev/klbt/ageds/core/ArtifactPayloadBudgetOwnerTest.kt": "570696d32b2857d6683bfcea63dce970e7902a4f74e7682428093ffde5849bd4",
+    "core/src/commonTest/kotlin/dev/klbt/ageds/core/CitationAdversarialTest.kt": "7ac0eb8c891c4ed87336befd2aa20e6fd5d44cf5be6e49b89a24979c0828684d",
+    "core/src/commonTest/kotlin/dev/klbt/ageds/core/CitationSelectionTest.kt": "54c829deaa482ab3ef8a1c170dd87d573a9c8f1fe9754ecf0b274974871e6193",
+    "core/src/commonTest/kotlin/dev/klbt/ageds/core/PriorityTest.kt": "8d34cdd20951399901ec43b0006ec6bbf25a3e5e8a49a6eed7e08635f675e61f",
+    "core/src/commonTest/kotlin/dev/klbt/ageds/core/SourceTextParserTest.kt": "32e556cced43c61388d88cbfdaf6bdeb7241f52e2567a45a0278e3f3fe7b3021",
+    "core/src/commonTest/kotlin/dev/klbt/ageds/core/WavHeaderCacheSerializationTest.kt": "fca78adff5528f0b0a31c4456a5c4340067544f8ad51b0f3b3b095ae90b5a0aa",
+    "core/src/commonTest/kotlin/dev/klbt/ageds/core/WavHeaderProbeAdversarialTest.kt": "25a39a95d855dcf6cc2ce37a56df6ae5668c09797caccf7c0e12b67d9468aa67",
+    "core/src/commonTest/kotlin/dev/klbt/ageds/core/WavHeaderProbeTest.kt": "03118c4e52063347994d77b872b5f8a8d202a6e2619186fbb72f95c541fc29f0",
+    "gradle.properties": "39fe86ddf046dbfa81ebd50aeafb8956e9351374c95b80e88dadf2f93a756157",
+    "gradle/wrapper/gradle-wrapper.jar": "7a9ce74cff467ca1bf60a4fcd9f05185acceda4d0f382434d393e17864262c5d",
+    "gradle/wrapper/gradle-wrapper.properties": "2f32fe111c0de78ff9b4aa65d86855fbb1f32989d62c4818b817ec93d088b510",
+    "gradlew": "a5a5c199ba02189ae8c46a334223371a20599d9c298ef65e7540ede4a3f72d59",
+    "gradlew.bat": "d539676c48b596afda64c963ec8f7ee56c7b3fe7e3b81d1dbe2d1a1e3dd9e9f8",
+    "settings.gradle.kts": "3b9cdf74adf2506f104110cd8c9dcc4f721f3a4958e8e6f2e24658825c898328"
+  },
+  "source_unchanged": true,
+  "tests": [
+    {
+      "path": "core/build/test-results/desktopTest/TEST-dev.klbt.ageds.core.WavHeaderProbeAdversarialTest.xml",
+      "suite": "WavHeaderProbeAdversarialTest[desktop]",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "core/build/test-results/desktopTest/TEST-dev.klbt.ageds.core.ArtifactPageChainTest.xml",
+      "suite": "ArtifactPageChainTest[desktop]",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "core/build/test-results/desktopTest/TEST-dev.klbt.ageds.core.CitationSelectionTest.xml",
+      "suite": "CitationSelectionTest[desktop]",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "core/build/test-results/desktopTest/TEST-dev.klbt.ageds.core.PriorityTest.xml",
+      "suite": "PriorityTest[desktop]",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "core/build/test-results/desktopTest/TEST-dev.klbt.ageds.core.WavHeaderCacheSerializationTest.xml",
+      "suite": "WavHeaderCacheSerializationTest[desktop]",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "core/build/test-results/desktopTest/TEST-dev.klbt.ageds.core.ArtifactPageAdversarialTest.xml",
+      "suite": "ArtifactPageAdversarialTest[desktop]",
+      "tests": 22,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "core/build/test-results/desktopTest/TEST-dev.klbt.ageds.core.SourceTextParserTest.xml",
+      "suite": "SourceTextParserTest[desktop]",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "core/build/test-results/desktopTest/TEST-dev.klbt.ageds.core.WavHeaderProbeTest.xml",
+      "suite": "WavHeaderProbeTest[desktop]",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "core/build/test-results/desktopTest/TEST-dev.klbt.ageds.core.CitationAdversarialTest.xml",
+      "suite": "CitationAdversarialTest[desktop]",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "core/build/test-results/desktopTest/TEST-dev.klbt.ageds.core.ArtifactPayloadBudgetAdversarialTest.xml",
+      "suite": "ArtifactPayloadBudgetAdversarialTest[desktop]",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "core/build/test-results/desktopTest/TEST-dev.klbt.ageds.core.ArtifactPayloadBudgetOwnerTest.xml",
+      "suite": "ArtifactPayloadBudgetOwnerTest[desktop]",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.SourceWorkbookParserTest.xml",
+      "suite": "dev.klbt.ageds.SourceWorkbookParserTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.RangePlaybackAdversarialTest.xml",
+      "suite": "dev.klbt.ageds.RangePlaybackAdversarialTest",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.SourceScanEnginePolicyAdversarialTest.xml",
+      "suite": "dev.klbt.ageds.SourceScanEnginePolicyAdversarialTest",
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.SourceAdversarialFormatsTest.xml",
+      "suite": "dev.klbt.ageds.SourceAdversarialFormatsTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.SourceWavReaderTest.xml",
+      "suite": "dev.klbt.ageds.SourceWavReaderTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.BoundedMetadataCacheTest.xml",
+      "suite": "dev.klbt.ageds.BoundedMetadataCacheTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.SourceWavReaderAdversarialTest.xml",
+      "suite": "dev.klbt.ageds.SourceWavReaderAdversarialTest",
+      "tests": 21,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.SourceScanEngineLifecycleTest.xml",
+      "suite": "dev.klbt.ageds.SourceScanEngineLifecycleTest",
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.SourceXlsParserTest.xml",
+      "suite": "dev.klbt.ageds.SourceXlsParserTest",
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.SourceAdversarialXlsTest.xml",
+      "suite": "dev.klbt.ageds.SourceAdversarialXlsTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.CitationPayloadBudgetAdversarialTest.xml",
+      "suite": "dev.klbt.ageds.CitationPayloadBudgetAdversarialTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.SourceXlsContinuationTest.xml",
+      "suite": "dev.klbt.ageds.SourceXlsContinuationTest",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.SourceWorkbookEncodingTest.xml",
+      "suite": "dev.klbt.ageds.SourceWorkbookEncodingTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.SourceDelimitedFormatsTest.xml",
+      "suite": "dev.klbt.ageds.SourceDelimitedFormatsTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.SourceScanEngineTest.xml",
+      "suite": "dev.klbt.ageds.SourceScanEngineTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.SourceAudioDisplayTest.xml",
+      "suite": "dev.klbt.ageds.SourceAudioDisplayTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.CitationDisplayProjectionTest.xml",
+      "suite": "dev.klbt.ageds.CitationDisplayProjectionTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.SourceXlsContinuationAdversarialTest.xml",
+      "suite": "dev.klbt.ageds.SourceXlsContinuationAdversarialTest",
+      "tests": 17,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.SourceScanEngineMixedFormatsTest.xml",
+      "suite": "dev.klbt.ageds.SourceScanEngineMixedFormatsTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.CitationWorkspaceAdversarialTest.xml",
+      "suite": "dev.klbt.ageds.CitationWorkspaceAdversarialTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.WavMetadataCacheCompatibilityTest.xml",
+      "suite": "dev.klbt.ageds.WavMetadataCacheCompatibilityTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.SourceScanEngineCacheFlowTest.xml",
+      "suite": "dev.klbt.ageds.SourceScanEngineCacheFlowTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "path": "androidApp/build/test-results/testDebugUnitTest/TEST-dev.klbt.ageds.CitationPagingAdversarialTest.xml",
+      "suite": "dev.klbt.ageds.CitationPagingAdversarialTest",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "checkout_commit": "70f44f0a86a2fa4d00a11737e6d263fb7c4a785d",
+  "java_version": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM Temurin-21.0.12.1+1 (build 21.0.12.1+1-LTS, mixed mode, sharing)",
+  "apk_sha256": "05d4eea3b424b79f21fdf89b2687da7992ee297bb39c160ed9836c61e80044bc",
+  "apk_bytes": 14156821,
+  "apksigner_exit_code": 0
+}

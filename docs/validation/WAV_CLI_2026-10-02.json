@@ -1,0 +1,476 @@
+{
+  "schema_version": 1,
+  "task_id": "AGEDS-20261001-N52",
+  "status": "passed",
+  "started_at": "2026-10-02T20:29:57.089611+00:00",
+  "input_kind": "synthetic_generated_wav_tree",
+  "python": "3.12.14",
+  "actual_cli_subprocess": true,
+  "limitations": [
+    "Header declarations are not decoded audio or measured playback duration.",
+    "No ASR, acoustic alignment, device runtime or private corpus was exercised.",
+    "Source access timestamps may change; source bytes, names and modification times are checked.",
+    "Manifest is metadata, not a source copy or replay archive."
+  ],
+  "code_sha256": {
+    "server/app/cli.py": "2081a974c17452e76f6a07f4ffc56a2f0f0b96fd0271a9cdc79a9996ffdf7e28",
+    "server/app/scanner.py": "711488e3e79f3dfc8f886f5a8a30da5865275677e55f6640ff90ca887d4dae95",
+    "server/app/wav_header.py": "71f8187cd8dcce4b58148682bcdce1208b0d953213cfb72a30a675dff93b6231",
+    "scripts/server_wav_scan_smoke.py": "85147d4b0487634f32fb9f8991694a0d8e1e5913eeb6c66ad62c02d0e15e5c59"
+  },
+  "source_before": [
+    {
+      "path": ".",
+      "kind": "directory",
+      "size_bytes": null,
+      "mtime_ns": 1790972997090953417,
+      "sha256": null
+    },
+    {
+      "path": "junk_fanout_over_64k.wav",
+      "kind": "file",
+      "size_bytes": 72060,
+      "mtime_ns": 1790972997090953417,
+      "sha256": "7befc041da61cddae6bb8bda84de883b1f3649fd00c783235b5177b3459bede4"
+    },
+    {
+      "path": "large_declared_sparse.wav",
+      "kind": "file",
+      "size_bytes": 4194348,
+      "mtime_ns": 1790972997090515463,
+      "sha256": "5ecf7771a084879f58b2c733bba9acd5dd686bf73249b0d69a82865789b92ea0"
+    },
+    {
+      "path": "truncated_44_declares_16000.wav",
+      "kind": "file",
+      "size_bytes": 44,
+      "mtime_ns": 1790972997090489257,
+      "sha256": "65c29572ed033886d9b59a2c8612dc72ded8cbf8c6a7d1592e77b3cbf65f8f3c"
+    },
+    {
+      "path": "unsupported_format.wav",
+      "kind": "file",
+      "size_bytes": 76,
+      "mtime_ns": 1790972997091009473,
+      "sha256": "349d720b83e03d9849c40c98c3e836747a53ee81b83c10e5897e738155e3d6e3"
+    },
+    {
+      "path": "valid_pcm.wav",
+      "kind": "file",
+      "size_bytes": 16044,
+      "mtime_ns": 1790972997090448037,
+      "sha256": "358c6dcef4442790decb0a5c03fb320154f9d1dd5b4618e301f9e6661a413cb5"
+    }
+  ],
+  "cli": {
+    "command": [
+      "/workspace/scratch/248dded521c2/AGEDS/.venv/bin/python",
+      "-m",
+      "server.app.cli",
+      "scan",
+      "/workspace/scratch/248dded521c2/wav-cli-check/source",
+      "--output",
+      "/workspace/scratch/248dded521c2/wav-cli-check/metadata/manifest.json",
+      "--max-hash-bytes",
+      "1048576",
+      "--max-total-hash-bytes",
+      "2097152",
+      "--max-output-bytes",
+      "262144"
+    ],
+    "returncode": 0,
+    "stdout": "{\"command\": \"scan\", \"output\": \"/workspace/scratch/248dded521c2/wav-cli-check/metadata/manifest.json\", \"schema_version\": \"ageds.source-scan/v1\", \"coverage\": {\"complete\": false, \"directories_seen\": 1, \"entries_seen\": 5, \"files_seen\": 5, \"files_hashed\": 4, \"wav_header_bytes_read\": 147236, \"rows_captured\": 0, \"cell_characters_captured\": 0, \"hash_bytes_read\": 88224, \"entries_enumerated\": 5, \"inventory_files\": 5, \"tables\": 0, \"observations\": 2}, \"issue_count\": 16, \"conflict_count\": 0, \"source_bytes_written\": false}\n",
+    "stderr": ""
+  },
+  "source_after": [
+    {
+      "path": ".",
+      "kind": "directory",
+      "size_bytes": null,
+      "mtime_ns": 1790972997090953417,
+      "sha256": null
+    },
+    {
+      "path": "junk_fanout_over_64k.wav",
+      "kind": "file",
+      "size_bytes": 72060,
+      "mtime_ns": 1790972997090953417,
+      "sha256": "7befc041da61cddae6bb8bda84de883b1f3649fd00c783235b5177b3459bede4"
+    },
+    {
+      "path": "large_declared_sparse.wav",
+      "kind": "file",
+      "size_bytes": 4194348,
+      "mtime_ns": 1790972997090515463,
+      "sha256": "5ecf7771a084879f58b2c733bba9acd5dd686bf73249b0d69a82865789b92ea0"
+    },
+    {
+      "path": "truncated_44_declares_16000.wav",
+      "kind": "file",
+      "size_bytes": 44,
+      "mtime_ns": 1790972997090489257,
+      "sha256": "65c29572ed033886d9b59a2c8612dc72ded8cbf8c6a7d1592e77b3cbf65f8f3c"
+    },
+    {
+      "path": "unsupported_format.wav",
+      "kind": "file",
+      "size_bytes": 76,
+      "mtime_ns": 1790972997091009473,
+      "sha256": "349d720b83e03d9849c40c98c3e836747a53ee81b83c10e5897e738155e3d6e3"
+    },
+    {
+      "path": "valid_pcm.wav",
+      "kind": "file",
+      "size_bytes": 16044,
+      "mtime_ns": 1790972997090448037,
+      "sha256": "358c6dcef4442790decb0a5c03fb320154f9d1dd5b4618e301f9e6661a413cb5"
+    }
+  ],
+  "source_unchanged": true,
+  "source_files_count": 5,
+  "observations": {
+    "junk_fanout_over_64k.wav": {
+      "parse_status": "limited",
+      "hash_status": "complete",
+      "sha256": "7befc041da61cddae6bb8bda84de883b1f3649fd00c783235b5177b3459bede4",
+      "audio_metadata": {
+        "source": "same_descriptor_riff_header",
+        "scope": "header_prefix_only",
+        "body_validated": false,
+        "size_basis": "fstat_same_descriptor",
+        "observed_file_size_bytes": 72060,
+        "header_bytes_read": 65536,
+        "header_probe": {
+          "status": "partial",
+          "coverage": "header_prefix_only",
+          "bytes_inspected": 65536,
+          "prefix_limit_bytes": 65536,
+          "end_of_input": false,
+          "provider_size_bytes": 72060,
+          "riff_declared_bytes": 72060,
+          "format_code": null,
+          "channels": null,
+          "sample_rate_hz": null,
+          "byte_rate": null,
+          "block_align_bytes": null,
+          "bits_per_sample": null,
+          "data_declared_bytes": null,
+          "declared_duration_sec": null,
+          "duration_basis": null,
+          "body_validated": false,
+          "issues": [
+            {
+              "code": "header_prefix_incomplete",
+              "message": "Next chunk header is outside the inspected prefix.",
+              "locator": "wav-prefix#byte=65532"
+            },
+            {
+              "code": "required_header_unobserved",
+              "message": "fmt or data header has not been observed in the prefix.",
+              "locator": "wav-prefix#byte=65532"
+            },
+            {
+              "code": "audio_body_not_validated",
+              "message": "Duration is a header declaration; audio samples, decoding and complete-content integrity were not validated.",
+              "locator": "wav-prefix#byte=0"
+            }
+          ]
+        },
+        "source_stability": "descriptor_stat_unchanged"
+      }
+    },
+    "large_declared_sparse.wav": {
+      "parse_status": "metadata_only",
+      "hash_status": "unknown",
+      "sha256": null,
+      "audio_metadata": {
+        "source": "same_descriptor_riff_header",
+        "scope": "header_prefix_only",
+        "body_validated": false,
+        "size_basis": "fstat_same_descriptor",
+        "observed_file_size_bytes": 4194348,
+        "header_bytes_read": 65536,
+        "header_probe": {
+          "status": "observed",
+          "coverage": "header_prefix_only",
+          "bytes_inspected": 65536,
+          "prefix_limit_bytes": 65536,
+          "end_of_input": false,
+          "provider_size_bytes": 4194348,
+          "riff_declared_bytes": 4194348,
+          "format_code": 1,
+          "channels": 1,
+          "sample_rate_hz": 16000,
+          "byte_rate": 32000,
+          "block_align_bytes": 2,
+          "bits_per_sample": 16,
+          "data_declared_bytes": 4194304,
+          "declared_duration_sec": 131.072,
+          "duration_basis": "declared_data_bytes_divided_by_header_byte_rate",
+          "body_validated": false,
+          "issues": [
+            {
+              "code": "data_body_uninspected",
+              "message": "Data payload/padding was not completely read or decoded.",
+              "locator": "wav-prefix#byte=36"
+            },
+            {
+              "code": "audio_body_not_validated",
+              "message": "Duration is a header declaration; audio samples, decoding and complete-content integrity were not validated.",
+              "locator": "wav-prefix#byte=0"
+            }
+          ]
+        },
+        "source_stability": "descriptor_stat_unchanged",
+        "frames": 2097152,
+        "sample_rate": 16000,
+        "channels": 1,
+        "sample_width_bytes": 2,
+        "duration_seconds": 131.072
+      }
+    },
+    "truncated_44_declares_16000.wav": {
+      "parse_status": "failed",
+      "hash_status": "complete",
+      "sha256": "65c29572ed033886d9b59a2c8612dc72ded8cbf8c6a7d1592e77b3cbf65f8f3c",
+      "audio_metadata": {
+        "source": "same_descriptor_riff_header",
+        "scope": "header_prefix_only",
+        "body_validated": false,
+        "size_basis": "fstat_same_descriptor",
+        "observed_file_size_bytes": 44,
+        "header_bytes_read": 44,
+        "header_probe": {
+          "status": "malformed",
+          "coverage": "header_prefix_only",
+          "bytes_inspected": 44,
+          "prefix_limit_bytes": 65536,
+          "end_of_input": true,
+          "provider_size_bytes": 44,
+          "riff_declared_bytes": 16044,
+          "format_code": 1,
+          "channels": 1,
+          "sample_rate_hz": 16000,
+          "byte_rate": 32000,
+          "block_align_bytes": 2,
+          "bits_per_sample": 16,
+          "data_declared_bytes": 16000,
+          "declared_duration_sec": null,
+          "duration_basis": null,
+          "body_validated": false,
+          "issues": [
+            {
+              "code": "provider_size_mismatch",
+              "message": "Provider byte count differs from RIFF declared extent.",
+              "locator": "wav-prefix#byte=4"
+            },
+            {
+              "code": "truncated_or_trailing_container",
+              "message": "Observed EOF differs from RIFF declared extent.",
+              "locator": "wav-prefix#byte=4"
+            },
+            {
+              "code": "truncated_chunk_payload",
+              "message": "Observed EOF is before declared payload/padding end.",
+              "locator": "wav-prefix#byte=36"
+            },
+            {
+              "code": "audio_body_not_validated",
+              "message": "Duration is a header declaration; audio samples, decoding and complete-content integrity were not validated.",
+              "locator": "wav-prefix#byte=0"
+            },
+            {
+              "code": "wav_descriptor_size_mismatch",
+              "message": "RIFF declared size differs from 44 bytes observed by fstat",
+              "locator": null
+            }
+          ]
+        },
+        "source_stability": "descriptor_stat_unchanged"
+      }
+    },
+    "unsupported_format.wav": {
+      "parse_status": "unsupported",
+      "hash_status": "complete",
+      "sha256": "349d720b83e03d9849c40c98c3e836747a53ee81b83c10e5897e738155e3d6e3",
+      "audio_metadata": {
+        "source": "same_descriptor_riff_header",
+        "scope": "header_prefix_only",
+        "body_validated": false,
+        "size_basis": "fstat_same_descriptor",
+        "observed_file_size_bytes": 76,
+        "header_bytes_read": 76,
+        "header_probe": {
+          "status": "unsupported",
+          "coverage": "header_prefix_only",
+          "bytes_inspected": 76,
+          "prefix_limit_bytes": 65536,
+          "end_of_input": true,
+          "provider_size_bytes": 76,
+          "riff_declared_bytes": 76,
+          "format_code": 6,
+          "channels": 1,
+          "sample_rate_hz": 16000,
+          "byte_rate": 32000,
+          "block_align_bytes": 2,
+          "bits_per_sample": 16,
+          "data_declared_bytes": 32,
+          "declared_duration_sec": null,
+          "duration_basis": null,
+          "body_validated": false,
+          "issues": [
+            {
+              "code": "unsupported_format",
+              "message": "Only PCM (1) and IEEE float (3) are supported.",
+              "locator": "wav-prefix#byte=12"
+            },
+            {
+              "code": "audio_body_not_validated",
+              "message": "Duration is a header declaration; audio samples, decoding and complete-content integrity were not validated.",
+              "locator": "wav-prefix#byte=0"
+            }
+          ]
+        },
+        "source_stability": "descriptor_stat_unchanged"
+      }
+    },
+    "valid_pcm.wav": {
+      "parse_status": "metadata_only",
+      "hash_status": "complete",
+      "sha256": "358c6dcef4442790decb0a5c03fb320154f9d1dd5b4618e301f9e6661a413cb5",
+      "audio_metadata": {
+        "source": "same_descriptor_riff_header",
+        "scope": "header_prefix_only",
+        "body_validated": false,
+        "size_basis": "fstat_same_descriptor",
+        "observed_file_size_bytes": 16044,
+        "header_bytes_read": 16044,
+        "header_probe": {
+          "status": "observed",
+          "coverage": "header_prefix_only",
+          "bytes_inspected": 16044,
+          "prefix_limit_bytes": 65536,
+          "end_of_input": true,
+          "provider_size_bytes": 16044,
+          "riff_declared_bytes": 16044,
+          "format_code": 1,
+          "channels": 1,
+          "sample_rate_hz": 16000,
+          "byte_rate": 32000,
+          "block_align_bytes": 2,
+          "bits_per_sample": 16,
+          "data_declared_bytes": 16000,
+          "declared_duration_sec": 0.5,
+          "duration_basis": "declared_data_bytes_divided_by_header_byte_rate",
+          "body_validated": false,
+          "issues": [
+            {
+              "code": "audio_body_not_validated",
+              "message": "Duration is a header declaration; audio samples, decoding and complete-content integrity were not validated.",
+              "locator": "wav-prefix#byte=0"
+            }
+          ]
+        },
+        "source_stability": "descriptor_stat_unchanged",
+        "frames": 8000,
+        "sample_rate": 16000,
+        "channels": 1,
+        "sample_width_bytes": 2,
+        "duration_seconds": 0.5
+      }
+    }
+  },
+  "coverage": {
+    "complete": false,
+    "directories_seen": 1,
+    "entries_seen": 5,
+    "files_seen": 5,
+    "files_hashed": 4,
+    "wav_header_bytes_read": 147236,
+    "rows_captured": 0,
+    "cell_characters_captured": 0,
+    "hash_bytes_read": 88224,
+    "entries_enumerated": 5,
+    "inventory_files": 5,
+    "tables": 0,
+    "observations": 2
+  },
+  "limits": {
+    "max_files": 5000,
+    "max_directory_entries": 20000,
+    "max_total_entries": 50000,
+    "max_sheets_per_file": 64,
+    "max_depth": 24,
+    "max_hash_bytes": 1048576,
+    "max_total_hash_bytes": 2097152,
+    "max_table_bytes": 16777216,
+    "max_xlsx_expanded_bytes": 67108864,
+    "max_rows_per_file": 2000,
+    "max_total_rows": 20000,
+    "max_columns": 128,
+    "max_cell_characters": 4096,
+    "max_total_cell_characters": 2000000,
+    "max_observations": 50000,
+    "max_candidate_links": 10000,
+    "max_wav_header_bytes": 65536,
+    "max_total_wav_header_bytes": 8388608
+  },
+  "manifest": {
+    "path": "/workspace/scratch/248dded521c2/wav-cli-check/metadata/manifest.json",
+    "bytes": 17222,
+    "sha256": "5039842993a93614d4ff1583f7218b4421a881e99f3f128e5cf242dc2ae62a09",
+    "policy": {
+      "read_only": true,
+      "source_copies": false,
+      "parsed_formats": [
+        "csv",
+        "tsv",
+        "xls",
+        "xlsx",
+        "wav_header"
+      ],
+      "other_formats": "inventory_and_hash_only",
+      "source_scope": "only_designated_local_directory",
+      "symlinks": "skip_all",
+      "special_files": "skip",
+      "hidden_files": "included",
+      "timezone_default": "unknown",
+      "spreadsheet_formulas": "never_execute; XLSX formula text, XLS cached values only",
+      "csv_header": "first_record_as_header_hypothesis",
+      "filename_metadata": "unverified_hypotheses",
+      "identities": "no_automatic_merge",
+      "hash_scope": "complete_file_or_unknown; never_partial_digest",
+      "filesystem_time": "filesystem_observation_not_event_time",
+      "wav_header_scope": "bounded_prefix; declared duration only; audio body not validated",
+      "wav_header_size_basis": "fstat_of_same_open_descriptor",
+      "wav_header_budget": "separate_from_hash_and_table_reads",
+      "read_side_effects": "source bytes are not written; OS may update access timestamps",
+      "limits": {
+        "max_files": 5000,
+        "max_directory_entries": 20000,
+        "max_total_entries": 50000,
+        "max_sheets_per_file": 64,
+        "max_depth": 24,
+        "max_hash_bytes": 1048576,
+        "max_total_hash_bytes": 2097152,
+        "max_table_bytes": 16777216,
+        "max_xlsx_expanded_bytes": 67108864,
+        "max_rows_per_file": 2000,
+        "max_total_rows": 20000,
+        "max_columns": 128,
+        "max_cell_characters": 4096,
+        "max_total_cell_characters": 2000000,
+        "max_observations": 50000,
+        "max_candidate_links": 10000,
+        "max_wav_header_bytes": 65536,
+        "max_total_wav_header_bytes": 8388608
+      }
+    }
+  },
+  "observed_non_source_files": [
+    "metadata/manifest.json"
+  ],
+  "no_audio_copy_in_output": true,
+  "elapsed_seconds": 0.09033586599980481,
+  "finished_at": "2026-10-02T20:29:57.180407+00:00"
+}

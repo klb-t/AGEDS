@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "scope": "wave13 browser create response consistency; native unchanged",
+  "observed_at": "2026-10-01T03:02:21.924041+00:00",
+  "base_remote_commit": "9197c521d7038534f0541ed7c72826fc4bffdc54",
+  "node_version": "v24.19.0",
+  "python_version": "Python 3.12.14",
+  "node_tests": 85,
+  "node_failures": 0,
+  "node_skipped": 0,
+  "python_numeric_comparisons": 3008,
+  "python_canonical_projections": 2,
+  "fake_dom_handler_tests": 6,
+  "actual_chromium_tests_executed": 0,
+  "browser_fixture_database_smoke": "passed actual SQLite and half-ms saved citation; uvicorn.run replaced by stop-at-server callback; no HTTP",
+  "android_build_executed": false,
+  "phone_tests_executed": 0,
+  "real_asr_executed": false,
+  "source_sha256": {
+    "server/app/static/citations.mjs": "190d34fd5979e2f7273edd2162c92a490892e3af197e7b10aede15e4173a6885",
+    "server/app/static/range-player.mjs": "f451e2f333cf480100d29dafa9181c8c6ebae748dda03092c0bc03c0664b901c",
+    "server/app/citations.py": "6a2780c9c7e18a62d425f9a413217ccfb84bd6091de300a3587a373fc44543bf",
+    "server/tests/browser/acceptance.cjs": "f1a33c8423725f6a7b0aa78a0830d87510541e83c326c7b9e15be85f9052464a",
+    "server/tests/browser_fixture.py": "59eadbefaeba6d7448f69ad7bdc24ea9e24a50cf35f69e8f1265ef884057d399",
+    "server/tests/js/citation-python-parity.test.mjs": "f48574eb0ff15489beb54a0b9c2ef8f2b0344cd62a97804233ad7edc63094a86",
+    "server/tests/js/citation-save-contract.test.mjs": "51a51376963759c7c33737ef73e031dc26d24368b9df69ca538ed883fed42bb5",
+    "server/tests/js/citation-save-handler.test.mjs": "f453b8bae6afe4f3d23a7b2563179394ab0caa8dfbec86d39c18ef4f487a1a03",
+    "server/tests/js/citation-save-snapshot.test.mjs": "09ab7a132b96250a330b7ab9cbfcc37ac12b04a4c92be52da81e64d48c16fc83",
+    "server/tests/js/history-budget-adversarial.test.mjs": "834fb3d730bdfa1306edd5be22daafb044b6be699715d0e5b02db39960f7c3f9",
+    "server/tests/js/history-pages.test.mjs": "c105347237cc971b33d86b27623db087bc8713c961db926de30fa0bf77d52f52",
+    "server/tests/js/history-payload-owner.test.mjs": "0c84b552047a6406176c9d6e9c8295f8f71cbf71f560576949aaae7c4e190a78",
+    "server/tests/js/id-boundaries.test.mjs": "88f59686cbc196156fb6a1931303853a4717bc94f82fca20b024face0b7e7cda",
+    "server/tests/js/range-player.test.mjs": "ffe91391c10083b379354541b9cdd2810d0dff81f40907966a6b24c876c87ad6"
+  },
+  "tap_sha256": "f44802536bd2d37f1285b75979332b016702691df514104b8c9622ca4c9122d3",
+  "limitations": [
+    "Chromium executable absent; new browser cases syntax-checked only",
+    "FastAPI/uvicorn absent from default and primary Python",
+    "Native N80/N81/N84 remain ready; no current Android SDK/Gradle cache",
+    "Prior backend/JVM/APK/Chromium/ASR receipts remain historical and were not rerun",
+    "Response consistency is not backend authentication or acoustic alignment"
+  ]
+}

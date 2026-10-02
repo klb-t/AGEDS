@@ -1,88 +1,83 @@
-# AGEDS — przekazanie do rozwoju i osobnego wątku zarządzania
+# AGEDS — current handoff
 
-Stan bieżący: nocny przyrost 2026-10-01. Fundament PR #2 scalono w `main`
-w commicie `b6b6a4e4a1fdafb53447bceaeab904aa7b660ee2`.
-Branch pracy: `codex/ageds-night-20261001`, PR #3.
-**Najświeższy odbiór i kolejka: `coordination/night-20261001.json`.**
-Procedura wznowienia: `coordination/NIGHT_WORK.md`.
-`coordination/state.json` zachowuje odbiór fundamentu i odsyła do nowego etapu.
+Recovery and repository cleanup: **2026-10-02**. Read
+[CLAUDE.md](CLAUDE.md), [current coordination](coordination/state.json) and
+[validation index](docs/validation/README.md) before continuing.
 
-## Mandat
+The earlier PR #4 line is preserved at `b6abe86`; it contains 49 commits beyond
+the previously published main `8c3efb9`. The foundation branch is already
+integrated. The standalone branch's functional changes were incorporated by
+`1e71cf8`; it needs no duplicate cherry-pick. Keep these branches as history.
+Current publication status is recorded in `coordination/state.json`.
 
-Użytkownik powierzył autonomiczne prowadzenie rozwoju AGEDS zgodnie ze swoją
-filozofią i w kontekście ekosystemu. Rutynowe wybory i odwracalne wdrożenia
-prowadzi koordynator. Osobny wątek zarządzania został wskazany przez użytkownika,
-ale nie jest tu utworzony ani zweryfikowany. Historia rozmów pomaga odszukać
-wymagania; wymiana pracy opiera się na odczytanych commitach i identyfikatorach
-zadań, decyzji i wyników. Aktywne wykonanie nie jest bezterminowym procesem. Na wyraźne nocne zlecenie
-utworzono sześć zaplanowanych wznowień około 01:00–06:00 Europe/Amsterdam
-2026-10-01. Każde musi odczytać stan i respektować aktywny claim, aby nie
-dublować pracy. Utworzenie harmonogramu nie potwierdza wykonania jego
-przyszłych przebiegów. Osobnego wątku zarządzania nadal nie zweryfikowano.
+## Implemented workflow
 
-W tej sesji działają koordynator i maksymalnie sześciu agentów równocześnie.
-Role zarządzania i wykonania mogą rotować. Limit innego wątku należy sprawdzić
-w tamtym wątku; nie zakładamy dodatkowej puli sześciu procesów.
-
-## Wdrożony zakres
-
-| Obszar | Zachowanie i granica |
+| Stage | Behavior |
 |---|---|
-| Zachowanie źródeł | Hash tego samego przechwyconego strumienia; kompletny plik publikowany bez nadpisania istniejących bajtów. Każde pozyskanie ma obserwację pochodzenia. Hash nie dowodzi autorstwa ani prawdy. |
-| Migracja | Addytywna i transakcyjna. Stare metadane, także uszkodzone, zachowane; brakująca historia pozyskania jawnie nieznana. Ten sam hash/lokator w różnych sprawach obecnie jest odrzucany, wymaga przyszłego kontraktu tożsamości. |
-| Importy | Idempotencja nowych importów SMS/WhatsApp według pozycji wystąpienia, nie samego tekstu. AM/PM działa; strefa, dwucyfrowy rok i niejednoznaczna kolejność dat pozostają jawne. Starych zdarzeń bez ID nie deduplikujemy wstecznie. |
-| Kolejka | Atomowy claim, heartbeat, odzyskanie wygasłej lease, token własności. Spóźniony worker nie publikuje. Każda próba ma run; każdy sukces nowy transcript. Lease zakłada prawidłowy zegar systemowy. |
-| Wyniki i cytaty | Adnotacja wskazuje wyświetloną wersję. Cytat segmentowy lub słowny zachowuje dokładny tekst, hash i selektor. Wybór słów wymaga zgodnych zapisanych znaczników ASR; brak precyzji pozostaje jawny. Weryfikacja oznacza zgodność z zapisaną wersją ASR; nie oznacza odsłuchu lub prawdziwości wypowiedzi. |
-| Skaner | Read-only CSV/TSV, XLS, XLSX, WAV, inwentaryzacja/hash innych plików. Kolizje nazw, kandydaci powiązań i sprzeczności zachowane. Limity, brak adaptera i uszkodzenia jawne. Safe no-follow descriptors wymagają wspieranego systemu POSIX. |
-| Pakiet | Snapshot 16 tabel metadanych, digests i walidacja grafu oraz cytatów. Dokładny kanoniczny roundtrip do inertnego archiwum SQLite i z powrotem. Bez bajtów źródeł, podpisu, wznowienia jobs, replay lub przywrócenia live DB. |
-| Android | Wszystkie URI kolizyjnych nazw, wybór konkretnego kandydata, prywatny manifest wyboru, jawne wysłanie na wybrany serwer, wyniki/błędy każdego pliku, wersja adnotacji. Widok Źródła skanuje SAF bez seed: CSV/TSV, XLSX, podstawowy WAV i inventory, raw komórki, lokatory, kolizje, ograniczenia. Dawny katalog JSON jest opcjonalny. Natywny XLS pozostaje unsupported. Build debug APK i 26 testów JVM przeszły; telefon pozostaje oddzielnym odbiorem. |
+| Discover | Android SAF or server/local read-only scan of CSV/TSV, bounded BIFF8 XLS, XLSX and WAV; inventory other files. Limits, ambiguity and omissions remain visible. |
+| Preserve | Content-addressed original bytes, separate acquisition observations, raw source fields and additive database migrations. |
+| Process | Renewable leased transcription jobs; one processing run per attempt; fenced publication and a new text version per successful run. |
+| Review | Search, bounded version histories, separate annotations, segment/word citation selection and range playback. |
+| Cite | Version, occurrence, exact raw text, hash and selector remain pinned; returned save data must match the frozen selection before success/history updates. |
+| Exchange | Metadata and citation packages with digests and graph checks; exact canonical roundtrip through a separate inert SQLite archive. |
 
-`scanner.observations` to obserwacje pól i hipotez; SQLite `source_observations`
-to pozyskania bajtów. Wspólny zapis JSON nie oznacza wspólnej semantyki.
+A private corpus seed is optional. Case-specific defaults now come from the
+seed's `defaultPresetIds`, filtered to existing preset IDs. Legacy seeds without
+this field start with no selected groups; the user can select them manually.
+The app contains no hardcoded case identities.
 
-## Odbiór
+## Recovery and acceptance
 
-Fundament miał 126 testów i 84 podtesty. Nocny przyrost rozszerza ten odbiór;
-aktualne dokładne liczby oraz dowody zapisują `docs/NIGHT_QA.md`
-i `coordination/night-20261001.json`. Rzeczywisty build Android wykonał
-57 zadań oraz 16 testów Android JVM i 10 desktop. Sprawdzono podpis APK
-i 35 hashy źródeł; receipt: `docs/ANDROID_NIGHT_BUILD_RECEIPT.json`.
+The overnight ledger had 82 tasks: 78 accepted and four blocked on test/runtime
+execution. The native implementation was already saved; it was not absent.
+All four blocked tasks now have actual acceptance. The recovery re-runs the concrete acceptance instead of implementing it twice.
 
-Odbiór obejmuje cytat starszej wersji, raw błędne dane, dokładny roundtrip
-archiwum, odrzucenie niejednoznacznego JSON i ochronę źródeł. Node sprawdza
-odtwarzacz na atrapie audio. Przegląd wykrył i naprawił wykonywalny HTML
-w snippetach wyszukiwania; fragment jest teraz wyświetlany jako tekst.
-Nie przeprowadzono realnej inferencji ASR ani interakcji SAF na telefonie.
+| Check | Current evidence |
+|---|---|
+| Backend | 429 tests + 588 subtests passed; generated fixtures and fresh Python environment. |
+| JavaScript | 85 tests passed, including exact occurrence and Python numeric parity. |
+| Browser | 25 real Chromium scenarios passed, including all four previously unexecuted N83 cases, real WAV/HTTP playback and history budgets. |
+| Native/JVM/APK | Pinned Gradle 9.7.0/JDK 21/Kotlin 2.4.20/AGP 9.4/SDK 37: 411 JVM tests passed (135 core, 276 Android), APK signature verified; test APK compiled, zero SAF runtime. |
+| ASR environment | Fresh installation of nine declared pins, 14 imports and `pip check` passed. |
+| Real ASR | New tiny.en CPU/int8 inference through production VerifiedReader passed; word citation and inert archive roundtrip retained exact output. |
+| CLI | Real subprocess acceptance for CSV raw records, bounded WAV scanning and archive budgets passed without changing synthetic sources. |
+| History | Byte-preserved documentation/coordination snapshots and their original-path/hash manifests. |
 
-Przed aktualizacją działającej instalacji zatrzymaj stare workery i wykonaj
-backup bazy oraz store. Ograniczenia append-only SQLite i uprawnienia plików
-nie są fizycznym WORM ani kryptograficznym podpisem łańcucha pochodzenia.
+All receipts and commands are in [validation](docs/validation/README.md).
+Failures from earlier attempts remain in the [historical documentation
+index](docs/archive/2026-09-30_2026-10-01/README.md). Full task history is in
+[historical coordination](coordination/archive/2026-09-30_2026-10-01/README.md).
+These snapshots can contain old paths, expired claims and superseded next steps.
 
-## Następny zakres wykonawczy
+## Concrete remaining boundaries
 
-1. Test dostawcy SAF na urządzeniu/emulatorze: folder bez seed, kolizje URI,
-   odmowa uprawnień, anulowanie, źródła bez zmian i selekcja nagrań. APK gotowy.
-2. Natywny adapter XLS oraz dodatkowe kodowania/separatory, po sprawdzeniu
-   ograniczeń adaptera. Unsupported musi pozostać jawne do realnego odbioru.
-3. Rzeczywista inferencja ASR na małym syntetycznym nagraniu; oddzielić
-   wykonanie adaptera od jakości na prywatnym korpusie.
-4. Cytaty słowne i przeglądarkowy wybór/odtwarzanie zakresu są wdrożone.
-   Następnie odbiór interaktywny i ewentualny analogiczny klient Android.
-5. Inertny roundtrip metadanych jest wdrożony. Kontrolowany restore live DB,
-   zakres mediów i podpis wymagają osobnego kontraktu; starych lease nie wznawiać.
-6. Profile pięciu warstw AGEDS i rozumowanie LLM — konkretne przypadki,
-   jawne RAW odpowiedzi oraz deterministyczna polityka liczb/wyliczeń.
+- SAF device/provider execution has not happened. Six instrumentation tests
+  are prepared; a successful APK or instrumentation compilation does not pass
+  them. Follow [the device harness](docs/ANDROID_SAF_PROVIDER_ACCEPTANCE.md) on an
+  available Android runtime, then separately test picker and persisted grants.
+- Synthetic English ASR does not validate Polish speech quality or word
+  alignment. Keep the uncorrected recognition result and use a separate consented
+  corpus for a quality experiment.
+- API authentication is not implemented; operate the current service on a
+  trusted/private network. Hash agreement is not authorship, truth or custody.
+- The inert archive has no source media, live restore, job replay or signature.
+- On-device JNI is an unconnected prototype, not a functioning ASR provider.
+- Full five-layer legal analysis, Live Explainer, signed custody and partner
+  integrations remain future work. Do not equate a retained design with a
+  deployed feature or manufacture numerical certainty.
+- Current files were cleared of case-specific identities. Those identifiers
+  already exist in the repository's public Git history; this work preserves
+  history and does not claim to erase that earlier exposure.
 
-Kierunki współpracy z ChatADHD, iOmatrix, Loom/LEM, WatchDog i PixelSpace są
-koncepcyjne. Używać `ECOSYSTEM.md` i `docs/ARCHITECTURE_RULES.md`; adapterów nie
-deklarować jako działających przed testem z rzeczywistym drugim projektem.
+## Continue without restarting completed work
 
-## Start osobnego wątku zarządzania
+Use local checks from [Development](docs/DEVELOPMENT.md). GitHub Actions now runs
+only by explicit manual dispatch. No Actions jobs or paid model calls were used
+for recovery. Never restore an expired overnight claim or infer an active agent
+from a historical schedule. Record a new task ID, file owner, source revision,
+acceptance and result in the current ledger. Preserve rejected attempts and
+experiments off the main documentation path.
 
-Przeczytaj ten plik, `AGENTS.md`, `coordination/night-20261001.json`,
-`coordination/NIGHT_WORK.md`, `coordination/state.json`,
-`coordination/README.md`, `docs/ARCHITECTURE_RULES.md` i `ECOSYSTEM.md` na tej samej
-rewizji repo. Potwierdź odczytany commit i task ID. Prowadź priorytety i decyzje,
-przekazując wykonaniu zlecenia z rozłącznym zakresem i kryteriami odbioru.
-Przyjmuj wyniki dopiero z ich dowodami testów i ograniczeniami. Nie wymagaj
-codziennych zatwierdzeń użytkownika dla pracy już objętej jego mandatem.
+Before upgrading a live deployment, stop old workers and back up SQLite and the
+content store. Existing loaded workers do not gain lease fencing from edited
+files on disk.

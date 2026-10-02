@@ -13,7 +13,7 @@ import unittest
 from unittest.mock import patch
 
 from fastapi.testclient import TestClient
-from server.app import archive, citations, db, evidence, jobs, packages
+from server.app import archive, citations, db, evidence, jobs, packages, worker
 from server.app.transcription import queue_transcription
 from server.app.worker import TranscriptionResult, process_job
 
@@ -23,9 +23,9 @@ class SyntheticWordAdapter:
         return {"tool": "night-integration-synthetic", "tool_version": "1",
                 "provider": "synthetic-test", "model": "not-an-ASR-model"}
 
-    def transcribe(self, path):
+    def transcribe(self, source):
         # Exercise the real worker boundary and verify the captured input.
-        assert Path(path).read_bytes() == b"synthetic waveform placeholder\x00\xff"
+        assert source.read() == b"synthetic waveform placeholder\x00\xff"
         return TranscriptionResult(" Zażółć  gęślą.\n jaźń!", "pl", [
             {"start": .125, "end": 1.25, "text": " Zażółć  gęślą.", "words": [
                 {"start": .125, "end": .6, "word": " Zażółć"},
@@ -42,7 +42,7 @@ class NightIntegrationTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         self.settings = replace(db.settings, data_dir=self.root,
                                 db_path=self.root / "live.sqlite", store_dir=self.root / "store")
-        self.patches = [patch.object(module, "settings", self.settings) for module in (db, evidence)]
+        self.patches = [patch.object(module, "settings", self.settings) for module in (db, evidence, worker)]
         for item in self.patches:
             item.start()
         db.init_db()

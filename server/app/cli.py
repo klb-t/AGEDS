@@ -54,6 +54,12 @@ def _parser() -> argparse.ArgumentParser:
                              help="maximum JSON package bytes (both directions)")
         command.add_argument("--max-archive-bytes", type=_positive_integer, default=128 * 1024 * 1024)
         command.add_argument("--max-rows", type=_positive_integer, default=100_000)
+    citation = commands.add_parser("citation-export", help="export one pinned citation and its transcript/provenance as inert metadata")
+    citation.add_argument("artifact_id", type=_positive_integer)
+    citation.add_argument("anchor_id", type=_positive_integer)
+    citation.add_argument("output", type=Path, help="new packet file; existing files are never overwritten")
+    inspect = commands.add_parser("citation-inspect", help="independently inspect a bounded citation packet without source access")
+    inspect.add_argument("input", type=Path)
     return parser
 
 
@@ -64,6 +70,11 @@ def _emit(value: dict, *, error: bool = False):
 def _write_new_json(value: dict, output: Path, *, max_bytes: int):
     """Publish atomically without overwriting a database or existing source file."""
     payload = json.dumps(value, ensure_ascii=False, indent=2, allow_nan=False).encode("utf-8") + b"\n"
+    _write_new_bytes(payload, output, max_bytes=max_bytes)
+
+
+def _write_new_bytes(payload: bytes, output: Path, *, max_bytes: int):
+    """Share only the exclusive byte-publication mechanism, not format semantics."""
     if len(payload) > max_bytes:
         raise ValueError(f"Metadata output exceeds size limit ({len(payload)} > {max_bytes})")
     if output.exists() or output.is_symlink():
@@ -104,6 +115,20 @@ def main(argv: list[str] | None = None) -> int:
             _emit({"command": "metadata-export", "output": str(args.output.resolve()),
                    "schema": package["schema"], "metadata_only": package["metadata_only"],
                    "replay_supported": package["replay_supported"], "signed": package["signed"]})
+            return 0
+        if args.command == "citation-export":
+            from .exchange import canonical_packet_bytes, export_citation_packet
+            packet = export_citation_packet(args.artifact_id, args.anchor_id)
+            _write_new_bytes(canonical_packet_bytes(packet), args.output, max_bytes=2 * 1024 * 1024)
+            _emit({"command": args.command, "output": str(args.output.resolve()),
+                   "schema": packet["schema"], "source_bytes_written": False,
+                   "full_pinned_transcript_included": True,
+                   "payload_sha256": packet["integrity"]["payload_sha256"]})
+            return 0
+        if args.command == "citation-inspect":
+            from .exchange_consumer import inspect_packet_file
+            result = inspect_packet_file(args.input)
+            _emit({"command": args.command, **result})
             return 0
         from .archive import ArchiveLimits, load_package
         if args.command in ("metadata-archive-import", "metadata-archive-export"):

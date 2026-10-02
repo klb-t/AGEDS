@@ -1,0 +1,70 @@
+{
+  "task": "AGEDS-20261001-N10",
+  "observed_at": "2026-09-30T23:14:32.635978+00:00",
+  "kvm_device_exists": false,
+  "kvm_module_exists": false,
+  "emulator_binary_exists": false,
+  "system_images": [],
+  "adb_exit_code": 0,
+  "adb_devices_output": "List of devices attached",
+  "connected_devices": [],
+  "runtime_tests_executed": 0,
+  "runtime_status": "blocked_select_connected_device",
+  "limitations": [
+    "Synthetic provider only; no picker UI, persisted grant lifecycle, recording selection or real provider acceptance."
+  ],
+  "compilation": {
+    "task": ":androidApp:assembleDebugAndroidTest",
+    "exit_code": 0,
+    "elapsed": "2m13s",
+    "tasks_executed": 60,
+    "runtime_tests_executed": 0,
+    "test_methods_compiled": 6,
+    "test_apk_bytes": 407235,
+    "test_apk_sha256": "266b90ceca4903c36aed8546feaccfeae5380c710b21013d557b62302baeae4c",
+    "gradle_log_sha256": "5fad5500a23c040701c887d0fb54fc161dfc1e236508d6682ed6a3a94237e9d6",
+    "test_input_sha256": {
+      "androidApp/build.gradle.kts": "fce128076bfa897fbcbaf17d12ccf676ec8eae919db9a3ca0fb12b4ec01411bd",
+      "androidApp/src/androidTest/AndroidManifest.xml": "4dbf7f6bde07757dece14cf936e0f516a93ebc91d588e7f6700a92fe68334f72",
+      "androidApp/src/androidTest/java/dev/klbt/ageds/SyntheticDocumentsProvider.kt": "36c3f2e8ccc90a0ab9c6a40c80d784d3f52590c1ed6cc6a760f81950c48bd1d4",
+      "androidApp/src/androidTest/java/dev/klbt/ageds/SourceScannerProviderTest.kt": "2615a03186f8b787a7754be0858e838462230aaf7534381f947d582a9d3898a6"
+    },
+    "test_inputs_unchanged": true,
+    "source_snapshot": "/tmp/ageds-provider-compile-js06t3pa",
+    "prior_attempt": "Failed before compilation on pre-existing shared Gradle cache lock; retry used separate mutable cache state.",
+    "other_source_drift_after_snapshot": [
+      "androidApp/src/main/java/dev/klbt/ageds/SourceXlsParser.kt",
+      "androidApp/src/main/java/dev/klbt/ageds/SourceWorkbookParser.kt"
+    ],
+    "provider_absent_from_merged_debug_application_manifest": true,
+    "test_apk_path": "/tmp/ageds-provider-compile-js06t3pa/androidApp/build/outputs/apk/androidTest/debug/androidApp-debug-androidTest.apk",
+    "log_path": "/tmp/ageds-provider-compile-js06t3pa/compile2.log"
+  },
+  "compiled_application_inputs": {
+    "androidApp/src/main/AndroidManifest.xml": "3312bc332bc3f6f77f8f2b9f89a57a561b96cfbbc457b744ef087e6d9f1e6fd6",
+    "androidApp/src/main/cpp/whisper_jni.cpp": "a657b54a6f820136c19fc9a69b884a7a36304ef6d119d93f0a2152713c018da0",
+    "androidApp/src/main/cpp/CMakeLists.txt": "839136a66c948c63ab388ad9d6c7c4d7584034d589fd7b548a8fb0d17ff177d8",
+    "androidApp/src/main/java/dev/klbt/ageds/SourceDelimitedParser.kt": "ac7a72bcee73a8663a257d018565b3b8bb4d10519183e87bbbcb5f86d41b2ed1",
+    "androidApp/src/main/java/dev/klbt/ageds/BoundedMetadataCache.kt": "a1e336762a8b629f8b514b83aeebd0bd6a97d08923b4d1765924d7b241edf659",
+    "androidApp/src/main/java/dev/klbt/ageds/CorpusVm.kt": "099a72264dfef814fe52053c0146816629f6e44ff4afc76310861436ce190a3f",
+    "androidApp/src/main/java/dev/klbt/ageds/SourceXlsParser.kt": "d44f415b6e6ce34f661b4b53ffd8889e5271c01580e094f08c52c02b77082a47",
+    "androidApp/src/main/java/dev/klbt/ageds/SourceWorkbookParser.kt": "74d1d36918dae55ca772ab8e2fe7df3c1cbd851d3c7ef680aa06e4657a513808",
+    "androidApp/src/main/java/dev/klbt/ageds/CorpusStore.kt": "00f3a231033cae5777acefe7882e51135b68c998260e08124bebb4e58e6601ea",
+    "androidApp/src/main/java/dev/klbt/ageds/CorpusActivity.kt": "0dc47d154855521f9d3658a0d7d484ec0f72c4e3629f54a8e14b57fb64a48e1c",
+    "androidApp/src/main/java/dev/klbt/ageds/Api.kt": "a775dc32be36bf215b2b4fd5899eb4d9fa57b5e4e61cd9aa744c15cf7e75db86",
+    "androidApp/src/main/java/dev/klbt/ageds/MainActivity.kt": "99e8730ecf85a37915279cdfa55bfac5415fb15d4dc73cbf7209520cd35769ed",
+    "androidApp/src/main/java/dev/klbt/ageds/SourceScanner.kt": "0e95c89ed19c11bfdd793ad20ad51e1991b06167ebce9c92905b3486cd8aab00",
+    "androidApp/src/main/java/dev/klbt/ageds/CorpusUi.kt": "b44645b323c9eb8c7edfd6d86cb7d9ad6fcb649cc34f800bb86b321c2d34e2f3",
+    "androidApp/src/main/java/dev/klbt/ageds/SourceScanUi.kt": "a717f4cceac8e09f78e5a5316a4d51f6ae0f19f37d916c4a06cae90d79dc95eb",
+    "androidApp/src/main/java/dev/klbt/ageds/SourceScanCache.kt": "88f5a1f9bd512155f08ccff3f10bd37e50e4332c76d78353de7f30017526d73f",
+    "androidApp/src/main/java/dev/klbt/ageds/PendingRecordings.kt": "1130db7bb0341c752fb82ef22bb74eb6cddf6b3a5419a167cf86dc28792bedeb",
+    "androidApp/src/main/res/values/styles.xml": "6a7531a6e7b821113cdaa407e9de407df7e5d281b85584991a91b35ecccb07c6",
+    "core/src/commonMain/kotlin/dev/klbt/ageds/core/Models.kt": "d376cf8121d531ce7df1bf682f4b4639e3e0cd94a9ffe00e4627e4e8dacd3a2a",
+    "core/src/commonMain/kotlin/dev/klbt/ageds/core/EvidenceInvariant.kt": "9854a1f7f352042b1f23991258ced7cfb828af39e549a37fd0c5a6e24a1348e7",
+    "core/src/commonMain/kotlin/dev/klbt/ageds/core/CorpusModels.kt": "11f14184f74ff07335dc6679fd74504a0c964b78664653cc00a09ce5529ff7ba",
+    "core/src/commonMain/kotlin/dev/klbt/ageds/core/SourceTextParser.kt": "5e21ab51c93496b97bc7798aaa635aea19db08d07110d30a6b1938acc37db074",
+    "core/src/commonMain/kotlin/dev/klbt/ageds/core/SourceScanModels.kt": "918f4ba027460eaf56b4fa6c1c9a6a53b49066c3fa558414d08e1180032c4482"
+  },
+  "checked_at": "2026-09-30T23:20:10.802566+00:00",
+  "harness_script_sha256": "d09898cd26378f9f553301a6642dc288de7647f7c032fb46d82cf4e4767d0c15"
+}

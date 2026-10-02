@@ -48,6 +48,7 @@ data class Transcript(
     val createdAt: String? = null,
     val runId: Long? = null,
     val metadata: JsonObject? = null,
+    val wordTiming: WordTiming? = null,
 )
 
 @Serializable
@@ -114,3 +115,72 @@ object TranscriptionPriority {
         return score
     }
 }
+
+@Serializable
+data class TranscriptVersion(
+    val id: Long,
+    @SerialName("artifact_id") val artifactId: Long,
+    @SerialName("run_id") val runId: Long? = null,
+    val model: String? = null,
+    val language: String? = null,
+    @SerialName("created_at") val createdAt: String? = null,
+)
+
+/** Availability describes stored ASR marks; it does not verify alignment or audio. */
+@Serializable
+data class WordTiming(
+    @SerialName("schema_version") val schemaVersion: Int = 1,
+    val kind: String = "asr_word_timing",
+    val status: String = "unavailable",
+    val segments: List<WordTimingSegment> = emptyList(),
+    @SerialName("coverage_complete") val coverageComplete: Boolean = false,
+    val reason: String? = null,
+)
+
+@Serializable
+data class WordTimingSegment(
+    @SerialName("segment_index") val segmentIndex: Int,
+    @SerialName("word_selection_available") val wordSelectionAvailable: Boolean,
+    val reason: String? = null,
+    @SerialName("word_count") val wordCount: Int? = null,
+)
+
+@Serializable
+data class WordRef(
+    @SerialName("segment_index") val segmentIndex: Int,
+    @SerialName("word_index") val wordIndex: Int,
+)
+
+@Serializable
+data class CitationCreate(
+    val derivedTextId: Long,
+    val segmentIndices: List<Int>? = null,
+    val wordRefs: List<WordRef>? = null,
+    val quoteText: String? = null,
+)
+
+@Serializable
+data class Citation(
+    val id: Long,
+    @SerialName("artifact_id") val artifactId: Long,
+    @SerialName("derived_text_id") val derivedTextId: Long,
+    @SerialName("start_ms") val startMs: Long,
+    @SerialName("end_ms") val endMs: Long,
+    @SerialName("quote_text") val quoteText: String,
+    @SerialName("quote_sha256") val quoteSha256: String,
+    val selector: JsonObject,
+    @SerialName("created_at") val createdAt: String? = null,
+    val validation: String? = null,
+    @SerialName("audio_verification") val audioVerification: String? = null,
+)
+
+/** Bounded descending-ID snapshot page; item wire shapes remain endpoint-specific. */
+@Serializable
+data class ArtifactPage<T>(
+    val artifactId: Long,
+    val items: List<T>,
+    val nextBeforeId: Long?,
+    val snapshotMaxId: Long,
+    val hasMore: Boolean,
+    val limit: Int,
+)

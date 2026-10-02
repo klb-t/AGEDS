@@ -5,10 +5,18 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 
 /** App-private metadata only. Failed or oversized replacements leave the old cache intact. */
-internal class BoundedMetadataCache(private val file: File, private val maxBytes: Int) {
+internal class BoundedMetadataCache(
+    private val file: File,
+    private val maxBytes: Int,
+    private val atomicReplace: (Path, Path) -> Unit = { source, target ->
+        Files.move(source, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+        Unit
+    },
+) {
     init { require(maxBytes > 0) }
 
     fun read(): String? {
@@ -29,7 +37,20 @@ internal class BoundedMetadataCache(private val file: File, private val maxBytes
             .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes)).toString()
     }
 
+    /** Legacy cancellation checkpoints; existing trailing-lambda calls remain compatible. */
     fun write(text: String, beforeCommit: () -> Unit = {}) {
+        writeStaged(text, beforeCommit) { publish -> publish(); true }
+    }
+
+    /** Only the final replacement is serialized with token invalidation.
+     * False means the staged result was superseded and never published.
+     */
+    fun writeGuarded(text: String, gate: SourceScanPublicationGate,
+                     token: SourceScanPublicationGate.Token, beforeCommit: () -> Unit = {}): Boolean =
+        writeStaged(text, beforeCommit) { publish -> gate.publishIfCurrent(token, publish) }
+
+    private fun writeStaged(text: String, beforeCommit: () -> Unit,
+                            commit: (() -> Unit) -> Boolean): Boolean {
         beforeCommit()
         require(text.length <= maxBytes) { "Metadane przekraczają limit $maxBytes B" }
         val bytes = text.toByteArray(Charsets.UTF_8)
@@ -41,7 +62,7 @@ internal class BoundedMetadataCache(private val file: File, private val maxBytes
             temporary.outputStream().use { stream -> stream.write(bytes); stream.fd.sync() }
             // No non-atomic fallback: a filesystem without atomic move keeps the previous version.
             beforeCommit()
-            Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            return commit { atomicReplace(temporary.toPath(), file.toPath()) }
         } finally { temporary.delete() }
     }
 }

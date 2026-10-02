@@ -108,5 +108,11 @@ data class CorpusSeed(
     val mms: List<CorpusSms> = emptyList(),
     val recordings: List<CorpusRecording> = emptyList(),
     val shortSenders: List<JsonObject> = emptyList(),
+    val defaultPresetIds: List<String> = emptyList(),
 )
 
+/** Selection policy comes from the private seed, never from identities in application code. */
+fun CorpusSeed.priorityPresetIds(): List<String> {
+    val available = presets.map { it.id }.toSet()
+    return defaultPresetIds.filter { it in available }.distinct()
+}

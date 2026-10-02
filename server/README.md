@@ -1,72 +1,59 @@
-# Evidence Workbench
+# Evidence Workbench service
 
-Self-hosted evidence/communications workbench for ingesting, preserving, searching, transcribing and annotating communication records.
-
-## What this starter already does
-
-- immutable-ish evidence store keyed by SHA-256
-- provenance for every imported artifact
-- SQLite catalog + FTS5 full-text search
-- upload/import through web UI
-- Android `SMS Backup & Restore` XML importer (calls, SMS, MMS text)
-- WhatsApp `.txt` export importer
-- generic file ingestion for audio/video/images/docs
-- annotations, tags and evidence links
-- timeline/search UI
-- batch transcription queue
-- optional local `faster-whisper` worker
-- audit log of imports, annotations and processing actions
-- JSON/CSV export endpoints
-
-The design deliberately separates **raw source evidence** from **derived data** (normalized events, transcripts, annotations, embeddings later). A derived result never overwrites source metadata.
+The AGEDS service owns preserved source bytes, acquisition provenance, normalized communication records, transcription runs, versioned results, citations and annotations. Android and browser clients consume the same HTTP contracts.
 
 ## Run
 
-```bash
-cp .env.example .env
+From this directory:
+
+```sh
 python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8080 --reload
+. .venv/bin/activate
+python -m pip install -r requirements.txt
+cp .env.example .env
+set -a
+. ./.env
+set +a
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8080
 ```
 
-Open http://localhost:8080.
+Open <http://127.0.0.1:8080>; API documentation is at <http://127.0.0.1:8080/docs>.
+The service has no built-in authentication. Keep access within a trusted environment.
 
-For transcription:
+For transcription, activate the same virtual environment in a second shell, change to this directory and load the same `.env`:
 
-```bash
-pip install -r requirements-whisper.txt
+```sh
+set -a
+. ./.env
+set +a
+python -m pip install -r requirements-whisper.txt
 python -m app.worker
 ```
 
-Or use Docker:
+The first use of a Whisper model may download it. Model, device and compute type are configured with `EW_WHISPER_*`. Each processing attempt retains its own run; successful attempts create new transcript versions.
 
-```bash
-docker compose up --build
+## Service boundaries
+
+- `app/evidence.py`, `app/importers/`: content-addressed ingestion, acquisition records and SMS/WhatsApp imports.
+- `app/jobs.py`, `app/worker.py`: transactional claims, renewable leases and fenced publication.
+- `app/citations.py`, `app/exchange.py`: exact version-pinned citations and bounded evidence packets.
+- `app/search.py`, `app/read_pages.py`: literal FTS queries and bounded history reads.
+- `app/verified_media.py`, `app/verified_reader.py`: verified descriptor reads for playback and decoding.
+- `app/scanner.py`: bounded source observations without modifying or importing originals.
+- `app/packages.py`, `app/archive.py`: metadata verification and inert archive roundtrips.
+- `app/templates/`, `app/static/`: browser review, citation selection and range playback.
+
+## Commands and checks
+
+Run local CLI commands from the repository root:
+
+```sh
+python -m server.app.cli --help
+python -m server.app.cli scan /path/to/sources --output /path/outside/sources/scan.json
+python -m server.app.cli citation-inspect /path/to/citation.json
 ```
 
-## Core evidence model
+Spreadsheet scanning adds optional dependencies from `requirements-scanner.txt`.
+HTTP scanning is disabled until `EW_SCAN_ROOTS` is configured. Recorded locators in imported packets are inert metadata and are never followed.
 
-`Artifact` is a source file or source-native object. It has a content hash, source locator, original name, timestamps and raw metadata. `Event` is a normalized communication event such as a call, SMS, WhatsApp message or e-mail. `DerivedText` stores transcript/OCR/parser output and points back to its artifact. `Annotation` is user-authored and never mutates the evidence itself.
-
-The critical invariant is:
-
-> original bytes + source metadata + import metadata stay addressable forever; every interpretation is a separate layer with its own provenance and confidence.
-
-## Connectors planned next
-
-- Gmail API incremental sync (`historyId`) with raw RFC 822 preservation
-- Google Drive incremental sync (`changes` token) with revisions where available
-- WhatsApp media + chat association
-- Google Takeout parsers
-- Android call/SMS backup cross-correlation and recorder filename reconciliation
-- OCR, PDF text extraction and image metadata
-- speaker diarization + word timestamps
-- vector search / semantic clustering
-- entity/contact resolution with confidence and alias history
-- case bundles / exhibit numbering / report generation
-- cryptographic manifests / signed exports / WORM destination
-
-## Existing catalog integration
-
-The application can ingest the existing communication catalog as a generic spreadsheet now. A dedicated importer should map its rows into normalized events without treating filename-derived numbers as authoritative; the current catalog already demonstrates why provenance/confidence needs to remain explicit.
+[Getting started](../docs/GETTING_STARTED.md) covers configuration and export; [Development](../docs/DEVELOPMENT.md) gives reproducible local checks and upgrade procedure. [Technical contracts](../docs/README.md) define preservation, budgets and failure behavior.

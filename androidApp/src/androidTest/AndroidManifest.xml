@@ -1,0 +1,15 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- This provider exists only in the separately installed test APK. -->
+    <application>
+        <provider
+            android:name="dev.klbt.ageds.SyntheticDocumentsProvider"
+            android:authorities="dev.klbt.ageds.test.documents"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+    </application>
+</manifest>

@@ -2,7 +2,7 @@
 
 These are preserved snapshots of implementation reports, experiments, independent reviews and build receipts. They describe the source revision and environment recorded in each file, not the current checkout. Their contents are unchanged, including initial failures, incomplete runs, old paths and observed limitations.
 
-The relocation baseline is `b6abe86ec1cdcd4ca8669be359ddb25422a51cc2`. [manifest.json](manifest.json) records every original path, destination, byte count and full SHA-256. Old paths quoted *inside* a snapshot are historical references; use this index to find the relocated file or inspect that path at the baseline commit. Current contracts and setup instructions are indexed in [docs](../../README.md).
+The relocation baseline is `b6abe86ec1cdcd4ca8669be359ddb25422a51cc2`. [manifest.json](manifest.json) records every original path, destination, byte count and full SHA-256. Old paths quoted *inside* a snapshot are historical references; use this index to find the relocated file or inspect that path at the baseline commit. The original `server/ARCHITECTURE.md` is preserved as `SERVER_ARCHITECTURE.md`; its original path now contains current backend documentation. Current contracts and setup instructions are indexed in [docs](../../README.md).
 
 ## Initial failures and incomplete acceptance
 
@@ -116,3 +116,4 @@ The relocation baseline is `b6abe86ec1cdcd4ca8669be359ddb25422a51cc2`. [manifest
 | `docs/WAVE9_LIFECYCLE_QA.md` | [WAVE9_LIFECYCLE_QA.md](WAVE9_LIFECYCLE_QA.md) | `ccd3998273a55aa7` |
 | `docs/WAVE9_QA.md` | [WAVE9_QA.md](WAVE9_QA.md) | `a5a3a6eab4480b82` |
 | `docs/WAVE9_SCAN_POLICY_QA.md` | [WAVE9_SCAN_POLICY_QA.md](WAVE9_SCAN_POLICY_QA.md) | `c14321053a990364` |
+| `server/ARCHITECTURE.md` | [SERVER_ARCHITECTURE.md](SERVER_ARCHITECTURE.md) | `c54b1a4a05319203` |

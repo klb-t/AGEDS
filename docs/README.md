@@ -12,7 +12,7 @@
 
 | Topic | Documents |
 |---|---|
-| Project boundary and decision semantics | [Architecture](ARCHITECTURE.md), [Architecture rules](ARCHITECTURE_RULES.md), [Ecosystem](../ECOSYSTEM.md). |
+| Project boundary and decision semantics | [Architecture](ARCHITECTURE.md), [Service architecture](../server/ARCHITECTURE.md), [Architecture rules](ARCHITECTURE_RULES.md), [Ecosystem](../ECOSYSTEM.md). |
 | Search, pagination and client limits | [Literal FTS search](SEARCH_CONTRACT.md), [Read pages](READ_PAGES.md), [Client history budget](CLIENT_HISTORY_PAYLOAD_BUDGET.md). |
 | Citation transfer | [Evidence exchange](EVIDENCE_EXCHANGE.md), [Independent consumer](EVIDENCE_CONSUMER.md). |
 | Metadata archives | [Inert archive](METADATA_ARCHIVE.md), [Interpreted verification](ARCHIVE_VERIFICATION_BUDGET.md), [Archive budgets](ARCHIVE_VERIFICATION_BUDGETS.md). |
@@ -26,4 +26,4 @@
 
 [HANDOFF.md](../HANDOFF.md) and [coordination](../coordination/README.md) identify current work and acceptance criteria. [AGENTS.md](../AGENTS.md) defines contributor responsibilities and invariants.
 
-New acceptance records are stored in `docs/validation/`. Preserved implementation notes, experiment outputs, initial failures and build receipts from the earlier increments have a separate [historical index](archive/2026-09-30_2026-10-01/README.md) and [path/hash manifest](archive/2026-09-30_2026-10-01/manifest.json). Archived snapshots describe the revisions they tested; consult the handoff for current acceptance.
+[Current acceptance records](validation/README.md) index the latest local checks and their limitations. Preserved implementation notes, experiment outputs, initial failures and build receipts from the earlier increments have a separate [historical index](archive/2026-09-30_2026-10-01/README.md) and [path/hash manifest](archive/2026-09-30_2026-10-01/manifest.json). Archived snapshots describe the revisions they tested; consult the handoff for current acceptance.

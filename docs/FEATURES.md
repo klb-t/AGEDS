@@ -25,6 +25,8 @@ AGEDS implements an evidence-review workflow. The source, each acquisition, proc
 5. Represent missing provenance and unsupported precision explicitly.
 6. Keep deterministic handling of identifiers, dates, numbers, hashes and selectors outside model interpretation.
 
+Transcription currently runs on the server. The Android JNI/whisper.cpp prototype is not wired into the Gradle build or a Kotlin native bridge; it does not provide on-device ASR.
+
 The current service uses SQLite and local content storage. Broader legal-analysis layers, OCR, diarization, semantic search, cloud connectors, signed exports and integrations with other ecosystem projects are future directions. Their presence in architectural notes does not imply an available adapter.
 
 [Architecture](ARCHITECTURE.md) describes the project boundary; [Architecture rules](ARCHITECTURE_RULES.md) record the authority and semantics of design decisions. [Documentation index](README.md) links the detailed contracts and acceptance records.

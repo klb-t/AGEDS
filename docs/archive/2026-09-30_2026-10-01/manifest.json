@@ -609,6 +609,13 @@
       "archived_path": "docs/archive/2026-09-30_2026-10-01/WAVE9_SCAN_POLICY_QA.md",
       "bytes": 4985,
       "sha256": "c14321053a990364c77ca068219a8ccbd2095415a263085e63f094c2d7fefda8"
+    },
+    {
+      "original_path": "server/ARCHITECTURE.md",
+      "archived_path": "docs/archive/2026-09-30_2026-10-01/SERVER_ARCHITECTURE.md",
+      "bytes": 1802,
+      "sha256": "c54b1a4a053192035eab2a6db6e07528f6872fb1be6deddd6f658c32c83d2c05",
+      "disposition": "historical_snapshot_preserved; original_path_replaced_with_current_backend_documentation"
     }
   ]
 }

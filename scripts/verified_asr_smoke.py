@@ -70,7 +70,7 @@ def main():
                                'Metadata archive excludes audio and model bytes; not replay or live restore.']}
     started = time.perf_counter()
     try:
-        previous_receipt = json.loads((Path(__file__).resolve().parents[1] / 'docs/REAL_ASR_SMOKE_RECEIPT.json').read_text())
+        previous_receipt = json.loads((Path(__file__).resolve().parents[1] / 'docs/archive/2026-09-30_2026-10-01/REAL_ASR_SMOKE_RECEIPT.json').read_text())
         require(receipt['model']['file_sha256'] == previous_receipt['model']['file_sha256'], 'Local model differs from previously accepted model bytes')
         receipt['model']['matches_previous_accepted_hashes'] = True
         receipt['offline_environment'] = {'HF_HUB_OFFLINE': os.environ.get('HF_HUB_OFFLINE'), 'model_path': str(model)}

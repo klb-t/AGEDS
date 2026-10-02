@@ -77,7 +77,7 @@ new common Kotlin tests in `ArtifactPayloadBudgetOwnerTest.kt` cover real serial
 prefix admission, invalid measured costs even beyond a cutoff, and explicit
 count-only compatibility behavior. The coordinator subsequently ran all three
 successfully within the 207-test integrated JVM build; the owner ran no Gradle.
-See `ANDROID_WAVE6_BUILD_RECEIPT.json`.
+See `archive/2026-09-30_2026-10-01/ANDROID_WAVE6_BUILD_RECEIPT.json`.
 
 Independent N41 budget tests and the coordinator's real Chromium large-row case
 provide additional acceptance separately. This document does not substitute code

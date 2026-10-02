@@ -62,7 +62,7 @@ within actual file/total read budgets and streams complete-file hashing only
 when EOF is observed. Duration is a supported header declaration, not measured
 playback or validation of audio samples. Provider/actual EOF size conflicts and
 unsupported layouts stay explicit. See `WAV_HEADER_PROBE.md`,
-`WAVE7_STREAM_QA.md` and `ANDROID_WAVE7_BUILD_RECEIPT.json`.
+`archive/2026-09-30_2026-10-01/WAVE7_STREAM_QA.md` and `archive/2026-09-30_2026-10-01/ANDROID_WAVE7_BUILD_RECEIPT.json`.
 
 ## Fala 12: tekst bazowy XLSX i adnotacje fonetyczne
 
@@ -74,4 +74,4 @@ Adnotacje fonetyczne nie są zachowywane w projekcji: jawny
 niezmieniony i wskazywany przez URI oraz hash odczytanych bajtów. Zliczanie
 znaków obejmuje także pomijany tekst, aby nie osłabiać dotychczasowego limitu.
 Szczegóły i reprodukcja: `XLSX_PHONETIC_PROJECTION.md`; niezależny odbiór:
-`WAVE12_XLSX_QA.md` i `WAVE12_XLSX_ENGINE_QA.md`.
+`archive/2026-09-30_2026-10-01/WAVE12_XLSX_QA.md` i `archive/2026-09-30_2026-10-01/WAVE12_XLSX_ENGINE_QA.md`.

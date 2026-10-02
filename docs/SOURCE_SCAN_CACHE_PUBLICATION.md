@@ -46,5 +46,5 @@ The independent gate/cache race checkpoint passed 17 tests. The integrated
 wave 11 build passed all six owner cases and the full JVM suite: 246 Android
 unit tests plus 111 desktop tests, 357 total. It completed 57 Gradle tasks;
 88 source hashes remained unchanged and APK signature verification exited 0.
-The coordinator records the build in `ANDROID_WAVE11_BUILD_RECEIPT.json`.
+The coordinator records the build in `archive/2026-09-30_2026-10-01/ANDROID_WAVE11_BUILD_RECEIPT.json`.
 No Android device/SAF runtime acceptance is implied.

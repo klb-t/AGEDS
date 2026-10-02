@@ -11,7 +11,7 @@ in 2 min 13 s and produced a 407,235-byte test APK. All six test methods and the
 provider compiled. None ran on Android. The test inputs match the recorded
 snapshot; concurrent XLS/OOXML edits changed two application files afterward,
 so this is not the final integrated application build. See
-[the machine-readable receipt](ANDROID_SAF_PROVIDER_RECEIPT.json).
+[the machine-readable receipt](archive/2026-09-30_2026-10-01/ANDROID_SAF_PROVIDER_RECEIPT.json).
 
 Six instrumentation contracts are provided in
 `androidApp/src/androidTest/java/dev/klbt/ageds/SourceScannerProviderTest.kt`:

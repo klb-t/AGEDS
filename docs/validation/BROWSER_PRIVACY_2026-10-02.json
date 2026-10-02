@@ -1,0 +1,229 @@
+{
+  "schema_version": 1,
+  "result_id": "AGEDS-RESULT-20261002-BROWSER-PRIVACY",
+  "status": "passed",
+  "reason_for_repeat": "Search template changed after previous browser acceptance.",
+  "previous_receipt": "docs/validation/BROWSER_COMPLETION_2026-10-02.json",
+  "changed_browser_inputs": {
+    "server/app/templates/index.html": {
+      "previous": "4d5cb3975a95d4d88bb7b9d89cc3f128b6a6cbebab41ae7a8343ecd49488e87e",
+      "current": "7949c2532a6063602ea4395e53661602698443a08fe343fa6aded864c7846661"
+    }
+  },
+  "production_citation_selector_changes": false,
+  "node_suite_repeated": false,
+  "node_previous_pass_count": 85,
+  "browser": {
+    "git_head": "6110f052e72eb3c040a3bb0ad39da07b73d9537d",
+    "playwright": "1.62.1",
+    "source_sha256": {
+      "server/app/main.py": "0ae7735006c42773058c58b02bf156d6d2898c5ae0ee039e18a074523d878233",
+      "server/app/db.py": "776f0039102c91e7da63fa489b64ae6fcccd1bf925db02501d09d01ab822bdf9",
+      "server/app/static/citations.mjs": "190d34fd5979e2f7273edd2162c92a490892e3af197e7b10aede15e4173a6885",
+      "server/app/static/range-player.mjs": "f451e2f333cf480100d29dafa9181c8c6ebae748dda03092c0bc03c0664b901c",
+      "server/app/templates/artifact.html": "04aeeb303579b8e6ef08f3d3f0c88c6d2503922f7c83fec509f43cf266a84025",
+      "server/app/templates/index.html": "7949c2532a6063602ea4395e53661602698443a08fe343fa6aded864c7846661",
+      "server/app/exchange.py": "f1f80e17c6e8697833d0e5b910807efe0e469aa22107ed1d5cc0e6fed1e061bc",
+      "server/app/exchange_consumer.py": "95bff415061954ae8cce8ca998f06229c70cf5477c4b47e0dba2fc3b210c3049",
+      "server/app/verified_media.py": "90308d9bc8061391c1f8772f027652fe45087f5fe80029d83d02b2a08590cd4d",
+      "server/app/search.py": "14783b0a154050a09521f58a57e6600bdd14ffad5fe2f231f69d15620fbfc8cd",
+      "server/app/read_pages.py": "fc5fbc7bd57d84bd1b384d01be810ad60120ad5747d2279120e3b3bff2785a5a",
+      "server/tests/browser/acceptance.cjs": "f1a33c8423725f6a7b0aa78a0830d87510541e83c326c7b9e15be85f9052464a",
+      "server/tests/browser_fixture.py": "59eadbefaeba6d7448f69ad7bdc24ea9e24a50cf35f69e8f1265ef884057d399"
+    },
+    "task": "AGEDS-20261001-N83-browser",
+    "baseline_task": "AGEDS-20261001-N12",
+    "started_at": "2026-10-02T20:38:44.822Z",
+    "fixture": "generated 4s mono PCM WAV; temporary SQLite; synthetic transcript versions",
+    "cases": [
+      {
+        "name": "older version exact word citation and literal XSS text",
+        "status": "passed"
+      },
+      {
+        "name": "fresh saved quote replay uses old anchor while latest version selected",
+        "status": "passed"
+      },
+      {
+        "name": "fresh packet link downloads and independently verifies old version while latest selected",
+        "status": "passed"
+      },
+      {
+        "name": "persisted quote replay retains anchor and cancels on seek outside range",
+        "status": "passed"
+      },
+      {
+        "name": "persisted packet link downloads identical pinned evidence while latest selected",
+        "status": "passed"
+      },
+      {
+        "name": "stale transcript response cannot replace newer selected version",
+        "status": "passed"
+      },
+      {
+        "name": "pending save stays pinned while version switches",
+        "status": "passed"
+      },
+      {
+        "name": "forged words occurrence with same text version and rounded time is rejected before history links",
+        "status": "passed"
+      },
+      {
+        "name": "forged segments occurrence with same text version and rounded time is rejected before history links",
+        "status": "passed"
+      },
+      {
+        "name": "real save after rejection preserves half-millisecond ties and selected occurrence",
+        "status": "passed"
+      },
+      {
+        "name": "late forged occurrence cannot enter history or overwrite switched version status",
+        "status": "passed"
+      },
+      {
+        "name": "real WAV playback seeks and stops at selected end",
+        "status": "passed"
+      },
+      {
+        "name": "stop button cancels real playback without later resumption",
+        "status": "passed"
+      },
+      {
+        "name": "version change cancels audio and clears unavailable word selection",
+        "status": "passed"
+      },
+      {
+        "name": "selection change cancels native playback",
+        "status": "passed"
+      },
+      {
+        "name": "stop during delayed metadata prevents late native playback",
+        "status": "passed"
+      },
+      {
+        "name": "search snippets keep source HTML inert in actual browser",
+        "status": "passed"
+      },
+      {
+        "name": "verified media endpoint supports exact ranges and HEAD in Chromium context",
+        "status": "passed"
+      },
+      {
+        "name": "unsafe DOM artifact ID refuses transcript requests before rounding",
+        "status": "passed"
+      },
+      {
+        "name": "unsafe DOM transcript ID refuses fetch and preserves exact unsupported ID",
+        "status": "passed"
+      },
+      {
+        "name": "unsafe or mismatched API version identity never enables quote actions",
+        "status": "passed"
+      },
+      {
+        "name": "paged versions preserve selected pin across delayed older load",
+        "status": "passed"
+      },
+      {
+        "name": "citation and annotation pages expose all 125 rows without duplicates or source HTML",
+        "status": "passed"
+      },
+      {
+        "name": "mismatched history snapshot is rejected without adding rows",
+        "status": "passed"
+      },
+      {
+        "name": "aggregate payload cap stops older quotes with explicit omission",
+        "status": "passed"
+      }
+    ],
+    "browser": "141.0.7390.37",
+    "downloads": [
+      {
+        "rendering": "dynamic",
+        "filename": "ageds-citation-1-132.json",
+        "content_disposition": "attachment; filename=\"ageds-citation-1-132.json\"",
+        "bytes": 3927,
+        "sha256": "56a5e38c60e8c621607b9bcbfb202a16b2a3b95285f903a62e1f789dcde0b555",
+        "derived_text_id": 1,
+        "anchor_id": 132,
+        "verification": "matches_included_pinned_transcript",
+        "media_requests": 0,
+        "stored_path_included": false,
+        "source_bytes_included": false,
+        "media_bytes_included": false
+      },
+      {
+        "rendering": "persisted",
+        "filename": "ageds-citation-1-132.json",
+        "content_disposition": "attachment; filename=\"ageds-citation-1-132.json\"",
+        "bytes": 3927,
+        "sha256": "56a5e38c60e8c621607b9bcbfb202a16b2a3b95285f903a62e1f789dcde0b555",
+        "derived_text_id": 1,
+        "anchor_id": 132,
+        "verification": "matches_included_pinned_transcript",
+        "media_requests": 0,
+        "stored_path_included": false,
+        "source_bytes_included": false,
+        "media_bytes_included": false
+      }
+    ],
+    "playback": {
+      "playing": {
+        "paused": false,
+        "time": 0.223388,
+        "duration": 4,
+        "ready": 4,
+        "native": true
+      },
+      "stopped": {
+        "paused": true,
+        "time": 1.1,
+        "duration": 4,
+        "ready": 4,
+        "native": true
+      },
+      "tolerance_seconds": 0.03
+    },
+    "verified_media": {
+      "full_bytes": 128044,
+      "range_bytes": 48,
+      "head_body_bytes": 0
+    },
+    "history_pages": {
+      "versions": 125,
+      "citations": 125,
+      "annotations": 125,
+      "initial_limit": 50
+    },
+    "payload_budget": {
+      "retained_quotes": 4,
+      "source_quotes": 6,
+      "retained_quote_text_bytes": 3600036,
+      "encoded_payload_cap": 4194304,
+      "coverage": "Pokazano 4 pozycji (3601936 bajtów JSON UTF-8). Osiągnięto budżet treści 4 MiB; dalsze wpisy pominięto, wczytywanie zatrzymane. To nie jest limit pamięci przeglądarki. Odśwież widok, aby zacząć od najnowszych."
+    },
+    "page_errors": [],
+    "status": "passed",
+    "finished_at": "2026-10-02T20:38:56.006Z"
+  },
+  "privacy_review": {
+    "mode": "read_only",
+    "current_tracked_tree": "6110f052e72eb3c040a3bb0ad39da07b73d9537d",
+    "known_case_identity_literals_found": 0,
+    "private_sources_modified": false,
+    "historical_git_ancestry_rewritten": false
+  },
+  "runtime": {
+    "browser_executable": "/root/.cache/ms-playwright/chromium_headless_shell-1194/chrome-linux/headless_shell",
+    "node_modules": "$CODEX_PRIMARY_RUNTIME_NODE_MODULES",
+    "python": ".venv/bin/python",
+    "budget_fixture": true,
+    "paid_services": false,
+    "private_data_used": false
+  },
+  "limits": [
+    "Known case-identity literal inspection is separate from general secret detection.",
+    "Browser acceptance does not establish ASR quality, acoustic alignment, Android/SAF runtime or partner integrations."
+  ]
+}

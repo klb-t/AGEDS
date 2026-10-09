@@ -1,0 +1,9 @@
+{
+  "schema": "ageds.asr_recipe/1",
+  "id": "faster-whisper-default",
+  "revision": 1,
+  "model": "small",
+  "device": "cpu",
+  "compute_type": "int8",
+  "options": {"word_timestamps": true, "vad_filter": true}
+}

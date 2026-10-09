@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import BinaryIO
 from .config import settings
+from .asr_recipe import load_recipe
 from .db import init_db, session
 from .verified_reader import CHUNK_SIZE, MAX_MEDIA_BYTES, MAX_READ_BYTES, VerifiedReader
 from .transcription import word_timing_capabilities
@@ -48,15 +49,19 @@ class TranscriptionResult:
 
 class FasterWhisperAdapter:
     """A replaceable ASR boundary; tests do not load models or use the network."""
+    def __init__(self):
+        self.recipe = load_recipe(settings.asr_recipe_path).with_runtime_settings(settings)
+
     def describe(self) -> dict:
         return {
             "tool": "faster-whisper", "tool_version": _version("faster-whisper"),
-            "provider": "local", "model": settings.whisper_model, "model_version": "unknown",
-            "parameters": {"device": settings.whisper_device, "compute_type": settings.whisper_compute_type,
-                           "word_timestamps": True, "vad_filter": True,
+            "provider": "local", "model": self.recipe.model, "model_version": "unknown",
+            "parameters": {"device": self.recipe.device, "compute_type": self.recipe.compute_type,
+                           **self.recipe.options(),
                            "unspecified_options": "library defaults; effective transcription options recorded in result"},
             "metadata": {"python_version": platform.python_version(), "ctranslate2_version": _version("ctranslate2"),
-                         "model_revision": "unknown", "seed": "unknown"},
+                         "model_revision": "unknown", "seed": "unknown",
+                         "asr_recipe": self.recipe.snapshot(), "asr_recipe_hash": self.recipe.content_hash},
         }
 
     def transcribe(self, audio: str | BinaryIO) -> TranscriptionResult:
@@ -69,9 +74,9 @@ class FasterWhisperAdapter:
             from faster_whisper import WhisperModel
         except ImportError as e:
             raise RuntimeError("Install requirements-whisper.txt to enable transcription") from e
-        model = WhisperModel(settings.whisper_model, device=settings.whisper_device,
-                             compute_type=settings.whisper_compute_type)
-        segments, info = model.transcribe(audio, word_timestamps=True, vad_filter=True)
+        model = WhisperModel(self.recipe.model, device=self.recipe.device,
+                             compute_type=self.recipe.compute_type)
+        segments, info = model.transcribe(audio, **self.recipe.options())
         out, texts = [], []
         for segment in segments:
             words = [{"start": _json_number(word.start), "end": _json_number(word.end), "word": word.word,
@@ -89,6 +94,7 @@ class FasterWhisperAdapter:
             "language_probability": _json_number(getattr(info, "language_probability", None)),
             "language_probability_meaning": "language identification probability; not transcript correctness",
             "transcript_confidence": "unknown", "effective_transcription_options": options,
+            "asr_recipe": self.recipe.snapshot(), "asr_recipe_hash": self.recipe.content_hash,
         })
 
 @contextmanager

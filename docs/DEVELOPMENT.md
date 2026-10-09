@@ -79,3 +79,30 @@ Do not configure an inert metadata archive as the live `EW_DB_PATH`. It is a sep
 ## Documentation layout
 
 Active contracts stay in `docs/`. New acceptance evidence belongs in `docs/validation/`; historical snapshots stay in `docs/archive/` with their original contents. The archive manifest maps prior paths and records hashes, including initial failures and blocked execution. [CHANGELOG.md](../CHANGELOG.md) describes functional increments; [HANDOFF.md](../HANDOFF.md) describes the current actionable state.
+
+## Versioned local ASR recipe
+
+`server/profiles/asr/default.json` (`ageds.asr_recipe/1`) is the sole source of
+model/device/compute defaults and the two supported decoder options. Select a
+complete recipe with `EW_ASR_RECIPE=/absolute/recipe.json`; missing, malformed,
+duplicate or unsupported fields fail explicitly. Existing `EW_WHISPER_MODEL`,
+`EW_WHISPER_DEVICE`, `EW_WHISPER_COMPUTE_TYPE` override the corresponding recipe
+defaults at worker startup. Options are read when an adapter is created and the
+effective model/settings/options are pinned for that adapter's entire operation.
+Restart the worker to change its model settings; later option edits apply only
+to the next adapter.
+
+Defaults remain small / CPU / int8, VAD on and word timings on. VAD off and word
+timings off are implemented options in the same adapter. Other decoder options
+and alternate providers are unsupported by this recipe schema; extending them
+requires adapter validation and a new tested contract. Unspecified library
+options and unknown model revision remain explicit unknown/default provenance.
+A recipe hash identifies configuration bytes; it does not establish ASR quality.
+
+The existing processing-run metadata, result metadata and inert metadata-package
+graph retain the full effective recipe and SHA-256 hash; no storage migration or
+parallel graph is added. Existing results are not backfilled. Without valid
+stored word timings, the existing citation mechanism reports word selection
+unavailable. Queue admission does not yet pin recipes: pending legacy jobs still
+use the configuration selected when their worker creates its adapter. This is
+separate backlog EA-AGEDS-002, not a promised replay capability.

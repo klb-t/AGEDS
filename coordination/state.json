@@ -137,6 +137,36 @@
         "docs/validation/BACKEND_COMPLETION_2026-10-02.json",
         "coordination/publication-20261002.json"
       ]
+    },
+    {
+      "id": "AGEDS-B-20261009-ASR-OPTIONS",
+      "owner": "task-B-product",
+      "status": "done",
+      "scope": [
+        "server/app/asr_recipe.py",
+        "server/app/worker.py",
+        "server/app/config.py",
+        "server/profiles/asr",
+        "server/tests/test_asr_recipe.py",
+        "docs/reports/data-graph-engine-2026-10-09.md",
+        "docs/DEVELOPMENT.md"
+      ],
+      "based_on_commit": "9c1d513bc19d177bd324d7506a21fbab98c2e268",
+      "acceptance": [
+        "Preserve default decoder parameters; VAD/timings changed through validated data; real worker stores recipe/hash; no source or historical result mutation."
+      ],
+      "result_refs": [
+        "docs/reports/data-graph-engine-2026-10-09.md"
+      ],
+      "results": {
+        "python_tests": 432,
+        "python_subtests": 588,
+        "js_tests": 85,
+        "repository_verifier": true,
+        "real_asr_inference": false,
+        "model_requests": 0,
+        "publication": "pending_commit_push"
+      }
     }
   ],
   "remaining_boundaries": [

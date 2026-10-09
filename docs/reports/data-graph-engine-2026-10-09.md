@@ -60,3 +60,5 @@ Final source-path check: 19/19 scoped tests PASS; full final Python 432/432 + 58
 Published product commit: `157d88f`; push PASS. Source main remains at baseline, no deployment/migration of live storage. Local synthetic runtime acceptance is accepted in the task ledger; this is not main integration or real ASR-quality acceptance.
 
 Additional fresh baseline at original SHA in an isolated detached worktree: 429/429 + 588 subtests PASS (9.46 s), compared with 432/432 final tree. Log data-graph-ageds-fresh-baseline.log. This execution occurred after implementation on preserved baseline source; it is not a historical receipt relabeled as a new run.
+
+Bootstrap environment regression added: independent subprocess reads EW_ASR_RECIPE through production config/adapter; file model/options are consumed, EW_WHISPER_MODEL overrides model alone and changes the effective hash. No model constructed. Final Python 433 + 588 subtests PASS (12.56 s), recipe 4/4 PASS; logs data-graph-ageds-env{,-full}.log.

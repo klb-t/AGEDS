@@ -2,6 +2,8 @@
 from dataclasses import replace
 import hashlib
 import json
+import os
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -104,6 +106,28 @@ class AsrRecipeTests(unittest.TestCase):
         self.assertEqual([r['status'] for r in self.rows('processing_runs')], ['failed', 'done'])
         self.assertEqual(len(self.rows('derived_text')), 1)
         self.assertEqual(self.audio.read_bytes(), self.raw)
+
+    def test_production_environment_selects_recipe_defaults_and_explicit_model_overlay(self):
+        value = {**self.base, 'model': 'synthetic-profile-model',
+                 'options': {'vad_filter': False, 'word_timestamps': True}}
+        self.profile.write_text(json.dumps(value))
+        env = dict(os.environ)
+        for key in ('EW_WHISPER_MODEL', 'EW_WHISPER_DEVICE', 'EW_WHISPER_COMPUTE_TYPE'):
+            env.pop(key, None)
+        env.update(EW_ASR_RECIPE=str(self.profile), EW_DATA_DIR=str(self.root),
+                   EW_DB_PATH=str(self.root / 'subprocess.sqlite'), EW_STORE_DIR=str(self.store))
+        script = ('import json; from server.app.worker import FasterWhisperAdapter; '
+                  'print(json.dumps(FasterWhisperAdapter().describe()["metadata"]))')
+        def describe():
+            return json.loads(subprocess.check_output([sys.executable, '-c', script],
+                              cwd=Path(__file__).resolve().parents[2], env=env, text=True))
+        first = describe()
+        self.assertEqual(first['asr_recipe'], value)
+        env['EW_WHISPER_MODEL'] = 'synthetic-environment-model'
+        second = describe()
+        self.assertEqual(second['asr_recipe']['model'], 'synthetic-environment-model')
+        self.assertEqual(second['asr_recipe']['options'], value['options'])
+        self.assertNotEqual(first['asr_recipe_hash'], second['asr_recipe_hash'])
 
     def test_validation_has_no_silent_default_or_unknown_switch(self):
         for invalid in ({}, {**self.base, 'revision': True},

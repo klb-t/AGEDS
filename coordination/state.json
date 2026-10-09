@@ -159,7 +159,7 @@
         "docs/reports/data-graph-engine-2026-10-09.md"
       ],
       "results": {
-        "python_tests": 432,
+        "python_tests": 433,
         "python_subtests": 588,
         "js_tests": 85,
         "repository_verifier": true,

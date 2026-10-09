@@ -141,7 +141,7 @@
     {
       "id": "AGEDS-B-20261009-ASR-OPTIONS",
       "owner": "task-B-product",
-      "status": "done",
+      "status": "accepted",
       "scope": [
         "server/app/asr_recipe.py",
         "server/app/worker.py",
@@ -165,7 +165,8 @@
         "repository_verifier": true,
         "real_asr_inference": false,
         "model_requests": 0,
-        "publication": "pending_commit_push"
+        "publication": "published_product_branch",
+        "product_commit": "157d88f"
       }
     }
   ],

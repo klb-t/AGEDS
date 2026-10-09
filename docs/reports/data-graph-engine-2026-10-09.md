@@ -58,3 +58,5 @@ historical intent. No claim that all app configuration is already graph data
 Final source-path check: 19/19 scoped tests PASS; full final Python 432/432 + 588 subtests PASS (9.81 s), repository verifier PASS. Default source is under profiles/, outside the private runtime data ignore rule. Appended Settings field preserves existing positional fields. Ready for product commit/push.
 
 Published product commit: `157d88f`; push PASS. Source main remains at baseline, no deployment/migration of live storage. Local synthetic runtime acceptance is accepted in the task ledger; this is not main integration or real ASR-quality acceptance.
+
+Additional fresh baseline at original SHA in an isolated detached worktree: 429/429 + 588 subtests PASS (9.46 s), compared with 432/432 final tree. Log data-graph-ageds-fresh-baseline.log. This execution occurred after implementation on preserved baseline source; it is not a historical receipt relabeled as a new run.

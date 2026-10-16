@@ -28,13 +28,20 @@ database stores `token_key` (public lookup id), a random salt and
 `hmac.compare_digest`. Scopes are `read` (all `/api/read/v1/*` and listing
 routes) and `propose` (submitting annotation proposals and relation
 hypotheses). Revocation and expiry are timestamps; rows are kept.
-`last_used_at`/`use_count` are updated on every accepted request.
+Verification of a valid token is read-only (review finding 8): `last_used_at` and
+`use_count` are written at most once per minute per token and server process
+(`TOUCH_INTERVAL_SECONDS`); uses in between are counted in memory and added on the
+next write, so `use_count` is a lower bound (uses since the last write are lost if the
+process stops) and a busy database never fails a valid request.
 
-`audit_log` records `token_create`, `token_revoke` and every rejection
-(`token_rejected` with `token_key` and reason: `unknown_key`, `secret_mismatch`,
-`revoked`, `expired`, `scope`). Requests without a token or with a malformed
-token are refused before any database access and are not audited. There is no
-rate limiting; the service remains intended for a trusted/private network.
+`audit_log` records `token_create`, `token_revoke` and rejections. Rejections are
+counted in `api_token_rejections` (schema 73) per UTC hour, `token_key` and reason
+(`unknown_key`, `secret_mismatch`, `revoked`, `expired`, `scope`) with first/last
+time; only the first one of each writes a `token_rejected` audit row. After 25 keys in
+one hour further keys are pooled under `*`, so junk bearer tokens cannot grow the
+tables per request. Requests without a token or with a malformed token are refused
+before any database access and are not audited. There is no rate limiting; the
+service remains intended for a trusted/private network.
 
 ### Authentication and error model
 

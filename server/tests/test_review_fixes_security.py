@@ -70,3 +70,41 @@ def test_finding3_operator_paths_keep_full_overrides(env):
     assert job['created'] is True
     pipeline = enqueue_media_job('diarize', artifact, overrides={'pipeline': '/opt/private/pipeline'})
     assert pipeline['created'] is True
+
+
+# --------------------------------------------------------------------- finding 8
+
+def test_finding8_rejected_tokens_are_aggregated_not_one_row_each(env, monkeypatch):
+    from server.app.integrations import tokens
+    monkeypatch.setenv('EW_REQUIRE_TOKEN', '1')
+    with env.client() as http:
+        for i in range(60):
+            assert http.get('/api/timeline', headers={'Authorization': f'Bearer ageds_{i:012x}.junk'}).status_code == 401
+        for _ in range(30):
+            assert http.get('/api/timeline', headers={'Authorization': 'Bearer ageds_aaaaaaaaaaaa.junk'}).status_code == 401
+    audit_rows = env.one("SELECT COUNT(*) FROM audit_log WHERE action='token_rejected'")
+    assert audit_rows <= tokens.MAX_REJECTION_KEYS_PER_BUCKET + 1
+    counters = env.rows('SELECT token_key, reason, count FROM api_token_rejections')
+    assert sum(r['count'] for r in counters) == 90
+    assert len(counters) <= tokens.MAX_REJECTION_KEYS_PER_BUCKET + 1
+    assert any(r['token_key'] == '*' for r in counters)  # keys beyond the per-hour cap are pooled
+
+
+def test_finding8_valid_token_checks_are_read_only_and_touch_lazily(env, monkeypatch):
+    import sqlite3
+    from server.app.integrations import tokens
+    created = tokens.create_token('synthetic', ['read'])
+    first = tokens.verify_token(created['token'])
+    assert first['use_count'] == 1 and first['last_used_at']
+    blocker = sqlite3.connect(str(env.settings.db_path), timeout=0.1)
+    blocker.execute('BEGIN IMMEDIATE')  # e.g. a long write elsewhere: verification must not need the lock
+    try:
+        for _ in range(10):
+            assert tokens.verify_token(created['token'])['id'] == created['id']
+    finally:
+        blocker.rollback()
+        blocker.close()
+    assert env.one('SELECT use_count FROM api_tokens WHERE id=?', (created['id'],)) == 1  # uses pending in memory
+    monkeypatch.setattr(tokens, 'TOUCH_INTERVAL_SECONDS', 0)
+    assert tokens.verify_token(created['token'])['use_count'] == 12  # 1 + 10 pending + this one
+    assert env.one("SELECT COUNT(*) FROM audit_log WHERE action='token_rejected'") == 0

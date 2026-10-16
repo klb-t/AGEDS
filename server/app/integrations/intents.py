@@ -33,7 +33,7 @@ MAX_CLAIMS = 500
 MAX_CLAIM_CHARS = 4096
 MAX_PROSE_CHARS = 65_536
 MAX_ITEM_IDS = 10_000
-MATCH_RULE = 'nfkd_strip_marks_casefold_substring/v1'
+MATCH_RULE = 'nfkd_strip_marks_strokes_casefold_substring/v1'
 _ITEM_ID = re.compile(r'^(segment|event|artifact|citation|derived_text|quote):[0-9:\-]{1,64}$')
 _FTS_OPERATORS = {'AND', 'OR', 'NOT', 'NEAR'}
 
@@ -129,8 +129,12 @@ def validate_intent(intent) -> dict:
     return dict(intent)
 
 
+_STROKES = str.maketrans({'ł': 'l', 'Ł': 'L', 'ø': 'o', 'Ø': 'O', 'đ': 'd', 'Đ': 'D', 'ħ': 'h', 'Ħ': 'H', 'ı': 'i', 'ŧ': 't', 'Ŧ': 'T', 'ß': 'ss', 'æ': 'ae', 'Æ': 'AE', 'œ': 'oe', 'Œ': 'OE'})
+
+
 def _normalize(text: str) -> str:
-    decomposed = unicodedata.normalize('NFKD', text)
+    """Fold at least as permissively as FTS5 unicode61: marks stripped, stroke letters mapped, casefold."""
+    decomposed = unicodedata.normalize('NFKD', text.translate(_STROKES))
     return ''.join(c for c in decomposed if not unicodedata.combining(c)).casefold()
 
 
@@ -142,13 +146,15 @@ def query_terms(q: str) -> list[str]:
     heuristic for anchoring, not a reimplementation of FTS5 matching.
     """
     terms = []
-    for phrase, bare in re.findall(r'"((?:[^"]|"")*)"|([^\s"(){}:+^,]+)', q):
+    for phrase, bare in re.findall(r'"((?:[^"]|"")*)"|([^\s"(){}+^,]+)', q):
         if phrase:
             term = phrase.replace('""', '"')
         else:
             term = bare
             if term in _FTS_OPERATORS or term.startswith('-'):
                 continue
+            if ':' in term:  # column filter such as title:word; keep the word
+                term = term.rsplit(':', 1)[1]
             term = term.rstrip('*')
         term = term.strip()
         if term and term not in terms:
@@ -302,7 +308,7 @@ def execute_intent(intent) -> dict:
         filters = {name: intent[name] for name in ('event_type', 'phone', 'direction', 'thread_id', 'artifact_id', 'source_id') if name in intent}
         window = read_api.read_timeline(from_=intent.get('from'), to=intent.get('to'), filters=filters,
                                         limit=intent.get('limit'), cursor=intent.get('cursor'))
-        items = [{'item_id': f'event:{event["id"]}', 'kind': 'event', 'quote_field': 'body', 'quote_text': event['body'],
+        items = [{'item_id': f'event:{event["id"]}', 'kind': 'event', 'event_id': event['id'], 'quote_field': 'body', 'quote_text': event['body'],
                   'quote_sha256': event['body_sha256'], 'verification': 'exact_stored_event_text', **event} for event in window['items']]
         has_more, complete = window['has_more'], window['complete']
         extra = {'next_cursor': window['next_cursor'], 'display_rule': window['display_rule'],

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "AGEDS",
   "state_id": "AGEDS-STATE-20261016-001",
-  "updated_at": "2026-10-16T18:37:07.628388+00:00",
+  "updated_at": "2026-10-16T18:39:47.604513+00:00",
   "based_on_remote_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
   "local_branch": "ccr-d25c3cb3-qgbhql",
   "status_summary": "Evidence Timeline & Analysis increment started on 9c1d513: Etap 0 report and F0 extension foundation; parallel tracks A-H claimed with disjoint file scopes.",
@@ -185,7 +185,7 @@
     {
       "id": "AGEDS-TASK-20261016-B",
       "owner": "importers",
-      "status": "claimed",
+      "status": "in_progress",
       "scope": [
         "server/app/importers/ (new files)",
         "server/app/importers/data/",
@@ -199,7 +199,33 @@
       "acceptance": [
         "Tree-preserving chat imports, logical dedup across 3 exports with edit/branch, raw fields, idempotent reimport, explicit tz ambiguity."
       ],
-      "result_refs": []
+      "result_refs": [],
+      "parts": {
+        "B1_chat": {
+          "status": "accepted",
+          "integrated_commit": "4e9097d",
+          "result_refs": [
+            "docs/IMPORTERS_CHAT.md",
+            "docs/validation/IMPORT_CHAT_2026-10-16.json"
+          ],
+          "results": {
+            "backend_after_merge": "498 passed, 1 skipped (opt-in scale), 658 subtests",
+            "scale_opt_in": "126 MB synthetic export, 57,825 events, 43 s, +19.5 MB RSS"
+          },
+          "shared_edits": [
+            "evidence.add_event(db=None) caller transaction",
+            "imports_chat router/command registration"
+          ],
+          "not_done": [
+            "ZIP export input",
+            "browser view of dedup report",
+            "real vendor exports unavailable"
+          ]
+        },
+        "B2_comm": {
+          "status": "claimed"
+        }
+      }
     },
     {
       "id": "AGEDS-TASK-20261016-C",

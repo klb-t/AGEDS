@@ -31,7 +31,10 @@ def test_page_renders_tree_filters_and_escapes_source_names(api):
     assert 'Phone A (synthetic)' in page and 'Drive B (synthetic)' in page
     assert '&lt;script&gt;alert(1).txt' in page
     assert '<script>alert' not in page
-    assert page.count('<script') == 1  # only the page's own module
+    # Only the page's own module plus the shared shell (nav) scripts from /static.
+    shell = ('<script type="application/json" id="ageds-shell-config">', '<script type="module" src="/static/workbench-shell.mjs">')
+    assert page.count('<script') == 1 + sum(page.count(tag) for tag in shell)
+    assert page.count('<script type="module" src="/static/catalog.mjs">') == 1
     selected = api.client.get('/catalog', params={'collection': api.a['id'], 'conflict': 'true'}).text
     for locator in api.expected['type_conflicts']:
         assert locator in selected

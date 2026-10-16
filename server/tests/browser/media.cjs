@@ -29,7 +29,8 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
     for (let i = 0; i < 200; i++) {try {if ((await fetch(base + '/media')).ok) break;} catch {} await delay(50);}
     browser = await chromium.launch({headless: true, executablePath: process.env.AGEDS_BROWSER_EXECUTABLE || undefined, args: ['--no-sandbox']});
     receipt.browser = browser.version();
-    const page = await browser.newPage();
+    // Polish UI explicitly: the workbench shell (track H) negotiates Accept-Language, and headless Chromium sends en-US.
+    const page = await browser.newPage({locale: 'pl-PL'});
     const errors = []; let dialogs = 0; const failures = [];
     page.on('pageerror', e => errors.push(e.message));
     page.on('console', m => { if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) errors.push(m.text()); });

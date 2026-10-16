@@ -272,3 +272,15 @@ def test_category_selector_uses_registered_private_configuration(db, tmp_path):
     by_type = pr.register_hypothesis(db, corpus.definition_for(scenario))
     plain = es.run_event_study(db, by_type['version_id'])['result']
     assert window(plain, 'after_3d')['naive'] == window(result, 'after_3d')['naive']
+
+
+def test_corpus_part_builds_a_manifest_of_planted_cases(tmp_path):
+    from server.tests.corpus import PARTS, build_corpus
+    assert 'hypotheses' in PARTS
+    manifest = build_corpus(tmp_path, ('hypotheses',))['hypotheses']
+    assert set(manifest['scenarios']) == set(corpus.SCENARIOS)
+    stored = json.loads((tmp_path / 'hypotheses' / 'scenarios.json').read_text(encoding='utf-8'))
+    assert stored['clustered_stimuli']['expect']['overlapping_pairs'] == 75
+    assert corpus.SCENARIOS['planted_effect']() == corpus.SCENARIOS['planted_effect']()  # generated deterministically
+    bodies = {e['body'] for s in stored.values() for e in s['events']}
+    assert bodies == {'pismo z urzędu', 'wpis zdrowotny wizyta', 'notatka robocza'}  # no personal data

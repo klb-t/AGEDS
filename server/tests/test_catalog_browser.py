@@ -23,7 +23,8 @@ const {chromium} = require('playwright');
   const page = await browser.newPage();
   const errors = []; let dialogs = 0;
   page.on('pageerror', e => errors.push(e.message));
-  page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
+  // Full headless Chrome requests /favicon.ico (no icon is served); that 404 is not a page error.
+  page.on('console', m => { if (m.type() === 'error' && !(m.location().url || '').endsWith('/favicon.ico')) errors.push(m.text()); });
   page.on('dialog', d => { dialogs += 1; d.dismiss(); });
   const out = {browser: browser.version()};
   await page.goto(`${base}/catalog?collection=${collection}`);

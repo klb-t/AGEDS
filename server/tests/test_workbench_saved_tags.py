@@ -176,7 +176,9 @@ class CrossSiteWriteTests(WorkbenchCase):
                 self.assertEqual(form.status_code, 403)
                 api = self.client.post('/api/workbench/folders', json={'name': 'x'}, headers=headers)
                 self.assertEqual(api.status_code, 403)
-                self.assertEqual(api.json()['detail']['code'], 'cross_site_write')
+                # The application-wide CSRF guard (review fix #6) answers before the workbench route guard,
+                # which stays as defense in depth; both refuse with 403.
+                self.assertIn(api.json()['detail']['code'], ('cross_site_request', 'cross_site_write'))
         self.assertEqual(self.count('tags'), 0)
         self.assertEqual(self.count('workbench_folders'), 0)
         same = self.client.post('/api/workbench/folders', json={'name': 'ok'},

@@ -177,7 +177,7 @@ def integration_hypotheses_import(token: ProposeToken, document: dict = Body(...
 @router.get('/api/integrations/v1/hypotheses')
 def integration_hypotheses_list(token: ReadToken, status: str | None = None, limit: int = Query(200, ge=1, le=10_000)):
     try:
-        return [h for h in loom_graph.list_hypotheses(status=status, limit=limit) if h['origin'] == (token['client_id'] or f'token:{token["id"]}')]
+        return loom_graph.list_hypotheses(status=status, limit=limit, origin=token['client_id'] or f'token:{token["id"]}')
     except loom_graph.GraphInputError as exc:
         raise _error(422, 'invalid_input', str(exc)) from exc
 

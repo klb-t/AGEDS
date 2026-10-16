@@ -682,12 +682,10 @@ def export_window(db, projection: dict, rule: Rule, *, fmt: str, max_rows: int =
     writer = csv.DictWriter(buffer, fieldnames=EXPORT_COLUMNS, lineterminator='\n')
     writer.writeheader()
     for item in items:
-        row = _export_row(item)
-        for name in ('title', 'text', 'counterparty', 'thread_id', 'chatbot'):
-            value = row.get(name)
-            if isinstance(value, str) and value.startswith(_FORMULA):
-                row[name] = "'" + value
-        writer.writerow(row)
+        # Every text cell is guarded: parsers keep raw source values (e.g. a billing
+        # direction cell) in columns that are not free text.
+        writer.writerow({name: "'" + value if isinstance(value, str) and value.startswith(_FORMULA) else value
+                         for name, value in _export_row(item).items()})
     meta['csv_note'] = "text cells beginning with = + - @ tab or CR are prefixed with ' (spreadsheet formula guard); JSON export is verbatim"
     return buffer.getvalue().encode('utf-8'), meta
 

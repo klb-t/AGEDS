@@ -20,6 +20,7 @@ ROUTER_MODULES = (
     'workbench',
     'imports_chat',
     'imports_comm',
+    'importplan',
 )
 
 

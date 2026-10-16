@@ -284,6 +284,9 @@ def process_job(job: dict, adapter=None, *, lease_seconds: float = DEFAULT_LEASE
             if job["kind"] == "diarize":
                 from .media.diarization import run_diarize
                 return run_diarize(job, adapter)
+            if job["kind"] == "import_plan_item":
+                from .importplan.execute import run_queued_job
+                return run_queued_job(job)
             raise RuntimeError(f"unknown job kind {job['kind']}")
     except Exception as error:
         finish(job["id"], "failed", f"{error}\n{traceback.format_exc()}", lease_token=job["lease_token"])

@@ -111,3 +111,16 @@ def test_review2_p4_timeline_http_reads_survive_an_eviction(env, monkeypatch):  
         assert busy.status_code == 503 and 'evicted' in busy.json()['detail']
         density = http.get('/api/timeline/density', params={'assume_zone': ZONE, 'assumption_rule': RULE})
         assert density.status_code == 503
+
+
+def test_review2_4_analysis_http_answers_503_instead_of_storing_an_empty_run(env, monkeypatch):  # noqa: F811
+    _events(20)
+    _evicting(monkeypatch, None)
+    from server.app.analysis import categories
+    config = {'schema': categories.CONFIG_SCHEMA, 'version': 't', 'categories': [{'id': 'a'}]}
+    body = {'from': '2023-12-31', 'to': '2024-01-03', 'zone': ZONE, 'assume_zone': ZONE, 'assumption_rule': RULE,
+            'config': config}
+    with env.client() as http:
+        response = http.post('/api/analysis/budget/runs', json=body)
+    assert response.status_code == 503, response.text
+    assert env.one('SELECT COUNT(*) FROM analysis_runs') == 0  # pre-fix: an append-only run of zero items

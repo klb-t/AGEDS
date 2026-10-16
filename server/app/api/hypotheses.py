@@ -104,6 +104,10 @@ def _call(fn, *args, **kwargs):
             raise HTTPException(422, str(exc)) from exc
         except sqlite3.IntegrityError as exc:
             raise HTTPException(409, str(exc)) from exc
+        except RuntimeError as exc:
+            if type(exc).__name__ != 'ProjectionNotFresh':
+                raise
+            raise HTTPException(503, f'{exc}; retry (review 2 finding 4: the projection was evicted concurrently)') from exc
 
 
 def _detail(db: sqlite3.Connection, hypothesis_id: int) -> dict:

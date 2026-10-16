@@ -7,6 +7,7 @@
 - [Development](DEVELOPMENT.md): reproducible local checks, acceptance runners and upgrades.
 - [Corpus import](CORPUS_IMPORT.md): optional private catalog workflow.
 - [Source catalog](CATALOG.md): collections, read-only archive-aware catalog scans, signature types, duplicates, coverage gaps, hypotheses and exports.
+- [Import plan](IMPORT_PLAN.md): catalog → reviewable, versioned import plan → confirmed, idempotent, resumable import with collection and virtual-locator provenance.
 - [Change history](../CHANGELOG.md): functional development increments.
 
 ## Architecture and evidence contracts

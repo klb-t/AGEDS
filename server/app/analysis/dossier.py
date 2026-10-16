@@ -268,12 +268,17 @@ def register_provider(provider: CandidateProvider) -> None:
 
 
 def _rule_hits(db: sqlite3.Connection, definition: dict, limit: int, category_config=None) -> list[dict]:
-    from .eventstudy import load_inputs
-    loaded, fts, cats, _ = load_inputs(db, definition, definition['analysis'], category_config=category_config)
-    stim = [i for i in loaded['items'] if selector_matches(i, definition['stimulus'], fts_ids=fts.get('stimulus'),
-                                                           category_ids=cats.get('stimulus'))]
-    out = [i for i in loaded['items'] if selector_matches(i, definition['outcome'], fts_ids=fts.get('outcome'),
-                                                          category_ids=cats.get('outcome'))]
+    from .eventstudy import load_inputs, uncertainty_s
+    params = definition['analysis']
+    loaded, fts, cats, _ = load_inputs(db, definition, params, category_config=category_config)
+    threshold = params['max_time_uncertainty_s'] if params['max_time_uncertainty_s'] is not None else definition['lags']['bin_s']
+    # same operationalization as the event study: coarse times follow the registered policy
+    items = [i for i in loaded['items'] if params['imprecise_times'] == 'keep'
+             or (uncertainty_s(i) is None or uncertainty_s(i) <= threshold)]
+    stim = [i for i in items if selector_matches(i, definition['stimulus'], fts_ids=fts.get('stimulus'),
+                                                 category_ids=cats.get('stimulus'))]
+    out = [i for i in items if selector_matches(i, definition['outcome'], fts_ids=fts.get('outcome'),
+                                                category_ids=cats.get('outcome'))]
     hits = [{'kind': 'event', 'id': i['event_id'], 'hint': {'role': 'stimulus'}, 't': i['t_start']} for i in stim]
     stim_ids = {i['event_id'] for i in stim}
     stim_sorted = sorted(stim, key=lambda i: (i['t_start'], i['event_id']))
@@ -402,7 +407,7 @@ def candidate_search(db: sqlite3.Connection, hypothesis_id: int, *, version_id: 
             if created:
                 _decide(db, item_id, version_id, 'candidate', 'system', None, 'system')
                 added.append(item_id)
-            else:
+            elif item_id not in added and item_id not in present:
                 present.append(item_id)
         db.commit()
     except Exception:

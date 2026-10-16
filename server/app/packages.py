@@ -391,6 +391,12 @@ def validate_metadata_package(package: Any, *, budget: VerificationBudget | None
                 error('unknown_link_target_kind', path, 'Unknown target kind cannot be verified.')
             else:
                 warning('unknown_audit_target_kind', path, 'Domain-specific audit target cannot be resolved by v1.')
+        elif identity is None and not strict:
+            # An audit row naming a kind but no id records an action without a target
+            # object (e.g. a file-name import run); nothing is referenced, so nothing can
+            # be broken. Links (strict) still require both. Historical rows of this shape
+            # exist and audit rows are never rewritten.
+            warning('audit_target_id_missing', path, f'Audit row names {target} without an ID; no object is referenced.')
         elif type(identity) is not int or identity not in indexes[target]:
             error('broken_object_reference', path, f'Referenced {target} ID does not exist.')
 

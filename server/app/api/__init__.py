@@ -20,3 +20,6 @@ def include_routers(app) -> None:
         for item in getattr(module, 'NAV', ()):
             if item not in NAV:
                 NAV.append(item)
+        install = getattr(module, 'install_app', None)
+        if install is not None:
+            install(app)

@@ -15,6 +15,7 @@
 | Project boundary and decision semantics | [Architecture](ARCHITECTURE.md), [Service architecture](../server/ARCHITECTURE.md), [Architecture rules](ARCHITECTURE_RULES.md), [Ecosystem](../ECOSYSTEM.md). |
 | Search, pagination and client limits | [Literal FTS search](SEARCH_CONTRACT.md), [Read pages](READ_PAGES.md), [Client history budget](CLIENT_HISTORY_PAYLOAD_BUDGET.md). |
 | Citation transfer | [Evidence exchange](EVIDENCE_EXCHANGE.md), [Independent consumer](EVIDENCE_CONSUMER.md). |
+| Ecosystem embedding | [Read API v1 and local tokens](READ_API.md), [Ecosystem adapters: ChatADHD and Loom](ECOSYSTEM_ADAPTERS.md). |
 | Metadata archives | [Inert archive](METADATA_ARCHIVE.md), [Interpreted verification](ARCHIVE_VERIFICATION_BUDGET.md), [Archive budgets](ARCHIVE_VERIFICATION_BUDGETS.md). |
 | Verified media and decoding | [Media serving](VERIFIED_MEDIA.md), [Decoder reader](VERIFIED_READER.md). |
 | Native source formats | [Format profiles](NATIVE_SOURCE_FORMATS.md), [BIFF8 XLS](NATIVE_XLS.md), [XLSX phonetic hints](XLSX_PHONETIC_PROJECTION.md). |

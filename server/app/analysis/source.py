@@ -68,14 +68,32 @@ def _choose_time(rows: list[sqlite3.Row], legacy_start: str | None, legacy_end: 
     return {'start': start, 'end': end, 'reason': reason}
 
 
+FIELD_BODY_CHARS = 65_536
+
+
+def _confirmed_duration(metadata: dict) -> float | None:
+    """Source-declared duration in seconds (call logs ``metadata.duration``), else None."""
+    duration = metadata.get('duration')
+    if isinstance(duration, dict):
+        seconds = duration.get('seconds')
+        if isinstance(seconds, (int, float)) and not isinstance(seconds, bool) and 0 <= seconds < 10 ** 9:
+            return float(seconds)
+    return None
+
+
 def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc: str | None = None,
                event_types: tuple[str, ...] | list[str] | None = None, assume_zone: str | None = None,
-               limit: int = 1_000_000) -> dict:
+               limit: int = 1_000_000, fields: bool = False) -> dict:
     """Return ``{'rule', 'items', 'untimed', 'truncated'}``; items sorted by (t_start, event_id).
 
     Item keys: event_id, event_type, source_id, artifact_id, collection_id, thread_id,
     counterparty, chatbot, direction, t_start, t_end (or None), time_basis (kind,
-    tz_status, source, precision, assumed_zone), text_chars, tags.
+    tz_status, source, precision, assumed_zone), text_chars, tags; additive since
+    E1: ``chat`` (role, content_kind, hidden, conversation_id, model or None),
+    ``end_basis`` (kind/source of the end candidate or None), ``declared_duration_s``
+    (source-declared duration, e.g. call logs) and, with ``fields=True``,
+    ``fields`` (sender, recipients, subject, contact_label, phone_or_address and
+    the first ``FIELD_BODY_CHARS`` characters of body with ``body_truncated``).
     """
     db.row_factory = sqlite3.Row
     has_event_times = db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='event_times'").fetchone()
@@ -109,7 +127,8 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
         metadata = json.loads(e['metadata_json'] or '{}')
         chat = metadata.get('chat') if isinstance(metadata.get('chat'), dict) else {}
         tags = [r[0] for r in db.execute('SELECT t.name FROM event_tags et JOIN tags t ON t.id=et.tag_id WHERE et.event_id=? ORDER BY t.name', (e['id'],))]
-        items.append({
+        end = chosen['end'] if t1 is not None else None
+        item = {
             'event_id': e['id'], 'event_type': e['event_type'], 'source_id': e['source_id'],
             'artifact_id': e['artifact_id'], 'collection_id': e['collection_id'], 'thread_id': e['thread_id'],
             'counterparty': e['contact_label'] or e['phone_or_address'], 'chatbot': chat.get('chatbot'),
@@ -117,6 +136,17 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
             'time_basis': {'kind': start.kind, 'tz_status': start.tz_status, 'source': start.source,
                            'precision': start.precision, 'assumed_zone': start.metadata.get('assumed_zone')},
             'text_chars': len(e['body']) if e['body'] is not None else None, 'tags': tags,
-        })
+            'chat': {'role': chat.get('role'), 'content_kind': chat.get('content_kind'), 'hidden': chat.get('hidden'),
+                     'conversation_id': chat.get('conversation_id'), 'model': chat.get('model')} if chat else None,
+            'end_basis': {'kind': end.kind, 'source': end.source, 'tz_status': end.tz_status} if end else None,
+            'declared_duration_s': _confirmed_duration(metadata),
+        }
+        if fields:
+            body = e['body']
+            item['fields'] = {'sender': e['sender'], 'recipients': e['recipients'], 'subject': e['subject'],
+                              'contact_label': e['contact_label'], 'phone_or_address': e['phone_or_address'],
+                              'body': body[:FIELD_BODY_CHARS] if body is not None else None,
+                              'body_truncated': body is not None and len(body) > FIELD_BODY_CHARS}
+        items.append(item)
     items.sort(key=lambda i: (i['t_start'], i['event_id']))
     return {'rule': RULE_ID, 'assume_zone': assume_zone, 'items': items, 'untimed': untimed, 'truncated': truncated}

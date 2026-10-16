@@ -93,7 +93,7 @@ Message-ID: <root-1@example.org>
 Date: Fri, 5 Jan 2024 10:20:00 +0100
 From: =?UTF-8?Q?Zo=C5=9Bka_Przyk=C5=82adowa?= <zoska@example.org>
 To: "Doe, John" <john@example.com>, team@example.net
-Cc: =?UTF-8?B?QW5uYSBWYW4gRGlqaw==?= <anna@example.net>
+Cc: =?UTF-8?B?QW5uYSBWb29yYmVlbGQ=?= <anna@example.net>
 Subject: {pl_subject}
 MIME-Version: 1.0
 Content-Type: multipart/mixed; boundary="outer"
@@ -303,7 +303,7 @@ def build(root: Path) -> dict:
                            'infer_dayfirst': str(billing / 'bill_infer_dayfirst.csv')}
     try:
         import openpyxl
-        from datetime import datetime, time
+        from datetime import datetime, time, timedelta
         workbook = openpyxl.Workbook()
         sheet = workbook.active
         sheet.title = 'Calls'
@@ -311,6 +311,7 @@ def build(root: Path) -> dict:
         sheet.append([datetime(2024, 1, 5, 10, 15, 0), NUMBER_A, 'MO', time(0, 2, 5)])
         sheet.append([datetime(2024, 1, 6, 11, 30, 0), NUMBER_B, 'MT', 61])
         sheet.append([datetime(2024, 1, 7, 9, 0, 0), 31600000005, 'MO', '0:00:10'])
+        sheet.append([datetime(2024, 1, 8, 9, 0, 0), NUMBER_B, 'MT', timedelta(hours=1, seconds=125)])
         buffer = io.BytesIO()
         workbook.save(buffer)
         (billing / 'bill.xlsx').write_bytes(buffer.getvalue())
@@ -358,7 +359,7 @@ def build(root: Path) -> dict:
         b'TEL;TYPE=work,voice:+31 6 0000 0002', b'TEL;TYPE=cell:0600000003', b'EMAIL;TYPE=INTERNET:john@example.com',
         b'EMAIL;TYPE=INTERNET:john.doe@example.net', b'UID:urn:uuid:00000000-0000-4000-8000-000000000001',
         b'NOTE:a folded', b'  note line', b'END:VCARD',
-        b'BEGIN:VCARD', b'VERSION:4.0', b'FN:Anna Van Dijk', b'TEL;VALUE=uri;TYPE="voice,cell":tel:+31-6-0000-0004',
+        b'BEGIN:VCARD', b'VERSION:4.0', b'FN:Anna Voorbeeld', b'TEL;VALUE=uri;TYPE="voice,cell":tel:+31-6-0000-0004',
         b'EMAIL:anna@example.net', b'END:VCARD',
         b'BEGIN:VCARD', b'VERSION:3.0', b'FN:Unterminated card', b'']))
     manifest['contacts'] = {'path': str(contacts / 'contacts.vcf'), 'cards': 4}

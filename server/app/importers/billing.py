@@ -140,6 +140,14 @@ def parse_duration(cell, fmt: str) -> tuple[float | None, dict]:
         return None, {'status': 'missing'}
     value, kind = cell['value'], cell.get('type')
     meta = {'raw': value, 'cell_type': kind, 'format_policy': fmt}
+    if kind == 'timedelta' and isinstance(value, dict):
+        # The scanner keeps a typed duration cell as its repr; read it back exactly.
+        match = re.fullmatch(r'datetime\.timedelta\((?:days=(-?\d+))?(?:, )?(?:seconds=(\d+))?(?:, )?'
+                             r'(?:microseconds=(\d+))?\)', str(value.get('representation', '')))
+        if match:
+            days, seconds, micro = (int(g or 0) for g in match.groups())
+            meta['interpretation'] = 'typed_duration_cell'
+            return days * 86400 + seconds + micro / 1_000_000, meta
     if kind in ('time',) and isinstance(value, str):
         h, m, s = (value.split(':') + ['0', '0'])[:3]
         meta['interpretation'] = 'typed_time_cell_as_hh_mm_ss'

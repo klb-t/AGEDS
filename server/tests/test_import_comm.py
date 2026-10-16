@@ -406,7 +406,9 @@ def test_billing_xlsx_typed_cells_and_private_profile(env, tmp_path):
         pytest.skip('openpyxl unavailable: XLSX fixture not generated')
     result = billing.import_billing(Path(path))
     found = events(result['artifact_id'])
-    assert len(found) == 3
+    assert len(found) == 4
+    assert found[3]['meta']['duration']['seconds'] == 3725
+    assert found[3]['meta']['duration']['interpretation'] == 'typed_duration_cell'
     assert [t['local'] for t in times(found[0]['id']) if t['kind'] == 'start'] == ['2024-01-05T10:15:00']
     assert found[0]['meta']['start']['interpretation'] == 'typed_spreadsheet_datetime'
     assert found[0]['meta']['duration']['seconds'] == 125
@@ -760,3 +762,15 @@ def test_all_importers_leave_corpus_bytes_unchanged(env):
     assert not any(env['root'] in p.parents for p in [store])
     leaked = [p for p in env['root'].rglob('*') if p.name.startswith(('.capture-', 'payload'))]
     assert leaked == []
+
+
+def test_mbox_long_lines_split_by_read_bound_never_create_separators(env, tmp_path):
+    path = tmp_path / 'long.mbox'
+    path.write_bytes(b'From a@example.org Mon Jan  1 10:00:00 2024\nMessage-ID: <long@example.org>\n\n'
+                     + b'x' * 64 + b'From fake@example.org Mon Jan  1 10:00:00 2024\n'
+                     + b'\nFrom b@example.org Tue Jan  2 10:00:00 2024\nMessage-ID: <second@example.org>\n\nok\n')
+    limits = comm_common.DEFAULT_LIMITS.replace(max_line_bytes=64)
+    result = email_mbox.import_mbox(path, limits=limits)
+    assert result['messages'] == 2
+    first = events(result['artifact_id'], 'email')[0]
+    assert first['body'].startswith('x' * 64 + 'From fake')

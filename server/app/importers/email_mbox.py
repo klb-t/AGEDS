@@ -445,6 +445,9 @@ class _Importer:
         headers, _, header_info = split_headers(raw, limits)
         parsed = email.message_from_bytes(raw, policy=email.policy.compat32)
         defects = [type(d).__name__ for d in parsed.defects]
+        for path, part in _part_paths(parsed, limits):
+            if part is not None and part is not parsed:
+                defects.extend(f'{path}:{type(d).__name__}' for d in getattr(part, 'defects', []))
         message_id_raw = _first(headers, 'Message-ID')
         message_id_match = _MSGID.search(message_id_raw or '')
         message_id = message_id_match.group(0) if message_id_match else None
@@ -483,6 +486,8 @@ class _Importer:
                 problems.append(f"date_header_{date_meta['status']}")
             else:
                 candidates.append(date_candidate)
+                if date_candidate.tz_status == 'unknown':
+                    problems.append(f"date_header_zone_{date_meta.get('zone_status')}")
         received = []
         for position, value in _all(headers, 'Received'):
             stamp = _received_date(value)

@@ -79,9 +79,10 @@ def ensure_source(kind: str, label: str, locator: str | None = None, account: st
 def ingest_file(path: Path, *, source_id: int, source_locator: str | None = None, original_name: str | None = None, mime_type: str | None = None, metadata: dict | None = None, is_raw: bool = True, collection_id: int | None = None, parent_artifact_id: int | None = None) -> int:
     """Acquire bytes; ``parent_artifact_id`` marks a contained/extracted child.
 
-    The parent must already exist in the same case. A repeated acquisition of
-    the same content/locator must name the same parent; a different parent is a
-    visible conflict, never a silent re-parenting.
+    The parent must already exist in the same case. ``None`` means "not
+    stated": a repeated acquisition of the same content/locator without a
+    parent reuses the artifact. Naming a different parent is a visible
+    conflict, never a silent re-parenting.
     """
     metadata_json = json.dumps(metadata or {}, ensure_ascii=False)
     observed_at = _utc_now()
@@ -118,7 +119,7 @@ def ingest_file(path: Path, *, source_id: int, source_locator: str | None = None
             stored_artifact = db.execute('SELECT stored_path,size_bytes,is_raw,parent_artifact_id FROM artifacts WHERE id=?', (aid,)).fetchone()
             if bool(stored_artifact['is_raw']) != bool(is_raw):
                 raise IntegrityError('raw and derived acquisitions cannot silently share an artifact identity')
-            if stored_artifact['parent_artifact_id'] != parent_artifact_id:
+            if parent_artifact_id is not None and stored_artifact['parent_artifact_id'] != parent_artifact_id:
                 raise IntegrityError('same content/locator was acquired under a different parent artifact')
             existing_path = stored_artifact['stored_path']
             if not existing_path or Path(existing_path).is_symlink() or not Path(existing_path).is_file() or sha256_file(Path(existing_path)) != digest:

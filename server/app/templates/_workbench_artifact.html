@@ -1,0 +1,7 @@
+{# Workbench panel on the artifact page: computed knowledge summary + add to folder. Never alters the evidence above. #}
+{% set k = wb_artifact_knowledge(a.id) %}
+<section class="panel" data-wb-artifact-panel="{{ a.id }}"><h2>{{ t('knowledge.title') }}</h2>
+{% if k %}<details class="wb-details"><summary>{{ t('knowledge.summary', recorded=k.recorded|length, unknown=k.not_recorded_or_unknown|length) }}</summary>{% include '_wb_knowledge.html' %}</details>{% else %}<p class="wb-alert">{{ t('knowledge.unavailable') }}</p>{% endif %}
+<p><a href="/workbench/artifacts/{{ a.id }}">{{ t('knowledge.open') }}</a></p>
+{% set choices = wb_folder_choices() %}{% if choices %}<form method="post" action="/workbench/folder-items" class="wb-row" data-wb-add-to-folder><input type="hidden" name="kind" value="artifact"><input type="hidden" name="item_id" value="{{ a.id }}"><input type="hidden" name="return_to" value="/artifact/{{ a.id }}"><label>{{ t('knowledge.add_to_folder') }} <select name="folder_id">{% for f in choices %}<option value="{{ f.id }}">{{ f.path|join(' / ') }}</option>{% endfor %}</select></label><button class="wb-small wb-secondary">{{ t('wb.folder.add_submit') }}</button></form>{% else %}<p><a href="/workbench/folders">{{ t('wb.folders.create') }}</a></p>{% endif %}
+</section>

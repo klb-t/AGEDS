@@ -1,0 +1,29 @@
+<!doctype html><html {{ ui_html_attrs() }}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ t('wb.bookmarks.title') }} — Evidence Workbench</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/workbench.css"></head><body>
+<header>{% include '_nav.html' %}<div><h1>{{ t('wb.bookmarks.title') }}</h1><p>{{ t('wb.bookmarks.subtitle') }}</p></div></header>
+<main class="wb-main">
+{% include '_wb_messages.html' %}
+<section class="wb-layout">
+<div class="panel"><h2>{{ t('wb.bookmarks.list') }}</h2>
+<ul class="wb-list" data-wb-bookmarks>{% for b in listing['items'] %}<li id="bookmark-{{ b.id }}" data-wb-bookmark="{{ b.id }}"><b>{{ b.label or t('wb.bookmarks.unnamed') }}</b> <small>#{{ b.id }}</small><br>
+<small>{{ t('wb.bookmarks.start') }}: <code>{{ b.start.raw }}</code>{% if b.start.utc %} → {{ b.start.utc }}{% endif %}{% if b.end %} · {{ t('wb.bookmarks.end') }}: <code>{{ b.end.raw }}</code>{% if b.end.utc %} → {{ b.end.utc }}{% endif %}{% endif %} · {{ t('tz.' ~ b.tz_status) }}</small>
+{% if b.ref %}<br><small>{{ t('wb.bookmarks.ref') }}: {{ t('kind.' ~ b.ref.kind) }} #{{ b.ref.id }}{% if b.ref.version_id %} · {{ t('wb.folder.pinned_version', id=b.ref.version_id) }} · {{ t('wb.bookmarks.segment', n=b.ref.segment_index) }}{% endif %}{% if not b.ref.exists %} · <span class="wb-status-missing">{{ t('status.missing') }}</span>{% endif %}</small>{% endif %}
+{% if b.note %}<p>{{ b.note }}</p>{% endif %}
+<form method="post" action="/workbench/bookmarks/{{ b.id }}/delete" class="wb-inline" data-wb-confirm="{{ t('wb.bookmarks.confirm_delete') }}"><button class="wb-small wb-secondary">{{ t('common.delete') }}</button></form></li>{% else %}<li>{{ t('common.none') }}</li>{% endfor %}</ul>
+{% if listing.has_more %}<p class="wb-meta">{{ t('wb.bookmarks.more', limit=listing.limit) }}</p>{% endif %}
+</div>
+<div class="panel"><h2>{{ t('wb.bookmarks.create') }}</h2>
+<form method="post" action="/workbench/bookmarks" data-wb-bookmark-create>
+<label>{{ t('wb.bookmarks.start') }}<input name="start" required placeholder="2026-03-01T08:00:00+01:00"></label>
+<label>{{ t('wb.bookmarks.end_optional') }}<input name="end" placeholder="2026-03-01T09:00:00+01:00"></label>
+<label>{{ t('wb.bookmarks.label') }}<input name="label"></label>
+<label>{{ t('wb.bookmarks.note') }}<textarea name="note"></textarea></label>
+<label>{{ t('wb.bookmarks.ref_kind') }}<select name="ref_kind"><option value="">—</option>{% for k in ref_kinds %}<option value="{{ k }}">{{ t('kind.' ~ k) }}</option>{% endfor %}</select></label>
+<label>{{ t('wb.bookmarks.ref_id') }}<input name="ref_id" inputmode="numeric"></label>
+<label>{{ t('wb.bookmarks.ref_version') }}<input name="ref_version_id" inputmode="numeric"></label>
+<label>{{ t('wb.bookmarks.ref_segment') }}<input name="ref_segment_index" inputmode="numeric"></label>
+<button>{{ t('wb.bookmarks.create_submit') }}</button></form>
+<p class="wb-meta">{{ t('wb.bookmarks.semantics') }}</p></div>
+</section>
+</main>
+<script type="module" src="/static/workbench.mjs"></script>
+</body></html>

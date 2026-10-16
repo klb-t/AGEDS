@@ -1,0 +1,40 @@
+<!doctype html><html {{ ui_html_attrs() }}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ folder.name }} — {{ t('wb.folders.title') }}</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/workbench.css"></head><body>
+<header>{% include '_nav.html' %}<div><p><a href="/workbench/folders">← {{ t('wb.folders.title') }}</a>{% for p in folder.path[:-1] %} / <a href="/workbench/folders/{{ p.id }}">{{ p.name }}</a>{% endfor %}</p><h1>{{ folder.name }}</h1><p>{{ t('wb.folder.counts', n=folder['items']|length, unchanged=folder.status_counts.unchanged, changed=folder.status_counts.changed, missing=folder.status_counts.missing) }}</p></div></header>
+<main class="wb-main" data-wb-folder-page="{{ folder.id }}">
+{% include '_wb_messages.html' %}
+<section class="wb-layout">
+<div class="panel"><h2>{{ t('wb.folder.items') }}</h2><p class="wb-meta">{{ t('wb.folder.status_hint') }}</p>
+<ol class="wb-list" data-wb-items>{% for item in folder['items'] %}<li data-wb-item="{{ item.id }}" data-kind="{{ item.item_kind }}" data-item-id="{{ item.item_id }}">
+<b>{{ t('kind.' ~ item.item_kind) }} #{{ item.item_id }}</b>{% if item.pinned_version_id %} <small>· {{ t('wb.folder.pinned_version', id=item.pinned_version_id) }}</small>{% endif %}
+<small class="wb-status-{{ item.status }}">· {{ t('status.' ~ item.status) }}{% if item.changed_keys %} ({{ item.changed_keys|join(', ') }}){% endif %}</small>
+{% if item.url %}<a href="{{ item.url }}">{{ t('wb.folder.open') }}</a>{% endif %} <code>{{ item.locator }}</code>
+{% if item.item_kind == 'citation' %}<button type="button" class="wb-small wb-secondary" data-wb-copy-citation="{{ item.item_id }}">{{ t('wb.copy.citation') }}</button>{% endif %}
+{% if item.pinned.original_name %}<br><small>{{ item.pinned.original_name }}{% if item.pinned.sha256 %} · SHA-256 {{ item.pinned.sha256[:16] }}…{% endif %}</small>{% endif %}
+<form method="post" action="/workbench/folders/{{ folder.id }}/items/{{ item.id }}/note" class="wb-row"><input name="note" value="{{ item.note or '' }}" placeholder="{{ t('wb.folder.note_placeholder') }}" aria-label="{{ t('wb.folder.note') }}"><button class="wb-small wb-secondary">{{ t('common.save') }}</button></form>
+<form method="post" action="/workbench/folders/{{ folder.id }}/items/{{ item.id }}/move" class="wb-inline"><button class="wb-small wb-secondary" name="direction" value="up"{% if loop.first %} disabled{% endif %} aria-label="{{ t('wb.folder.up') }}">↑</button><button class="wb-small wb-secondary" name="direction" value="down"{% if loop.last %} disabled{% endif %} aria-label="{{ t('wb.folder.down') }}">↓</button></form>
+<form method="post" action="/workbench/folders/{{ folder.id }}/items/{{ item.id }}/remove" class="wb-inline" data-wb-confirm="{{ t('wb.folder.confirm_remove') }}"><button class="wb-small wb-secondary" data-wb-remove-item>{{ t('wb.folder.remove') }}</button></form>
+</li>{% else %}<li>{{ t('wb.folder.empty') }}</li>{% endfor %}</ol>
+<p data-wb-copy-status role="status" aria-live="polite"></p>
+</div>
+<div>
+<section class="panel"><h2>{{ t('wb.folder.add') }}</h2>
+<form method="post" action="/workbench/folders/{{ folder.id }}/items" data-wb-folder-add>
+<label>{{ t('wb.folder.kind') }}<select name="kind">{% for kind in item_kinds %}<option value="{{ kind }}">{{ t('kind.' ~ kind) }}</option>{% endfor %}</select></label>
+<label>{{ t('wb.folder.item_id') }}<input name="item_id" required inputmode="numeric" data-wb-item-id></label>
+<label>{{ t('wb.folder.note') }}<input name="note"></label>
+<button>{{ t('wb.folder.add_submit') }}</button></form>
+<p class="wb-meta">{{ t('wb.folders.invariant') }}</p></section>
+<section class="panel"><h2>{{ t('wb.folder.export') }}</h2><p class="wb-meta">{{ t('wb.folder.export_hint') }}</p>
+<p><a href="/api/workbench/folders/{{ folder.id }}/export?format=json" data-wb-export="json">JSON</a> · <a href="/api/workbench/folders/{{ folder.id }}/export?format=csv" data-wb-export="csv">CSV</a> · <a href="/api/workbench/folders/{{ folder.id }}/export?format=json&amp;recursive=true">{{ t('wb.folder.export_recursive') }}</a></p>
+<p class="wb-meta">{{ t('wb.folder.export_cli', id=folder.id) }}</p></section>
+<section class="panel"><h2>{{ t('wb.folder.settings') }}</h2>
+{% if folder.children %}<p>{{ t('wb.folder.children') }}: {% for c in folder.children %}<a href="/workbench/folders/{{ c.id }}">{{ c.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+<form method="post" action="/workbench/folders/{{ folder.id }}/update"><label>{{ t('wb.folders.name') }}<input name="name" value="{{ folder.name }}" required></label><label>{{ t('wb.folders.note') }}<textarea name="note">{{ folder.note or '' }}</textarea></label><button class="wb-secondary">{{ t('common.save') }}</button></form>
+<form method="post" action="/workbench/folders" class="wb-row"><input type="hidden" name="parent_id" value="{{ folder.id }}"><input type="hidden" name="return_to" value="/workbench/folders/{{ folder.id }}"><input name="name" required placeholder="{{ t('wb.folder.subfolder') }}" aria-label="{{ t('wb.folder.subfolder') }}"><button class="wb-small wb-secondary">{{ t('wb.folders.create_submit') }}</button></form>
+<form method="post" action="/workbench/folders/{{ folder.id }}/delete" data-wb-confirm="{{ t('wb.folder.confirm_delete') }}"><label><input type="checkbox" class="wb-check" name="recursive" value="1"> {{ t('wb.folder.recursive') }}</label><button class="wb-secondary" data-wb-delete-folder>{{ t('wb.folder.delete') }}</button></form>
+</section>
+</div>
+</section>
+</main>
+<script type="module" src="/static/workbench.mjs"></script>
+</body></html>

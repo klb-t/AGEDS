@@ -53,6 +53,40 @@ def read_projection(db: sqlite3.Connection, rule: Rule, params: dict) -> dict:
             db.execute('PRAGMA query_only=0')
 
 
+SNAPSHOT_ATTEMPTS = 5
+
+
+def open_snapshot(db: sqlite3.Connection, rule: Rule, params: dict, *, attempts: int = SNAPSHOT_ATTEMPTS) -> dict:
+    """Refresh the projection, then open a read snapshot in which it is fresh and not evicted.
+
+    ``ensure_projection`` commits its refresh; another request may evict (or refresh) the
+    projection before the caller reads ``timeline_items`` (review 2 finding 4). This opens a
+    read transaction (``BEGIN``) and re-checks the projection inside it with
+    ``read_projection``: evicted or stale in that snapshot means another refresh and another
+    snapshot, up to ``attempts`` times, then ``ProjectionNotFresh`` — never a silently empty
+    read. Every read in the same transaction sees one consistent state (WAL snapshot), even
+    if the projection is evicted meanwhile. The read transaction stays open: end it with
+    ``db.rollback()``/``db.commit()`` (``db.session()`` does). Inside a caller's transaction
+    the caller owns the snapshot and the refresh joins it (savepoint), as before.
+    """
+    if db.in_transaction:
+        return ensure_projection(db, rule, params)
+    for attempt in range(1, attempts + 1):
+        refreshed = ensure_projection(db, rule, params)
+        db.execute('BEGIN')
+        try:
+            current = read_projection(db, rule, params)  # first read fixes the snapshot
+        except ProjectionNotFresh:
+            db.rollback()
+            if attempt == attempts:
+                raise
+            continue
+        if refreshed['status'] == 'refreshed' and refreshed['build']['id'] == current['build']['id']:
+            current = {**current, 'status': 'refreshed'}  # this call built what the snapshot reads
+        return current
+    raise RuntimeError('unreachable')  # pragma: no cover
+
+
 # Projection reasons mapped to the analysis item contract (analysis/source.py).
 _ANALYSIS_REASON = {'no_candidates': 'no_time_candidate', 'no_usable_candidate': 'no_parseable_time'}
 
@@ -84,13 +118,27 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
 
     ``refresh=False`` never writes: the projection must already be fresh in this
     connection's snapshot, otherwise ``ProjectionNotFresh`` is raised (read-only callers).
+    With ``refresh=True`` all reads happen in one snapshot (``open_snapshot``), closed here
+    unless the caller already had a transaction open.
     """
     if unknown_zone not in ('exclude', 'interval'):
         raise ValueError("unknown_zone must be 'exclude' or 'interval'")
     resolved = rule if isinstance(rule, Rule) else load_rule(rule, kind='display_rule')
     params = display_params(assume_zone, assumption_rule)
     db.row_factory = sqlite3.Row
-    projection = ensure_projection(db, resolved, params) if refresh else read_projection(db, resolved, params)
+    own_snapshot = refresh and not db.in_transaction
+    projection = open_snapshot(db, resolved, params) if refresh else read_projection(db, resolved, params)
+    try:
+        return _read_items(db, resolved, params, projection, start_utc=start_utc, end_utc=end_utc,
+                           event_types=event_types, assume_zone=assume_zone, unknown_zone=unknown_zone,
+                           include_hidden=include_hidden, limit=limit)
+    finally:
+        if own_snapshot:
+            db.rollback()  # read-only snapshot opened above
+
+
+def _read_items(db, resolved: Rule, params: dict, projection: dict, *, start_utc, end_utc, event_types, assume_zone,
+                unknown_zone, include_hidden, limit) -> dict:
     lo, hi = parse_bound(start_utc), parse_bound(end_utc, end=True)
     clauses, args = ["ti.projection_id=?", "ti.item_kind='event'"], [projection['id']]
     if not include_hidden:

@@ -1,0 +1,21 @@
+{
+  "rule_id": "same_conversation",
+  "version": 1,
+  "kind": "correlation_rule",
+  "status": "released",
+  "relation": "same_conversation_across_exports_hypothesis",
+  "description": "Proposes that two exports (artifacts) contain the same chatbot conversation: identical thread_id and chatbot on chat_message events of different artifacts. If a logical-record table from the importer track exists, its presence is reported; its columns are not interpreted by this rule version.",
+  "left": {"kind": "artifact", "selector": "artifact containing chat_message events"},
+  "right": {"kind": "artifact", "selector": "another artifact containing the same thread_id"},
+  "parameters": {
+    "event_types": ["chat_message"],
+    "logical_record_tables": ["chat_logical_records", "logical_records", "logical_messages"],
+    "max_threads": 100000,
+    "max_artifacts_per_thread": 20
+  },
+  "criteria": {
+    "thread_id": "gate: identical thread_id and chatbot",
+    "shared_external_ids": "evidence: count of external_id values present in both artifacts",
+    "message_counts": "evidence: messages per artifact and first/last display times"
+  }
+}

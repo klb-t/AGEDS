@@ -185,14 +185,8 @@ def api_search(q:str):
         'X-AGEDS-Search-Complete': str(page['complete']).lower(),
     })
 
-@app.get('/api/timeline')
-def timeline(limit:int=Query(500,ge=1,le=10000),phone:str|None=None,event_type:str|None=None):
-    clauses=[];args=[]
-    if phone:clauses.append('phone_or_address=?');args.append(phone)
-    if event_type:clauses.append('event_type=?');args.append(event_type)
-    where=' WHERE '+' AND '.join(clauses) if clauses else ''
-    with session() as db:
-        return [dict(r) for r in db.execute(f"SELECT * FROM events{where} ORDER BY COALESCE(ts_start,created_at) DESC LIMIT ?",(*args,limit))]
+# GET /api/timeline moved to server/app/api/timeline.py (timeline area): same path and
+# response shape; ordering now follows the versioned display-time projection.
 
 @app.get('/export/events.csv')
 def export_events_csv():

@@ -46,6 +46,9 @@ UNOBSERVED = 'nieobserwowane'
 UNLABELLED = 'bez_kategorii'
 RESERVED = (UNOBSERVED, UNLABELLED)
 RESERVED_COLORS = {UNOBSERVED: '#8b949e', UNLABELLED: '#6e7681'}
+# Validated categorical order (dataviz reference palette, dark steps; checked against the #161b22 panel).
+DEFAULT_COLORS = ('#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767')
+OVERFLOW_COLOR = '#9da7b3'
 RULE_KINDS = ('counterparty', 'email_domain', 'keyword', 'chatbot', 'tag', 'thread', 'event_type')
 COMBINE_MODES = ('max', 'first')
 PATHS = ('annotation', 'rule', 'model', 'default')
@@ -385,14 +388,19 @@ def labels_sha256(labels: dict[int, dict]) -> str:
 
 def category_palette(config: CategoryConfig, extra: list[str] = ()) -> list[dict]:
     """Declared categories, then reserved ones, then any extra ids found in labels."""
-    out = [dict(c) for c in config.categories]
+    out = []
+    for index, c in enumerate(config.categories):
+        entry = dict(c)
+        if not entry.get('color'):
+            entry['color'] = DEFAULT_COLORS[index] if index < len(DEFAULT_COLORS) else OVERFLOW_COLOR
+        out.append(entry)
     seen = {c['id'] for c in out}
     for rid in (UNLABELLED, UNOBSERVED):
         out.append({'id': rid, 'label': rid, 'color': RESERVED_COLORS[rid], 'reserved': True})
         seen.add(rid)
     for e in extra:
         if e not in seen:
-            out.append({'id': e, 'label': e, 'color': None, 'not_in_config': True})
+            out.append({'id': e, 'label': e, 'color': OVERFLOW_COLOR, 'not_in_config': True})
             seen.add(e)
     return out
 

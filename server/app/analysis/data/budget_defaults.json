@@ -13,7 +13,11 @@
     "priority": [],
     "excluded_event_types": ["chat_conversation"],
     "chat_content_kinds": ["text", "multimodal"],
-    "include_hidden_chat": false,
+    "include_hidden": false,
+    "max_time_uncertainty_s": 21600,
+    "uncertainty_mode": "widen_upper",
+    "ambiguous_fold": "exclude",
+    "timeline_rule": null,
     "typing_directions": ["outgoing"],
     "typing_event_types": null,
     "reading_directions": ["incoming"],
@@ -32,6 +36,6 @@
     "flip_tolerance_s": 60,
     "max_candle_events": 2000,
     "max_flip_records": 500,
-    "max_items": 1000000
+    "max_items": 250000
   }
 }

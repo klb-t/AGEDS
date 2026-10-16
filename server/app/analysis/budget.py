@@ -63,12 +63,15 @@ DISCLAIMER = ('Wynik interpretacyjny: szacunek z jawnym modelem i przedziałami,
 
 _RANGES = {'session_gap_s': (0, 7 * 86400), 'typing_chars_per_min': (1, 100_000),
            'reading_chars_per_min': (1, 1_000_000), 'max_typing_s': (0, 86400), 'max_reading_s': (0, 86400),
-           'max_attribution_s': (0, 7 * 86400), 'flip_tolerance_s': (0, 86400)}
+           'max_attribution_s': (0, 7 * 86400), 'flip_tolerance_s': (0, 86400),
+           'max_time_uncertainty_s': (0, 366 * 86400)}
 _INTS = {'max_grid_points': (1, 4096), 'max_candle_events': (0, 1_000_000), 'max_flip_records': (0, 100_000),
          'max_items': (1, 10_000_000)}
 _STR_LISTS = ('excluded_event_types', 'chat_content_kinds', 'typing_directions', 'reading_directions', 'priority')
 _OPT_STR_LISTS = ('typing_event_types', 'reading_event_types')
-_BOOLS = ('include_hidden_chat', 'wav_header_durations')
+_BOOLS = ('include_hidden', 'wav_header_durations')
+UNCERTAINTY_MODES = ('widen_upper', 'ignore')
+FOLD_POLICIES = ('exclude', 'carry')
 
 
 def _number(name, value):
@@ -89,6 +92,18 @@ def _check(name, value):
     if name == 'overlap_rule':
         if value not in OVERLAP_RULES:
             raise ValueError(f'overlap_rule must be one of {OVERLAP_RULES}')
+        return value
+    if name == 'uncertainty_mode':
+        if value not in UNCERTAINTY_MODES:
+            raise ValueError(f'uncertainty_mode must be one of {UNCERTAINTY_MODES}')
+        return value
+    if name == 'ambiguous_fold':
+        if value not in FOLD_POLICIES:
+            raise ValueError(f'ambiguous_fold must be one of {FOLD_POLICIES}')
+        return value
+    if name == 'timeline_rule':
+        if value is not None and (not isinstance(value, str) or not value or len(value) > 200):
+            raise ValueError('timeline_rule must be a rule reference such as display_time@1, or null')
         return value
     if name == 'grid_mode':
         if value not in GRID_MODES:
@@ -166,10 +181,15 @@ def grid_points(params: dict) -> tuple[list[dict], int, bool]:
 def _filter_reason(item: dict, params: dict) -> str | None:
     if item['event_type'] in params['excluded_event_types']:
         return f'excluded_event_type:{item["event_type"]}'
+    if (item.get('hidden') or (item.get('chat') or {}).get('hidden')) and not params['include_hidden']:
+        return 'hidden_by_projection'
+    if (item.get('time_basis') or {}).get('dst') == 'ambiguous_fold' and params['ambiguous_fold'] == 'exclude':
+        return 'ambiguous_fold'
+    width = item.get('t_hi', item['t_start']) - item.get('t_lo', item['t_start'])
+    if width > params['max_time_uncertainty_s']:
+        return 'time_uncertainty_over_limit'
     chat = item.get('chat')
     if chat:
-        if chat.get('hidden') and not params['include_hidden_chat']:
-            return 'hidden_chat_content'
         if chat.get('content_kind') is not None and chat['content_kind'] not in params['chat_content_kinds']:
             return f'chat_content_kind:{chat["content_kind"]}'
     return None
@@ -198,6 +218,7 @@ def _prepare(items: list[dict], labels: dict[int, dict], params: dict) -> list[d
             (params['reading_event_types'] is None or it['event_type'] in params['reading_event_types'])
         label = labels[it['event_id']]
         acts.append({'eid': it['event_id'], 't': it['t_start'], 'explicit': explicit, 'explicit_basis': basis,
+                     'lo': it.get('t_lo', it['t_start']), 'hi': it.get('t_hi', it['t_start']),
                      'chars': chars, 'typing': typing, 'reading': reading,
                      'cats': label['categories'], 'path': label['path']})
     return acts
@@ -281,6 +302,17 @@ def _gap_intervals(confirmed, estimated, acts, extents, horizon: tuple[float, fl
     return out
 
 
+def _uncertainty_intervals(acts: list[dict]) -> list[tuple]:
+    """Upper variant only: the item could lie anywhere in its projected interval [t_lo, t_hi]."""
+    out = []
+    for a in acts:
+        if a['hi'] > a['lo']:
+            duration = a['explicit'][1] - a['explicit'][0] if a['explicit'] else 0.0
+            for c, w in a['cats'].items():
+                out.append((a['lo'], a['hi'] + duration, c, w, (a['eid'],), 'time_uncertainty'))
+    return out
+
+
 def _resolve(shares: dict[str, float], rule: str, order: list[str]) -> dict[str, float]:
     if rule == 'count_both':
         return dict(shares)
@@ -310,38 +342,48 @@ def _allocate(levels: list[list[tuple]], day_list: list[dict], lo: float, hi: fl
     alloc = [[defaultdict(float) for _ in range(n)] for _ in VARIANTS]
     observed = [[0.0] * n for _ in VARIANTS]
     overlap = [[0.0] * n for _ in VARIANTS]
+    cache: dict = {}
+
+    def resolved_of(basis: dict) -> tuple:
+        """(resolved items, unlabelled remainder, competing-claims flag), memoized per share set."""
+        key = tuple(sorted(basis.items()))
+        hit = cache.get(key)
+        if hit is None:
+            resolved = _resolve(basis, rule, order)
+            total = sum(basis.values())
+            rest = 1.0 - min(1.0, total) if rule == 'count_both' else 1.0 - sum(min(f, 1.0) for f in resolved.values())
+            hit = cache[key] = (tuple(resolved.items()), rest if rest > 1e-12 else 0.0, total > 1 + 1e-9)
+        return hit
+
     for a, b, shares in iv.weighted_segments(tagged, breakpoints):
         if a < lo or b > hi:
             continue
         day = bisect.bisect_right(starts, a) - 1
         dt = b - a
-        per_variant = []
-        for v in range(3):
-            s = {}
-            for (level, c), w in shares.items():
-                if level <= v and w > s.get(c, 0.0):
-                    s[c] = w
-            per_variant.append(s)
+        s0, s1, s2 = {}, {}, {}
+        for (level, c), w in shares.items():
+            if w > s2.get(c, 0.0):
+                s2[c] = w
+            if level <= 1 and w > s1.get(c, 0.0):
+                s1[c] = w
+            if level == 0 and w > s0.get(c, 0.0):
+                s0[c] = w
+        per_variant = (s0, s1, s2)
+        layer = s0 or s1 or s2  # layered: confirmed > estimated > gap attribution
         for v, s in enumerate(per_variant):
             if not s:
                 continue
             observed[v][day] += dt
-            if sum(s.values()) > 1 + 1e-9:
+            items, rest, competing = resolved_of(s)
+            if competing:
                 overlap[v][day] += dt
-        for v, s in enumerate(per_variant):
-            if not s:
-                continue
-            if rule == 'count_both':
-                basis = s
-            else:  # layered: confirmed > estimated > gap attribution
-                basis = next(layer for layer in per_variant if layer)
-            resolved = _resolve(basis, rule, order)
-            for c, f in resolved.items():
-                alloc[v][day][c] += f * dt
-            rest = 1.0 - sum(min(f, 1.0) for f in resolved.values()) if rule != 'count_both' else \
-                1.0 - min(1.0, sum(basis.values()))
-            if rest > 1e-12:
-                alloc[v][day][cat.UNLABELLED] += rest * dt
+            if rule != 'count_both':
+                items, rest, _ = resolved_of(layer)
+            target = alloc[v][day]
+            for c, f in items:
+                target[c] += f * dt
+            if rest:
+                target[cat.UNLABELLED] += rest * dt
     return alloc, observed, overlap
 
 
@@ -392,6 +434,8 @@ def compute_budget(items: list[dict], labels: dict[int, dict], config: cat.Categ
     for index, point in enumerate(points):
         confirmed, estimated, extents = _point_intervals(acts, point, params)
         gaps = _gap_intervals(confirmed, estimated, acts, extents, horizon, point['max_attribution_s'])
+        if params['uncertainty_mode'] == 'widen_upper':
+            gaps += _uncertainty_intervals(acts)
         alloc, observed, overlap = _allocate([confirmed, estimated, gaps], day_list, lo, hi, point['overlap_rule'], order)
         per = bucketize(alloc, observed, overlap)
         totals = {c: [sum(alloc[v][d].get(c, 0.0) for d in range(len(day_list))) for v in range(3)] for c in category_ids}
@@ -592,12 +636,23 @@ def method_record(params: dict) -> dict:
                         'some grid point'),
         'calendar': 'buckets are local days/ISO weeks/months in the stated zone; DST days last 23 h or 25 h',
         'exclusions': 'untimed items (unknown zone, no parseable time) and filtered items are counted, not placed',
+        'time_source': ('timeline display rule (seam timeline): t_start is the display time; items whose uncertainty '
+                        'interval [t_lo, t_hi] is wider than max_time_uncertainty_s are excluded; with uncertainty_mode '
+                        'widen_upper the upper variant also covers [t_lo, t_hi + confirmed duration]'),
+        'hidden': 'items hidden by the timeline projection (chat parts, hidden chat messages) are excluded unless include_hidden',
+        'ambiguous_fold': ('a wall clock in a repeated DST hour has two instants; ambiguous_fold=exclude (default) '
+                           'excludes it with that reason; carry keeps the display (earlier) instant for lower/probable, '
+                           'flags it and lets the upper variant cover both instants (t_lo..t_hi)'),
     }
 
 
 def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_to: str, zone: str,
-                   params: dict | None = None, assume_zone: str | None = None, persist: bool = True) -> dict:
-    """Validate, load items (window plus margin), filter, label and (optionally) store the labelling run."""
+                   params: dict | None = None, assume_zone: str | None = None, assumption_rule: str | None = None,
+                   persist: bool = True, need_fields: bool = False) -> dict:
+    """Validate, load items (window plus margin), filter, label and (optionally) store the labelling run.
+
+    Call it before writing in the same connection: the timeline projection refreshes in its own transaction.
+    """
     from . import model_runs
     p = effective_params(params)
     z = cal.zone_info(zone)
@@ -610,8 +665,9 @@ def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_t
     points, _, _ = grid_points(p)
     margin = horizon_margin(p, points)
     loaded = load_items(db, start_utc=cal.iso_utc(lo - margin), end_utc=cal.iso_utc(hi + margin),
-                        assume_zone=assume_zone, limit=p['max_items'], fields=cat.needs_fields(config),
-                        media_durations=p['wav_header_durations'])
+                        assume_zone=assume_zone, assumption_rule=assumption_rule, include_hidden=True,
+                        limit=p['max_items'], fields=need_fields or cat.needs_fields(config),
+                        media_durations=p['wav_header_durations'], timeline_rule=p['timeline_rule'])
     kept, filtered = [], Counter()
     for it in loaded['items']:
         reason = _filter_reason(it, p)
@@ -625,6 +681,9 @@ def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_t
     if p['model_label_run_id'] is not None:
         model_labels = model_runs.load_outputs(db, p['model_label_run_id'], purpose='labels')
     labels = cat.label_items(kept, config, annotations=annotations, model_labels=model_labels)
+    for it in kept:  # bodies were needed only for keyword rules; free them before the grid computation
+        if it.get('fields'):
+            it['fields'].pop('body', None)
     input_sha = event_set_sha256(ids)
     label_run = None
     if persist:
@@ -633,7 +692,11 @@ def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_t
     untimed = loaded['untimed']
     in_window = sum(1 for it in kept if it['t_start'] < hi and max(it['t_start'], it['t_end'] or it['t_start']) >= lo)
     window = {'from': window_from, 'to': window_to, 'zone': zone, 'from_utc': cal.iso_utc(lo), 'to_utc': cal.iso_utc(hi),
-              'margin_s': margin, 'assume_zone': assume_zone}
+              'margin_s': margin, 'assume_zone': assume_zone, 'assumption_rule': assumption_rule}
+    widths = [it['t_hi'] - it['t_lo'] for it in kept if it.get('t_hi') is not None and it['t_hi'] > it['t_lo']]
+    day_starts = [d['start'] for d in cal.days(lo, hi, z)]
+    crossing = sum(1 for it in kept if it.get('t_hi') is not None and
+                   bisect.bisect_right(day_starts, it['t_lo']) != bisect.bisect_right(day_starts, it['t_hi']))
     return {
         'params': p, 'lo': lo, 'hi': hi, 'zone': zone, 'window': window, 'items': kept, 'labels': labels,
         'label_run': label_run, 'input_sha256': input_sha,
@@ -642,27 +705,37 @@ def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_t
                           'by_path': dict(sorted(Counter(l['path'] for l in labels.values()).items())),
                           'issues': dict(sorted(Counter(i for l in labels.values() for i in l['issues']).items())),
                           'model_label_run_id': p['model_label_run_id']},
-        'input': {'source_rule': loaded['rule'], 'event_ids_sha256': input_sha, 'items_used': len(kept),
+        'input': {'seam': loaded.get('seam'), 'source_rule': loaded['rule'], 'source_rule_sha256': loaded.get('rule_sha256'),
+                  'projection': loaded.get('projection'), 'projection_params': loaded.get('params'),
+                  'event_ids_sha256': input_sha, 'items_used': len(kept),
                   'items_in_window': in_window, 'items_in_margin_only': len(kept) - in_window,
-                  'items_sha256': sha256_json([[it['event_id'], it['t_start'], it['t_end'], it.get('declared_duration_s'),
-                                                it.get('text_chars'), it.get('direction')] for it in kept])},
+                  'items_sha256': sha256_json([[it['event_id'], it['t_start'], it['t_end'], it.get('t_lo'), it.get('t_hi'),
+                                                it.get('basis'), it.get('declared_duration_s'), it.get('text_chars'),
+                                                it.get('direction')] for it in kept]),
+                  'time_uncertainty': {'items_with_interval': len(widths), 'max_width_s': _r(max(widths)) if widths else 0.0,
+                                       'items_crossing_day_boundary': crossing, 'mode': p['uncertainty_mode'],
+                                       'max_time_uncertainty_s': p['max_time_uncertainty_s']}},
         'exclusions': {
             'untimed': {'count': len(untimed), 'by_reason': dict(sorted(Counter(u['reason'] for u in untimed).items())),
                         'event_ids': [u['event_id'] for u in untimed[:1000]],
                         'event_ids_truncated': len(untimed) > 1000,
-                        'scope': 'all events whose time could not be placed on the UTC axis (window unknown)'},
+                        'scope': ('unknown-zone wall clocks that could fall in the loaded window under any real UTC '
+                                  'offset, and every event without a usable time (undated)')},
             'filtered': {'count': sum(filtered.values()), 'by_reason': dict(sorted(filtered.items()))},
             'assumed_zone_items': sum(1 for it in kept if it['time_basis'].get('assumed_zone')),
+            'hidden_excluded_by_seam': len(loaded.get('hidden_excluded', [])),
+            'ambiguous_fold_items_carried': sum(1 for it in kept if (it.get('time_basis') or {}).get('dst') == 'ambiguous_fold'),
             'source_truncated': loaded['truncated'],
         },
     }
 
 
 def run_budget(db, config: cat.CategoryConfig, *, window_from: str, window_to: str, zone: str,
-               params: dict | None = None, assume_zone: str | None = None, persist: bool = True) -> dict:
+               params: dict | None = None, assume_zone: str | None = None, assumption_rule: str | None = None,
+               persist: bool = True) -> dict:
     from . import runs
     prepared = prepare_inputs(db, config, window_from=window_from, window_to=window_to, zone=zone, params=params,
-                              assume_zone=assume_zone, persist=persist)
+                              assume_zone=assume_zone, assumption_rule=assumption_rule, persist=persist)
     p = prepared['params']
     computed = compute_budget(prepared['items'], prepared['labels'], config, lo=prepared['lo'], hi=prepared['hi'],
                               zone_name=zone, params=p)

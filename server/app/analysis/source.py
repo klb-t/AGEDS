@@ -1,14 +1,25 @@
-"""Timed items for analyses: the single seam between observations and analysis.
+"""Timed items for analyses: the single seam between observations and analyses.
 
-``load_items`` returns plain dicts with UTC epoch seconds. It is an interim
-projection (rule ``analysis_source.v1``) over ``events`` + ``event_times`` +
-legacy ``ts_start``/``ts_end``; the timeline area's versioned display rule will
-replace the body of ``_choose_time`` without changing the item contract.
+``load_items`` delegates to the timeline projection
+(``server.app.timeline.analysis_items.load_items``: versioned display rule
+``display_time@N`` with its SHA-256, materialized projection, uncertainty
+interval ``t_lo``/``t_hi``, ``basis``, ``hidden``) and enriches every item with
+the analysis keys added by track E1 (``chat``, ``end_basis``,
+``declared_duration_s``/``duration_basis`` and optional ``fields``). The result
+names the seam (``timeline``) and the rule id and hash, which every analysis run
+records.
 
-Wall-clock times with an unknown zone are NOT placed on the UTC axis unless the
-caller passes ``assume_zone`` (recorded on every affected item); otherwise they
-are returned in ``untimed`` with the reason, so analyses can report them as
-excluded instead of silently shifting them.
+The interim projection (rule ``analysis_source.v1`` over ``events`` +
+``event_times`` + legacy ``ts_start``/``ts_end``) remains only as a clearly
+labelled fallback (``seam: interim_fallback``) for a checkout without the
+timeline package; ``load_items_interim`` keeps it testable.
+
+Wall-clock times with an unknown zone are never placed on the UTC axis unless
+the caller names an operator zone (and, through the timeline, an
+``assumption_rule`` id); otherwise they are returned in ``untimed`` with the
+reason, so analyses report them as excluded instead of silently shifting them.
+Items hidden by the projection (chat parts, hidden chat messages) are reported
+in ``hidden_excluded`` unless ``include_hidden=True``.
 """
 from __future__ import annotations
 
@@ -71,6 +82,20 @@ def _choose_time(rows: list[sqlite3.Row], legacy_start: str | None, legacy_end: 
 
 
 FIELD_BODY_CHARS = 65_536
+
+
+def _fold_alternatives(candidate: TimeCandidate) -> list[float]:
+    """Both instants of a DST fold (never silently resolved: they stay in time_basis and t_lo/t_hi)."""
+    values = candidate.metadata.get('utc_alternatives')
+    if not isinstance(values, list):
+        return []
+    out = []
+    for value in values:
+        try:
+            out.append(_epoch(value))
+        except (TypeError, ValueError):
+            continue
+    return out
 
 
 def _confirmed_duration(metadata: dict) -> float | None:
@@ -136,28 +161,56 @@ _EVENT_SQL = ('SELECT e.*, (SELECT o.collection_id FROM source_observations o WH
               'ORDER BY o.id LIMIT 1) AS collection_id FROM events e')
 
 
-def event_item(db: sqlite3.Connection, event_id: int, *, assume_zone: str | None = None) -> dict:
-    """One event as an item with ``fields``; time keys are None and ``untimed_reason`` set when not placeable."""
+def event_item(db: sqlite3.Connection, event_id: int) -> dict:
+    """One event as an item with ``fields`` and its projected time (timeline seam, default rule).
+
+    Time keys are None and ``untimed_reason`` is set when the event has no usable or
+    only an unknown-zone time. Without the timeline package the interim rule is used
+    and named in ``rule``.
+    """
     db.row_factory = sqlite3.Row
     e = db.execute(_EVENT_SQL + ' WHERE e.id=?', (event_id,)).fetchone()
     if e is None:
         raise LookupError(f'event {event_id} not found')
-    times = db.execute('SELECT * FROM event_times WHERE event_id=? ORDER BY id', (event_id,)).fetchall()
-    chosen = _choose_time(times, e['ts_start'], e['ts_end'], assume_zone)
     item = _describe(db, e, True)
-    start, end = chosen['start'], chosen['end']
-    t0 = _epoch(start.utc) if start else None
-    t1 = _epoch(end.utc) if start and end else None
-    item.update({'t_start': t0, 't_end': t1 if t1 is not None and t1 >= t0 else None,
-                 'time_basis': {'kind': start.kind, 'tz_status': start.tz_status, 'source': start.source,
-                                'precision': start.precision, 'assumed_zone': start.metadata.get('assumed_zone')}
-                 if start else None, 'untimed_reason': chosen['reason'], 'rule': RULE_ID})
+    try:
+        from ..timeline.projection import ensure_projection
+        from ..timeline.ruleset import display_params, load_rule
+    except ImportError:
+        times = db.execute('SELECT * FROM event_times WHERE event_id=? ORDER BY id', (event_id,)).fetchall()
+        chosen = _choose_time(times, e['ts_start'], e['ts_end'], None)
+        start, end = chosen['start'], chosen['end']
+        t0 = _epoch(start.utc) if start else None
+        t1 = _epoch(end.utc) if start and end else None
+        alternatives = _fold_alternatives(start) if start else []
+        item.update({'t_start': t0, 't_end': t1 if t1 is not None and t1 >= t0 else None,
+                     't_lo': min([t0, *alternatives]) if start else None, 't_hi': max([t0, *alternatives]) if start else None,
+                     'dst': start.metadata.get('dst') if start else None,
+                     'basis': start.tz_status if start else 'none', 'untimed_reason': chosen['reason'],
+                     'rule': RULE_ID, 'seam': 'interim_fallback'})
+        return item
+    rule = load_rule(None, kind='display_rule')
+    projection = ensure_projection(db, rule, display_params())
+    row = db.execute("SELECT * FROM timeline_items WHERE projection_id=? AND item_kind='event' AND ref_id=?",
+                     (projection['id'], event_id)).fetchone()
+    us = 1_000_000
+    placed = row is not None and row['sort_us'] is not None and row['basis'] != 'local_as_utc_unknown_zone'
+    reason = None
+    if not placed:
+        reason = 'unknown_zone' if row is not None and row['sort_us'] is not None else \
+            json.loads((row['flags_json'] if row is not None else None) or '{}').get('undated_reason', 'no_time_candidate')
+    item.update({'t_start': row['sort_us'] / us if placed else None,
+                 't_end': row['end_us'] / us if placed and row['end_us'] is not None and row['end_us'] >= row['sort_us'] else None,
+                 't_lo': row['lo_us'] / us if placed else None, 't_hi': row['hi_us'] / us if placed else None,
+                 'basis': row['basis'] if row is not None else 'none', 'hidden': bool(row['hidden']) if row is not None else None,
+                 'untimed_reason': reason, 'rule': f'{rule.rule_id}@{rule.version}', 'rule_sha256': rule.sha256,
+                 'seam': 'timeline'})
     return item
 
 
-def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc: str | None = None,
-               event_types: tuple[str, ...] | list[str] | None = None, assume_zone: str | None = None,
-               limit: int = 1_000_000, fields: bool = False, media_durations: bool = False) -> dict:
+def load_items_interim(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc: str | None = None,
+                       event_types: tuple[str, ...] | list[str] | None = None, assume_zone: str | None = None,
+                       limit: int = 1_000_000, fields: bool = False, media_durations: bool = False) -> dict:
     """Return ``{'rule', 'items', 'untimed', 'truncated'}``; items sorted by (t_start, event_id).
 
     Item keys: event_id, event_type, source_id, artifact_id, collection_id, thread_id,
@@ -201,10 +254,14 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
             continue
         end = chosen['end'] if t1 is not None else None
         item = _describe(db, e, fields)
+        alternatives = _fold_alternatives(start)
         item.update({
             't_start': t0, 't_end': t1,
+            't_lo': min([t0, *alternatives]), 't_hi': max([t0, *alternatives]),
             'time_basis': {'kind': start.kind, 'tz_status': start.tz_status, 'source': start.source,
-                           'precision': start.precision, 'assumed_zone': start.metadata.get('assumed_zone')},
+                           'precision': start.precision, 'assumed_zone': start.metadata.get('assumed_zone'),
+                           'dst': start.metadata.get('dst'),
+                           'utc_alternatives': start.metadata.get('utc_alternatives')},
             'end_basis': {'kind': end.kind, 'source': end.source, 'tz_status': end.tz_status} if end else None,
         })
         if item['declared_duration_s'] is None and t1 is None and media_durations and e['artifact_id']:
@@ -213,4 +270,104 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
                 item['declared_duration_s'], item['duration_basis'] = wav, 'wav_header_declared'
         items.append(item)
     items.sort(key=lambda i: (i['t_start'], i['event_id']))
-    return {'rule': RULE_ID, 'assume_zone': assume_zone, 'items': items, 'untimed': untimed, 'truncated': truncated}
+    for item in items:
+        item.setdefault('t_lo', item['t_start'])
+        item.setdefault('t_hi', item['t_start'])
+        item.setdefault('hidden', False)
+    return {'rule': RULE_ID, 'rule_sha256': None, 'seam': 'interim_fallback', 'assume_zone': assume_zone,
+            'items': items, 'untimed': untimed, 'hidden_excluded': [], 'truncated': truncated}
+
+
+def _enrich(db: sqlite3.Connection, items: list[dict], fields: bool, media_durations: bool) -> None:
+    """Add the E1 keys to timeline items (batched lookups of the events rows)."""
+    wav_cache: dict = {}
+    by_id = {it['event_id']: it for it in items}
+    ids = list(by_id)
+    for offset in range(0, len(ids), 500):
+        chunk = ids[offset:offset + 500]
+        rows = db.execute('SELECT id, sender, recipients, subject, body, contact_label, phone_or_address, metadata_json '
+                          'FROM events WHERE id IN (%s)' % ','.join('?' * len(chunk)), chunk).fetchall()
+        for e in rows:
+            item = by_id[e['id']]
+            metadata = json.loads(e['metadata_json'] or '{}')
+            chat = metadata.get('chat') if isinstance(metadata.get('chat'), dict) else {}
+            declared = _confirmed_duration(metadata)
+            item['chat'] = {'role': chat.get('role'), 'content_kind': chat.get('content_kind'), 'hidden': chat.get('hidden'),
+                            'conversation_id': chat.get('conversation_id'), 'model': chat.get('model')} if chat else None
+            item['end_basis'] = {'kind': 'end', 'source': 'display_rule_end'} if item['t_end'] is not None else None
+            item['declared_duration_s'] = declared
+            item['duration_basis'] = 'source_declared' if declared is not None else None
+            if declared is None and item['t_end'] is None and media_durations and item.get('artifact_id'):
+                wav = _wav_duration(db, item['artifact_id'], wav_cache)
+                if wav is not None:
+                    item['declared_duration_s'], item['duration_basis'] = wav, 'wav_header_declared'
+            if fields:
+                body = e['body']
+                item['fields'] = {'sender': e['sender'], 'recipients': e['recipients'], 'subject': e['subject'],
+                                  'contact_label': e['contact_label'], 'phone_or_address': e['phone_or_address'],
+                                  'body': body[:FIELD_BODY_CHARS] if body is not None else None,
+                                  'body_truncated': body is not None and len(body) > FIELD_BODY_CHARS}
+
+
+def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc: str | None = None,
+               event_types: tuple[str, ...] | list[str] | None = None, assume_zone: str | None = None,
+               assumption_rule: str | None = None, include_hidden: bool = False, limit: int = 1_000_000,
+               fields: bool = False, media_durations: bool = False, timeline_rule: str | None = None) -> dict:
+    """Return ``{'seam', 'rule', 'rule_sha256', 'items', 'untimed', 'hidden_excluded', 'truncated', ...}``.
+
+    Items are sorted by (t_start, event_id) and keep the interim contract: event_id,
+    event_type, source_id, artifact_id, collection_id, thread_id, counterparty,
+    chatbot, direction, t_start, t_end (or None), time_basis, text_chars, tags;
+    timeline keys t_lo, t_hi, basis, candidate_ref, hidden; E1 keys chat,
+    end_basis, declared_duration_s, duration_basis and, with ``fields=True``,
+    ``fields`` (sender, recipients, subject, contact_label, phone_or_address and the
+    first ``FIELD_BODY_CHARS`` characters of body with ``body_truncated``).
+    """
+    try:
+        from ..timeline.analysis_items import load_items as timeline_load_items
+    except ImportError:  # labelled fallback: a checkout without the timeline package
+        return load_items_interim(db, start_utc=start_utc, end_utc=end_utc, event_types=event_types,
+                                  assume_zone=assume_zone, limit=limit, fields=fields, media_durations=media_durations)
+    db.row_factory = sqlite3.Row
+    try:
+        loaded = timeline_load_items(db, start_utc=start_utc, end_utc=end_utc, event_types=event_types,
+                                     assume_zone=assume_zone, assumption_rule=assumption_rule, include_hidden=True,
+                                     rule=timeline_rule, limit=limit)
+    except sqlite3.OperationalError as exc:
+        if 'within a transaction' not in str(exc):
+            raise
+        raise ValueError('the timeline projection needs its own refresh transaction: load analysis items before '
+                         'writing in this connection (or commit first)') from exc
+    folds = [it['event_id'] for it in loaded['items'] if it['time_basis'].get('dst') == 'ambiguous_fold']
+    if folds:
+        for offset in range(0, len(folds), 500):
+            chunk = folds[offset:offset + 500]
+            flags = {r[0]: json.loads(r[1] or '{}') for r in db.execute(
+                "SELECT ref_id, flags_json FROM timeline_items WHERE projection_id=? AND item_kind='event' "
+                'AND ref_id IN (%s)' % ','.join('?' * len(chunk)), (loaded['projection']['id'], *chunk))}
+            for it in loaded['items']:
+                if it['event_id'] in flags:
+                    it['time_basis']['utc_alternatives'] = flags[it['event_id']].get('utc_alternatives')
+    if start_utc and end_utc:
+        # An unknown-zone wall clock may fall in the window under any real offset: report every such
+        # item whose offset interval [t_lo, t_hi] overlaps the window, not only those whose wall clock
+        # read as UTC does.
+        lo_us, hi_us = int(_epoch(start_utc) * 1_000_000), int(_epoch(end_utc) * 1_000_000)
+        seen = {u['event_id'] for u in loaded['untimed']}
+        for row in db.execute(
+                "SELECT ref_id, event_type, sort_us FROM timeline_items WHERE projection_id=? AND item_kind='event' "
+                "AND basis='local_as_utc_unknown_zone' AND lo_us<? AND hi_us>=? ORDER BY ref_id",
+                (loaded['projection']['id'], hi_us, lo_us)):
+            if row[0] not in seen and (not event_types or row[1] in event_types):
+                loaded['untimed'].append({'event_id': row[0], 'event_type': row[1], 'reason': 'unknown_zone',
+                                          'local_as_utc': row[2] / 1_000_000})
+        loaded['untimed'].sort(key=lambda u: u['event_id'])
+    items, hidden = [], []
+    for item in loaded['items']:
+        if item['hidden'] and not include_hidden:
+            hidden.append({'event_id': item['event_id'], 'event_type': item['event_type']})
+        else:
+            items.append(item)
+    _enrich(db, items, fields, media_durations)
+    return {**loaded, 'seam': 'timeline', 'assumption_rule': assumption_rule, 'items': items,
+            'hidden_excluded': hidden}

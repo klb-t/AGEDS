@@ -30,6 +30,7 @@
 | Common timeline | [Projection rule, correlation hypotheses, timeline API and swimlane view](TIMELINE.md). |
 | Reports and export | [Report types, method record, manifest verification, citation bundles, extension tables in the metadata package](REPORTS.md). |
 | Hypothesis analyzer (interpretive) | [Preregistration, evidence dossier, thesis typology, permutation event study](HYPOTHESES.md). |
+| Time budget and feature series | [Categories, labels, bounds, candles, sensitivity, feature series](TIME_BUDGET.md). |
 
 ## Development state and records
 

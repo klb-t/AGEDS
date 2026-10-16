@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "AGEDS",
   "state_id": "AGEDS-STATE-20261016-001",
-  "updated_at": "2026-10-16T17:59:30.885452+00:00",
+  "updated_at": "2026-10-16T18:44:48.527456+00:00",
   "based_on_remote_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
   "local_branch": "ccr-d25c3cb3-qgbhql",
   "status_summary": "Evidence Timeline & Analysis increment started on 9c1d513: Etap 0 report and F0 extension foundation; parallel tracks A-H claimed with disjoint file scopes.",
@@ -185,7 +185,7 @@
     {
       "id": "AGEDS-TASK-20261016-B",
       "owner": "importers",
-      "status": "claimed",
+      "status": "accepted",
       "scope": [
         "server/app/importers/ (new files)",
         "server/app/importers/data/",
@@ -199,7 +199,59 @@
       "acceptance": [
         "Tree-preserving chat imports, logical dedup across 3 exports with edit/branch, raw fields, idempotent reimport, explicit tz ambiguity."
       ],
-      "result_refs": []
+      "result_refs": [],
+      "parts": {
+        "B1_chat": {
+          "status": "accepted",
+          "integrated_commit": "4e9097d",
+          "result_refs": [
+            "docs/IMPORTERS_CHAT.md",
+            "docs/validation/IMPORT_CHAT_2026-10-16.json"
+          ],
+          "results": {
+            "backend_after_merge": "498 passed, 1 skipped (opt-in scale), 658 subtests",
+            "scale_opt_in": "126 MB synthetic export, 57,825 events, 43 s, +19.5 MB RSS"
+          },
+          "shared_edits": [
+            "evidence.add_event(db=None) caller transaction",
+            "imports_chat router/command registration"
+          ],
+          "not_done": [
+            "ZIP export input",
+            "browser view of dedup report",
+            "real vendor exports unavailable"
+          ]
+        },
+        "B2_comm": {
+          "status": "accepted",
+          "integrated_commit": "merge of wt-B2 de29aaf",
+          "result_refs": [
+            "docs/IMPORTERS_COMM.md",
+            "docs/validation/IMPORT_COMM_2026-10-16.json"
+          ],
+          "results": {
+            "backend_after_merge": "610 passed, 1 skipped, 680 subtests",
+            "cli_runtime": "12 commands, 14 import runs exit 0, 4 refusals exit 2, 34 corpus files hashes unchanged"
+          },
+          "shared_edits": [
+            "evidence.ingest_file(parent_artifact_id=None)",
+            "records.py COMM_MIGRATIONS 25-27",
+            "imports_comm registration"
+          ],
+          "deviations": [
+            "alphabetic email zones (CET) not converted; RFC 5322 -0000 reading kept as alternative",
+            "ICS TZID stored as explicit_offset + zone_declaration",
+            "ts_start/ts_end filled only when UTC instant fixed"
+          ],
+          "not_done": [
+            "correlations (track C)",
+            "XLS billing",
+            "PNG tEXt",
+            "TNEF/uuencode",
+            "UI"
+          ]
+        }
+      }
     },
     {
       "id": "AGEDS-TASK-20261016-C",
@@ -226,7 +278,7 @@
     {
       "id": "AGEDS-TASK-20261016-D",
       "owner": "media",
-      "status": "claimed",
+      "status": "accepted",
       "scope": [
         "server/app/worker.py",
         "server/app/transcription.py",
@@ -243,7 +295,28 @@
       "acceptance": [
         "Recipe pinned to job, per-segment language run with alternatives, run comparison, WER/CER tool, OCR/diarization adapters unavailable-explicit."
       ],
-      "result_refs": []
+      "result_refs": [
+        "docs/MULTILINGUAL_ASR.md",
+        "docs/validation/MEDIA_2026-10-16.json"
+      ],
+      "results": {
+        "backend_after_merge": "556 passed, 1 skipped, 680 subtests",
+        "real_inference": "not executed (HF blocked; whisper/tesseract/pyannote absent)",
+        "runtime_executed": [
+          "CLI subprocess asr-recipes/media-capabilities/asr-benchmark hypotheses mode",
+          "uvicorn pages",
+          "worker explicit unavailable failures",
+          "poppler rasterization in OCR job"
+        ]
+      },
+      "coordinator_followup": "HTTP enqueue refuses model_options download_root/local_files_only (operator-only)",
+      "not_done": [
+        "real Whisper/Tesseract/pyannote",
+        "browser acceptance of /media pages",
+        "PDF text layer",
+        "event candidate review/promotion",
+        "B-AG-01 audit probes unavailable"
+      ]
     },
     {
       "id": "AGEDS-TASK-20261016-E",
@@ -290,7 +363,7 @@
     {
       "id": "AGEDS-TASK-20261016-G",
       "owner": "ecosystem",
-      "status": "claimed",
+      "status": "accepted",
       "scope": [
         "server/app/integrations/",
         "server/app/schema/integrations.py",
@@ -305,12 +378,30 @@
       "acceptance": [
         "Read contract with local token, ChatADHD stub returning anchored quotes only, Loom graph export with hypothesis quarantine."
       ],
-      "result_refs": []
+      "result_refs": [
+        "docs/validation/INTEGRATIONS_2026-10-16.json",
+        "docs/READ_API.md",
+        "docs/ECOSYSTEM_ADAPTERS.md",
+        "chatadhd ccr-d25c3cb3-qgbhql b0ffa8f (PR klb-t/chatadhd#46)"
+      ],
+      "results": {
+        "integrated_commit": "b6f3dd7",
+        "backend_after_merge": "471 passed, 658 subtests",
+        "chatadhd_unittest": 11,
+        "not_executed": [
+          "live ChatADHD/Loom against live AGEDS",
+          "browser run of /integrations",
+          "Android token setting"
+        ]
+      },
+      "shared_edits": [
+        "server/app/api/__init__.py: install_app hook (accepted)"
+      ]
     },
     {
       "id": "AGEDS-TASK-20261016-H",
-      "owner": "workbench",
-      "status": "ready",
+      "owner": "workbench (Fable)",
+      "status": "claimed",
       "scope": [
         "server/app/workbench/",
         "server/app/schema/workbench.py",
@@ -321,7 +412,7 @@
         "server/tests/test_workbench*.py",
         "docs/WORKBENCH.md"
       ],
-      "based_on_commit": "9c1d513b",
+      "based_on_commit": "887cc55",
       "acceptance": [
         "Layer-filtered search, saved searches, bulk tags, folders, bookmarks, theme, PL/NL/EN."
       ],
@@ -330,7 +421,7 @@
     {
       "id": "AGEDS-TASK-20261016-P",
       "owner": "coordinator",
-      "status": "ready",
+      "status": "accepted",
       "scope": [
         "scripts/verify_repository.py"
       ],
@@ -338,7 +429,14 @@
       "acceptance": [
         "Privacy heuristics without false positives on current tree."
       ],
-      "result_refs": []
+      "result_refs": [],
+      "results": {
+        "commits": [
+          "8c23ea8",
+          "887cc55"
+        ],
+        "tests": "server/tests/test_repository_privacy.py 2 passed"
+      }
     }
   ],
   "remaining_boundaries": [

@@ -1,0 +1,80 @@
+{
+ "schema": "ageds.integrations-validation/v1",
+ "task": "AGEDS-TASK-20261016-G",
+ "source_baseline": "9c1d513b (main) + f09e8f7 (F0)",
+ "tested_code_head": "5974b5e425049b8c9eff3bf3e49d7b7a2f271d35",
+ "branch": "wt-G",
+ "checked_at": "2026-10-16",
+ "python": "Python 3.13.16",
+ "environment": "/home/user/wt/venv (shared session venv); no model, no network, no Hugging Face",
+ "commands": [
+  {
+   "command": "/home/user/wt/venv/bin/python -m pytest server/tests -q",
+   "summary": "469 passed, 3 warnings, 658 subtests passed in 21.33s",
+   "exit_code": 0,
+   "note": "434 pre-existing tests + 35 new integration tests (70 subtests)"
+  },
+  {
+   "command": "/home/user/wt/venv/bin/python -m pytest server/tests/test_integrations_tokens.py server/tests/test_integrations_read_api.py server/tests/test_integrations_intents.py server/tests/test_integrations_loom.py -q",
+   "summary": "35 passed, 3 warnings, 70 subtests passed in 5.47s",
+   "exit_code": 0
+  },
+  {
+   "command": "python3 scripts/verify_repository.py",
+   "summary": "Historical snapshots: 108; active pages: 51; relative links: 245",
+   "exit_code": 0
+  },
+  {
+   "command": "node --test server/tests/js/*.test.mjs",
+   "summary": "not run: no JavaScript touched",
+   "exit_code": null
+  }
+ ],
+ "runtime_executed": [
+  "FastAPI TestClient requests against all /api/read/v1 and /api/integrations/v1 routes and the /integrations page (fresh SQLite per test)",
+  "EW_REQUIRE_TOKEN=1 middleware on legacy /api/* routes including streamed /api/artifacts/{id}/content and multipart upload",
+  "Real CLI subprocesses: token-create/list/revoke, loom-export (new file only), loom-import-hypotheses, hypothesis-list/promote, proposal-list/accept, read-contract, CLI import isolation",
+  "Read-only receipts: database bytes unchanged and no audit rows after read API calls; builtins.open patched to fail during reads"
+ ],
+ "unit_tested_only": [
+  "JSON Schema document INTENT_SCHEMA is published but validated by hand-written code (no jsonschema library in the venv); the schema is checked for shape consistency with the validator, not executed by a schema engine",
+  "Loom vocabulary mapping is a documented hint; no Loom codec validation"
+ ],
+ "not_run": [
+  "Live ChatADHD or Loom process against a live AGEDS service",
+  "Android client with EW_REQUIRE_TOKEN=1 (no token setting exists in the app)",
+  "Any model call (interpretive mode is a labelling contract only)",
+  "Browser/Playwright acceptance of the /integrations page"
+ ],
+ "boundaries": [
+  "Tokens protect HTTP routes only; the database file, HTML UI and network remain the operator's responsibility; no rate limiting",
+  "Timeline windows are lexicographic over stored ts_start text; display_time is null (timeline area owns the projection)",
+  "Counterparties in the graph export are label hypotheses, not identities",
+  "New tables are not in the metadata package until extension tables are declared (reports area)",
+  "annotations has no provenance column; proposal row + audit_log are the provenance record"
+ ],
+ "shared_edits": [
+  "server/app/api/__init__.py: 3-line install_app hook so a router module can add app middleware"
+ ],
+ "files_outside_listed_scope": [
+  "server/app/templates/integrations.html (area template by naming convention), server/tests/test_integrations_support.py (fixture module)"
+ ],
+ "source_sha256": {
+  "server/app/api/__init__.py": "96dda90e323ff46258a4d02b06c8bb5376c69884a6ea884e7421cf2608e45c33",
+  "server/app/api/integrations.py": "54d237722c6c9e7e13d6de1c880ebd177492d481ae23720c72e08794bce236f4",
+  "server/app/commands/integrations.py": "e1e7c7bf112fbf986d75a71332781cd80d5c26cce816e33a9f67958c539b816d",
+  "server/app/integrations/__init__.py": "6eb0b6786f8984f2ccc5db26078746379564ce7772f03c8fa1a47f9b01215854",
+  "server/app/integrations/intents.py": "039e9913190a4a0e3eeafcc0470910b73977abd88c212ffca52cb8ffebf34836",
+  "server/app/integrations/loom_graph.py": "d77dff2cceb3acbdcce4b2bdc74a258be29a4de22e50d5de4b38559d0875e78e",
+  "server/app/integrations/proposals.py": "c5bfdcc64d6a4789a10ed8d9be10dcccc9276d3816454a212f71319817ba66e7",
+  "server/app/integrations/read_api.py": "90b78c84069663988702c7e893d7f6f6c990f4674179c48a3d956202e9f1d5ab",
+  "server/app/integrations/tokens.py": "23e119e6cd8d64910fdbf4e8f70459bce0f00b43992e1a4bfbc57e293b479c79",
+  "server/app/schema/integrations.py": "d57517a3d8acccbe7040b05e3474e5f7ea38d1a28300001665e25d0e618166e9",
+  "server/app/templates/integrations.html": "e83eb15709939b3c2a96511fde46f0822ca0497c7b5ff0a95cf1358c520375da",
+  "server/tests/test_integrations_intents.py": "8903eaf13721a013a9d2f9fe2984185e2311e3e20f82eb4c3f3c6ac4062eeb68",
+  "server/tests/test_integrations_loom.py": "74797ce4edb09081dd871c9748ea5e75d15e48a439b9e62386da55f93e6d1182",
+  "server/tests/test_integrations_read_api.py": "476d02bff3960444b1c98463e35b48f5353391f7b6a550811347c6f0f09bf311",
+  "server/tests/test_integrations_support.py": "3afb738408e3839eb242fad422697a103365a4609cb02fba6b3ccd46187fa2e2",
+  "server/tests/test_integrations_tokens.py": "29b6915b6b4cf822b8c2d61b7439a98e630f369f53da862e19eb15ac8bd5955f"
+ }
+}

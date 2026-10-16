@@ -76,7 +76,14 @@ def ensure_source(kind: str, label: str, locator: str | None = None, account: st
         cur = db.execute("INSERT INTO sources(case_id,kind,label,locator,account,metadata_json) VALUES (?,?,?,?,?,?)", (case_id,kind,label,locator,account,json.dumps(metadata or {},ensure_ascii=False)))
         return int(cur.lastrowid)
 
-def ingest_file(path: Path, *, source_id: int, source_locator: str | None = None, original_name: str | None = None, mime_type: str | None = None, metadata: dict | None = None, is_raw: bool = True, collection_id: int | None = None) -> int:
+def ingest_file(path: Path, *, source_id: int, source_locator: str | None = None, original_name: str | None = None, mime_type: str | None = None, metadata: dict | None = None, is_raw: bool = True, collection_id: int | None = None, parent_artifact_id: int | None = None) -> int:
+    """Acquire bytes; ``parent_artifact_id`` marks a contained/extracted child.
+
+    The parent must already exist in the same case. ``None`` means "not
+    stated": a repeated acquisition of the same content/locator without a
+    parent reuses the artifact. Naming a different parent is a visible
+    conflict, never a silent re-parenting.
+    """
     metadata_json = json.dumps(metadata or {}, ensure_ascii=False)
     observed_at = _utc_now()
     source_stat = path.stat()
@@ -93,6 +100,13 @@ def ingest_file(path: Path, *, source_id: int, source_locator: str | None = None
             collection = db.execute('SELECT case_id FROM collections WHERE id=?', (collection_id,)).fetchone()
             if collection is None or collection['case_id'] != source['case_id']:
                 raise IntegrityError('collection does not exist in the source case')
+        if parent_artifact_id is not None:
+            parent_cases = {r['case_id'] for r in db.execute('''
+                SELECT s.case_id FROM artifacts a JOIN sources s ON s.id=a.source_id WHERE a.id=?
+                UNION SELECT s.case_id FROM source_observations o JOIN sources s ON s.id=o.source_id WHERE o.artifact_id=?
+                ''', (parent_artifact_id, parent_artifact_id))}
+            if parent_cases != {source['case_id']}:
+                raise IntegrityError('parent artifact does not exist in the source case')
         row = db.execute("SELECT id FROM artifacts WHERE sha256=? AND COALESCE(source_locator,'')=COALESCE(?, '') ORDER BY id LIMIT 1", (digest, source_locator)).fetchone()
         if row:
             aid = int(row['id'])
@@ -102,17 +116,19 @@ def ingest_file(path: Path, *, source_id: int, source_locator: str | None = None
                 ''', (aid, aid))}
             if not provenance_cases or provenance_cases != {source['case_id']}:
                 raise IntegrityError('same content/locator belongs to another or unknown case; explicit migration is required')
-            stored_artifact = db.execute('SELECT stored_path,size_bytes,is_raw FROM artifacts WHERE id=?', (aid,)).fetchone()
+            stored_artifact = db.execute('SELECT stored_path,size_bytes,is_raw,parent_artifact_id FROM artifacts WHERE id=?', (aid,)).fetchone()
             if bool(stored_artifact['is_raw']) != bool(is_raw):
                 raise IntegrityError('raw and derived acquisitions cannot silently share an artifact identity')
+            if parent_artifact_id is not None and stored_artifact['parent_artifact_id'] != parent_artifact_id:
+                raise IntegrityError('same content/locator was acquired under a different parent artifact')
             existing_path = stored_artifact['stored_path']
             if not existing_path or Path(existing_path).is_symlink() or not Path(existing_path).is_file() or sha256_file(Path(existing_path)) != digest:
                 raise IntegrityError('existing artifact content is unavailable or failed SHA-256 verification')
             if stored_artifact['size_bytes'] is not None and stored_artifact['size_bytes'] != size:
                 raise IntegrityError('existing artifact size disagrees with captured bytes')
         else:
-            cur = db.execute("""INSERT INTO artifacts(source_id,sha256,original_name,mime_type,size_bytes,source_locator,stored_path,is_raw,metadata_json)
-                                VALUES(?,?,?,?,?,?,?,?,?)""", (source_id,digest,name,mime,size,source_locator,str(stored),1 if is_raw else 0,metadata_json))
+            cur = db.execute("""INSERT INTO artifacts(source_id,sha256,original_name,mime_type,size_bytes,source_locator,stored_path,is_raw,metadata_json,parent_artifact_id)
+                                VALUES(?,?,?,?,?,?,?,?,?,?)""", (source_id,digest,name,mime,size,source_locator,str(stored),1 if is_raw else 0,metadata_json,parent_artifact_id))
             aid = int(cur.lastrowid)
             db.execute("INSERT INTO search_fts(object_kind,object_id,title,content) VALUES ('artifact',?,?,?)", (aid,name,metadata_json))
         observation_metadata = {
@@ -131,41 +147,49 @@ def ingest_file(path: Path, *, source_id: int, source_locator: str | None = None
             (aid, source_id, source_locator, observed_at, 'ingest', name, mime, size, digest,
              datetime.fromtimestamp(source_stat.st_mtime, timezone.utc).isoformat(),
              json.dumps(observation_metadata, ensure_ascii=False), collection_id))
-        db.execute("INSERT INTO audit_log(action,object_kind,object_id,details_json) VALUES ('ingest','artifact',?,?)", (aid,json.dumps({'sha256':digest,'source_locator':source_locator,'source_id':source_id,'observation_id':observation.lastrowid,'collection_id':collection_id,'deduplicated':row is not None},ensure_ascii=False)))
+        db.execute("INSERT INTO audit_log(action,object_kind,object_id,details_json) VALUES ('ingest','artifact',?,?)", (aid,json.dumps({'sha256':digest,'source_locator':source_locator,'source_id':source_id,'observation_id':observation.lastrowid,'collection_id':collection_id,'deduplicated':row is not None,**({'parent_artifact_id':parent_artifact_id} if parent_artifact_id is not None else {})},ensure_ascii=False)))
         return aid
 
-def add_event(*, source_id: int, artifact_id: int | None, event_type: str, ts_start: str | None = None, ts_end: str | None = None, direction: str | None = None, sender: str | None = None, recipients: str | None = None, contact_label: str | None = None, phone_or_address: str | None = None, subject: str | None = None, body: str | None = None, external_id: str | None = None, thread_id: str | None = None, confidence: float | None = None, metadata: dict | None = None) -> int:
+def add_event(*, source_id: int, artifact_id: int | None, event_type: str, ts_start: str | None = None, ts_end: str | None = None, direction: str | None = None, sender: str | None = None, recipients: str | None = None, contact_label: str | None = None, phone_or_address: str | None = None, subject: str | None = None, body: str | None = None, external_id: str | None = None, thread_id: str | None = None, confidence: float | None = None, metadata: dict | None = None, db: sqlite3.Connection | None = None) -> int:
+    """Insert or re-observe one event; an optional caller transaction batches writes.
+
+    The caller owns BEGIN/commit/rollback when it supplies ``db``.
+    """
     values = (artifact_id,source_id,event_type,ts_start,ts_end,direction,sender,recipients,contact_label,phone_or_address,subject,body,external_id,thread_id,confidence,json.dumps(metadata or {},ensure_ascii=False,sort_keys=True))
     columns = ('artifact_id','source_id','event_type','ts_start','ts_end','direction','sender','recipients','contact_label','phone_or_address','subject','body','external_id','thread_id','confidence','metadata_json')
-    with session() as db:
-        db.execute('BEGIN IMMEDIATE')
-        source = db.execute('SELECT case_id FROM sources WHERE id=?', (source_id,)).fetchone()
+    def insert(connection: sqlite3.Connection) -> int:
+        source = connection.execute('SELECT case_id FROM sources WHERE id=?', (source_id,)).fetchone()
         if source is None:
             raise ValueError('source does not exist')
         if artifact_id is not None:
-            provenance_cases = {r['case_id'] for r in db.execute('''
+            provenance_cases = {r['case_id'] for r in connection.execute('''
                 SELECT s.case_id FROM artifacts a JOIN sources s ON s.id=a.source_id WHERE a.id=?
                 UNION SELECT s.case_id FROM source_observations o JOIN sources s ON s.id=o.source_id WHERE o.artifact_id=?
                 ''', (artifact_id, artifact_id))}
             if provenance_cases != {source['case_id']}:
                 raise IntegrityError('event source and artifact must belong to the same known case')
         if external_id is not None:
-            existing = db.execute('SELECT * FROM events WHERE artifact_id IS ? AND source_id=? AND event_type=? AND external_id=? ORDER BY id LIMIT 1', (artifact_id,source_id,event_type,external_id)).fetchone()
+            existing = connection.execute('SELECT * FROM events WHERE artifact_id IS ? AND source_id=? AND event_type=? AND external_id=? ORDER BY id LIMIT 1', (artifact_id,source_id,event_type,external_id)).fetchone()
             if existing:
                 # Equality of parsed values avoids silently accepting parser-ID
                 # collisions or a later reinterpretation under the same version.
                 if any(existing[column] != value for column, value in zip(columns, values)):
                     raise IntegrityError('event external_id conflicts with existing payload; retain a separate parser version')
                 eid = int(existing['id'])
-                db.execute("INSERT INTO audit_log(action,object_kind,object_id,details_json) VALUES ('event_reobserved','event',?,?)", (eid,json.dumps({'artifact_id':artifact_id,'source_id':source_id,'external_id':external_id},ensure_ascii=False)))
+                connection.execute("INSERT INTO audit_log(action,object_kind,object_id,details_json) VALUES ('event_reobserved','event',?,?)", (eid,json.dumps({'artifact_id':artifact_id,'source_id':source_id,'external_id':external_id},ensure_ascii=False)))
                 return eid
-        cur = db.execute("""INSERT INTO events(artifact_id,source_id,event_type,ts_start,ts_end,direction,sender,recipients,contact_label,phone_or_address,subject,body,external_id,thread_id,confidence,metadata_json)
+        cur = connection.execute("""INSERT INTO events(artifact_id,source_id,event_type,ts_start,ts_end,direction,sender,recipients,contact_label,phone_or_address,subject,body,external_id,thread_id,confidence,metadata_json)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", values)
         eid = int(cur.lastrowid)
         title = ' | '.join(x for x in [event_type, contact_label, phone_or_address, subject] if x)
-        db.execute("INSERT INTO search_fts(object_kind,object_id,title,content) VALUES ('event',?,?,?)", (eid,title,body or ''))
-        db.execute("INSERT INTO audit_log(action,object_kind,object_id,details_json) VALUES ('event_imported','event',?,?)", (eid,json.dumps({'artifact_id':artifact_id,'source_id':source_id,'external_id':external_id},ensure_ascii=False)))
+        connection.execute("INSERT INTO search_fts(object_kind,object_id,title,content) VALUES ('event',?,?,?)", (eid,title,body or ''))
+        connection.execute("INSERT INTO audit_log(action,object_kind,object_id,details_json) VALUES ('event_imported','event',?,?)", (eid,json.dumps({'artifact_id':artifact_id,'source_id':source_id,'external_id':external_id},ensure_ascii=False)))
         return eid
+    if db is not None:
+        return insert(db)
+    with session() as connection:
+        connection.execute('BEGIN IMMEDIATE')
+        return insert(connection)
 
 def add_derived_text(artifact_id: int, kind: str, text: str, *, model: str | None = None, language: str | None = None, segments: list | None = None, confidence: float | None = None, run_id: int | None = None, metadata: dict | None = None, db: sqlite3.Connection | None = None) -> int:
     """Append a text version; an optional caller transaction supports lease fencing.

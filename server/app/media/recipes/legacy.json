@@ -1,0 +1,22 @@
+{
+  "schema": "ageds.media_recipe",
+  "schema_version": 1,
+  "id": "legacy",
+  "kind": "asr",
+  "revision": 1,
+  "description": "Pre-recipe behaviour: one language detected per file; model, device and compute type come from EW_WHISPER_* settings; faster-whisper called with word_timestamps=True and vad_filter=True and library defaults for everything else.",
+  "strategy": "auto_per_file",
+  "engine": "faster-whisper",
+  "model": {"$setting": "whisper_model"},
+  "device": {"$setting": "whisper_device"},
+  "compute_type": {"$setting": "whisper_compute_type"},
+  "model_options": {},
+  "vad": {"enabled": true, "parameters": null},
+  "word_timestamps": true,
+  "language": null,
+  "allowed_languages": null,
+  "windows": null,
+  "detection": null,
+  "transcribe_options": {},
+  "limits": null
+}

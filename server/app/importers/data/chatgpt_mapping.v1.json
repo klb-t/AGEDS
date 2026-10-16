@@ -1,0 +1,81 @@
+{
+  "schema": "ageds.chat_export_mapping",
+  "schema_version": 1,
+  "namespace": "chatgpt",
+  "chatbot": "chatgpt",
+  "mapping_version": "1",
+  "description": "Key paths of the ChatGPT data export (conversations.json and conversations-NNN.json shards). JSON pointers; '*' expands every list item. Observed-format mapping, not a vendor specification.",
+  "files": {
+    "conversations": "conversations\\.json",
+    "shard": "conversations-(?P<index>\\d+)\\.json"
+  },
+  "time": {
+    "formats": ["epoch_seconds"],
+    "zero_is_placeholder": true,
+    "zone_rule": "epoch seconds are UTC by definition (tz_status=utc_epoch)"
+  },
+  "conversation": {
+    "id": ["/conversation_id", "/id"],
+    "title": ["/title"],
+    "create_time": ["/create_time"],
+    "update_time": ["/update_time"],
+    "current_node": ["/current_node"],
+    "mapping": ["/mapping"],
+    "default_model": ["/default_model_slug"],
+    "raw_exclude": ["mapping"]
+  },
+  "node": {
+    "id": ["/id"],
+    "parent": ["/parent"],
+    "children": ["/children"],
+    "message": ["/message"]
+  },
+  "message": {
+    "id": ["/id"],
+    "role": ["/author/role"],
+    "author_name": ["/author/name"],
+    "create_time": ["/create_time"],
+    "update_time": ["/update_time"],
+    "content": ["/content"],
+    "content_type": ["/content/content_type"],
+    "model": ["/metadata/model_slug"],
+    "default_model": ["/metadata/default_model_slug"],
+    "recipient": ["/recipient"],
+    "status": ["/status"],
+    "end_turn": ["/end_turn"],
+    "weight": ["/weight"],
+    "attachments": ["/metadata/attachments"],
+    "raw_metadata": ["/metadata"]
+  },
+  "hidden_rules": [
+    {"pointer": "/metadata/is_visually_hidden_from_conversation", "equals": true, "reason": "is_visually_hidden_from_conversation"},
+    {"pointer": "/metadata/is_user_system_message", "equals": true, "reason": "is_user_system_message"},
+    {"pointer": "/author/role", "equals": "system", "reason": "system_role"},
+    {"pointer": "/weight", "equals": 0, "reason": "weight_zero"}
+  ],
+  "direction_by_role": {"user": "outgoing", "assistant": "incoming", "tool": "incoming", "system": null},
+  "content_types": {
+    "text": {"kind": "text", "text": ["/parts/*"], "join": "\n"},
+    "multimodal_text": {"kind": "multimodal", "text": [{"each": "/parts/*", "fields": ["", "/text"]}], "join": "\n"},
+    "code": {"kind": "tool_call", "text": ["/text"], "join": "\n"},
+    "execution_output": {"kind": "tool_output", "text": ["/text"], "join": "\n"},
+    "thoughts": {"kind": "reasoning", "text": [{"each": "/thoughts/*", "fields": ["/summary", "/content"]}], "join": "\n\n"},
+    "reasoning_recap": {"kind": "reasoning", "text": ["/content"], "join": "\n"},
+    "tether_browsing_display": {"kind": "tool_output", "text": ["/result", "/summary"], "join": "\n"},
+    "tether_quote": {"kind": "tool_output", "text": ["/title", "/url", "/text"], "join": "\n"},
+    "user_editable_context": {"kind": "context", "text": ["/user_profile", "/user_instructions"], "join": "\n\n"},
+    "system_error": {"kind": "error", "text": ["/name", "/text"], "join": "\n"}
+  },
+  "unknown_content_type": {"kind": "unknown", "text": [], "join": "\n"},
+  "asset_pointer": {
+    "key": "asset_pointer",
+    "id_pattern": "^(?:file-service|sediment)://(?P<file_id>[^/?#]+)$"
+  },
+  "attachment": {
+    "id": ["/id"],
+    "name": ["/name"],
+    "mime_type": ["/mime_type", "/mimeType"],
+    "size": ["/size"]
+  },
+  "attachment_file_match": "{file_id}(?:[-_.].*)?"
+}

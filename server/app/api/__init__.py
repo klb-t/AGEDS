@@ -10,7 +10,17 @@ import importlib
 
 from ..web import NAV
 
-ROUTER_MODULES = ('catalog', 'timeline', 'media', 'analysis', 'reports', 'integrations', 'workbench')
+ROUTER_MODULES = (
+    'catalog',
+    'timeline',
+    'media',
+    'analysis',
+    'reports',
+    'integrations',
+    'workbench',
+    'imports_chat',
+    'imports_comm',
+)
 
 
 def include_routers(app) -> None:
@@ -20,3 +30,6 @@ def include_routers(app) -> None:
         for item in getattr(module, 'NAV', ()):
             if item not in NAV:
                 NAV.append(item)
+        install = getattr(module, 'install_app', None)
+        if install is not None:
+            install(app)

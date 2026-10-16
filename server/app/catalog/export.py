@@ -159,8 +159,23 @@ def _about(collection_id, scan_ids, rows_written, truncated, max_rows, min_gap_d
         'truncated_by_max_rows': truncated, 'max_rows': max_rows, 'min_gap_days': min_gap_days,
         'notes': ['Locators are inert identifiers, not paths. Hash equality is byte identity only.',
                   'Control characters in text cells are shown as \\xNN; locator and name_raw_hex keep exact bytes.',
-                  'Scan observations are not acquisitions; ingest creates acquisition records separately.'],
+                  'Scan observations are not acquisitions; ingest creates acquisition records separately.',
+                  'CSV only: text cells starting with = + - @ TAB CR are prefixed with an apostrophe '
+                  '(formula guard ' + CSV_FORMULA_GUARD + '); XLSX/HTML keep the text unchanged.'],
     }
+
+
+CSV_FORMULA_GUARD = 'apostrophe_prefix_v1'
+_FORMULA_LEADS = ('=', '+', '-', '@', '\t', '\r')
+
+
+def _csv_guard(value):
+    """Spreadsheet apps execute text starting with =,+,-,@ as formulas. Text cells
+    that would be interpreted get a leading apostrophe; exact names stay in
+    name_raw_hex and in the XLSX/HTML exports."""
+    if isinstance(value, str) and value.startswith(_FORMULA_LEADS):
+        return "'" + value
+    return value
 
 
 def _write_csv(path: Path, rows) -> int:
@@ -169,7 +184,7 @@ def _write_csv(path: Path, rows) -> int:
         writer = csv.DictWriter(handle, fieldnames=COLUMNS)
         writer.writeheader()
         for row in rows:
-            writer.writerow({k: _clean(v) for k, v in row.items()})
+            writer.writerow({k: _csv_guard(_clean(v)) for k, v in row.items()})
             count += 1
     return count
 

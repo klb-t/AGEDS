@@ -161,6 +161,7 @@ def test_damage_encryption_unsupported_and_ratio_are_visible(world):
     assert world.scan_a['status'] == 'partial'
     reasons = world.scan_a['coverage']['incomplete_reasons']
     assert reasons['limit:compression_ratio_declared'] == 1 and reasons['container_not_expanded'] == 2
+    assert reasons['encrypted_content'] == 1
 
 
 def test_times_keep_kind_source_and_zone_status(world):

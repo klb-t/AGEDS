@@ -26,7 +26,7 @@ from .. import db as dbmod
 from .. import scanner
 from ..timeinfo import TimeCandidate, from_epoch
 from . import archives, signatures
-from .limits import GiB, LIMIT_NAMES, MiB, CatalogLimits  # noqa: F401 (re-exported)
+from .limits import LIMIT_NAMES, CatalogLimits  # noqa: F401 (re-exported for callers)
 from .locator import disk_locator, member_locator
 
 CATALOG_VERSION = '1.0.0'
@@ -383,6 +383,7 @@ class _Engine:
     def _member_failure(self, node: _Node, exc: BaseException) -> int:
         if isinstance(exc, RuntimeError) and 'encrypt' in str(exc).lower():
             node.issues.append({'code': 'encrypted_member'})
+            self._count(self.incomplete, 'encrypted_content')
             return self._insert_leaf(node, status='encrypted', hash_status='unavailable_encrypted', sniff=None)
         if isinstance(exc, NotImplementedError):
             node.issues.append({'code': 'compression_method_unsupported', 'error': str(exc)})
@@ -510,6 +511,7 @@ class _Engine:
             return None
         if member.encrypted:
             node.issues.append({'code': 'encrypted_member'})
+            self._count(self.incomplete, 'encrypted_content')
             self._insert_leaf(node, status='encrypted', hash_status='unavailable_encrypted', sniff=None)
             return None
         reason = container.precheck(member)
@@ -536,8 +538,7 @@ class _Engine:
             stream = container.open(member)
         except archives.MemberError as error:
             node.issues.append({'code': error.code, **error.details})
-            if error.status != 'encrypted':
-                self._count(self.incomplete, f'member_{error.status}')
+            self._count(self.incomplete, 'encrypted_content' if error.status == 'encrypted' else f'member_{error.status}')
             hash_status = {'encrypted': 'unavailable_encrypted', 'unsupported': 'unavailable_unsupported'}.get(error.status, 'error_damaged')
             self._insert_leaf(node, status=error.status, hash_status=hash_status, sniff=None)
             return None

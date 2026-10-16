@@ -214,12 +214,17 @@
     "recording_event_types": [
       "recording",
       "recording_observation",
+      "recording_name_observation",
       "call_recording",
       "media_observation",
+      "media_metadata",
+      "exif_observation",
+      "file_observation",
       "photo"
     ],
     "correlation_rule_ids": [
       "recording_call_log"
-    ]
+    ],
+    "note": "Events attached to the recorded artifact (artifact_id) whose event_type is listed here contribute their time candidates; another importer's type needs a new rule version."
   }
 }

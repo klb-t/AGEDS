@@ -453,3 +453,26 @@ def test_export_guards_formulas_in_csv_but_json_is_verbatim(tl):
     assert "'=HYPERLINK" in csv_bytes.decode() and meta['complete']
     assert json.loads(json_bytes)['items'][0]['text'] == '=HYPERLINK("x")'
     assert limited_meta['complete'] is True and json.loads(limited)['row_count'] == 1
+
+
+def test_scan_plan_and_index_plan_return_identical_pages(tl, monkeypatch):
+    from server.app.timeline import query as query_module
+    for minute in range(12):
+        sms(tl, f'2024-05-01T10:{minute:02d}:00+00:00', 1714557600000 + minute * 60000)
+        tl.event('call', ts_start=f'2024-05-01T10:{minute:02d}:00+00:00')
+    filters = make_filters(event_types=['sms'])
+
+    def pages():
+        keys, cursor, plans = [], None, set()
+        while True:
+            page = tl.window(limit=5, filters=filters, cursor=cursor, candidates=False)
+            keys += [i['key'] for i in page['items']]
+            plans.add(page['notes']['plan'])
+            if not page['has_more']:
+                return keys, plans
+            cursor = page['next_cursor']
+    index_keys, index_plans = pages()
+    monkeypatch.setattr(query_module, 'SCAN_THRESHOLD', 0)
+    scan_keys, scan_plans = pages()
+    assert index_plans == {'sort_index'} and scan_plans == {'primary_key_scan'}
+    assert index_keys == scan_keys and len(scan_keys) == 12

@@ -185,8 +185,13 @@ def filter_sql(db, pid: int, f: Filters, alias: str = 'ti') -> tuple[str, list, 
     return ' AND '.join(clauses), args, notes
 
 
-def _range_sql(start_us, end_us, match: str, halfwidth: int, a: str = 'ti') -> tuple[str, list]:
-    clauses, args = [f'{a}.sort_us IS NOT NULL'], []
+SCAN_THRESHOLD = 20_000
+
+
+def _range_sql(start_us, end_us, match: str, halfwidth: int, a: str = 'ti', *, scan: bool = False) -> tuple[str, list]:
+    """Time-range predicate; ``scan`` disables the sort index (``+col``) for aggregates over most rows."""
+    col = f'+{a}.sort_us' if scan else f'{a}.sort_us'
+    clauses, args = [f'{col} IS NOT NULL'], []
     if match == 'overlap':
         if start_us is not None:
             clauses.append(f'{a}.sort_us>=? AND {a}.hi_us>=?')
@@ -196,12 +201,20 @@ def _range_sql(start_us, end_us, match: str, halfwidth: int, a: str = 'ti') -> t
             args += [end_us + halfwidth, end_us]
     else:
         if start_us is not None:
-            clauses.append(f'{a}.sort_us>=?')
+            clauses.append(f'{col}>=?')
             args.append(start_us)
         if end_us is not None:
-            clauses.append(f'{a}.sort_us<?')
+            clauses.append(f'{col}<?')
             args.append(end_us)
     return ' AND '.join(clauses), args
+
+
+def _prefer_scan(db, pid: int, start_us, end_us) -> bool:
+    """Aggregates over many rows are cheaper as a primary-key scan than as sort-index lookups."""
+    where, args = _range_sql(start_us, end_us, 'display', 0)
+    count = db.execute(f'SELECT COUNT(*) FROM (SELECT 1 FROM timeline_items ti WHERE ti.projection_id=? AND {where} LIMIT ?)',
+                       (pid, *args, SCAN_THRESHOLD + 1)).fetchone()[0]
+    return count > SCAN_THRESHOLD
 
 
 def _query_hash(*parts) -> str:
@@ -386,18 +399,25 @@ def window(db, projection: dict, rule: Rule, *, start_us=None, end_us=None, filt
     halfwidth = int(projection['build']['counts'].get('max_halfwidth_us', 0))
     range_where, range_args = _range_sql(start_us, end_us, match, halfwidth)
     qhash = _query_hash(start_us, end_us, match, order, filters.canonical())
+    # Selective filters over a long range: a primary-key scan plus a top-N sort beats walking the
+    # sort index with a row lookup per candidate. Without filters the sort index pages directly.
+    filtered = any(v for k, v in filters.canonical().items() if k != 'transcript_versions')
+    scan = filtered and _prefer_scan(db, pid, start_us, end_us)
+    if scan:
+        range_where, range_args = _range_sql(start_us, end_us, match, halfwidth, scan=True)
+    sort_col = '+ti.sort_us' if scan else 'ti.sort_us'
     page_where, page_args = f'{where} AND {range_where}', [*args, *range_args]
     cursor_note = None
     if cursor:
         key, build_id = decode_cursor(cursor, pid, qhash)
         comparator = '>' if order == 'asc' else '<'
-        page_where += f' AND (ti.sort_us,ti.item_kind,ti.ref_id,ti.sub_index) {comparator} (?,?,?,?)'
+        page_where += f' AND ({sort_col},ti.item_kind,ti.ref_id,ti.sub_index) {comparator} (?,?,?,?)'
         page_args += list(key)
         if build_id != projection['build']['id']:
             cursor_note = 'projection_refreshed_since_previous_page'
     direction = 'ASC' if order == 'asc' else 'DESC'
     rows = db.execute(f'''SELECT * FROM timeline_items ti WHERE {page_where}
-                          ORDER BY ti.sort_us {direction}, ti.item_kind {direction}, ti.ref_id {direction}, ti.sub_index {direction}
+                          ORDER BY {sort_col} {direction}, ti.item_kind {direction}, ti.ref_id {direction}, ti.sub_index {direction}
                           LIMIT ?''', (*page_args, limit + 1)).fetchall()
     has_more = len(rows) > limit
     rows = rows[:limit]
@@ -414,12 +434,13 @@ def window(db, projection: dict, rule: Rule, *, start_us=None, end_us=None, filt
         'items': hydrate(db, rows, rule, params, candidates=candidates, group=group),
         'undated_count': int(db.execute(f'SELECT COUNT(*) FROM timeline_items ti WHERE {where} AND ti.sort_us IS NULL',
                                         args).fetchone()[0]),
-        'notes': {**notes, **({'cursor': cursor_note} if cursor_note else {})},
+        'notes': {**notes, **({'cursor': cursor_note} if cursor_note else {}), 'plan': 'primary_key_scan' if scan else 'sort_index'},
     }
     if include_lanes is None:
         include_lanes = cursor is None
     if include_lanes and group:
-        result['lanes'] = lanes(db, f'{where} AND {range_where}', [*args, *range_args], group, max_lanes)
+        scan_where, scan_args = _range_sql(start_us, end_us, match, halfwidth, scan=scan or _prefer_scan(db, pid, start_us, end_us))
+        result['lanes'] = lanes(db, f'{where} AND {scan_where}', [*args, *scan_args], group, max_lanes)
     return result
 
 
@@ -439,27 +460,16 @@ def iter_window(db, projection: dict, rule: Rule, *, batch: int = 1000, max_rows
 
 
 def _bucket_expr(unit: str, a: str = 'ti') -> str:
-    if unit in ('minute', 'hour', 'day'):
-        width = APPROX_BUCKET_US[unit]
-        return f'({a}.sort_us - ((({a}.sort_us % {width}) + {width}) % {width}))'
+    """Integer bucket start in SQL; calendar months/years are folded from UTC days in Python."""
     if unit == 'week':
         width, monday = 7 * 86400 * US, 4 * 86400 * US
         return f'({a}.sort_us - (((({a}.sort_us - {monday}) % {width}) + {width}) % {width}))'
-    seconds = f'(({a}.sort_us - ((({a}.sort_us % {US}) + {US}) % {US})) / {US})'
-    if unit == 'month':
-        return f"strftime('%Y-%m', {seconds}, 'unixepoch')"
-    return f"strftime('%Y', {seconds}, 'unixepoch')"
+    width = APPROX_BUCKET_US[unit if unit in ('minute', 'hour', 'day') else 'day']
+    return f'({a}.sort_us - ((({a}.sort_us % {width}) + {width}) % {width}))'
 
 
 def _bucket_start(unit: str, value) -> int:
-    if unit in ('month', 'year'):
-        from datetime import datetime, timezone
-        from .timeutil import to_us
-        text = str(value)
-        year = int(text[:4])
-        month = int(text[5:7]) if unit == 'month' else 1
-        return to_us(datetime(year, month, 1, tzinfo=timezone.utc))
-    return int(value)
+    return floor_unit(int(value), unit) if unit in ('month', 'year') else int(value)
 
 
 def bucket_count(start_us: int, end_us: int, unit: str) -> int:
@@ -505,7 +515,7 @@ def density(db, projection: dict, *, start_us=None, end_us=None, bucket: str = '
     count = bucket_count(start_us, end_us, unit)
     if count > max_buckets:
         raise QueryLimitError(f'{count} {unit} buckets exceed max_buckets={max_buckets}; use a coarser bucket or a shorter window')
-    range_where, range_args = _range_sql(start_us, end_us, 'display', 0)
+    range_where, range_args = _range_sql(start_us, end_us, 'display', 0, scan=_prefer_scan(db, pid, start_us, end_us))
     column = f'ti.{GROUPS[group]}' if group else "''"
     rows = db.execute(f'''SELECT {column} AS lane, {_bucket_expr(unit)} AS bucket, COUNT(*) AS n,
                             SUM(ti.basis='local_as_utc_unknown_zone') AS unknown_zone

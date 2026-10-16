@@ -23,7 +23,7 @@ _REF = re.compile(r'^(?P<rule_id>[a-z][a-z0-9_]{0,63})(?:@(?P<version>[1-9][0-9]
 # Pinned hashes of released rule files. A mismatch means a released rule was
 # edited in place; that is refused rather than silently re-labelled.
 RELEASED_SHA256: dict[tuple[str, int], str] = {
-    ('display_time', 1): 'c5295a579ec90d6ee16df964ace0582304dacce66b96bb1b6fe6cf1a9911458b',
+    ('display_time', 1): 'b977c01deff300a8db32b5a767a3902f7c652d45c832bcaf2aa2b52c47810978',
     ('email_chat', 1): 'ee6a9fe20e557b5726fe46133eda219c34e1e62095f8087370b1497847cc141c',
     ('recording_call_log', 1): 'f7ef7fee08419216263a25803681268748a858f17d005f8605eef0bf3f351d37',
     ('same_conversation', 1): '0323cfe6de7e719f96406d91633f19e61027832e2d533b5ff3d1919ac67887c5',

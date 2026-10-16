@@ -64,8 +64,9 @@ with tempfile.TemporaryDirectory(prefix='ageds-wb-browser-') as directory:
     const context = await browser.newContext({locale: 'pl-PL', colorScheme: 'dark'});
     const page = await context.newPage();
     const pageErrors = []; page.on('pageerror', e => pageErrors.push(e.message));
-    const consoleErrors = []; page.on('console', m => {if (m.type() === 'error') consoleErrors.push(m.text());});
+    const consoleErrors = []; page.on('console', m => {if (m.type() === 'error') consoleErrors.push(`${m.text()} @ ${new URL(m.location().url || 'about:blank').pathname}`);});
     page.on('dialog', dialog => dialog.accept());
+    const failedResponses = []; page.on('response', r => {if (r.status() >= 400) failedResponses.push(`${r.status()} ${new URL(r.url()).pathname}`);});
     const ready = async () => page.waitForFunction(() => document.documentElement.dataset.wbShell === 'ready');
     const inert = async () => {
       assert.equal(await page.locator('img').count(), 0);
@@ -245,7 +246,10 @@ with tempfile.TemporaryDirectory(prefix='ageds-wb-browser-') as directory:
       await inert();
     });
 
-    assert.deepEqual(pageErrors, []); receipt.page_errors = pageErrors; receipt.console_errors = consoleErrors; receipt.status = 'passed';
+    assert.deepEqual(pageErrors, []); receipt.page_errors = pageErrors; receipt.console_errors = consoleErrors;
+    receipt.failed_responses = failedResponses;
+    assert.deepEqual(failedResponses.filter(r => !r.endsWith(' /favicon.ico')), [], 'only the absent favicon may fail');
+    receipt.status = 'passed';
   } catch (error) {receipt.status = 'failed'; receipt.error = error.stack; process.exitCode = 1; console.error(error); console.error(stderr.slice(-4000));}
   finally {if (browser) await browser.close(); server.kill('SIGTERM'); receipt.finished_at = new Date().toISOString(); if (process.env.AGEDS_BROWSER_RECEIPT) fs.writeFileSync(process.env.AGEDS_BROWSER_RECEIPT, JSON.stringify(receipt, null, 2) + '\n');}
 })();

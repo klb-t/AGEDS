@@ -14,7 +14,7 @@ from __future__ import annotations
 import io
 import json
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -27,7 +27,7 @@ from .comm_common import (DEFAULT_LIMITS, CommLimits, Issues, acquire, add_event
 
 PARSER_NAME = 'ics_rfc5545'
 PARSER_VERSION = '1'
-PROJECTION_RULE = 'ics_recurrence_projection/v1'
+PROJECTION_RULE = 'ics_recurrence_projection/v2'
 _DT = re.compile(r'^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})?(Z)?)?$')
 _DURATION = re.compile(r'^([+-])?P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$')
 
@@ -318,6 +318,59 @@ def import_ics(path: Path, *, source_locator: str | None = None, original_name: 
             'coverage': coverage, 'issues': issues.as_dict()}
 
 
+def _start_zone(start, calendar: Calendar):
+    """tzinfo of DTSTART's wall clock, or None for a floating/all-day/unresolved start."""
+    if start.tz_status == 'unknown' or start.metadata.get('all_day_date'):
+        return None
+    if start.tz == 'UTC':
+        return timezone.utc
+    resolved = calendar.zone(start.tz)
+    return resolved[0] if resolved else None
+
+
+def _to_start_wall_clock(aware: datetime, start_zone) -> datetime:
+    return aware.astimezone(start_zone).replace(tzinfo=None) if start_zone is not None else aware.replace(tzinfo=None)
+
+
+def _property_wall_clock(raw: str, tzid: str | None, calendar: Calendar, start_zone) -> datetime | None:
+    """EXDATE / RECURRENCE-ID / UNTIL value expressed in DTSTART's wall clock.
+
+    RFC 5545 compares these values as instants: ``Z`` is UTC and a ``TZID``
+    names the value's own zone. A floating value (or a floating DTSTART) is
+    compared as wall-clock time, which is the only reading available.
+    """
+    match = _DT.match(raw.strip())
+    if not match:
+        return None
+    y, mo, d, h, mi, s, utc_flag = match.groups()
+    try:
+        naive = datetime(int(y), int(mo), int(d), int(h or 0), int(mi or 0), int(s or 0))
+    except ValueError:
+        return None
+    if h is None or start_zone is None:
+        return naive
+    if utc_flag:
+        return _to_start_wall_clock(naive.replace(tzinfo=timezone.utc), start_zone)
+    if tzid:
+        resolved = calendar.zone(tzid)
+        if resolved is not None:
+            return _to_start_wall_clock(naive.replace(tzinfo=resolved[0]), start_zone)
+    return naive
+
+
+_UNTIL = re.compile(r'(?i)(^|;)UNTIL=([0-9TZ]+)')
+
+
+def _rrule_in_start_wall_clock(rule: str, calendar: Calendar, start_zone) -> str:
+    """Rewrite a UTC ``UNTIL`` into DTSTART's wall clock (dateutil runs with ignoretz)."""
+    def replace(match):
+        converted = _property_wall_clock(match.group(2), None, calendar, start_zone)
+        if converted is None or not match.group(2).upper().endswith('Z'):
+            return match.group(0)
+        return f'{match.group(1)}UNTIL={converted.strftime("%Y%m%dT%H%M%S")}'
+    return _UNTIL.sub(replace, rule)
+
+
 def expand_recurrence(event_id: int, *, max_instances: int = 100, until: str | None = None,
                       limits: CommLimits = DEFAULT_LIMITS) -> dict:
     """Bounded projection of a recurring VEVENT; nothing is stored.
@@ -352,33 +405,40 @@ def expand_recurrence(event_id: int, *, max_instances: int = 100, until: str | N
     if start is None:
         return {'status': 'unparsable_dtstart', 'rule': PROJECTION_RULE, 'occurrences': []}
     naive_start = datetime.fromisoformat(start.local)
-    lines = [f'RRULE:{rule}' for rule in rules]
+    start_zone = _start_zone(start, calendar)
+    lines = [f'RRULE:{_rrule_in_start_wall_clock(rule, calendar, start_zone)}' for rule in rules]
     for line in rdates:
         lines.append(f'RDATE:{line.value}')
     exdates = set()
     for line in (l for l in vevent['lines'] if l.name == 'EXDATE'):
+        tzid = (line.param('TZID') or [None])[0]
         for value in line.value.split(','):
-            match = _DT.match(value.strip())
-            if match:
-                y, mo, d, h, mi, s, _ = match.groups()
-                exdates.add(datetime(int(y), int(mo), int(d), int(h or 0), int(mi or 0), int(s or 0)))
+            converted = _property_wall_clock(value, tzid, calendar, start_zone)
+            if converted is not None:
+                exdates.add(converted)
     overrides = set()
     uid = metadata.get('uid')
     for other in calendar.vevents:
         if uid and any(l.name == 'UID' and unescape_text(l.value) == uid for l in other['lines']):
             rid = next((l for l in other['lines'] if l.name == 'RECURRENCE-ID'), None)
             if rid is not None:
-                match = _DT.match(rid.value.strip())
-                if match:
-                    y, mo, d, h, mi, s, _ = match.groups()
-                    overrides.add(datetime(int(y), int(mo), int(d), int(h or 0), int(mi or 0), int(s or 0)))
+                converted = _property_wall_clock(rid.value, (rid.param('TZID') or [None])[0], calendar, start_zone)
+                if converted is not None:
+                    overrides.add(converted)
     try:
-        # ignoretz: a UTC UNTIL is compared as a naive wall-clock bound; the
-        # projection labels this simplification instead of hiding it.
+        # ignoretz: UNTIL/EXDATE/RECURRENCE-ID were converted to DTSTART's wall
+        # clock above, so dateutil compares like with like.
         ruleset = rrulestr('\n'.join(lines), dtstart=naive_start, forceset=True, ignoretz=True)
     except (ValueError, TypeError) as exc:
         return {'status': 'unsupported_rule', 'rule': PROJECTION_RULE, 'error': str(exc)[:200], 'occurrences': []}
-    bound = datetime.fromisoformat(until) if until else None
+    bound = None
+    if until:
+        try:
+            bound = datetime.fromisoformat(until)
+        except ValueError as exc:
+            raise ValueError(f'until must be ISO 8601 date-time: {exc}') from exc
+        if bound.tzinfo is not None:
+            bound = _to_start_wall_clock(bound, start_zone)
     occurrences = []
     truncated = False
     for value in ruleset:
@@ -402,5 +462,6 @@ def expand_recurrence(event_id: int, *, max_instances: int = 100, until: str | N
                             'overridden_by_recurrence_id': value in overrides})
     return {'status': 'projected', 'rule': PROJECTION_RULE, 'engine': f'python-dateutil {dateutil_version}',
             'event_id': event_id, 'max_instances': max_instances, 'truncated': truncated,
-            'until_simplification': 'UNTIL compared as wall-clock time of DTSTART',
+            'until_semantics': ('UNTIL/EXDATE/RECURRENCE-ID with Z or TZID converted to the wall clock of DTSTART '
+                                'before comparison; floating values compared as wall-clock time'),
             'stored': False, 'occurrences': occurrences}

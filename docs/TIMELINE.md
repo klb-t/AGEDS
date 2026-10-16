@@ -17,7 +17,7 @@ uncertainty interval of the choice. Nothing is written back into events or candi
 | `stored` | rows of `event_times` written by an importer (kind, raw, utc/local, zone status, precision) |
 | `derived_legacy` | computed on the fly for events without usable stored candidates: SMS/MMS/calls from the epoch-ms parser metadata (`timestamp.raw`, `raw_attributes.date_sent`), otherwise `events.ts_start`/`ts_end`; WhatsApp minute precision from the raw time |
 | `derived_artifact` | candidates of events attached to a recorded artifact (`recording`, `image_capture`, …): file-name times, EXIF |
-| `derived_observation` | `source_observations.source_modified_at` (file mtime). **Unusable** when the observation describes a server temporary upload |
+| `derived_observation` | `source_observations.source_modified_at` (file mtime), only from observations whose `filesystem_stat_scope` is `source_path` (stat of the original path) or `declared_by_caller` (e.g. the catalogued mtime; the candidate carries `source_modified_at_basis`). Temporary copies (uploads, extracted children, catalog/import-plan copies) record no source time since 2026-10-16 (review finding 1). **Unusable**: any non-declared row whose acquisition metadata marks a temporary upload (`file_mtime_of_temporary_upload`) or an extracted/catalog-materialized copy (`extracted_from`, `catalog_entry_id` → `file_mtime_of_temporary_copy`), whatever scope its caller passed; older rows also with an `upload:`/`client-upload:` locator (`…temporary_upload`) or a container-member locator `…!/…` (`…temporary_copy`). Older rows without any marker stay usable, labelled `legacy_unmarked_assumed_source_path` (residual ambiguity: a direct `ingest_file` of a temporary file by other code cannot be recognised) |
 | `derived_correlation` | start of a call-log entry linked by an **accepted** correlation hypothesis |
 
 Every derived candidate names `derived_from` (column or JSON path). `events.created_at`
@@ -70,7 +70,20 @@ sort/lo/hi/end µs, basis, precision, chosen candidate, lane keys, hidden, flags
 counts of events, event_times, derived_text, observations, hypothesis statuses). Every read
 compares watermarks: unchanged → `fresh`; new events/candidates/transcripts/observations/
 decisions → **incremental** recomputation of affected events and recordings; deleted rows →
-full rebuild. Rule versions and operator parameters get separate projections, so a new
+full rebuild; a build written by older projection code (`watermarks.projection_code` ≠ the
+current `PROJECTION_CODE`, now 2) is rebuilt in full on first use after an upgrade.
+**Projection identity and cache bound (review finding 7).** A projection is keyed by
+the rule and the *effective zone parameters* (`assume_zone`, `zone_by_source`) only; the
+free-text `assumption_rule` label is not stored in the cache: items keep the placeholder
+`$request.assumption_rule` and every reader (window, item, export, `analysis_items`)
+reports the label of its own request, so a typo or a new label never copies the items
+again. At most `EW_TIMELINE_MAX_PROJECTIONS` (default 8) non-default projections keep
+materialized items; after a full build the least recently built others lose their items
+(rebuildable cache) and an append-only `timeline_projection_evictions` row (schema 32)
+records projection, build, count and reason; their next use rebuilds them in full. The
+default projection (`{}`) is never evicted. Projection and build-log rows stay
+(append-only); reads still write the cache when data or parameters changed.
+Rule versions and operator parameters get separate projections, so a new
 version never overwrites an older one. Measured on 200 000 synthetic events: first build
 ≈ 11 s, incremental refresh after 1 000 new events ≈ 0.15 s, fresh check ≈ 1 ms
 (receipt). Reads that refresh write only the cache tables.
@@ -84,7 +97,7 @@ version never overwrites an older one. Measured on 200 000 synthetic events: fir
 | `GET /api/timeline/density` | bucketed counts per lane computed in SQL: `bucket=auto|year|month|week|day|hour|minute` (UTC calendar; weeks start Monday), `max_buckets` ≤ 5000 (exceeding → 413), `max_lanes` (rest in an "other" lane); each bucket also counts unknown-zone items. Items are placed at their sort time. |
 | `GET /api/timeline/undated` | items without a usable time, ordered by identity, with `undated_reason`. |
 | `GET /api/timeline/items/{event:ID | segment:VERSION:INDEX}` | detail: all candidates, evaluation, tags, hypotheses, links to the artifact page / transcript version. |
-| `GET /api/timeline/export?format=csv|json` | the current window (same filters), ≤ 200 000 rows, `X-AGEDS-Timeline-Complete`; CSV prefixes text cells starting with `= + - @` with `'`, JSON is verbatim. |
+| `GET /api/timeline/export?format=csv|json` | the current window (same filters), ≤ 200 000 rows, `X-AGEDS-Timeline-Complete`; CSV prefixes **every** text cell starting with `= + - @`, tab or CR with `'` (review finding 9: raw parser values such as a billing direction cell are not free text but still guarded), JSON is verbatim. |
 | `GET /api/timeline/facets`, `/rules`, `/projection` | filter values, rule data, projection/build state. |
 | `POST /api/timeline/correlations/runs`, `GET …/runs[/{id}]`, `GET /api/timeline/correlations[/{id}]`, `POST …/{id}/review` | correlation runs and review (below). |
 

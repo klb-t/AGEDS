@@ -1,7 +1,7 @@
 """SMS Backup & Restore ``calls.xml`` import as ``call`` events with time candidates.
 
-The XML is read with a streaming pull parser; DTD/entity declarations are
-rejected. ``date`` (Unix milliseconds) is the start candidate; ``duration`` in
+The XML is read with a streaming expat parser; DTD/entity declarations are
+rejected in any encoding. ``date`` (Unix milliseconds) is the start candidate; ``duration`` in
 seconds yields a separately labelled ``end`` projection. Type/presentation
 codes are mapped through ``data/call_log_codes.v1.json``; unmapped codes stay
 raw. ``readable_date`` is the app's display string in an unknown zone and is
@@ -13,7 +13,7 @@ the same rows; the result reports when the other projection exists.
 """
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
+from xml.parsers import expat
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -27,37 +27,76 @@ PARSER_VERSION = '1'
 CHUNK = 64 * 1024
 
 
+class _Refused(ValueError):
+    """A document type / entity declaration (in any encoding)."""
+
+
 def iter_xml_elements(path: Path, tag: str, issues: Issues, limits: CommLimits):
-    """Yield (index, attributes) for ``tag`` elements; bounded and DTD-free."""
-    parser = ET.XMLPullParser(events=('start', 'end'))
+    """Yield (index, attributes) for ``tag`` elements; bounded and DTD-free.
+
+    Expat reports declarations through handlers after decoding, so a DOCTYPE
+    or ENTITY declaration is refused whatever the document encoding (UTF-16
+    included); the raw-byte check stays as a cheap early refusal for ASCII
+    compatible encodings. Undeclared entity references are well-formedness
+    errors. Malformed XML or an encoding expat cannot read is a ValueError.
+    """
+    parser = expat.ParserCreate()
+    parser.SetParamEntityParsing(expat.XML_PARAM_ENTITY_PARSING_NEVER)
+    pending: list = []
+    open_items: list[dict] = []
+    state = {'root': None, 'index': 0}
+
+    def refuse(*_args):
+        raise _Refused('XML document type/entity declarations are not accepted')
+
+    def start(name, attributes):
+        if state['root'] is None:
+            state['root'] = name
+            pending.append(('root', name))
+        if name == tag:
+            open_items.append(dict(attributes))
+
+    def end(name):
+        if name == tag:
+            pending.append(('item', open_items.pop()))
+        elif name != state['root']:
+            issues.add('unexpected_element', tag=str(name)[:64])
+
+    parser.StartDoctypeDeclHandler = refuse
+    parser.EntityDeclHandler = refuse
+    parser.UnparsedEntityDeclHandler = refuse
+    parser.NotationDeclHandler = refuse
+    parser.ExternalEntityRefHandler = refuse
+    parser.StartElementHandler = start
+    parser.EndElementHandler = end
     tail = b''
-    index = 0
-    root_tag = None
     with path.open('rb') as handle:
         while True:
             chunk = handle.read(CHUNK)
-            if not chunk:
-                break
             window = (tail + chunk).upper()
             if b'<!DOCTYPE' in window or b'<!ENTITY' in window:
-                raise ValueError('XML document type/entity declarations are not accepted')
+                raise _Refused('XML document type/entity declarations are not accepted')
             tail = chunk[-16:]
-            parser.feed(chunk)
-            for event, element in parser.read_events():
-                if event == 'start' and root_tag is None:
-                    root_tag = element.tag
-                    yield 'root', element.tag
-                elif event == 'end' and element.tag == tag:
-                    index += 1
-                    if index > limits.max_records:
-                        issues.add('record_limit', limit=limits.max_records)
-                        return
-                    yield index, dict(element.attrib)
-                    element.clear()
-                elif event == 'end' and element.tag != root_tag:
-                    issues.add('unexpected_element', tag=str(element.tag)[:64])
-                    element.clear()
-        parser.close()
+            try:
+                parser.Parse(chunk, not chunk)
+            except _Refused:
+                raise
+            except expat.ExpatError as exc:
+                raise ValueError(f'XML is not well-formed: {exc}') from exc
+            except ValueError as exc:  # e.g. an encoding expat cannot decode
+                raise ValueError(f'XML encoding not supported: {exc}') from exc
+            for kind, value in pending:
+                if kind == 'root':
+                    yield 'root', value
+                    continue
+                state['index'] += 1
+                if state['index'] > limits.max_records:
+                    issues.add('record_limit', limit=limits.max_records)
+                    return
+                yield state['index'], value
+            pending.clear()
+            if not chunk:
+                break
 
 
 def call_candidates(attrs: dict, issues_for_row: list[str]) -> tuple[TimeCandidate | None, TimeCandidate | None, dict]:

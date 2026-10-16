@@ -1,0 +1,70 @@
+{
+  "schema": "ageds.validation_receipt.v1",
+  "task": "AGEDS-TASK-20261016-R",
+  "date": "2026-10-16",
+  "branch": "wt-R",
+  "base": "b181c21",
+  "tested_head": "943b32ede9d2eb16694af6ced0a1b191556f68c7",
+  "note": "the receipt commit that follows the tested head changes documentation only",
+  "environment": {"python": "3.13.16", "sqlite": "3.45.1", "node": "v22.22.0", "chromium": "141.0.7390.37",
+                  "os": "Linux container (no GPU, no network models; py7zr/rarfile not installed)"},
+  "commands": [
+    "/home/user/wt/venv/bin/python -m pytest server/tests -q -p no:cacheprovider",
+    "/home/user/wt/venv/bin/python -m pytest server/tests/test_review_fixes_*.py -q -p no:cacheprovider",
+    "node --test server/tests/js/*.test.mjs",
+    "python3 scripts/verify_repository.py",
+    "NODE_PATH=<playwright> PYTHON=<venv python> AGEDS_BROWSER_EXECUTABLE=<chromium> node server/tests/browser/acceptance.cjs",
+    "NODE_PATH=<playwright> PYTHON=<venv python> AGEDS_BROWSER_EXECUTABLE=<chromium> node server/tests/browser/timeline.cjs",
+    "reviewer reproducers repro1..repro9 copied to a scratch directory with sys.path pointed at this worktree (not part of the test suite)"
+  ],
+  "results": {
+    "backend_full_suite": {"passed": 846, "skipped": 1, "failed": 0, "subtests_passed": 680, "baseline_at_b181c21": {"passed": 765, "skipped": 1}},
+    "review_fix_tests": {"passed": 81, "failed": 0, "files": ["server/tests/test_review_fixes_time.py", "server/tests/test_review_fixes_misc.py",
+      "server/tests/test_review_fixes_security.py", "server/tests/test_review_fixes_catalog.py", "server/tests/test_review_fixes_ingest.py",
+      "server/tests/test_review_fixes_timeline.py"], "support": "server/tests/test_review_fixes_support.py"},
+    "node": {"passed": 95, "failed": 0},
+    "verify_repository": "ok (active pages 62, relative links 288, privacy-scanned files 444)",
+    "browser_acceptance_cjs": {"pass_lines": 24, "exit": 0},
+    "browser_timeline_cjs": {"pass_lines": 7, "exit": 0},
+    "browser_catalog_pytest": "passed (server/tests/test_catalog_browser.py, real Chromium)",
+    "reproducers_after_fix": "repro1 segment undated; repro2/repro1 MBOX 200 with all messages and audit; repro3 422 and no job; repro4 concurrent writer gets the lock at once; repro5 401 on exports/state changes, 26 audit rows for 50 junk keys; repro6 refused in UTF-16 and UTF-8; repro7 1 projection/500 items/1 build; repro8 both exports 200; repro9 422 and correct EXDATE/until"
+  },
+  "findings": [
+    {"id": "1", "status": "fixed", "regression_tests": ["test_finding1_upload_then_transcript_is_not_placed_at_upload_time", "test_finding1_every_server_temporary_copy_records_no_source_mtime", "test_finding1_path_ingest_keeps_source_mtime_and_extracted_children_do_not", "test_finding1_catalog_ingest_declares_the_catalogued_mtime", "test_finding1_declared_scope_validation", "test_finding1_legacy_rows_with_temporary_markers_are_ignored", "test_finding1_materialized_catalog_copies_are_never_source_times", "test_finding7_builds_from_older_code_are_rebuilt"],
+     "change": "ingest_file(source_stat='path'|'temporary_copy'|'declared', declared_source_modified_at, declared_time_basis) + evidence.temporary_copy_acquisitions(); upload routes, imports_comm/imports_chat uploads, acquire_bytes, WhatsApp zip chat text are temporary copies; catalog ingest declares the catalogued mtime; projection uses file_mtime only from source_path/declared scope, ignores marked legacy rows, PROJECTION_CODE=2 forces one full rebuild"},
+    {"id": "2", "status": "fixed", "regression_tests": ["test_finding2_out_of_range_numeric_offsets_stay_local_and_flagged", "test_finding2_mbox_with_bad_offsets_imports_every_message_with_audit"]},
+    {"id": "3", "status": "fixed", "regression_tests": ["test_finding3_http_cannot_choose_model_pipeline_or_operator_options", "test_finding3_http_may_override_decode_and_strategy_parameters", "test_finding3_operator_paths_keep_full_overrides"]},
+    {"id": "4", "status": "fixed", "regression_tests": ["test_finding4_no_write_transaction_is_open_while_content_is_read", "test_finding4_worker_loop_survives_locked_claims"],
+     "measurement": "5,000 small files: 1.09 s before, 2.17 s after (per-entry commits, synchronous=NORMAL)"},
+    {"id": "5", "status": "fixed", "regression_tests": ["test_finding5_two_takeouts_with_the_same_mbox_name_both_import", "test_finding5_reexported_whatsapp_zip_with_unchanged_media", "test_finding5_same_child_under_another_parent_is_an_additional_observation", "test_finding5_container_imported_by_version_1_keeps_version_1"]},
+    {"id": "6", "status": "fixed", "regression_tests": ["test_finding6_require_token_covers_exports_and_every_state_change", "test_finding6_cross_site_state_changes_are_refused", "test_finding6_same_origin_and_headerless_state_changes_work", "test_finding6_trusted_origins_and_bearer_clients"]},
+    {"id": "7", "status": "fixed", "regression_tests": ["test_finding7_free_text_labels_do_not_create_projections", "test_finding7_analysis_items_report_the_requested_label", "test_finding7_non_default_projections_are_capped_and_evicted", "test_finding7_cap_setting_is_validated"]},
+    {"id": "8", "status": "fixed", "regression_tests": ["test_finding8_rejected_tokens_are_aggregated_not_one_row_each", "test_finding8_valid_token_checks_are_read_only_and_touch_lazily"]},
+    {"id": "9", "status": "fixed", "regression_tests": ["test_finding9_timeline_csv_guards_every_text_column"]},
+    {"id": "10", "status": "fixed", "regression_tests": ["test_finding10_doctype_and_entities_rejected_in_any_encoding", "test_finding10_plain_utf16_calls_still_parse"]},
+    {"id": "11", "status": "fixed", "regression_tests": ["test_finding11_exdate_and_until_are_compared_in_the_dtstart_zone"]},
+    {"id": "12", "status": "fixed", "regression_tests": ["test_finding12_bound_offsets_out_of_range_are_input_errors"]},
+    {"id": "13", "status": "fixed", "regression_tests": ["test_finding13_client_hypothesis_list_filters_origin_before_limit"]},
+    {"id": "U1", "status": "confirmed_and_fixed", "regression_tests": ["test_u1_single_file_scan_keeps_temp_db_and_store_out_of_its_directory"]},
+    {"id": "U2", "status": "confirmed_and_fixed", "regression_tests": ["test_u2_benchmark_output_never_inside_the_audio_directories"]},
+    {"id": "U3", "status": "not_touched", "reason": "server/app/analysis/ is owned by track E1 (its worktree head 99d944c names U3); forwarded by the coordinator"},
+    {"id": "U4", "status": "confirmed_low_and_fixed", "regression_tests": ["test_u4_test_double_provider_is_not_offered_in_the_ui_by_default"]},
+    {"id": "U5", "status": "claim_not_reproduced_related_edge_fixed",
+     "reason": "py7zr 0.22.0 source: decompress() writes at most the member's declared uncompressed size, so the declared-size precheck bounds memory for that member; but read(targets=[name]) also extracts same-named siblings into memory, which the precheck now counts. py7zr is not installed: verified by source reading and a stand-in module, not executed.",
+     "regression_tests": ["test_u5_7z_duplicate_names_count_every_member_read_into_memory"]},
+    {"id": "U6", "status": "confirmed_and_fixed", "regression_tests": ["test_u6_invalid_chatbot_paths_are_input_errors_not_busy", "test_u6_valid_single_path_still_runs"]}
+  ],
+  "schema_additions": ["timeline 32 timeline_projection_evictions (append-only)", "integrations 73 api_token_rejections (counts; no delete)"],
+  "behaviour_changes_in_existing_tests": [
+    "test_import_comm.py::test_parent_artifact_validation: another parent is an additional observation, not IntegrityError",
+    "test_import_comm.py::test_whatsapp_zip_children_of_container_and_pdf_identity: member locator carries the zip SHA-256",
+    "test_integrations_tokens.py: 5 audit rows (two secret mismatches of one key share one row, count 2)",
+    "test_catalog_browser.py fixture sets EW_CATALOG_TEST_PROVIDERS=1 to select the fake provider"
+  ],
+  "not_verified": [
+    "7z/RAR adapters not executed (libraries absent)",
+    "existing installations: legacy rows without markers stay 'legacy_unmarked_assumed_source_path'; no migration of existing rows was run against a real database",
+    "CSRF guard tested with TestClient headers and same-origin Chromium flows; no real cross-site browser attack page was executed",
+    "catalog per-entry commit cost measured only on 5,000 small synthetic files"
+  ]
+}

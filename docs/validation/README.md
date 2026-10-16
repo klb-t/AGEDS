@@ -17,6 +17,7 @@ execution.
 | Hypothesis analyzer (task E part 2, 2026-10-16) | [Report](HYPOTHESES_2026-10-16.md), [receipt](HYPOTHESES_2026-10-16.json) |
 | Time budget and feature series (task E part 1, 2026-10-16) | [Report](TIME_BUDGET_2026-10-16.md), [receipt](TIME_BUDGET_2026-10-16.json) |
 | Import plan: catalog → plan → import (task I, 2026-10-16) | [Report](IMPORT_PLAN_2026-10-16.md), [receipt](IMPORT_PLAN_2026-10-16.json) |
+| Review fixes @ b181c21 (task R, 2026-10-16) | [Report](REVIEW_FIXES_2026-10-16.md), [receipt](REVIEW_FIXES_2026-10-16.json) |
 
 Native completion: 411 executed JVM tests, main APK signature verification and
 synthetic-provider test APK compilation passed with pinned versions. SAF device

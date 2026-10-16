@@ -15,11 +15,15 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import sqlite3
+import threading
+from contextlib import closing
 from datetime import datetime, timedelta, timezone
 
+from .. import db as dbmod
 from ..db import session
 
 TOKEN_PREFIX = 'ageds_'
@@ -29,6 +33,17 @@ MAX_TOKEN_CHARS = 256
 KEY_BYTES = 6
 SECRET_BYTES = 32
 SALT_BYTES = 16
+# Review finding 8: a valid token is verified read-only; ``last_used_at`` and
+# ``use_count`` are written at most once per interval per token and process
+# (uses in between are counted in memory and added on the next write).
+TOUCH_INTERVAL_SECONDS = 60
+# Rejections are counted per UTC hour, public key and reason; the first one of
+# each writes an audit row. Past this many keys in one hour further keys are
+# pooled under ``*`` so unauthenticated clients cannot grow the tables per request.
+MAX_REJECTION_KEYS_PER_BUCKET = 25
+_PENDING_USES: dict[tuple[str, int], int] = {}
+_PENDING_LOCK = threading.Lock()
+log = logging.getLogger(__name__)
 
 
 class TokenError(ValueError):
@@ -152,13 +167,65 @@ def parse_bearer(header_value: str | None) -> str | None:
     return parts[1].strip() or None
 
 
+def _record_rejection(key: str, reason: str, token_id: int | None, now: str, details: dict | None = None) -> None:
+    """Count one rejection; only the first per hour, key and reason writes an audit row."""
+    bucket = now[:13]
+    with session() as db:
+        db.execute('BEGIN IMMEDIATE')
+        found = db.execute('SELECT id FROM api_token_rejections WHERE bucket=? AND token_key=? AND reason=?',
+                           (bucket, key, reason)).fetchone()
+        if found is None and db.execute('SELECT COUNT(*) FROM api_token_rejections WHERE bucket=?',
+                                        (bucket,)).fetchone()[0] >= MAX_REJECTION_KEYS_PER_BUCKET:
+            key, token_id, details = '*', None, {'pooled': 'per-hour key cap reached'}
+            found = db.execute('SELECT id FROM api_token_rejections WHERE bucket=? AND token_key=? AND reason=?',
+                               (bucket, key, reason)).fetchone()
+        if found is not None:
+            db.execute('UPDATE api_token_rejections SET count=count+1, last_seen_at=? WHERE id=?', (now, found['id']))
+            return
+        db.execute('INSERT INTO api_token_rejections(bucket,token_key,reason,token_id,count,first_seen_at,last_seen_at) '
+                   'VALUES(?,?,?,?,1,?,?)', (bucket, key, reason, token_id, now, now))
+        _audit(db, 'token_rejected', token_id, {'token_key': key, 'reason': reason, **(details or {}),
+                                                'counted_in': f'api_token_rejections bucket {bucket}'})
+
+
+def _touch(row, now: str):
+    """Lazy ``last_used_at``/``use_count`` update; never blocks or fails a valid request."""
+    entry = (str(dbmod.settings.db_path), int(row['id']))
+    with _PENDING_LOCK:
+        _PENDING_USES[entry] = _PENDING_USES.get(entry, 0) + 1
+        pending = _PENDING_USES[entry]
+    last = row['last_used_at']
+    if last:
+        try:
+            age = (datetime.fromisoformat(now.replace('Z', '+00:00'))
+                   - datetime.fromisoformat(last.replace('Z', '+00:00'))).total_seconds()
+        except ValueError:
+            age = TOUCH_INTERVAL_SECONDS
+        if age < TOUCH_INTERVAL_SECONDS:
+            return row
+    try:
+        with closing(dbmod.connect()) as db:
+            db.execute('PRAGMA busy_timeout=200')
+            db.execute('UPDATE api_tokens SET last_used_at=?, use_count=use_count+? WHERE id=?', (now, pending, row['id']))
+            db.commit()
+            fresh = db.execute('SELECT * FROM api_tokens WHERE id=?', (row['id'],)).fetchone()
+    except sqlite3.OperationalError as exc:  # busy: keep the uses pending for the next write
+        log.debug('token use bookkeeping deferred: %s', exc)
+        return row
+    with _PENDING_LOCK:
+        _PENDING_USES[entry] = _PENDING_USES.get(entry, 0) - pending
+    return fresh
+
+
 def verify_token(token: str | None, *, scope: str | None = 'read', touch: bool = True) -> dict:
     """Return the token record for a valid bearer with ``scope``; else raise.
 
-    Rejections are audited with the public key only. Expired, revoked and
-    unknown tokens all yield HTTP 401 reasons; a valid token lacking the scope
-    yields 403. ``scope=None`` checks validity only (global enforcement mode).
-    The digest comparison is constant-time for a given key.
+    Expired, revoked and unknown tokens yield HTTP 401 reasons; a valid token
+    lacking the scope yields 403. ``scope=None`` checks validity only (global
+    enforcement mode). The digest comparison is constant-time for a given key.
+    Verification reads without a write transaction; rejections are counted in
+    ``api_token_rejections`` (the first per hour/key/reason is audited) and the
+    use of a valid token is recorded lazily (``TOUCH_INTERVAL_SECONDS``).
     """
     if scope is not None and scope not in KNOWN_SCOPES:
         raise TokenError('unknown scope requested by route')
@@ -169,34 +236,26 @@ def verify_token(token: str | None, *, scope: str | None = 'read', touch: bool =
     key, _, secret = token[len(TOKEN_PREFIX):].partition('.')
     if not key or not secret or any(c not in '0123456789abcdef' for c in key):
         raise TokenRejected('malformed_token')
-    rejection: TokenRejected | None = None
-    # The audit row must survive a rejection, so the decision is made inside the
-    # transaction and the exception is raised after commit.
-    with session() as db:
-        db.execute('BEGIN IMMEDIATE')
+    with closing(dbmod.connect()) as db:
         row = db.execute('SELECT * FROM api_tokens WHERE token_key=?', (key,)).fetchone()
-        now = utc_now()
-        if row is None:
-            # Burn comparable work so an unknown key is not distinguishable by timing alone.
-            hmac.compare_digest(_digest('0' * 2 * SALT_BYTES, secret), '0' * 64)
-            _audit(db, 'token_rejected', None, {'token_key': key, 'reason': 'unknown_key'})
-            rejection = TokenRejected('unknown_token')
-        elif not hmac.compare_digest(_digest(row['salt'], secret), row['secret_sha256']):
-            _audit(db, 'token_rejected', row['id'], {'token_key': key, 'reason': 'secret_mismatch'})
-            rejection = TokenRejected('unknown_token')
-        elif row['revoked_at']:
-            _audit(db, 'token_rejected', row['id'], {'token_key': key, 'reason': 'revoked'})
-            rejection = TokenRejected('revoked_token')
-        elif row['expires_at'] and row['expires_at'] <= now:
-            _audit(db, 'token_rejected', row['id'], {'token_key': key, 'reason': 'expired'})
-            rejection = TokenRejected('expired_token')
-        elif scope is not None and scope not in json.loads(row['scopes_json']):
-            _audit(db, 'token_rejected', row['id'], {'token_key': key, 'reason': 'scope', 'required': scope})
-            rejection = TokenRejected('insufficient_scope', status=403)
-        elif touch:
-            db.execute('UPDATE api_tokens SET last_used_at=?, use_count=use_count+1 WHERE id=?', (now, row['id']))
-            row = db.execute('SELECT * FROM api_tokens WHERE id=?', (row['id'],)).fetchone()
-        result = None if rejection else token_payload(row)
-    if rejection:
-        raise rejection
-    return result
+    now = utc_now()
+    if row is None:
+        # Burn comparable work so an unknown key is not distinguishable by timing alone.
+        hmac.compare_digest(_digest('0' * 2 * SALT_BYTES, secret), '0' * 64)
+        _record_rejection(key, 'unknown_key', None, now)
+        raise TokenRejected('unknown_token')
+    if not hmac.compare_digest(_digest(row['salt'], secret), row['secret_sha256']):
+        _record_rejection(key, 'secret_mismatch', row['id'], now)
+        raise TokenRejected('unknown_token')
+    if row['revoked_at']:
+        _record_rejection(key, 'revoked', row['id'], now)
+        raise TokenRejected('revoked_token')
+    if row['expires_at'] and row['expires_at'] <= now:
+        _record_rejection(key, 'expired', row['id'], now)
+        raise TokenRejected('expired_token')
+    if scope is not None and scope not in json.loads(row['scopes_json']):
+        _record_rejection(key, 'scope', row['id'], now, {'required': scope})
+        raise TokenRejected('insufficient_scope', status=403)
+    if touch:
+        row = _touch(row, now)
+    return token_payload(row)

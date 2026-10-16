@@ -83,7 +83,10 @@ def parse_bound(text: str | None, *, end: bool = False) -> int | None:
         tz = timezone.utc
     else:
         digits = offset[1:].replace(':', '')
-        delta = timedelta(hours=int(digits[:2]), minutes=int(digits[2:]))
+        hours, minutes = int(digits[:2]), int(digits[2:] or 0)
+        if hours > 23 or minutes > 59:
+            raise TimeInputError(f'UTC offset out of range: {offset!r}')
+        delta = timedelta(hours=hours, minutes=minutes)
         tz = timezone(delta if offset[0] == '+' else -delta)
     try:
         value = to_us(naive.replace(tzinfo=tz))

@@ -95,7 +95,7 @@ class _Writer:
     def __init__(self, db, scan_id: int, collection_id: int, case_id: int):
         self.db, self.scan_id, self.collection_id, self.case_id = db, scan_id, collection_id, case_id
         self.groups: dict[str, int] = {}
-        self.pending = 0
+        self.commits = 0
         self.entries = 0
 
     def group(self, sha256: str, size: int | None) -> int:
@@ -142,6 +142,7 @@ class _Writer:
             fields['content_group_id'] = self.group(fields['sha256'], node.size)
         assignments = ','.join(f'{k}=?' for k in fields)
         self.db.execute(f'UPDATE catalog_entries SET {assignments} WHERE id=?', (*fields.values(), entry_id))
+        self._tick()
 
     def issue(self, code: str, locator: str | None = None, entry_id: int | None = None, **details):
         self.db.execute('INSERT INTO catalog_issues(scan_id,entry_id,code,locator,details_json) VALUES(?,?,?,?,?)',
@@ -149,10 +150,11 @@ class _Writer:
         self._tick()
 
     def _tick(self):
-        self.pending += 1
-        if self.pending >= 2000:
-            self.db.commit()
-            self.pending = 0
+        # Every write is its own short transaction. The engine reads and hashes
+        # file content between writes; holding the write lock across that would
+        # block workers, publications and token checks (review finding 4).
+        self.commits += 1
+        self.db.commit()
 
 
 class _Walk(scanner._Scan):
@@ -590,7 +592,9 @@ def run_catalog_scan(root: str | Path, collection_id: int, *, limits: CatalogLim
         raise ValueError('Source root must be a directory or a regular file')
     temp_root = Path(temp_dir or tempfile.gettempdir()).expanduser().resolve(strict=False)
     scan_root = source if root_kind == 'directory' else source.parent
-    _validate_paths(source, temp_root)  # before creating anything
+    # A single-file scan protects the file's directory (review U1): spool files,
+    # the database and the store must not land beside the source.
+    _validate_paths(scan_root, temp_root)  # before creating anything
     temp_root.mkdir(parents=True, exist_ok=True)
     with closing(dbmod.connect()) as db:
         collection = db.execute('SELECT id, case_id FROM collections WHERE id=?', (collection_id,)).fetchone()
@@ -606,6 +610,9 @@ def run_catalog_scan(root: str | Path, collection_id: int, *, limits: CatalogLim
         db.execute("INSERT INTO audit_log(action,object_kind,object_id,details_json) VALUES ('catalog_scan_started','catalog_scan',?,?)",
                    (scan_id, _json({'collection_id': collection_id, 'root_kind': root_kind})))
         db.commit()
+        # One short commit per entry: in WAL mode NORMAL syncs at checkpoints, not
+        # per commit. A crash can lose the last entries of a 'running' scan only.
+        db.execute('PRAGMA synchronous=NORMAL')
         writer = _Writer(db, scan_id, collection_id, int(collection['case_id']))
         engine = _Engine(writer, limits, scan_root, temp_root)
         try:

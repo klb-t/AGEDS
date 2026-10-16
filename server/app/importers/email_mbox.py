@@ -29,11 +29,14 @@ from pathlib import Path
 
 from ..timeinfo import TimeCandidate
 from .comm_common import (DEFAULT_LIMITS, CommLimits, Issues, acquire, acquire_bytes, add_event_with_times,
-                          add_media_reference, bounded_text, legacy_instant, local_candidate,
-                          offset_candidate, record_import_run, safe_name, stored_path)
+                          add_media_reference, bounded_text, container_scheme, legacy_instant, local_candidate,
+                          numeric_offset_minutes, offset_candidate, out_of_range_offset_candidate,
+                          record_import_run, safe_name, stored_path)
 
 PARSER_NAME = 'email_rfc5322'
-PARSER_VERSION = '1'
+# '2' (2026-10-16, review finding 5): attachment locators carry the container's
+# SHA-256 (comm_common.container_scheme); a container imported by '1' stays '1'.
+PARSER_VERSION = '2'
 
 _MONTHS = {m: i for i, m in enumerate(('jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'), 1)}
 _DAYS = ('mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun')
@@ -190,7 +193,9 @@ def parse_mail_date(raw: str, kind: str, source: str) -> tuple[TimeCandidate | N
         if minutes >= 60:
             meta['zone_status'] = 'invalid_numeric_zone'
             return local_candidate(kind, raw, source, naive, precision, meta), meta
-        offset = (hours * 60 + minutes) * (1 if zone[0] == '+' else -1)
+        offset = numeric_offset_minutes(zone[0], hours, minutes)
+        if offset is None:  # e.g. +2400 or +9900: not an offset; the wall clock stays, zone unknown
+            return out_of_range_offset_candidate(kind, raw, source, naive, precision, meta, zone), meta
         if abs(offset) > 14 * 60:
             meta['zone_offset_outside_civil_range'] = True
         if zone == '-0000':
@@ -430,9 +435,10 @@ def reconstruct_roots(index: list[dict]) -> list[dict]:
 
 
 class _Importer:
-    def __init__(self, *, source_id, artifact_id, base_locator, collection_id, limits, issues):
+    def __init__(self, *, source_id, artifact_id, base_locator, collection_id, limits, issues, version=PARSER_VERSION):
         self.source_id, self.artifact_id = source_id, artifact_id
         self.base_locator, self.collection_id = base_locator, collection_id
+        self.version = version
         self.limits, self.issues = limits, issues
         self.seen_ids: dict[str, int] = {}
         self.counts = {'messages': 0, 'attachments': 0, 'inline_parts': 0, 'attachments_not_extracted': 0,
@@ -524,7 +530,7 @@ class _Importer:
                 recipients.extend(a['address'] for a in addresses[key]['parsed'] if a['address'])
         sender = addresses['from']['parsed'][0] if addresses['from'] and addresses['from']['parsed'] else {}
         metadata = {
-            'parser': {'name': PARSER_NAME, 'version': PARSER_VERSION, 'message_index': index},
+            'parser': {'name': PARSER_NAME, 'version': self.version, 'message_index': index},
             'locator': locator,
             'message_id': {'raw': message_id_raw, 'value': message_id, 'external_id_kind': id_kind},
             'headers_raw': raw_headers, 'headers_total': len(headers), 'header_parse': header_info,
@@ -553,7 +559,7 @@ class _Importer:
             add_media_reference(
                 event_id=event_id, artifact_id=item.get('artifact_id'), reference_kind=item['reference_kind'],
                 reference_key=f"mime:{item['part']}", reference_name=item['filename'], status=item['status'],
-                parser=PARSER_NAME, parser_version=PARSER_VERSION,
+                parser=PARSER_NAME, parser_version=self.version,
                 locator={**locator, 'mime_part': item['part']},
                 metadata={'content_type': item['content_type'], 'size_bytes': item.get('size_bytes'),
                           'sha256': item.get('sha256'), 'reason': item.get('reason')})
@@ -652,7 +658,7 @@ class _Importer:
         locator = f'{self.base_locator}!/message/{index}/mime-part/{path}'
         artifact_id = acquire_bytes(
             payload, name=name, source_id=self.source_id, locator=locator, importer=PARSER_NAME,
-            parser_version=PARSER_VERSION, parent_artifact_id=self.artifact_id, mime_type=content_type,
+            parser_version=self.version, parent_artifact_id=self.artifact_id, mime_type=content_type,
             collection_id=self.collection_id, is_raw=is_raw,
             extra_metadata={'extracted_from': {'message_index': index, 'mime_part': path},
                             'raw_filename': filename, 'extraction': item['extraction']})
@@ -688,8 +694,9 @@ def import_mbox(path: Path, *, source_locator: str | None = None, original_name:
             break
         index.append(scan_ids(b''.join(framed['chunks']), limits))
     roots = reconstruct_roots(index)
-    importer = _Importer(source_id=source_id, artifact_id=artifact_id, base_locator=locator,
-                         collection_id=collection_id, limits=limits, issues=issues)
+    version, child_base = container_scheme(artifact_id, locator, PARSER_NAME, PARSER_VERSION)
+    importer = _Importer(source_id=source_id, artifact_id=artifact_id, base_locator=child_base,
+                         collection_id=collection_id, limits=limits, issues=issues, version=version)
     complete = True
     for count, framed in enumerate(iter_mbox(snapshot, limits, issues)):
         if count >= limits.max_records:
@@ -707,9 +714,9 @@ def import_mbox(path: Path, *, source_locator: str | None = None, original_name:
             complete = False
     counts = importer.counts
     coverage = {'complete': complete and not counts['truncated_messages'] and not counts['attachments_not_extracted']}
-    record_import_run(artifact_id=artifact_id, importer=PARSER_NAME, parser_version=PARSER_VERSION,
+    record_import_run(artifact_id=artifact_id, importer=PARSER_NAME, parser_version=version,
                       options=_options(limits), counts=counts, coverage=coverage, issues=issues)
-    return {'artifact_id': artifact_id, 'source_id': source_id, 'parser_version': PARSER_VERSION, **counts,
+    return {'artifact_id': artifact_id, 'source_id': source_id, 'parser_version': version, **counts,
             'coverage': coverage, 'issues': issues.as_dict()}
 
 
@@ -729,14 +736,15 @@ def import_eml(path: Path, *, source_locator: str | None = None, original_name: 
     truncated = size > limits.max_message_bytes
     ids = scan_ids(raw, limits)
     thread = reconstruct_roots([ids])[0]
-    importer = _Importer(source_id=source_id, artifact_id=artifact_id, base_locator=locator,
-                         collection_id=collection_id, limits=limits, issues=issues)
+    version, child_base = container_scheme(artifact_id, locator, PARSER_NAME, PARSER_VERSION)
+    importer = _Importer(source_id=source_id, artifact_id=artifact_id, base_locator=child_base,
+                         collection_id=collection_id, limits=limits, issues=issues, version=version)
     importer.message(raw, index=0, thread=thread, from_line=None, truncated=truncated,
                      locator={'artifact_id': artifact_id, 'container': 'eml', 'message_index': 0,
                               'byte_start': 0, 'byte_end': min(size, limits.max_message_bytes)})
     counts = importer.counts
     coverage = {'complete': not truncated and not counts['attachments_not_extracted']}
-    record_import_run(artifact_id=artifact_id, importer=PARSER_NAME, parser_version=PARSER_VERSION,
+    record_import_run(artifact_id=artifact_id, importer=PARSER_NAME, parser_version=version,
                       options=_options(limits), counts=counts, coverage=coverage, issues=issues)
-    return {'artifact_id': artifact_id, 'source_id': source_id, 'parser_version': PARSER_VERSION, **counts,
+    return {'artifact_id': artifact_id, 'source_id': source_id, 'parser_version': version, **counts,
             'coverage': coverage, 'issues': issues.as_dict()}

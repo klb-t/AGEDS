@@ -142,4 +142,26 @@ CREATE TRIGGER IF NOT EXISTS timeline_hypothesis_status_no_delete
     SELECT RAISE(ABORT, 'hypothesis status history is append-only');
   END;
 '''),
+    # Review finding 7: the cache of non-default projections is bounded. An
+    # eviction deletes the (rebuildable) items of one projection after a given
+    # build; the next use rebuilds it in full. The log is append-only.
+    (32, 'timeline_projection_evictions_v1', r'''
+CREATE TABLE IF NOT EXISTS timeline_projection_evictions (
+  id INTEGER PRIMARY KEY,
+  projection_id INTEGER NOT NULL REFERENCES timeline_projections(id),
+  build_id INTEGER REFERENCES timeline_projection_builds(id),
+  evicted_at TEXT NOT NULL,
+  items_deleted INTEGER NOT NULL,
+  reason TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_timeline_evictions_projection ON timeline_projection_evictions(projection_id, id);
+CREATE TRIGGER IF NOT EXISTS timeline_projection_evictions_no_update
+  BEFORE UPDATE ON timeline_projection_evictions BEGIN
+    SELECT RAISE(ABORT, 'timeline projection evictions are append-only');
+  END;
+CREATE TRIGGER IF NOT EXISTS timeline_projection_evictions_no_delete
+  BEFORE DELETE ON timeline_projection_evictions BEGIN
+    SELECT RAISE(ABORT, 'timeline projection evictions are append-only');
+  END;
+'''),
 )

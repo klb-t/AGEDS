@@ -10,6 +10,7 @@ accepted correlation hypotheses at any time.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sqlite3
 import time
@@ -69,6 +70,38 @@ def hidden_reason(rule: Rule, event) -> str | None:
     return None
 
 
+# Review finding 7: the free-text ``assumption_rule`` label is not part of a
+# projection's identity. Items store this placeholder in their flags; readers
+# substitute the label of their own request (``label_flags``). Placement does
+# not depend on the label, only on the effective zone parameters.
+ASSUMPTION_LABEL = '$request.assumption_rule'
+DEFAULT_MAX_PROJECTIONS = 8
+
+
+def max_projections() -> int:
+    """Materialized non-default projections kept (``EW_TIMELINE_MAX_PROJECTIONS``, default 8)."""
+    try:
+        value = int(os.environ.get('EW_TIMELINE_MAX_PROJECTIONS', ''))
+    except ValueError:
+        return DEFAULT_MAX_PROJECTIONS
+    return value if value >= 1 else DEFAULT_MAX_PROJECTIONS
+
+
+def cache_params(params: dict) -> dict:
+    """Projection identity: the effective zone parameters, never the free-text label."""
+    key = {k: v for k, v in params.items() if k != 'assumption_rule'}
+    if key.get('assume_zone') or key.get('zone_by_source'):
+        key['assumption_rule'] = ASSUMPTION_LABEL
+    return key
+
+
+def label_flags(flags: dict, params: dict) -> dict:
+    """Put the requesting call's ``assumption_rule`` where a stored item has the placeholder."""
+    if flags.get('assumption_rule') == ASSUMPTION_LABEL:
+        flags['assumption_rule'] = params.get('assumption_rule')
+    return flags
+
+
 def projection_id(db: sqlite3.Connection, rule: Rule, params: dict) -> int:
     params_json = canonical_json(params)
     digest = params_sha256(params)
@@ -81,10 +114,17 @@ def projection_id(db: sqlite3.Connection, rule: Rule, params: dict) -> int:
     return int(cur.lastrowid)
 
 
+# Bumped when the projection code changes what it derives from unchanged data
+# (2: stat-scoped file_mtime candidates, review finding 1); a build made by
+# other code is rebuilt in full.
+PROJECTION_CODE = 2
+
+
 def watermarks(db: sqlite3.Connection) -> dict:
     def one(sql):
         return int(db.execute(sql).fetchone()[0])
     return {
+        'projection_code': PROJECTION_CODE,
         'events_max_id': one('SELECT COALESCE(MAX(id),0) FROM events'),
         'events_count': one('SELECT COUNT(*) FROM events'),
         'event_times_max_id': one('SELECT COALESCE(MAX(id),0) FROM event_times'),
@@ -206,6 +246,45 @@ def _accepted_correlations(db, artifact_id: int, rule_ids: list[str]):
         ORDER BY h.id''', (artifact_id, json.dumps(rule_ids))).fetchall()
 
 
+_TEMPORARY_SOURCE_KEYS = ('extracted_from', 'catalog_entry_id')
+
+
+def observation_mtime_scope(locator: str | None, meta: dict) -> tuple[str, str | None]:
+    """What an observation's ``source_modified_at`` describes, and why it is unusable (or None).
+
+    Rows since 2026-10-16 carry ``filesystem_stat_scope`` (``evidence.STAT_SCOPES``):
+    only ``source_path`` (a stat of the original location) and ``declared_by_caller``
+    (with its own basis) are usable. A temporary-upload marker in the caller's
+    metadata (``acquisition_kind: uploaded_stream`` or a ``…temporary…`` scope)
+    or extraction/catalog-materialization metadata (``extracted_from``,
+    ``catalog_entry_id``) makes any row except a declared one unusable:
+    conflicting signals resolve to "not the source".
+    Older rows are judged by the markers they have: those, an
+    ``upload:``/``client-upload:`` locator (server upload routes), a
+    container-member locator (``…!/…``), extraction or catalog-ingest metadata.
+    Older rows without any marker stay usable and are labelled
+    ``legacy_unmarked_assumed_source_path`` (residual ambiguity).
+    """
+    scope = meta.get('filesystem_stat_scope')
+    if scope == 'declared_by_caller':
+        return scope, None
+    source_meta = meta.get('source_metadata') if isinstance(meta.get('source_metadata'), dict) else {}
+    declared = str(source_meta.get('filesystem_stat_scope') or '')
+    if 'temporary' in declared or source_meta.get('acquisition_kind') == 'uploaded_stream':
+        return declared or 'uploaded_stream', 'file_mtime_of_temporary_upload'
+    if any(key in source_meta for key in _TEMPORARY_SOURCE_KEYS):
+        # Extracted or catalog-materialized copies, whatever scope the caller passed.
+        return scope if isinstance(scope, str) else 'legacy_temporary_copy', 'file_mtime_of_temporary_copy'
+    if isinstance(scope, str):
+        return (scope, None) if scope == 'source_path' else (scope, 'file_mtime_of_temporary_copy')
+    locator = locator or ''
+    if locator.startswith(('upload:', 'client-upload:')):
+        return 'legacy_server_upload', 'file_mtime_of_temporary_upload'
+    if '!/' in locator:
+        return 'legacy_temporary_copy', 'file_mtime_of_temporary_copy'
+    return 'legacy_unmarked_assumed_source_path', None
+
+
 def recording_candidates(db, artifact_id: int, rule: Rule, params: dict) -> list[Candidate]:
     """Start-time candidates of a recorded artifact (all visible, each labelled)."""
     out: list[Candidate] = []
@@ -224,20 +303,22 @@ def recording_candidates(db, artifact_id: int, rule: Rule, params: dict) -> list
                                              ref_prefix=f"artifact_event:{event['id']}"):
                 c.metadata = {**c.metadata, 'event_id': int(event['id']), 'event_type': event['event_type']}
                 out.append(c)
-    for obs in db.execute('''SELECT id,source_modified_at,acquisition_kind,metadata_json FROM source_observations
+    for obs in db.execute('''SELECT id,source_locator,source_modified_at,acquisition_kind,metadata_json FROM source_observations
                              WHERE artifact_id=? ORDER BY id''', (artifact_id,)):
         if not obs['source_modified_at']:
             continue
         c = _iso_candidate('file_mtime', obs['source_modified_at'], f"derived:source_observations:{obs['id']}.source_modified_at",
                            f"observation:{obs['id']}", 'derived_observation', ['source_observations.source_modified_at'])
         meta = _metadata(obs['metadata_json'])
-        source_meta = meta.get('source_metadata') if isinstance(meta.get('source_metadata'), dict) else {}
-        scope = str(source_meta.get('filesystem_stat_scope') or '')
+        scope, reason = observation_mtime_scope(obs['source_locator'], meta)
         c.metadata['acquisition_kind'] = obs['acquisition_kind']
+        c.metadata['filesystem_stat_scope'] = scope
         c.metadata['semantics'] = 'filesystem modification time of the acquired copy; copying can change it'
-        if 'temporary' in scope or source_meta.get('acquisition_kind') == 'uploaded_stream':
-            c.usable, c.unusable_reason = False, 'file_mtime_of_temporary_upload'
-            c.metadata['filesystem_stat_scope'] = scope or 'uploaded_stream'
+        if scope == 'declared_by_caller':
+            c.metadata['source_modified_at_basis'] = meta.get('source_modified_at_basis')
+            c.metadata['semantics'] = 'modification time declared by the acquiring code; see source_modified_at_basis'
+        if reason is not None:
+            c.usable, c.unusable_reason = False, reason
         out.append(c)
     for hypothesis in _accepted_correlations(db, artifact_id, recording.get('correlation_rule_ids', [])):
         call = event_selection(db, int(hypothesis['right_id']), rule, params)
@@ -361,17 +442,40 @@ def _last_build(db, pid: int):
     return db.execute('SELECT * FROM timeline_projection_builds WHERE projection_id=? ORDER BY id DESC LIMIT 1', (pid,)).fetchone()
 
 
+def _evicted(db, build) -> bool:
+    return db.execute('SELECT 1 FROM timeline_projection_evictions WHERE projection_id=? AND build_id=?',
+                      (build['projection_id'], build['id'])).fetchone() is not None
+
+
+def _evict_over_cap(db, keep: int) -> list[int]:
+    """Drop the items of the least recently built non-default projections beyond the cap."""
+    cap = max_projections()
+    rows = db.execute('''SELECT p.id AS pid, b.id AS build_id FROM timeline_projections p
+        JOIN timeline_projection_builds b ON b.id=(SELECT MAX(id) FROM timeline_projection_builds WHERE projection_id=p.id)
+        WHERE p.params_json <> '{}' AND NOT EXISTS (SELECT 1 FROM timeline_projection_evictions e
+                                                    WHERE e.projection_id=p.id AND e.build_id=b.id)
+        ORDER BY b.id DESC''').fetchall()
+    victims = [r for r in rows if r['pid'] != keep][max(cap - 1, 0):]
+    for victim in victims:
+        deleted = db.execute('DELETE FROM timeline_items WHERE projection_id=?', (victim['pid'],)).rowcount
+        db.execute('''INSERT INTO timeline_projection_evictions(projection_id,build_id,evicted_at,items_deleted,reason)
+                      VALUES(?,?,?,?,?)''', (victim['pid'], victim['build_id'], _now(), deleted,
+                                             f'over_cap: EW_TIMELINE_MAX_PROJECTIONS={cap} non-default projections'))
+    return [int(v['pid']) for v in victims]
+
+
 def ensure_projection(db: sqlite3.Connection, rule: Rule | None = None, params: dict | None = None, *,
                       force_full: bool = False) -> dict:
     """Return a fresh projection description, refreshing the cache when data changed."""
     rule = rule or load_rule(kind='display_rule')
     params = params or {}
+    key = cache_params(params)
     db.execute('PRAGMA busy_timeout=60000')
     row = db.execute('''SELECT id FROM timeline_projections WHERE rule_id=? AND rule_version=? AND rule_sha256=?
-                        AND params_sha256=?''', (rule.rule_id, rule.version, rule.sha256, params_sha256(params))).fetchone()
+                        AND params_sha256=?''', (rule.rule_id, rule.version, rule.sha256, params_sha256(key))).fetchone()
     if row is not None and not force_full:
         build = _last_build(db, int(row['id']))
-        if build is not None and json.loads(build['watermarks_json']) == watermarks(db):
+        if build is not None and json.loads(build['watermarks_json']) == watermarks(db) and not _evicted(db, build):
             return _describe(rule, params, int(row['id']), build, 'fresh')
     started_at, started = _now(), time.perf_counter()
     # Inside a caller's transaction (e.g. a report or analysis that already read
@@ -391,19 +495,21 @@ def ensure_projection(db: sqlite3.Connection, rule: Rule | None = None, params: 
 
     db.execute('SAVEPOINT timeline_refresh' if nested else 'BEGIN IMMEDIATE')
     try:
-        pid = projection_id(db, rule, params)
+        pid = projection_id(db, rule, key)
         build = _last_build(db, pid)
         current = watermarks(db)
-        last = json.loads(build['watermarks_json']) if build is not None else None
+        evicted = build is not None and _evicted(db, build)
+        last = json.loads(build['watermarks_json']) if build is not None and not evicted else None
         if last == current and not force_full:
             _commit()
             return _describe(rule, params, pid, build, 'fresh')
-        plan = None if (last is None or force_full) else _affected(db, last, current)
+        stale_code = last is not None and last.get('projection_code') != PROJECTION_CODE
+        plan = None if (last is None or force_full or stale_code) else _affected(db, last, current)
         if plan is None:
             mode = 'full'
             db.execute('DELETE FROM timeline_items WHERE projection_id=?', (pid,))
-            counts = _build_events(db, pid, rule, params, None)
-            counts.update(_build_segments(db, pid, rule, params, None))
+            counts = _build_events(db, pid, rule, key, None)
+            counts.update(_build_segments(db, pid, rule, key, None))
         else:
             mode = 'incremental'
             events, artifacts = plan
@@ -411,16 +517,18 @@ def ensure_projection(db: sqlite3.Connection, rule: Rule | None = None, params: 
             for start in range(0, len(events), BATCH):
                 db.execute("DELETE FROM timeline_items WHERE projection_id=? AND item_kind='event' AND ref_id IN (SELECT value FROM json_each(?))",
                            (pid, json.dumps(events[start:start + BATCH])))
-            counts.update(_build_events(db, pid, rule, params, events))
+            counts.update(_build_events(db, pid, rule, key, events))
             if artifacts:
                 db.execute("""DELETE FROM timeline_items WHERE projection_id=? AND item_kind='transcript_segment'
                               AND artifact_id IN (SELECT value FROM json_each(?))""", (pid, json.dumps(artifacts)))
-                counts.update(_build_segments(db, pid, rule, params, artifacts))
+                counts.update(_build_segments(db, pid, rule, key, artifacts))
         counts['max_halfwidth_us'] = _max_halfwidth(db, pid)
         duration_ms = int((time.perf_counter() - started) * 1000)
         cur = db.execute('''INSERT INTO timeline_projection_builds(projection_id,mode,started_at,finished_at,duration_ms,
                             watermarks_json,counts_json) VALUES(?,?,?,?,?,?,?)''',
                          (pid, mode, started_at, _now(), duration_ms, canonical_json(current), canonical_json(counts)))
+        if mode == 'full' and key:
+            _evict_over_cap(db, pid)
         _commit()
     except Exception:
         _rollback()

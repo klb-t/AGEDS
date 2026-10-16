@@ -94,4 +94,23 @@ CREATE TABLE IF NOT EXISTS relation_hypotheses (
 CREATE INDEX IF NOT EXISTS idx_relation_hypotheses_status ON relation_hypotheses(status, id);
 CREATE INDEX IF NOT EXISTS idx_relation_hypotheses_import ON relation_hypotheses(import_id, id);
 '''),
+    # Review finding 8: rejected bearer tokens are counted per UTC hour, key and
+    # reason (one audit_log row per first occurrence) instead of one row each.
+    (73, 'integration_token_rejection_counts_v1', r'''
+CREATE TABLE IF NOT EXISTS api_token_rejections (
+  id INTEGER PRIMARY KEY,
+  bucket TEXT NOT NULL,
+  token_key TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  token_id INTEGER REFERENCES api_tokens(id),
+  count INTEGER NOT NULL,
+  first_seen_at TEXT NOT NULL,
+  last_seen_at TEXT NOT NULL,
+  UNIQUE(bucket, token_key, reason)
+);
+CREATE TRIGGER IF NOT EXISTS api_token_rejections_no_delete
+  BEFORE DELETE ON api_token_rejections BEGIN
+    SELECT RAISE(ABORT, 'token rejection counts are retained');
+  END;
+'''),
 )

@@ -31,6 +31,9 @@ MAX_REASON = 2000
 MAX_ACTOR = 200
 
 
+_JSON_PATH = re.compile(r'\$(\.[A-Za-z_][A-Za-z0-9_]{0,63}){1,8}')
+
+
 class CorrelationError(ValueError):
     """Invalid rule parameters, review action or state transition."""
 
@@ -59,6 +62,12 @@ def merge_params(rule: Rule, override: dict | None) -> dict:
             if numeric and (value != value or value < 0):
                 raise CorrelationError(f'parameter {key} must be a finite non-negative number')
         params[key] = value
+    for key, value in params.items():
+        # JSON-path lists are interpolated into SQL (json_extract) or walked in
+        # Python; only simple, validated paths are accepted, never an empty list.
+        if key.endswith('_paths') and (not isinstance(value, list) or not value
+                                       or not all(isinstance(p, str) and _JSON_PATH.fullmatch(p) for p in value)):
+            raise CorrelationError(f'parameter {key} must be a non-empty list of simple JSON paths like $.chat.chatbot')
     if rule.rule_id == 'recording_call_log' and params.get('assume_zone'):
         if not params.get('assumption_rule'):
             raise CorrelationError('assume_zone requires assumption_rule')

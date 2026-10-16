@@ -133,8 +133,8 @@ normalization. An empty reference has no rate (`null`) and reports insertions; c
 aggregates are micro averages that include those insertions. Results include per item,
 per item language, per reference-segment language and language-label agreement (labels
 only). Output is written exclusively (never overwritten) only into the given directory;
-paths inside the repository or the content store are refused. Source audio is opened
-read-only. The result carries a scope statement that it is not a quality claim.
+paths inside the repository, the content store or any directory holding manifest audio
+(review U2) are refused. Source audio is opened read-only. The result carries a scope statement that it is not a quality claim.
 
 ## 5. Diarization (optional post-pass)
 

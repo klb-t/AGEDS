@@ -6,7 +6,8 @@ precomputed hypotheses are scored without inference. WER and CER are computed
 by code (``textmetrics``) with a declared, versioned normalization, per item,
 per language and per reference segment when references are segmented.
 Results go only to the given output directory, which must be outside the
-repository and outside the content store; source audio is opened read-only.
+repository, the content store and every directory holding manifest audio; source
+audio is opened read-only.
 
 Manifest (``ageds.asr_benchmark_manifest`` v1)::
 
@@ -68,13 +69,17 @@ def _inside(path: Path, root: Path) -> bool:
         return False
 
 
-def check_output_dir(output: Path, *, store_dir: Path | None = None) -> Path:
-    """Refuse output inside the repository or the content store; create it otherwise."""
+def check_output_dir(output: Path, *, store_dir: Path | None = None, source_dirs=()) -> Path:
+    """Refuse output inside the repository, the content store or a directory of the source
+    audio (review U2: originals are read-only); create it otherwise."""
     resolved = output.expanduser().resolve()
     if _inside(resolved, REPO_ROOT):
         raise ValueError(f'refusing to write benchmark results inside the repository ({REPO_ROOT}); choose a private directory')
     if store_dir is not None and _inside(resolved, Path(store_dir).resolve()):
         raise ValueError('refusing to write benchmark results inside the evidence content store')
+    for directory in source_dirs:
+        if _inside(resolved, Path(directory).resolve()):
+            raise ValueError(f'refusing to write benchmark results inside a source audio directory ({directory})')
     resolved.mkdir(parents=True, exist_ok=True)
     return resolved
 
@@ -219,7 +224,8 @@ def run_benchmark(manifest_path: Path, output_dir: Path, *, recipes: list[str] |
     manifest_path = Path(manifest_path)
     manifest = _load_json(manifest_path, MANIFEST_SCHEMA)
     items = _validate_items(manifest, manifest_path.resolve().parent)
-    output = check_output_dir(Path(output_dir), store_dir=store_dir)
+    audio_dirs = sorted({item['audio'].resolve().parent for item in items if item['audio'] is not None})
+    output = check_output_dir(Path(output_dir), store_dir=store_dir, source_dirs=audio_dirs)
     runs = []
     if hypotheses_path is not None:
         hypotheses = _load_json(Path(hypotheses_path), HYPOTHESES_SCHEMA)

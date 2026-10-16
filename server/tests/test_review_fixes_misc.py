@@ -109,3 +109,30 @@ def test_u6_valid_single_path_still_runs(env):
         response = http.post('/api/timeline/correlations/runs',
                              json={'rule': 'same_conversation', 'params': {'chatbot_metadata_paths': ['$.chatbot']}})
     assert response.status_code == 200, response.text
+
+
+# --------------------------------------------------------------------- U2
+
+def test_u2_benchmark_output_never_inside_the_audio_directories(tmp_path):
+    import json
+    from server.app.media import benchmark
+    corpus = tmp_path / 'corpus'
+    (corpus / 'audio').mkdir(parents=True)
+    (corpus / 'audio' / 'call-01.wav').write_bytes(b'RIFF')
+    elsewhere = tmp_path / 'other-audio'
+    elsewhere.mkdir()
+    (elsewhere / 'call-02.wav').write_bytes(b'RIFF')
+    manifest = corpus / 'manifest.json'
+    manifest.write_text(json.dumps({'schema': benchmark.MANIFEST_SCHEMA, 'schema_version': 1, 'items': [
+        {'id': 'call-01', 'audio': 'audio/call-01.wav', 'reference': 'dzień dobry'},
+        {'id': 'call-02', 'audio': str(elsewhere / 'call-02.wav'), 'reference': 'goedemiddag'}]}))
+    hypotheses = tmp_path / 'hypotheses.json'
+    hypotheses.write_text(json.dumps({'schema': benchmark.HYPOTHESES_SCHEMA, 'schema_version': 1,
+                                      'runs': {'h': {'call-01': {'text': 'dzień dobry'}, 'call-02': {'text': 'goedemiddag'}}}}))
+    for inside in (corpus / 'audio', corpus / 'audio' / 'results', elsewhere / 'results'):
+        with pytest.raises(ValueError, match='audio'):
+            benchmark.run_benchmark(manifest, inside, hypotheses_path=hypotheses)
+    assert sorted(p.name for p in (corpus / 'audio').iterdir()) == ['call-01.wav']
+    assert sorted(p.name for p in elsewhere.iterdir()) == ['call-02.wav']
+    result = benchmark.run_benchmark(manifest, corpus / 'results', hypotheses_path=hypotheses)
+    assert Path(result['output']).parent == corpus / 'results'

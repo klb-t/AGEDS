@@ -98,6 +98,7 @@ def served(tmp_path, monkeypatch):
     import uvicorn
     world = make_world(tmp_path, monkeypatch)
     monkeypatch.setattr(main, 'settings', world.settings)
+    monkeypatch.setenv('EW_CATALOG_TEST_PROVIDERS', '1')  # the script selects the 'fake' test double (review U4)
     with socket.socket() as sock:
         sock.bind(('127.0.0.1', 0))
         port = sock.getsockname()[1]

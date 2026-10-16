@@ -97,13 +97,15 @@ Both claims are stored; nothing is renamed or corrected.
 | ZIP with unreadable central directory | local-header walk | Container `damaged`; members recovered from local headers (stored/deflate, CRC checked); a cut member is `damaged` (`member_data_truncated`). |
 | TAR, TAR.GZ/TGZ, TAR.BZ2, TAR.XZ | `tarfile` | `encoding=utf-8, errors=surrogateescape`; symlink/hardlink members recorded with their link text, never followed; a missing end-of-archive marker marks the container `damaged`. |
 | gzip/bzip2/xz that is not a tar | single stream | One member; gzip `FNAME` and `MTIME` are recorded. |
-| 7z, RAR | `py7zr`, `rarfile` (optional) | Not installed in this session → entry `unsupported`, issue `adapter_unavailable` (container bytes are still hashed). The adapter code paths are **not run**. |
+| 7z, RAR | `py7zr`, `rarfile` (optional) | Not installed in this session → entry `unsupported`, issue `adapter_unavailable` (container bytes are still hashed). The adapter code paths are **not run**. The 7z adapter reads a member into memory: `py7zr` 0.22 bounds each member by its declared size (source inspected, review U5), and since `read(targets=[name])` extracts every member of that name, the precheck adds the declared sizes of same-named members (unit-tested with a stand-in module). |
 
 Document containers (docx/xlsx/pptx/odt/ods/odp/epub/apk) are recognized by their
 members and not expanded unless `expand_document_containers` is set. Nested
 archives are spooled to memory or an unnamed temporary file in a directory that
 must be outside the source root (checked before anything is created). The
-database and content store must also be outside the scanned root.
+database and content store must also be outside the scanned root. For a
+single-file root (one archive) the protected root is the file's directory, so
+nothing is spooled or stored beside the source (review U1).
 
 ## Limits
 
@@ -168,7 +170,9 @@ catalogued carries a time there on this basis", not inactivity.
   nothing private reaches a provider by default), stored append-only with SHA-256;
   identical profiles are reused.
 - `explain(provider=…)` — provider adapters: `none` (default, nothing generated),
-  `fake` (deterministic test double). Other adapters must be registered in code; an
+  `fake` (deterministic test double; offered in the `/catalog` form only with
+  `EW_CATALOG_TEST_PROVIDERS=1`, review U4 — the API/CLI accept it when named and the
+  run records it). Other adapters must be registered in code; an
   adapter with `external = True` requires `allow_external=True` for that run, and
   the opt-in is recorded. **No real model is called by this increment.** The model
   may only write placeholders such as `{{totals.entries}}`; the pipeline resolves

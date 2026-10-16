@@ -592,7 +592,9 @@ def run_catalog_scan(root: str | Path, collection_id: int, *, limits: CatalogLim
         raise ValueError('Source root must be a directory or a regular file')
     temp_root = Path(temp_dir or tempfile.gettempdir()).expanduser().resolve(strict=False)
     scan_root = source if root_kind == 'directory' else source.parent
-    _validate_paths(source, temp_root)  # before creating anything
+    # A single-file scan protects the file's directory (review U1): spool files,
+    # the database and the store must not land beside the source.
+    _validate_paths(scan_root, temp_root)  # before creating anything
     temp_root.mkdir(parents=True, exist_ok=True)
     with closing(dbmod.connect()) as db:
         collection = db.execute('SELECT id, case_id FROM collections WHERE id=?', (collection_id,)).fetchone()

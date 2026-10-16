@@ -550,7 +550,11 @@ class SevenZipContainer:  # pragma: no cover - exercised only when py7zr is inst
                          getattr(info, 'compressed', None), False, times, name_flags(raw), {}, info)
 
     def precheck(self, member):
-        if (member.size or 0) > self.limits.spool_memory_bytes:
+        # py7zr.read(targets=[name]) decompresses every member with that name into
+        # memory (each bounded by its declared size), so same-named siblings count.
+        same_name = sum((info.uncompressed or 0) for info in self.infos
+                        if info.filename == member.handle.filename and not info.is_directory)
+        if max(member.size or 0, same_name) > self.limits.spool_memory_bytes:
             return 'adapter_reads_member_into_memory'
         return None
 

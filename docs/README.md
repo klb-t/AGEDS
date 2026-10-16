@@ -17,6 +17,7 @@
 | Citation transfer | [Evidence exchange](EVIDENCE_EXCHANGE.md), [Independent consumer](EVIDENCE_CONSUMER.md). |
 | Metadata archives | [Inert archive](METADATA_ARCHIVE.md), [Interpreted verification](ARCHIVE_VERIFICATION_BUDGET.md), [Archive budgets](ARCHIVE_VERIFICATION_BUDGETS.md). |
 | Verified media and decoding | [Media serving](VERIFIED_MEDIA.md), [Decoder reader](VERIFIED_READER.md). |
+| ASR recipes, code-switching, OCR, diarization, media queue | [Multilingual ASR and media jobs](MULTILINGUAL_ASR.md). |
 | Native source formats | [Format profiles](NATIVE_SOURCE_FORMATS.md), [BIFF8 XLS](NATIVE_XLS.md), [XLSX phonetic hints](XLSX_PHONETIC_PROJECTION.md). |
 | WAV observations | [Common-core header probe](WAV_HEADER_PROBE.md), [Server probe](SERVER_WAV_HEADER.md), [Server scan integration](SERVER_WAV_HEADER_SCAN.md), [Android display](ANDROID_WAV_HEADER_UI.md). |
 | Source scan and cache lifecycle | [Production engine](SOURCE_SCAN_ENGINE.md), [Android adapter](ANDROID_SOURCE_SCAN_ADAPTER.md), [Publication gate](SOURCE_SCAN_PUBLICATION_GATE.md), [Guarded cache](SOURCE_SCAN_CACHE_PUBLICATION.md), [ViewModel integration](ANDROID_SCAN_PUBLICATION_INTEGRATION.md). |

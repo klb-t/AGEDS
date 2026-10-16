@@ -37,7 +37,7 @@ def _collection_fields(parser, *, update: bool):
 
 
 def register(subparsers) -> None:
-    from ..catalog.scan import LIMIT_NAMES
+    from ..catalog.limits import LIMIT_NAMES
     add = subparsers.add_parser('catalog-collection-add', help='create a collection (device/account/export batch)')
     add.add_argument('label')
     add.add_argument('--case-id', type=_positive, default=None)
@@ -137,7 +137,8 @@ def handle(args) -> int | None:
         return None
     from ..cli import _emit
     from ..catalog import coverage, describe, export, ingest, store
-    from ..catalog.scan import LIMIT_NAMES, CatalogLimits, run_catalog_scan
+    from ..catalog.limits import LIMIT_NAMES, CatalogLimits
+    from ..catalog.scan import run_catalog_scan
     from ..db import init_db
     try:
         init_db()

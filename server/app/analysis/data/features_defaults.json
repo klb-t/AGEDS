@@ -1,0 +1,13 @@
+{
+  "schema": "ageds.feature_series_params.v1",
+  "note": "Default PRESETS, not rules. budget_params uses the time-budget parameter names (filters, labels, granularities).",
+  "params": {
+    "message_event_types": ["sms", "mms", "whatsapp", "whatsapp_message", "chat_message", "email"],
+    "night_start": "22:00",
+    "night_end": "06:00",
+    "response_roles": ["assistant"],
+    "official_rule_kinds": ["counterparty", "email_domain"],
+    "budget_params": {},
+    "model_features": {"tone": {"provider": "none", "opt_in": false}}
+  }
+}

@@ -89,10 +89,13 @@ flagged. DST gaps stay `unknown` (`dst: nonexistent_local_time`); folds keep bot
 instants (`utc_alternatives`) and leave `ts_start` empty. `RRULE`/`RDATE`/`EXDATE` are
 kept raw; **nothing is expanded on import**. `expand_recurrence(event_id, max_instances,
 until)` (CLI `expand-calendar-recurrence`, API `GET …/calendar/{id}/occurrences`) returns
-a bounded, unsaved projection labelled `ics_recurrence_projection/v1` with the dateutil
+a bounded, unsaved projection labelled `ics_recurrence_projection/v2` with the dateutil
 version; occurrences are generated in wall-clock time and mapped through the declared
-zone, EXDATEs are removed and `RECURRENCE-ID` overrides are marked, not merged. A UTC
-`UNTIL` is compared as wall-clock time (labelled simplification). Overrides are separate
+zone, EXDATEs are removed and `RECURRENCE-ID` overrides are marked, not merged. Since v2
+(review finding 11) `UNTIL`, `EXDATE` and `RECURRENCE-ID` values with `Z` or their own
+`TZID` are converted to DTSTART's wall clock before comparison (RFC 5545 instants); only
+floating values are compared as wall-clock time. The `until` query bound may carry an
+offset; an unparsable bound is a 422. Overrides are separate
 events sharing `thread_id = uid:<UID>`; missing UID → content-derived id.
 
 ### Contacts: VCF (`vcf.py`, table `contact_observations`)

@@ -30,7 +30,8 @@ from pathlib import Path
 from ..timeinfo import TimeCandidate
 from .comm_common import (DEFAULT_LIMITS, CommLimits, Issues, acquire, acquire_bytes, add_event_with_times,
                           add_media_reference, bounded_text, legacy_instant, local_candidate,
-                          offset_candidate, record_import_run, safe_name, stored_path)
+                          numeric_offset_minutes, offset_candidate, out_of_range_offset_candidate,
+                          record_import_run, safe_name, stored_path)
 
 PARSER_NAME = 'email_rfc5322'
 PARSER_VERSION = '1'
@@ -190,7 +191,9 @@ def parse_mail_date(raw: str, kind: str, source: str) -> tuple[TimeCandidate | N
         if minutes >= 60:
             meta['zone_status'] = 'invalid_numeric_zone'
             return local_candidate(kind, raw, source, naive, precision, meta), meta
-        offset = (hours * 60 + minutes) * (1 if zone[0] == '+' else -1)
+        offset = numeric_offset_minutes(zone[0], hours, minutes)
+        if offset is None:  # e.g. +2400 or +9900: not an offset; the wall clock stays, zone unknown
+            return out_of_range_offset_candidate(kind, raw, source, naive, precision, meta, zone), meta
         if abs(offset) > 14 * 60:
             meta['zone_offset_outside_civil_range'] = True
         if zone == '-0000':

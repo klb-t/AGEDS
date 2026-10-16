@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 import sqlite3
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -24,7 +25,8 @@ DEFINITION_SCHEMA = 'ageds.hypothesis-definition/v1'
 NULL_MODELS = ('circular_shift', 'permutation', 'stratified_weekday_hour', 'block_permutation')
 DIRECTIONS = ('increase', 'decrease', 'two_sided')
 TOP_KEYS = ('schema', 'title', 'text', 'stimulus', 'outcome', 'density', 'eligible', 'windows', 'lags',
-            'direction', 'analysis', 'dossier', 'notes')
+            'direction', 'analysis', 'dossier', 'notes', 'category_config_sha256')
+IMPRECISE_POLICIES = ('exclude', 'keep')
 ANALYSIS_DEFAULTS = {
     'permutations': 999,
     'seed': 1,
@@ -32,6 +34,9 @@ ANALYSIS_DEFAULTS = {
     'block_s': 7 * 86400,
     'stratify_zone': 'UTC',
     'assume_zone': None,
+    'assumption_rule': None,
+    'imprecise_times': 'exclude',
+    'max_time_uncertainty_s': None,
     'span': None,
     'exclude_self_pairs': True,
     'density_excludes_stimuli': True,
@@ -149,6 +154,19 @@ def _analysis(value) -> dict:
         'flag_threshold': _number(merged['flag_threshold'], 'analysis.flag_threshold', 0, 1),
         'density_ratio_warning': _number(merged['density_ratio_warning'], 'analysis.density_ratio_warning', 1, 1e6),
     }
+    rule = merged['assumption_rule']
+    if result['assume_zone'] is not None:
+        result['assumption_rule'] = clean_text(rule, 'analysis.assumption_rule (named assumption required with assume_zone)',
+                                               max_chars=200)
+    elif rule is not None:
+        raise HypothesisError('analysis.assumption_rule given without analysis.assume_zone')
+    else:
+        result['assumption_rule'] = None
+    if merged['imprecise_times'] not in IMPRECISE_POLICIES:
+        raise HypothesisError('analysis.imprecise_times must be one of ' + ', '.join(IMPRECISE_POLICIES))
+    result['imprecise_times'] = merged['imprecise_times']
+    limit = merged['max_time_uncertainty_s']
+    result['max_time_uncertainty_s'] = None if limit is None else _int(limit, 'analysis.max_time_uncertainty_s', 0, MAX_ABS_SECONDS)
     if merged['null_model'] not in NULL_MODELS:
         raise HypothesisError('analysis.null_model must be one of ' + ', '.join(NULL_MODELS))
     result['null_model'] = merged['null_model']
@@ -206,6 +224,14 @@ def normalize_definition(raw) -> dict:
         'dossier': _dossier(raw.get('dossier')),
         'notes': clean_text(raw.get('notes'), 'notes', required=False),
     }
+    config_hash = raw.get('category_config_sha256')
+    uses_categories = any('categories' in definition[n] for n in ('stimulus', 'outcome', 'density', 'eligible'))
+    if config_hash is not None and (not isinstance(config_hash, str) or not re.fullmatch('[0-9a-f]{64}', config_hash)):
+        raise HypothesisError('category_config_sha256 must be a lowercase SHA-256 hex digest')
+    if uses_categories and config_hash is None:
+        raise HypothesisError('category selectors need category_config_sha256: the canonical hash of the private category '
+                              'configuration the operationalization refers to')
+    definition['category_config_sha256'] = config_hash
     return definition
 
 

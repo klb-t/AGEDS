@@ -105,6 +105,7 @@ def register(subparsers) -> None:
     p.add_argument('--opt-in', action='store_true', help='explicit per-run consent to send excerpts to the provider')
     p.add_argument('--limit', type=_positive, default=50)
     p.add_argument('--version', type=_positive, default=None)
+    p.add_argument('--categories', type=Path, default=None, help='private category configuration for category selectors')
     p.add_argument('--actor', default=None)
     p = subparsers.add_parser('dossier-list', help='dossier items with current classification and decision history')
     p.add_argument('hypothesis_id', type=_positive)
@@ -129,6 +130,8 @@ def register(subparsers) -> None:
                    choices=('circular_shift', 'permutation', 'stratified_weekday_hour', 'block_permutation'))
     p.add_argument('--block-s', type=_positive, default=None)
     p.add_argument('--max-work', type=_positive, default=None, help='explicit work budget (bisect operations)')
+    p.add_argument('--categories', type=Path, default=None,
+                   help='private category configuration (else AGEDS_ACTIVITY_CATEGORIES); its hash must match the registration')
     p.add_argument('--actor', default=None)
     p.add_argument('--summary', action='store_true', help='print a summary instead of the full result')
     p = subparsers.add_parser('eventstudy-show', help='print one stored run (result hash re-verified)')
@@ -176,7 +179,7 @@ def _dispatch(args, db) -> dict:
     if c == 'dossier-candidates':
         return dossier.candidate_search(db, args.hypothesis_id, version_id=args.version, queries=args.query,
                                         use_rules=not args.no_rules, provider=args.provider, opt_in=args.opt_in,
-                                        limit=args.limit, actor=args.actor)
+                                        limit=args.limit, actor=args.actor, category_config=args.categories)
     if c == 'dossier-list':
         return dossier.list_dossier(db, args.hypothesis_id)
     if c == 'thesis-add':
@@ -189,7 +192,8 @@ def _dispatch(args, db) -> dict:
                                                    ('null_model', args.null_model), ('block_s', args.block_s))
                      if value is not None}
         limits = eventstudy.EventStudyLimits(**({'max_work': args.max_work} if args.max_work else {}))
-        run = eventstudy.run_event_study(db, args.version_id, overrides=overrides or None, actor=args.actor, limits=limits)
+        run = eventstudy.run_event_study(db, args.version_id, overrides=overrides or None, actor=args.actor, limits=limits,
+                                         category_config=args.categories)
         return _summary(run) if args.summary else run
     return eventstudy.get_run(db, args.run_id)
 

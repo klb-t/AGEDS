@@ -42,6 +42,7 @@ class PreviewIn(BaseModel):
 class EventStudyIn(BaseModel):
     model_config = ConfigDict(extra='forbid')
     overrides: dict[str, Any] | None = None
+    category_config: dict[str, Any] | None = None  # inline private configuration; never a server path
     actor: str | None = None
 
 
@@ -73,6 +74,7 @@ class CandidatesIn(BaseModel):
     opt_in: StrictBool = False
     limit: Annotated[StrictInt, Field(ge=1, le=dossier_mod.MAX_CANDIDATES)] = 50
     version_id: PositiveId | None = None
+    category_config: dict[str, Any] | None = None
     actor: str | None = None
 
 
@@ -139,7 +141,8 @@ def api_version(version_id: SqlId):
 
 @router.post('/api/hypotheses/versions/{version_id}/event-study')
 def api_event_study(version_id: SqlId, body: EventStudyIn):
-    return _call(eventstudy.run_event_study, version_id, overrides=body.overrides, actor=body.actor)
+    return _call(eventstudy.run_event_study, version_id, overrides=body.overrides, actor=body.actor,
+                 category_config=body.category_config)
 
 
 @router.get('/api/hypotheses/runs/{run_id}')
@@ -175,7 +178,8 @@ def api_add_item(hypothesis_id: SqlId, body: ItemIn):
 @router.post('/api/hypotheses/{hypothesis_id}/candidates')
 def api_candidates(hypothesis_id: SqlId, body: CandidatesIn):
     return _call(dossier_mod.candidate_search, hypothesis_id, version_id=body.version_id, queries=body.queries,
-                 use_rules=body.use_rules, provider=body.provider, opt_in=body.opt_in, limit=body.limit, actor=body.actor)
+                 use_rules=body.use_rules, provider=body.provider, opt_in=body.opt_in, limit=body.limit, actor=body.actor,
+                 category_config=body.category_config)
 
 
 @router.post('/api/hypotheses/{hypothesis_id}/theses')

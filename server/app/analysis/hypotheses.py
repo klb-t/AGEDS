@@ -202,23 +202,67 @@ def fts_event_ids(db: sqlite3.Connection, query: str, *, max_ids: int) -> tuple[
 
 
 def category_adapter_status() -> dict:
-    """Whether category selectors can be evaluated (E1's ``analysis.categories``)."""
+    """Whether category selectors can be evaluated through the time-budget track's labeller."""
     try:
-        from . import categories  # noqa: F401  (owned by the time-budget track)
+        from . import categories
     except ImportError as exc:
         return {'status': 'unavailable', 'reason': f'analysis.categories is not importable: {exc}'}
-    labeller = getattr(categories, 'event_ids_for_categories', None)
-    if labeller is None:
-        return {'status': 'unavailable', 'reason': 'analysis.categories has no event_ids_for_categories(db, items, names) contract'}
-    return {'status': 'available', 'module': 'analysis.categories'}
+    missing = [name for name in ('label_items', 'load_effective_annotations', 'load_config', 'resolve_config_path',
+                                 'parse_config', 'labels_sha256', 'needs_fields') if not hasattr(categories, name)]
+    if missing:
+        return {'status': 'unavailable', 'reason': 'analysis.categories lacks ' + ', '.join(missing)}
+    return {'status': 'available', 'module': 'analysis.categories', 'labeller': getattr(categories, 'LABELLER_ID', 'unknown')}
 
 
-def category_event_ids(db: sqlite3.Connection, items: list[dict], names: list[str]) -> set[int]:
+def resolve_category_config(registered_sha256: str | None, supplied=None):
+    """Return the configuration whose canonical hash equals the registered one, or refuse.
+
+    ``supplied`` is a loaded ``CategoryConfig``, an inline dict or None (then the
+    ``AGEDS_ACTIVITY_CATEGORIES`` file). The configuration is private user data;
+    only its hash is part of the registered definition.
+    """
+    if registered_sha256 is None:
+        return None
     status = category_adapter_status()
     if status['status'] != 'available':
         raise HypothesisError('category selector cannot be evaluated: ' + status['reason'])
     from . import categories
-    return set(categories.event_ids_for_categories(db, items, names))
+    try:
+        if supplied is None:
+            path = categories.resolve_config_path(None)
+            if path is None:
+                raise HypothesisError('category selectors need the private category configuration '
+                                      f'({categories.ENV_VAR} or an explicit configuration); none was given')
+            config = categories.load_config(path)
+        elif isinstance(supplied, dict):
+            config = categories.parse_config(supplied, origin='inline')
+        elif isinstance(supplied, (str, Path)):
+            config = categories.load_config(supplied)
+        else:
+            config = supplied
+    except (ValueError, OSError) as exc:
+        raise HypothesisError(f'category configuration: {exc}') from exc
+    if config.sha256 != registered_sha256:
+        raise HypothesisError(f'category configuration hash {config.sha256} differs from the registered '
+                              f'{registered_sha256}; register a new hypothesis version to use another configuration')
+    return config
+
+
+def category_event_ids(db: sqlite3.Connection, items: list[dict], names: list[str], config) -> tuple[set[int], dict]:
+    """Events whose effective label (human correction > rule > default) includes any of ``names``.
+
+    Model labels are never used here: no model-label run is opted into by a hypothesis run.
+    """
+    from . import categories
+    annotations = categories.load_effective_annotations(db, [i['event_id'] for i in items])
+    labels = categories.label_items(items, config, annotations=annotations)
+    wanted = set(names)
+    ids = {eid for eid, label in labels.items() if wanted & set(label['categories'])}
+    paths: dict[str, int] = {}
+    for eid in ids:
+        paths[labels[eid]['path']] = paths.get(labels[eid]['path'], 0) + 1
+    return ids, {'labels_sha256': categories.labels_sha256(labels), 'selected_by_path': dict(sorted(paths.items())),
+                 'model_labels': 'not used'}
 
 
 __all__ = ['CANONICALIZATION', 'DISCLAIMER', 'HypothesisError', 'HypothesisNotFound', 'canonical_json',

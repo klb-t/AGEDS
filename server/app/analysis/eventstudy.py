@@ -38,7 +38,8 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from .hypotheses import (HypothesisError, HypothesisNotFound, canonical_json, category_event_ids, clean_actor,
-                         code_version, disclaimer, fts_event_ids, selector_matches, sha256_canonical, utc_now)
+                         code_version, disclaimer, fts_event_ids, resolve_category_config, selector_matches,
+                         sha256_canonical, utc_now)
 from .preregistration import _analysis, require_registered
 
 RESULT_SCHEMA = 'ageds.event-study-result/v1'
@@ -48,6 +49,8 @@ OVERRIDABLE = ('permutations', 'seed', 'null_model', 'block_s', 'stratify_zone')
 SEASONALITY_TV_THRESHOLD = 0.2
 DEPENDENCE_CV_THRESHOLD = 1.5
 WEAK_TIME_KINDS = ('file_mtime', 'export_time', 'observed', 'filename_derived', 'other')
+PRECISION_WIDTH_S = {'year': 366 * 86400, 'month': 31 * 86400, 'day': 86400, 'hour': 3600, 'minute': 60, 'second': 1,
+                     'millisecond': 0.001, 'microsecond': 0.000001}
 MASK64 = (1 << 64) - 1
 
 
@@ -349,7 +352,15 @@ def _warning(wid: str, flagged: bool, severity: str, pl: str, en: str, computed:
 
 
 ALWAYS_PRESENT_WARNINGS = ('causation', 'detection_bias', 'seasonality', 'clustering', 'dependence',
-                           'unknown_zone_excluded', 'time_basis', 'preregistration_deviation')
+                           'unknown_zone_excluded', 'time_uncertainty', 'time_basis', 'preregistration_deviation')
+
+
+def uncertainty_s(item: dict) -> float | None:
+    """Width of the item's time uncertainty: the timeline interval if present, else its precision."""
+    lo, hi = item.get('t_lo'), item.get('t_hi')
+    if lo is not None and hi is not None:
+        return max(0.0, hi - lo)
+    return PRECISION_WIDTH_S.get((item.get('time_basis') or {}).get('precision'))
 
 
 def _warnings(ctx: dict) -> list[dict]:
@@ -409,6 +420,16 @@ def _warnings(ctx: dict) -> list[dict]:
                  f'Zdarzenia bez umiejscowienia na osi UTC (np. nieznana strefa) są wyłączone: {untimed["count"]}.',
                  f'Events without a position on the UTC axis (e.g. unknown zone) are excluded: {untimed["count"]}.',
                  {'count': untimed['count'], 'by_reason': untimed['by_reason'], 'assume_zone': ctx['assume_zone']}),
+        _warning('time_uncertainty', bool(ctx['uncertainty']['imprecise'] or ctx['uncertainty']['unknown_width']), 'warning',
+                 f'Niepewność czasu: {ctx["uncertainty"]["imprecise"]} zdarzeń bodźca/wyniku/dokumentacji ma przedział czasu '
+                 f'szerszy niż {ctx["uncertainty"]["threshold_s"]} s (rozdzielczość opóźnień) — '
+                 + ('wyłączone z analizy' if ctx['uncertainty']['policy'] == 'exclude' else 'zachowane mimo to')
+                 + f'; o nieznanej szerokości: {ctx["uncertainty"]["unknown_width"]} (zachowane).',
+                 f'Time uncertainty: {ctx["uncertainty"]["imprecise"]} stimulus/outcome/documentation events have a time '
+                 f'interval wider than {ctx["uncertainty"]["threshold_s"]} s (lag resolution) — '
+                 + ('excluded from the analysis' if ctx['uncertainty']['policy'] == 'exclude' else 'kept anyway')
+                 + f'; unknown width: {ctx["uncertainty"]["unknown_width"]} (kept).',
+                 ctx['uncertainty']),
         _warning('time_basis', ctx['weak_time_basis'] > 0, 'warning',
                  'Część czasów bodźców/wyników pochodzi ze słabych źródeł (np. czas modyfikacji pliku, eksportu).',
                  'Some stimulus/outcome times come from weak bases (e.g. file modification or export time).',
@@ -428,7 +449,7 @@ def _warnings(ctx: dict) -> list[dict]:
 
 def compute_event_study(definition: dict, params: dict, loaded: dict, *, fts: dict[str, set],
                         categories: dict[str, set], limits: EventStudyLimits = EventStudyLimits(),
-                        deviations: list | None = None) -> tuple[dict, str, int]:
+                        deviations: list | None = None, category_info: dict | None = None) -> tuple[dict, str, int]:
     """Pure computation; returns ``(result_without_run_fields, input_sha256, input_count)``."""
     deviations = deviations or []
     items = [dict(i, t_ms=round(i['t_start'] * 1000)) for i in loaded['items']]
@@ -447,17 +468,33 @@ def compute_event_study(definition: dict, params: dict, loaded: dict, *, fts: di
 
     def select(name):
         return [i for i in inside if selector_matches(i, definition[name], fts_ids=fts.get(name), category_ids=categories.get(name))]
-    stim_items = select('stimulus')
+    threshold = params['max_time_uncertainty_s'] if params['max_time_uncertainty_s'] is not None else definition['lags']['bin_s']
+    widths = {i['event_id']: uncertainty_s(i) for i in inside}
+    imprecise_ids = {eid for eid, w in widths.items() if w is not None and w > threshold}
+    unknown_ids = {eid for eid, w in widths.items() if w is None}
+    selected = {name: select(name) for name in ('stimulus', 'outcome', 'density', 'eligible')}
+    involved = {i['event_id'] for name in ('stimulus', 'outcome', 'density') for i in selected[name]}
+    uncertainty = {
+        'policy': params['imprecise_times'], 'threshold_s': threshold,
+        'imprecise': len(imprecise_ids & involved), 'unknown_width': len(unknown_ids & involved),
+        'by_set': {name: {'selected': len(items_), 'imprecise': sum(1 for i in items_ if i['event_id'] in imprecise_ids),
+                          'unknown_width': sum(1 for i in items_ if i['event_id'] in unknown_ids)}
+                   for name, items_ in selected.items()},
+        'event_ids_listed': sorted(imprecise_ids & involved)[:limits.max_listed_ids],
+    }
+    if params['imprecise_times'] == 'exclude':
+        selected = {name: [i for i in items_ if i['event_id'] not in imprecise_ids] for name, items_ in selected.items()}
+    stim_items = selected['stimulus']
     stim_ids = {i['event_id'] for i in stim_items}
-    out_items = select('outcome')
+    out_items = selected['outcome']
     self_pairs = sorted(i['event_id'] for i in out_items if i['event_id'] in stim_ids)
     if params['exclude_self_pairs']:
         out_items = [i for i in out_items if i['event_id'] not in stim_ids]
     out_ids = {i['event_id'] for i in out_items}
-    dens_items = [i for i in select('density')
+    dens_items = [i for i in selected['density']
                   if not (params['density_excludes_stimuli'] and i['event_id'] in stim_ids)
                   and not (params['density_excludes_outcomes'] and i['event_id'] in out_ids)]
-    elig_times = sorted({i['t_ms'] for i in select('eligible')})
+    elig_times = sorted({i['t_ms'] for i in selected['eligible']})
     S = sorted(i['t_ms'] for i in stim_items)
     O = sorted(i['t_ms'] for i in out_items)
     D = sorted(i['t_ms'] for i in dens_items)
@@ -470,6 +507,9 @@ def compute_event_study(definition: dict, params: dict, loaded: dict, *, fts: di
         'density': sorted([i['event_id'], i['t_ms']] for i in dens_items),
         'eligible_times': elig_times, 'self_pairs_excluded': self_pairs if params['exclude_self_pairs'] else [],
         'untimed': sorted([u['event_id'], u['reason']] for u in untimed), 'outside_span': outside,
+        'imprecise': sorted(imprecise_ids), 'uncertainty_policy': [params['imprecise_times'], threshold],
+        'source_rule': loaded.get('rule'), 'source_rule_sha256': loaded.get('rule_sha256', 'unknown'),
+        'categories': category_info,
     }
     input_sha256 = sha256_canonical(input_record)
     input_count = len(stim_items) + len(out_items) + len(dens_items)
@@ -519,6 +559,10 @@ def compute_event_study(definition: dict, params: dict, loaded: dict, *, fts: di
                                  'event_ids': sorted(u['event_id'] for u in untimed)[:limits.max_listed_ids],
                                  'listed_limit': limits.max_listed_ids},
             'time_basis': dict(sorted(time_basis.items())),
+            'time_uncertainty': uncertainty,
+            'source': {'rule': loaded.get('rule'), 'rule_sha256': loaded.get('rule_sha256', 'unknown'),
+                       'params': loaded.get('params'), 'seam': 'analysis.source.load_items'},
+            'categories': category_info,
         },
         'seasonality': seasonality, 'clustering': clustering,
         'dependence': {'outcome_gap_cv': _round(_cv(O)), 'stimulus_gap_cv': _round(_cv(S))},
@@ -528,7 +572,8 @@ def compute_event_study(definition: dict, params: dict, loaded: dict, *, fts: di
            'seasonality': seasonality, 'clustering': clustering, 'null_model': params['null_model'],
            'untimed': base['input']['untimed_excluded'], 'assume_zone': loaded.get('assume_zone'),
            'outcome_cv': _cv(O), 'stimulus_cv': _cv(S), 'density_count': len(D), 'deviations': deviations,
-           'weak_time_basis': sum(v for k, v in time_basis.items() if k in WEAK_TIME_KINDS), 'time_basis': time_basis}
+           'weak_time_basis': sum(v for k, v in time_basis.items() if k in WEAK_TIME_KINDS), 'time_basis': time_basis,
+           'uncertainty': uncertainty}
 
     reasons = []
     if t1 - t0 < 2:
@@ -644,19 +689,24 @@ def effective_parameters(definition: dict, overrides: dict | None) -> tuple[dict
     return params, deviations
 
 
-def run_event_study(db: sqlite3.Connection, version_id: int, *, overrides: dict | None = None, actor=None,
-                    limits: EventStudyLimits = EventStudyLimits()) -> dict:
-    """Run on a REGISTERED version only and append the result; returns the stored run."""
+def load_inputs(db: sqlite3.Connection, definition: dict, params: dict, *, limits: EventStudyLimits = EventStudyLimits(),
+                category_config=None) -> tuple[dict, dict, dict, dict | None]:
+    """Items through the analysis seam plus FTS and category selections (shared with the dossier rules)."""
+    import inspect
     from .source import load_items
-    db.row_factory = sqlite3.Row
-    actor = clean_actor(actor)
-    version = require_registered(db, version_id)
-    definition = version['definition']
-    params, deviations = effective_parameters(definition, overrides)
-    loaded = load_items(db, assume_zone=params['assume_zone'], limit=limits.max_events)
+    config = resolve_category_config(definition.get('category_config_sha256'), category_config) \
+        if any('categories' in definition[n] for n in ('stimulus', 'outcome', 'density', 'eligible')) else None
+    accepted = inspect.signature(load_items).parameters
+    kwargs = {'assume_zone': params['assume_zone'], 'limit': limits.max_events}
+    if 'assumption_rule' in accepted:
+        kwargs['assumption_rule'] = params['assumption_rule']
+    if config is not None and 'fields' in accepted:
+        from . import categories as category_module
+        kwargs['fields'] = category_module.needs_fields(config)
+    loaded = load_items(db, **kwargs)
     if loaded['truncated']:
         raise HypothesisError(f'more than max_events={limits.max_events} events; the analysis refuses partial input')
-    fts, categories = {}, {}
+    fts, categories, info = {}, {}, None
     for name in ('stimulus', 'outcome', 'density', 'eligible'):
         selector = definition[name]
         if 'text_query' in selector:
@@ -665,9 +715,24 @@ def run_event_study(db: sqlite3.Connection, version_id: int, *, overrides: dict 
                 raise HypothesisError(f'{name}.text_query matches more than max_fts_ids={limits.max_fts_ids} events')
             fts[name] = ids
         if 'categories' in selector:
-            categories[name] = category_event_ids(db, loaded['items'], selector['categories'])
+            categories[name], details = category_event_ids(db, loaded['items'], selector['categories'], config)
+            info = info or {'config': config.describe(), 'sets': {}}
+            info['sets'][name] = details
+    return loaded, fts, categories, info
+
+
+def run_event_study(db: sqlite3.Connection, version_id: int, *, overrides: dict | None = None, actor=None,
+                    limits: EventStudyLimits = EventStudyLimits(), category_config=None) -> dict:
+    """Run on a REGISTERED version only and append the result; returns the stored run."""
+    db.row_factory = sqlite3.Row
+    actor = clean_actor(actor)
+    version = require_registered(db, version_id)
+    definition = version['definition']
+    params, deviations = effective_parameters(definition, overrides)
+    loaded, fts, categories, category_info = load_inputs(db, definition, params, limits=limits, category_config=category_config)
     result, input_sha256, input_count = compute_event_study(definition, params, loaded, fts=fts, categories=categories,
-                                                            limits=limits, deviations=deviations)
+                                                            limits=limits, deviations=deviations,
+                                                            category_info=category_info)
     result['hypothesis'] = {'hypothesis_id': version['hypothesis_id'], 'version_id': version['version_id'],
                             'version_number': version['version_number'], 'definition_sha256': version['definition_sha256'],
                             'registered_at': version['registered_at'], 'title': definition['title']}
@@ -684,7 +749,8 @@ def run_event_study(db: sqlite3.Connection, version_id: int, *, overrides: dict 
         run_id = int(cur.lastrowid)
         db.execute("INSERT INTO audit_log(actor,action,object_kind,object_id,details_json) VALUES (?,?,?,?,?)",
                    (actor, 'event_study_run', 'hypothesis_run', run_id,
-                    json.dumps({'version_id': version_id, 'result_sha256': result_sha256}, ensure_ascii=False)))
+                    json.dumps({'version_id': version_id, 'result_sha256': result_sha256,
+                                'projection': loaded.get('projection')}, ensure_ascii=False)))
         db.commit()
     except Exception:
         db.rollback()

@@ -23,7 +23,8 @@ Scenarios
 * ``unknown_zone``: stimuli/outcomes with wall-clock times without zone, one
   nonexistent local time (DST gap in Europe/Warsaw) and one event without any
   time → excluded and counted; an assumed zone places all but the gap and the
-  timeless event.
+  timeless event. Two outcomes are known only to the day (precision ``day``),
+  coarser than the lag resolution → excluded by default, kept on request.
 """
 from __future__ import annotations
 
@@ -36,8 +37,9 @@ DAY = 86400
 START = int(datetime(2025, 1, 6, tzinfo=timezone.utc).timestamp())  # a Monday, 00:00 UTC
 
 
-def _ev(role: str, event_type: str, t: float | None = None, *, local: str | None = None, body: str | None = None) -> dict:
-    return {'role': role, 'event_type': event_type, 't': None if t is None else int(t), 'local': local,
+def _ev(role: str, event_type: str, t: float | None = None, *, local: str | None = None, body: str | None = None,
+        precision: str | None = None) -> dict:
+    return {'role': role, 'event_type': event_type, 't': None if t is None else int(t), 'local': local, 'precision': precision,
             'body': body or {'letter': 'pismo z urzędu', 'health': 'wpis zdrowotny wizyta', 'note': 'notatka robocza'}[event_type]}
 
 
@@ -127,11 +129,13 @@ def unknown_zone(seed: int = 505) -> dict:
     events += [_ev('local_outcome', 'health', local=f'2025-02-{d:02d} 18:30') for d in (4, 14)]
     events.append(_ev('dst_gap_outcome', 'health', local='2025-03-30 02:30'))
     events.append(_ev('timeless_outcome', 'health'))
+    events += [_ev('day_precision_outcome', 'health', START + (7 + 10 * k) * DAY, precision='day') for k in range(2)]
     return {'name': 'unknown_zone', 'events': events,
             'windows': [{'label': 'after_2d', 'start_s': 0, 'end_s': 2 * DAY}],
             'expect': {'untimed_without_zone': {'unknown_zone': 6, 'no_time_candidate': 1},
                        'untimed_with_warsaw': {'nonexistent_local_time': 1, 'no_time_candidate': 1},
-                       'timed_stimuli': 5, 'timed_stimuli_with_warsaw': 8}}
+                       'timed_stimuli': 5, 'timed_stimuli_with_warsaw': 8,
+                       'day_precision_outcomes': 2, 'outcomes_timed_exact': 5}}
 
 
 SCENARIOS = {f.__name__: f for f in (planted_effect, density_burst_null, weekday_confound, clustered_stimuli, unknown_zone)}
@@ -165,7 +169,12 @@ def populate(scenario: dict, *, label: str | None = None) -> dict:
             event_id = evidence.add_event(source_id=source, artifact_id=None, event_type=event['event_type'],
                                           ts_start=event['local'], body=event['body'],
                                           external_id=f'{scenario["name"]}:{index}', db=connection)
-            if event['t'] is not None:
+            if event['t'] is not None and event.get('precision'):
+                utc = datetime.fromtimestamp(event['t'], timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+                timeinfo.record_event_times(connection, event_id, [timeinfo.TimeCandidate(
+                    'created', utc[:10], 'synthetic', utc=utc, tz_status='explicit_offset', tz='UTC',
+                    precision=event['precision'])])
+            elif event['t'] is not None:
                 timeinfo.record_event_times(connection, event_id, [timeinfo.from_epoch('created', event['t'], 'synthetic')])
             ids.setdefault(event['role'], []).append(event_id)
     return ids

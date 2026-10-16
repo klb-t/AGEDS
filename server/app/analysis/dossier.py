@@ -18,11 +18,11 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from bisect import bisect_right
 from dataclasses import dataclass
 
 from .hypotheses import (DISCLAIMER, HypothesisError, HypothesisNotFound, canonical_json, clean_actor, clean_text,
-                         code_version, disclaimer, fts_event_ids, selector_matches, sha256_canonical, sha256_text,
-                         utc_now)
+                         code_version, disclaimer, selector_matches, sha256_canonical, sha256_text, utc_now)
 from .preregistration import require_registered
 
 TARGET_KINDS = ('event', 'artifact', 'derived_text', 'anchor', 'annotation')
@@ -267,30 +267,25 @@ def register_provider(provider: CandidateProvider) -> None:
     PROVIDERS[provider.name] = provider
 
 
-def _rule_hits(db: sqlite3.Connection, definition: dict, limit: int) -> list[dict]:
-    from .source import load_items
-    loaded = load_items(db, assume_zone=definition['analysis']['assume_zone'])
-    fts = {}
-    for name in ('stimulus', 'outcome'):
-        if 'text_query' in definition[name]:
-            fts[name], _ = fts_event_ids(db, definition[name]['text_query'], max_ids=1_000_000)
-    if 'categories' in definition['stimulus'] or 'categories' in definition['outcome']:
-        from .hypotheses import category_event_ids
-        cats = {name: category_event_ids(db, loaded['items'], definition[name]['categories'])
-                for name in ('stimulus', 'outcome') if 'categories' in definition[name]}
-    else:
-        cats = {}
+def _rule_hits(db: sqlite3.Connection, definition: dict, limit: int, category_config=None) -> list[dict]:
+    from .eventstudy import load_inputs
+    loaded, fts, cats, _ = load_inputs(db, definition, definition['analysis'], category_config=category_config)
     stim = [i for i in loaded['items'] if selector_matches(i, definition['stimulus'], fts_ids=fts.get('stimulus'),
                                                            category_ids=cats.get('stimulus'))]
     out = [i for i in loaded['items'] if selector_matches(i, definition['outcome'], fts_ids=fts.get('outcome'),
                                                           category_ids=cats.get('outcome'))]
     hits = [{'kind': 'event', 'id': i['event_id'], 'hint': {'role': 'stimulus'}, 't': i['t_start']} for i in stim]
     stim_ids = {i['event_id'] for i in stim}
+    stim_sorted = sorted(stim, key=lambda i: (i['t_start'], i['event_id']))
+    stim_times = [i['t_start'] for i in stim_sorted]
+    low = min(w['start_s'] for w in definition['windows'])
+    high = max(w['end_s'] for w in definition['windows'])
     for o in out:
         if o['event_id'] in stim_ids:
             continue
         best = None
-        for s in stim:
+        # only stimuli with lag = o - s in [low, high) can fall in any window
+        for s in stim_sorted[bisect_right(stim_times, o['t_start'] - high):bisect_right(stim_times, o['t_start'] - low)]:
             lag = o['t_start'] - s['t_start']
             for w in definition['windows']:
                 if w['start_s'] <= lag < w['end_s'] and (best is None or abs(lag) < abs(best['lag_s'])):
@@ -304,7 +299,7 @@ def _rule_hits(db: sqlite3.Connection, definition: dict, limit: int) -> list[dic
 
 def candidate_search(db: sqlite3.Connection, hypothesis_id: int, *, version_id: int | None = None,
                      queries: list[str] | None = None, use_rules: bool = True, provider: str = 'none',
-                     opt_in: bool = False, limit: int = 50, actor=None) -> dict:
+                     opt_in: bool = False, limit: int = 50, actor=None, category_config=None) -> dict:
     """Propose candidates (FTS + rules + optional provider); every proposal stays ``candidate``."""
     from ..search import SearchQueryError, search_page
     db.row_factory = sqlite3.Row
@@ -337,7 +332,7 @@ def candidate_search(db: sqlite3.Connection, hypothesis_id: int, *, version_id: 
             kind = FTS_KIND_MAP.get(hit['object_kind'])
             if kind:
                 proposals.append({'origin': 'fts', 'kind': kind, 'id': int(hit['object_id']), 'hint': {'query': query}})
-    rule_hits = _rule_hits(db, definition, limit) if use_rules else []
+    rule_hits = _rule_hits(db, definition, limit, category_config) if use_rules else []
     proposals.extend({'origin': 'rule', **h} for h in rule_hits)
     pool = []
     for proposal in proposals:

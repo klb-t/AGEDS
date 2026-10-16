@@ -52,6 +52,7 @@ def test_every_number_in_html_is_a_value_of_the_computed_json(env, report_type):
     assert check['stray_numerals'] == []
     assert check['title_ok']
     assert 'script' not in check['tags'] and 'img' not in check['tags'] and 'link' not in check['tags']
+    assert 'ol' not in check['tags']  # no generated ordinal numbers outside the computed document
     for href in check['hrefs']:  # only in-document anchors and files of this report
         assert href.startswith('#') or (root / href).is_file(), href
     assert content_digest(document) == document['integrity']['content_sha256'] == result['content_sha256']

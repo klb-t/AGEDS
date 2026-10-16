@@ -38,13 +38,13 @@ CONTROL_BODY = 'linia\x01z kontrolnym znakiem'
 
 
 class ReportEnv:
-    def __init__(self, *, chat: bool = True, comm: bool = True, catalog: bool = True):
-        self.tmp = tempfile.TemporaryDirectory(prefix='ageds-reports-')
-        self.root = Path(self.tmp.name)
-        (self.root / 'data' / 'store').mkdir(parents=True)
+    def __init__(self, *, chat: bool = True, comm: bool = True, catalog: bool = True, root: Path | None = None):
+        self.tmp = tempfile.TemporaryDirectory(prefix='ageds-reports-') if root is None else None
+        self.root = Path(self.tmp.name) if root is None else Path(root)
+        (self.root / 'data' / 'store').mkdir(parents=True, exist_ok=True)
         self.settings = replace(db.settings, data_dir=self.root / 'data', db_path=self.root / 'data' / 'evidence.db',
                                 store_dir=self.root / 'data' / 'store', scan_roots=(self.root / 'scan',))
-        (self.root / 'scan').mkdir()
+        (self.root / 'scan').mkdir(exist_ok=True)
         self.output = self.root / 'private-reports'
         self.chat, self.comm, self.catalog = chat, comm, catalog
 
@@ -60,7 +60,8 @@ class ReportEnv:
         return self
 
     def close(self):
-        self.tmp.cleanup()
+        if self.tmp is not None:
+            self.tmp.cleanup()
 
     def plant(self):
         corpus_root = self.root / 'corpus'

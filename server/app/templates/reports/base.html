@@ -49,7 +49,7 @@ td.f-quote,td.f-text{white-space:pre-wrap;overflow-wrap:anywhere}td.f-number,td.
 .rows,.note,.meta{color:#57606a;font-size:.8rem}
 .prose{max-width:60rem}.author-human{border-left:3px solid #8250df;padding-left:.6rem}
 .v-slot{font-weight:600}
-nav ol{columns:2;font-size:.9rem}
+ul.toc{columns:2;font-size:.9rem;list-style:none;padding-left:0}
 @media print{body{max-width:none;padding:0}.tw{overflow:visible}a{color:inherit}h2{break-after:avoid}tr{break-inside:avoid}}
 </style>
 </head>
@@ -60,7 +60,7 @@ nav ol{columns:2;font-size:.9rem}
 <p class="lead">{{ L('content_sha256') }}: {{ v(doc.integrity.content_sha256, '/integrity/content_sha256', 'hash') }}</p>
 </header>
 {% block intro %}{% endblock %}
-<nav><ol>{% for s in doc.sections %}<li><a href="#s-{{ s.section }}">{{ v(s.title, '/sections/' ~ loop.index0 ~ '/title') }}</a></li>{% endfor %}<li><a href="#method">{{ L('method') }}</a></li></ol></nav>
+<nav><ul class="toc">{% for s in doc.sections %}<li><a href="#s-{{ s.section }}">{{ v(s.title, '/sections/' ~ loop.index0 ~ '/title') }}</a></li>{% endfor %}<li><a href="#method">{{ L('method') }}</a></li></ul></nav>
 <main>
 {% for s in doc.sections %}{% set sp = '/sections/' ~ loop.index0 %}
 <section id="s-{{ s.section }}" class="status-{{ s.status }}">

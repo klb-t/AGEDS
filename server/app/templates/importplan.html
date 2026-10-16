@@ -19,7 +19,7 @@
   </form>
   <h2>Plany</h2>
   <ul class="ip-plans">{% for p in plans %}<li class="{% if selected and selected.plan.id == p.id %}active{% endif %}"><a href="/import?plan={{p.id}}">Plan #{{p.id}}</a>
-    <small>{{p.items}} pozycji · wersja {{p.latest_version}} · uruchomień {{p.runs}} · {{p.created_at}}</small></li>
+    <small>{{p['items']}} pozycji · wersja {{p.latest_version}} · uruchomień {{p.runs}} · {{p.created_at}}</small></li>
   {% else %}<li><small>Brak planów.</small></li>{% endfor %}</ul>
 </aside>
 <div class="ip-main">

@@ -65,7 +65,7 @@ def prepared(world) -> int:
 def test_execution_imports_everything_approved_with_provenance(world):
     plan_id = prepared(world)
     result = execute.execute_plan(plan_id, actor='tester', temp_dir=world.work)
-    assert result['status'] == 'completed' and result['selected_items'] == 23
+    assert result['status'] == 'completed' and result['selected_items'] == 24
     assert {o['status'] for o in result['items']} == {'done'}
     items = all_items(plan_id)
     assert {i['status'] for i in items} == {'done'}
@@ -95,7 +95,7 @@ def test_execution_imports_everything_approved_with_provenance(world):
         children = db.execute("SELECT COUNT(*) FROM artifacts WHERE parent_artifact_id=?", (mbox['id'],)).fetchone()[0]
         assert children >= 1  # attachments extracted under the virtual locator
         links = db.execute('SELECT COUNT(DISTINCT entry_id) FROM catalog_entry_artifacts').fetchone()[0]
-        assert links >= 23
+        assert links >= 24
         exports = {r['label']: r['collection_id'] for r in db.execute("SELECT label, collection_id FROM record_exports")}
     assert exports == {
         f'catalog:collection/{world.collections["drive_b"]}/chatgpt-export-2025-03.zip': world.collections['drive_b'],
@@ -122,7 +122,7 @@ def test_rerun_is_idempotent(world):
     with dbmod.session() as db:
         observations = db.execute('SELECT COUNT(*) FROM source_observations').fetchone()[0]
     forced = execute.execute_plan(plan_id, actor='tester', temp_dir=world.work, rerun_done=True)
-    assert forced['selected_items'] == 23 and {o['status'] for o in forced['items']} == {'done'}
+    assert forced['selected_items'] == 24 and {o['status'] for o in forced['items']} == {'done'}
     assert counts() == first, 're-running a done plan creates no new events, records or links'
     assert all(o['footprint']['events_new'] == 0 and o['footprint']['artifacts_new'] == 0 for o in forced['items'])
     with dbmod.session() as db:

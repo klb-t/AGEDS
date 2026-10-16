@@ -225,11 +225,13 @@ def _billing_profiles() -> list[str]:
 @router.get('/import', response_class=HTMLResponse)
 def import_page(request: Request, plan_id: Id | None = Query(None, alias='plan'), version: Id | None = None,
                 importer: str | None = Query(None, max_length=100), status: str | None = Query(None, max_length=30),
-                ambiguous: bool = False, blocked: bool = False, collection: Id | None = None,
+                ambiguous: bool = False, blocked: bool = False, collection: str | None = Query(None, max_length=20),
                 q: str | None = Query(None, max_length=500), after: int | None = Query(None, ge=0),
                 limit: int = Query(200, ge=1, le=plan.MAX_PAGE)):
+    # The filter form submits empty selects as empty strings; treat them as "no filter".
     if status is not None and status not in plan.DISPLAY_STATUSES:
         status = None
+    collection = int(collection) if collection and collection.isdigit() and int(collection) > 0 else None
     collections = store.list_collections()
     selected = None
     post = None

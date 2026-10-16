@@ -35,6 +35,7 @@ DAT_CONV = '6b1f0c2e-0000-4000-8000-00000000c0d1'
 PDF_DAT = (b'%PDF-1.7\n% AGEDS synthetic ChatGPT export attachment in a .dat file\n'
            b'1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n')
 DOS = (2024, 10, 1, 12, 0, 0)
+XSS_ICS_NAME = '<img src=x onerror=window.__ageds_xss=1>.ics'  # a planned item whose locator looks like markup
 SOURCE_MTIME = 1704628800  # 2024-01-07T12:00:00Z, set on every source file (filesystem time is not an event time)
 
 
@@ -160,6 +161,7 @@ def build(root: Path) -> dict:
     _write(phone / 'DCIM' / 'without_exif.jpg', (comm / 'images' / 'without_exif.jpg').read_bytes())
     _write(phone / 'billing' / 'bill_daymonth.csv', (comm / 'billing' / 'bill_daymonth.csv').read_bytes())
     _write(phone / 'notes' / '<img src=x onerror=alert(1)>.txt', b'a file name that looks like markup')
+    _write(phone / 'calendar' / XSS_ICS_NAME, (comm / 'calendar' / 'calendar.ics').read_bytes())
 
     # ---- drive B
     _write(drive_b / 'takeout-20241001.zip', _takeout(parts))
@@ -191,6 +193,7 @@ def build(root: Path) -> dict:
             ('file', 'backup/calls-20240107.xml', 'calls_xml', []),
             ('file', 'backup/sms-20240107.xml', 'sms_backup', []),
             ('file', 'billing/bill_daymonth.csv', 'billing', ['parameter_missing:profile_id']),
+            ('file', f'calendar/{XSS_ICS_NAME}', 'ics', []),
         ],
         'drive_b': [
             ('archive', 'chatgpt-export-2025-03.zip', 'chatgpt_export', []),
@@ -235,4 +238,5 @@ def build(root: Path) -> dict:
         'whatsapp': comm_manifest['whatsapp'],
         'chat_manifest_keys': sorted(chat_manifest),
         'source_mtime_utc': '2024-01-07T12:00:00+00:00',
+        'xss_locator': f'calendar/{XSS_ICS_NAME}',
     }

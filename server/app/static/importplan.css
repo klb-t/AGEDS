@@ -39,3 +39,4 @@ button.secondary{background:#30363d;border-color:#484f58}
 .ip-status:empty{display:none}
 .ip-status{padding:.6rem;border:1px solid #d29922;border-radius:8px}
 @media(max-width:900px){.ip-layout{grid-template-columns:minmax(0,1fr)}.importplan dl{grid-template-columns:minmax(0,1fr)}.ip-actor{min-width:0}}
+.ip-items td:last-child{min-width:12rem}.ip-items td:nth-child(4){min-width:14rem}

@@ -36,14 +36,16 @@ def _create(api) -> dict:
 def test_http_plan_review_run_and_cross_exports(api):
     created = _create(api)
     plan_id = created['plan']['id']
-    assert created['summary']['items'] == 23 and created['summary']['ambiguous'] == 1
+    assert created['summary']['items'] == 24 and created['summary']['ambiguous'] == 1
     listing = api.client.get('/api/import-plans').json()
     assert listing['plans'][0]['id'] == plan_id
     assert {i['key'] for i in listing['importers']} >= {'chatgpt_export', 'location_history', 'billing'}
     ambiguous = api.client.get(f'/api/import-plans/{plan_id}', params={'ambiguous': 'true'}).json()
     assert ambiguous['matching'] == 1 and ambiguous['items'][0]['locator'] == 'exports/ambiguous'
-    calendars = api.client.get(f'/api/import-plans/{plan_id}', params={'importer': 'ics', 'q': 'calendar'}).json()
+    calendars = api.client.get(f'/api/import-plans/{plan_id}', params={'importer': 'ics', 'q': 'example.ics'}).json()
     assert [i['locator'].rsplit('/', 1)[-1] for i in calendars['items']] == ['Example.ics']
+    markup = api.client.get(f'/api/import-plans/{plan_id}', params={'q': '<img'}).json()
+    assert [i['locator'] for i in markup['items']] == [api.expected['xss_locator']]
     paged = api.client.get(f'/api/import-plans/{plan_id}', params={'limit': 5}).json()
     assert paged['has_more'] and paged['next_after_ordinal'] == 5
     second = api.client.get(f'/api/import-plans/{plan_id}', params={'limit': 5, 'afterOrdinal': 5}).json()
@@ -90,13 +92,17 @@ def test_import_page_renders_review_table_and_escapes_source_text(api):
     plan_id = _create(api)['plan']['id']
     page = api.client.get('/import', params={'plan': plan_id}).text
     assert 'Plan #%d' % plan_id in page and 'niejednoznaczne — wybierz' in page
+    assert '24 pozycji' in page and 'built-in method' not in page
     assert 'takeout-20241001.zip!/Takeout/takeout-inner.zip!/Mail/All mail Including Spam and Trash.mbox' in page
     assert 'opt_in_disabled:enable_location' in page and 'parameter_missing:profile_id' in page
-    assert page.count('<script') == 1 and 'onerror=alert' not in page.replace('&lt;img src=x onerror=alert(1)&gt;', '')
-    filtered = api.client.get('/import', params={'plan': plan_id, 'status': 'proposed', 'ambiguous': 'true'}).text
+    assert page.count('<script') == 1 and '<img' not in page
+    assert '&lt;img src=x onerror=window.__ageds_xss=1&gt;.ics' in page
+    filtered = api.client.get('/import', params={'plan': plan_id, 'importer': '', 'status': 'proposed', 'collection': '',
+                                                  'ambiguous': 'true', 'q': ''}).text
     assert filtered.count('class="ip-row ') == 1
     blocked = api.client.get('/import', params={'plan': plan_id, 'blocked': 'true'}).text
     assert blocked.count('class="ip-row ') == 5
+    assert page.count('class="ip-row ') == 24
     old = api.client.get('/import', params={'plan': plan_id, 'version': 1}).text
     assert 'data-ip-action="decide"' in old  # version 1 is the latest so far
 
@@ -136,7 +142,7 @@ def test_cli_end_to_end(tmp_path):
     created = run('import-plan-create', '--collection', collection, '--billing-profile', 'example_semicolon_daymonth_v1',
                   '--temp-dir', world_root / 'work')
     plan_id = created['plan']['id']
-    assert created['summary']['items'] == 10 and created['summary']['blocked'] == {}
+    assert created['summary']['items'] == 11 and created['summary']['blocked'] == {}
     shown = run('import-plan-show', plan_id, '--importer', 'calls_xml')
     calls = shown['items'][0]
     run('import-plan-decide', plan_id, '--base-version', 1, '--actor', 'cli', '--approve', 999, expect=2)
@@ -144,16 +150,16 @@ def test_cli_end_to_end(tmp_path):
     assert stale['error'] == 'Conflict'
     decided = run('import-plan-decide', plan_id, '--base-version', 1, '--actor', 'cli', '--approve-all-ready',
                   '--importer', f'{calls["id"]}=sms_backup', '--note', 'all ready')
-    assert decided['version'] == 2 and decided['changed'] == 10
+    assert decided['version'] == 2 and decided['changed'] == 11
     summary = run('import-plan-summary', plan_id)
-    assert summary['to_run']['items'] == 10
+    assert summary['to_run']['items'] == 11
     result = run('import-plan-run', plan_id, '--temp-dir', world_root / 'work')
-    assert result['status'] == 'completed' and result['selected_items'] == 10
+    assert result['status'] == 'completed' and result['selected_items'] == 11
     assert run('import-plan-run', plan_id, '--temp-dir', world_root / 'work')['selected_items'] == 0
     runs = run('import-plan-runs', plan_id)
     assert [r['status'] for r in runs['runs']] == ['completed', 'completed']
     one = run('import-plan-runs', plan_id, '--run', result['run_id'])
-    assert len(one['attempts']) == 10
+    assert len(one['attempts']) == 11
     item = run('import-plan-show', plan_id, '--item', calls['id'])
     assert item['status'] == 'done' and item['state']['importer'] == 'sms_backup'
     assert run('import-plan-cross', plan_id)['after_import']['conversations_total'] == 0

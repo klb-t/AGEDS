@@ -37,8 +37,8 @@ function overlay(doc, name, labelKey, t) {
   let returnFocus = null;
   const api = {
     element: backdrop, dialog,
-    open() {returnFocus = doc.activeElement; backdrop.hidden = false; dialog.focus(); doc.documentElement.dataset.wbOverlay = name;},
-    close() {backdrop.hidden = true; delete doc.documentElement.dataset.wbOverlay; try {returnFocus?.focus?.();} catch {}},
+    open() {returnFocus = doc.activeElement; backdrop.hidden = false; dialog.focus(); doc.documentElement.dataset.wbOpenOverlay = name;},
+    close() {backdrop.hidden = true; delete doc.documentElement.dataset.wbOpenOverlay; try {returnFocus?.focus?.();} catch {}},
     get isOpen() {return !backdrop.hidden;},
   };
   backdrop.addEventListener('click', event => {if (event.target === backdrop) api.close();});

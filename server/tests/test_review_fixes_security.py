@@ -108,3 +108,102 @@ def test_finding8_valid_token_checks_are_read_only_and_touch_lazily(env, monkeyp
     monkeypatch.setattr(tokens, 'TOUCH_INTERVAL_SECONDS', 0)
     assert tokens.verify_token(created['token'])['use_count'] == 12  # 1 + 10 pending + this one
     assert env.one("SELECT COUNT(*) FROM audit_log WHERE action='token_rejected'") == 0
+
+
+# --------------------------------------------------------------------- finding 6
+
+def _proposal(env) -> tuple[int, dict]:
+    from server.app.integrations import proposals, tokens
+    artifact = _audio(env)
+    token = tokens.create_token('synthetic client', ['propose'], client_id='chatadhd')
+    proposal = proposals.submit_proposal({'artifact_id': artifact, 'body': 'model says X'}, client_id='chatadhd',
+                                         token_id=token['id'])
+    return proposal['id'], token
+
+
+def test_finding6_require_token_covers_exports_and_every_state_change(env, monkeypatch):
+    from server.app.integrations import tokens
+    proposal_id, client_token = _proposal(env)
+    operator = tokens.create_token('operator browser', ['read'])['token']
+    monkeypatch.setenv('EW_REQUIRE_TOKEN', '1')
+    with env.client() as http:
+        assert http.get('/api/timeline').status_code == 401
+        for path in ('/export/events.csv', '/export/manifest.json'):
+            assert http.get(path).status_code == 401, path
+        assert http.post('/upload', files={'file': ('a.txt', b'abc', 'text/plain')}).status_code == 401
+        decided = http.post(f'/integrations/proposals/{proposal_id}/decide', data={'decision': 'accepted'},
+                            follow_redirects=False)
+        assert decided.status_code == 401
+        assert http.post(f"/integrations/tokens/{client_token['id']}/revoke", follow_redirects=False).status_code == 401
+        assert env.one('SELECT COUNT(*) FROM annotations') == 0
+        assert env.one('SELECT revoked_at FROM api_tokens WHERE id=?', (client_token['id'],)) is None
+        assert http.get('/integrations').status_code == 200  # read-only pages stay open (documented)
+        bearer = {'Authorization': f'Bearer {operator}'}
+        assert http.get('/export/events.csv', headers=bearer).status_code == 200
+        assert http.post('/upload', files={'file': ('a.txt', b'abc', 'text/plain')}, headers=bearer).status_code == 200
+        # Browser forms: a same-origin session cookie issued by the login form.
+        assert http.post('/integrations/session', data={'token': 'ageds_000000000000.nope'},
+                         follow_redirects=False).status_code == 401
+        login = http.post('/integrations/session', data={'token': operator}, follow_redirects=False)
+        assert login.status_code == 303
+        cookie = login.headers['set-cookie']
+        assert 'ageds_token=' in cookie and 'HttpOnly' in cookie and 'SameSite=strict' in cookie.replace('Strict', 'strict')
+        assert http.post(f'/integrations/proposals/{proposal_id}/decide', data={'decision': 'accepted'},
+                         follow_redirects=False).status_code == 303
+        assert env.one('SELECT COUNT(*) FROM annotations') == 1
+        assert http.get('/export/events.csv').status_code == 200
+        assert http.get('/api/read/v1/contract').status_code == 401  # scoped routes still need a bearer header
+        assert http.post('/integrations/session/logout', follow_redirects=False).status_code == 303
+        assert http.get('/export/events.csv').status_code == 401
+
+
+@pytest.mark.parametrize('headers', [
+    {'Origin': 'https://evil.example'},
+    {'Origin': 'null'},
+    {'Origin': 'http://testserver.evil.example'},
+    {'Referer': 'https://evil.example/page'},
+    {'Sec-Fetch-Site': 'cross-site'},
+    {'Origin': 'http://testserver', 'Sec-Fetch-Site': 'cross-site'},
+])
+def test_finding6_cross_site_state_changes_are_refused(env, headers):
+    proposal_id, client_token = _proposal(env)
+    with env.client() as http:
+        response = http.post(f'/integrations/proposals/{proposal_id}/decide', data={'decision': 'accepted'},
+                             headers=headers, follow_redirects=False)
+        assert response.status_code == 403, response.text
+        assert http.post(f"/integrations/tokens/{client_token['id']}/revoke", headers=headers,
+                         follow_redirects=False).status_code == 403
+        assert http.post('/upload', files={'file': ('a.txt', b'abc', 'text/plain')}, headers=headers).status_code == 403
+        assert http.get('/integrations', headers=headers).status_code == 200  # reads are not state changes
+    assert env.one('SELECT COUNT(*) FROM annotations') == 0
+    assert env.one('SELECT revoked_at FROM api_tokens WHERE id=?', (client_token['id'],)) is None
+
+
+@pytest.mark.parametrize('headers', [
+    {},  # CLI, curl, scripts
+    {'Origin': 'http://testserver'},
+    {'Origin': 'http://testserver', 'Sec-Fetch-Site': 'same-origin'},
+    {'Referer': 'http://testserver/integrations'},
+])
+def test_finding6_same_origin_and_headerless_state_changes_work(env, headers):
+    proposal_id, _ = _proposal(env)
+    with env.client() as http:
+        response = http.post(f'/integrations/proposals/{proposal_id}/decide', data={'decision': 'accepted'},
+                             headers=headers, follow_redirects=False)
+    assert response.status_code == 303, response.text
+    assert env.one('SELECT COUNT(*) FROM annotations') == 1
+
+
+def test_finding6_trusted_origins_and_bearer_clients(env, monkeypatch):
+    from server.app.integrations import tokens
+    proposal_id, _ = _proposal(env)
+    client = tokens.create_token('synthetic proposer', ['propose'], client_id='chatadhd')['token']
+    monkeypatch.setenv('EW_TRUSTED_ORIGINS', 'https://evidence.example.org')
+    with env.client() as http:
+        # A bearer client cannot be forged cross-site (custom headers need a CORS preflight).
+        sent = http.post('/api/integrations/v1/proposals', json={'artifact_id': 1, 'body': 'x'},
+                         headers={'Authorization': f'Bearer {client}', 'Origin': 'https://elsewhere.example'})
+        assert sent.status_code == 201, sent.text
+        proxied = http.post(f'/integrations/proposals/{proposal_id}/decide', data={'decision': 'rejected'},
+                            headers={'Origin': 'https://evidence.example.org'}, follow_redirects=False)
+        assert proxied.status_code == 303

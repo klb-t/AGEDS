@@ -6,14 +6,20 @@ is ``{"detail": {"code": "...", "message": "..."}}``; 401 carries
 ``WWW-Authenticate: Bearer``. The human pages under ``/integrations`` follow the
 rest of the workbench UI (trusted network).
 
-``install_app`` adds the opt-in global enforcement middleware
-(``EW_REQUIRE_TOKEN=1``): every other ``/api/*`` route then needs a valid
-token too, without scope checks. ``api.include_routers`` calls it.
+``install_app`` adds one middleware (``api.include_routers`` calls it): a CSRF
+guard for every state-changing request (review finding 6) and the opt-in global
+enforcement (``EW_REQUIRE_TOKEN=1``): every other ``/api/*`` and ``/export/*``
+route and every state-changing route then needs a valid token (bearer header
+or the browser session cookie from ``POST /integrations/session``), without
+scope checks.
 """
 from __future__ import annotations
 
+import os
 import sqlite3
+from http.cookies import CookieError, SimpleCookie
 from typing import Annotated
+from urllib.parse import urlsplit
 
 from anyio import to_thread
 from fastapi import APIRouter, Body, Depends, Form, HTTPException, Query, Request
@@ -222,11 +228,115 @@ def integrations_revoke_token(token_id: SqlPathId):
     return RedirectResponse('/integrations', status_code=303)
 
 
-# --- opt-in global enforcement -------------------------------------------------------
-class RequireTokenMiddleware:
-    """Pure ASGI: when ``EW_REQUIRE_TOKEN`` is on, every ``/api/*`` request needs a valid token.
+# --- browser session (EW_REQUIRE_TOKEN) ------------------------------------------------
+SESSION_COOKIE = 'ageds_token'
+_SESSION_PATHS = ('/integrations/session', '/integrations/session/logout')
 
-    Routes owned by this area verify tokens themselves (with scopes) and are
+
+@router.post('/integrations/session')
+def integrations_session_login(token: str = Form(...)):
+    """Same-origin browser session: the token is checked and kept in an HttpOnly, SameSite=Strict cookie."""
+    try:
+        tokens.verify_token(token.strip(), scope=None)
+    except tokens.TokenRejected as exc:
+        return HTMLResponse(f'<p>Token odrzucony: {exc.reason}.</p><p><a href="/integrations">Wróć</a></p>', status_code=401)
+    response = RedirectResponse('/integrations', status_code=303)
+    response.set_cookie(SESSION_COOKIE, token.strip(), httponly=True, samesite='strict', path='/')
+    return response
+
+
+@router.post('/integrations/session/logout')
+def integrations_session_logout():
+    response = RedirectResponse('/integrations', status_code=303)
+    response.delete_cookie(SESSION_COOKIE, path='/', httponly=True, samesite='strict')
+    return response
+
+
+# --- CSRF guard and opt-in global enforcement ----------------------------------------------
+SAFE_METHODS = frozenset({'GET', 'HEAD', 'OPTIONS'})
+
+
+def _headers(scope) -> dict[str, str]:
+    found: dict[str, str] = {}
+    for name, value in scope.get('headers', []):
+        found.setdefault(name.decode('latin-1').lower(), value.decode('latin-1'))
+    return found
+
+
+def _netloc(value: str) -> str | None:
+    """``host[:port]`` of an absolute http(s) URL with the default port removed, else None."""
+    try:
+        parsed = urlsplit(value.strip())
+    except ValueError:
+        return None
+    if parsed.scheme not in ('http', 'https') or not parsed.netloc or '@' in parsed.netloc:
+        return None
+    netloc = parsed.netloc.lower()
+    default = ':80' if parsed.scheme == 'http' else ':443'
+    return netloc[:-len(default)] if netloc.endswith(default) else netloc
+
+
+def _trusted(value: str, host: str | None) -> bool:
+    origin = _netloc(value)
+    if origin is None:
+        return False
+    own = (host or '').strip().lower()
+    for default in (':80', ':443'):
+        if own.endswith(default):
+            own = own[:-len(default)]
+    if origin == own:
+        return True
+    extra = [o.strip() for o in os.environ.get('EW_TRUSTED_ORIGINS', '').split(',') if o.strip()]
+    return origin in {_netloc(o) for o in extra}
+
+
+def csrf_refusal(method: str, headers: dict[str, str]) -> str | None:
+    """Why a state-changing browser request is refused as cross-site, or None (review finding 6).
+
+    Applies to every non-GET/HEAD/OPTIONS request without an ``Authorization``
+    header (a header a cross-site page cannot send without a CORS preflight,
+    which this server never grants). ``Sec-Fetch-Site: cross-site`` is refused;
+    otherwise ``Origin`` (or, without it, ``Referer``) must name this server
+    (``Host``) or an origin in ``EW_TRUSTED_ORIGINS``. Requests without these
+    headers (CLI, curl, scripts) are allowed.
+    """
+    if method in SAFE_METHODS or 'authorization' in headers:
+        return None
+    if headers.get('sec-fetch-site', '').strip().lower() == 'cross-site':
+        return 'cross-site request (Sec-Fetch-Site)'
+    host = headers.get('host')
+    if 'origin' in headers:
+        return None if _trusted(headers['origin'], host) else 'Origin is not this server'
+    if 'referer' in headers and not _trusted(headers['referer'], host):
+        return 'Referer is not this server'
+    return None
+
+
+def _needs_token(path: str, method: str) -> bool:
+    if path.startswith(_OWN_PREFIXES) or path in _SESSION_PATHS:
+        return False  # scoped bearer checks in the routes / the login form itself
+    return path.startswith(('/api/', '/export/')) or method not in SAFE_METHODS
+
+
+def _session_token(headers: dict[str, str]) -> str | None:
+    if 'cookie' not in headers:
+        return None
+    jar = SimpleCookie()
+    try:
+        jar.load(headers['cookie'])
+    except CookieError:
+        return None
+    morsel = jar.get(SESSION_COOKIE)
+    return morsel.value if morsel is not None else None
+
+
+class RequireTokenMiddleware:
+    """Pure ASGI: CSRF guard always; token enforcement when ``EW_REQUIRE_TOKEN`` is on.
+
+    With enforcement every ``/api/*`` and ``/export/*`` request and every
+    state-changing request needs a valid token, sent as ``Authorization: Bearer``
+    or as the HttpOnly session cookie set by ``POST /integrations/session``.
+    Routes owned by this area verify scoped bearer tokens themselves and are
     skipped here. Streaming responses are untouched because the middleware
     never wraps ``send``.
     """
@@ -235,12 +345,20 @@ class RequireTokenMiddleware:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        if scope['type'] == 'http' and tokens.token_required_everywhere():
+        if scope['type'] == 'http':
+            method = scope.get('method', 'GET').upper()
+            headers = _headers(scope)
+            refusal = csrf_refusal(method, headers)
+            if refusal is not None:
+                response = JSONResponse({'detail': {'code': 'cross_site_request', 'message': refusal}}, status_code=403)
+                await response(scope, receive, send)
+                return
             path = scope.get('path', '')
-            if path.startswith('/api/') and not path.startswith(_OWN_PREFIXES):
-                header = next((value.decode('latin-1') for name, value in scope.get('headers', []) if name == b'authorization'), None)
+            if tokens.token_required_everywhere() and _needs_token(path, method):
+                header = headers.get('authorization')
+                bearer = tokens.parse_bearer(header) if header is not None else _session_token(headers)
                 try:
-                    await to_thread.run_sync(lambda: tokens.verify_token(tokens.parse_bearer(header), scope=None))
+                    await to_thread.run_sync(lambda: tokens.verify_token(bearer, scope=None))
                 except tokens.TokenRejected as exc:
                     response = JSONResponse({'detail': {'code': exc.reason, 'message': 'A valid local token is required (EW_REQUIRE_TOKEN).'}},
                                             status_code=exc.status, headers={'WWW-Authenticate': 'Bearer'})

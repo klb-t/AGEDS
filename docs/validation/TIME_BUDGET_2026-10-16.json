@@ -1,0 +1,116 @@
+{
+  "schema": "ageds.validation_receipt.v1",
+  "task": "AGEDS-TASK-20261016-E (part 1, E1: time budget and feature series)",
+  "date": "2026-10-16",
+  "branch": "wt-E",
+  "tested_head": "4e035bd51bdb2b6c326dd84c5a5a85f806ac2cc8",
+  "tested_head_note": "code as committed at 4e035bd (includes merge 15aeb6b of integration head b181c21 with tracks A, B1, B2, C, D, G); the receipt commit adds only documentation",
+  "environment": {
+    "python": "/home/user/wt/venv (Python 3.13)",
+    "node": "node --test",
+    "browser": "Chromium 141.0.7390.37 via Playwright 1.62.1",
+    "network_model_calls": 0
+  },
+  "commands": [
+    "/home/user/wt/venv/bin/python -m pytest server/tests -q",
+    "/home/user/wt/venv/bin/python -m pytest server/tests/test_analysis_budget.py server/tests/test_analysis_budget_api.py server/tests/test_analysis_source.py server/tests/test_analysis_budget_categories.py server/tests/test_analysis_budget_intervals.py -q",
+    "node --test server/tests/js/*.test.mjs",
+    "NODE_PATH=<playwright> PYTHON=<venv python> AGEDS_BROWSER_EXECUTABLE=<chromium> node server/tests/browser/analysis_budget.cjs",
+    "NODE_PATH=<playwright> PYTHON=<venv python> AGEDS_BROWSER_EXECUTABLE=<chromium> node server/tests/browser/acceptance.cjs",
+    "NODE_PATH=<playwright> PYTHON=<venv python> AGEDS_BROWSER_EXECUTABLE=<chromium> node server/tests/browser/timeline.cjs",
+    "python3 scripts/verify_repository.py",
+    "scratchpad scale script: synthetic SMS/chat events over 90 days, run_budget twice (default 11-point grid)"
+  ],
+  "results": {
+    "pytest_all": {
+      "passed": 797,
+      "skipped": 1,
+      "failed": 0,
+      "subtests_passed": 680
+    },
+    "pytest_analysis_e1": {
+      "passed": 33,
+      "failed": 0,
+      "files": {
+        "test_analysis_budget.py": 14,
+        "test_analysis_budget_api.py": 4,
+        "test_analysis_source.py": 4,
+        "test_analysis_budget_categories.py": 7,
+        "test_analysis_budget_intervals.py": 4
+      }
+    },
+    "node_all": {
+      "passed": 102,
+      "failed": 0,
+      "analysis_budget_test_mjs": 7
+    },
+    "browser_analysis_budget": {
+      "cases_passed": 9,
+      "status": "passed",
+      "cases": [
+        "page renders newest run with candles and unobserved strip",
+        "run picker switches runs and granularity",
+        "click candle lists contributing events with label path and links",
+        "manual correction is visible as the annotation path",
+        "unobserved candle explains the gap and is keyboard reachable",
+        "table, sensitivity, exclusions and method panels are filled",
+        "new run from the form is stored and selected; flip window is flagged unstable",
+        "phone width keeps the chart inside the viewport",
+        "no page errors or console errors"
+      ],
+      "measurements": {
+        "first_render_ms": 216,
+        "phone_document_scroll_width": 390,
+        "failed_responses": [
+          "422 /api/analysis/budget/runs"
+        ]
+      }
+    },
+    "browser_acceptance_existing": {
+      "pass_lines": 24,
+      "exit": 0
+    },
+    "browser_timeline_existing": {
+      "pass_lines": 7,
+      "exit": 0
+    },
+    "verify_repository": "OK"
+  },
+  "measurements": {
+    "note": "single container, synthetic data, wall-clock seconds; max RSS is the process peak including fixture generation",
+    "events_20000_days_90_grid_11": {
+      "first_run_s": 9.26,
+      "repeat_run_s": 7.36,
+      "result_json_bytes": 615982
+    },
+    "events_100000_days_90_grid_11": {
+      "first_run_s": 43.36,
+      "repeat_run_s": 38.39,
+      "result_json_bytes": 2449716,
+      "max_rss_mb": 732.4
+    }
+  },
+  "runtime_executed": [
+    "time budget over the hard synthetic corpus server/tests/corpus/activity.py through the timeline projection seam (pytest, CLI subprocess, HTTP TestClient, real Chromium)",
+    "parallel chatbot sessions counted as a union; long gap = nieobserwowane in all variants; DST 23 h / 25 h days; call durations and a WAV header duration in the lower bound; unknown-zone and nonexistent wall clocks excluded and reported; DST fold excluded by default and carried only with ambiguous_fold=carry; manual correction precedence with visible path; rule weight splitting; overlap rules split_equal/priority/count_both; sensitivity ordering, top-category and trend flips; determinism (reused identical run) and new parameters creating a new run while the old stays; append-only triggers",
+    "feature series (deterministic) and the separate model series with providers none and fake",
+    "page /analysis/budget in Chromium: render, run picker, granularity switch, candle click and keyboard activation listing events with label paths and links, correction visible as annotation path, unobserved explanation, table/sensitivity/exclusions/method, new run from the form, invalid parameters reported, phone width"
+  ],
+  "unit_tested_only": [
+    "interim fallback seam load_items_interim (used only without the timeline package)",
+    "chart scaling/geometry helpers (Node)"
+  ],
+  "not_run": [
+    "real LLM/model providers (none implemented; provider none/fake only)",
+    "real private data or a real category configuration",
+    "Android",
+    "light theme (page uses the existing dark app styles)"
+  ],
+  "boundaries": [
+    "Every result is interpretive; bounds depend on declared heuristics and the parameter grid; nieobserwowane is not idleness.",
+    "Upper bounds of different categories may overlap (each neighbour of a gap may claim up to max_attribution_s).",
+    "Candle event lists are capped by max_candle_events (exact counts kept).",
+    "Runs must start before writing in the same SQLite connection (the timeline projection refreshes in its own transaction).",
+    "max_items bounds a run (default 250 000); a cut input is reported as source_truncated."
+  ]
+}

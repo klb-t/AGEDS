@@ -30,6 +30,7 @@ TIMELINE_MAX_FILTER_CHARS = 512
 EVENT_TEXT_MAX_CHARS = 16_384
 EVENT_TIME_CANDIDATES_MAX = 50
 ARTIFACT_LIST_LIMIT = 200
+REPORTS_LIST_LIMIT = 500
 MAX_VM_STEPS = 2_000_000
 PROGRESS_INTERVAL = 1000
 TIMELINE_FILTERS = ('event_type', 'phone', 'direction', 'thread_id')
@@ -345,12 +346,22 @@ def read_citation_packet(artifact_id: int, anchor_id: int) -> bytes:
 
 
 def read_reports() -> dict:
-    """Explicit stub: the reports area is not implemented in this revision."""
+    """Report register listing (reports area); output locations are never exposed.
+
+    Rows come from the append-only ``reports`` table. ``output_dir`` (a private
+    filesystem path) is withheld; files are served only by the workbench for
+    registered reports after their manifest digest matches the register row.
+    """
     def reader(db):
-        tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        return sorted(name for name in tables if name.startswith('report'))
-    detected = run_read(reader)
-    return {'schema': SCHEMA, 'kind': 'reports', 'available': False, 'items': [],
-            'reason': 'reports are not implemented in this revision; the list is empty by design, not by filter',
-            'detected_report_tables': detected,
-            'note': 'a future reports area publishes its own listing; this stub never fabricates entries'}
+        from ..reports.store import list_reports, table_exists
+        if not table_exists(db):
+            return None
+        return list_reports(db, limit=REPORTS_LIST_LIMIT + 1, include_output_dir=False)
+    rows = run_read(reader)
+    if rows is None:
+        return {'schema': SCHEMA, 'kind': 'reports', 'available': False, 'items': [], 'has_more': False,
+                'reason': 'the reports register table is not present (database not migrated)',
+                'output_location_included': False}
+    return {'schema': SCHEMA, 'kind': 'reports', 'available': True, 'items': rows[:REPORTS_LIST_LIMIT],
+            'has_more': len(rows) > REPORTS_LIST_LIMIT, 'reason': None, 'output_location_included': False,
+            'note': 'newest first; manifests are unsigned digests, not signatures'}

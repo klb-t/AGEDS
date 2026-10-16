@@ -1,0 +1,97 @@
+{#- Generic AGEDS report layout. Receives only `doc` (the computed report document).
+    Every dynamic value goes through v(value, pointer); static text here has no digits. -#}
+{%- macro L(key) -%}{{ v(doc.labels[key], '/labels/' ~ (key|pt)) }}{%- endmacro -%}
+{%- macro render_block(b, p) -%}
+<div class="block b-{{ b.kind }}">
+{% if b.get('title') is not none %}<h3>{{ v(b.title, p ~ '/title') }}</h3>{% endif %}
+{% if b.kind == 'kv' %}
+<dl>{% for r in b.rows %}<dt>{{ v(r.label, p ~ '/rows/' ~ loop.index0 ~ '/label') }}</dt><dd>{{ v(r.value, p ~ '/rows/' ~ loop.index0 ~ '/value') }}</dd>{% endfor %}</dl>
+{% elif b.kind == 'table' %}
+<div class="tw"><table>
+<thead><tr>{% for c in b.columns %}<th>{{ v(c.label, p ~ '/columns/' ~ loop.index0 ~ '/label') }}</th>{% endfor %}</tr></thead>
+<tbody>
+{% for r in b.rows %}{% set rp = p ~ '/rows/' ~ loop.index0 %}<tr>{% for c in b.columns %}<td class="f-{{ c.format }}">{% if c.href_key and r[c.href_key] %}<a href="{{ r[c.href_key] }}">{{ v(r[c.key], rp ~ '/' ~ (c.key|pt), c.format) }}</a>{% else %}{{ v(r[c.key], rp ~ '/' ~ (c.key|pt), c.format) }}{% endif %}</td>{% endfor %}</tr>
+{% else %}<tr><td colspan="{{ b.columns|length }}" class="empty">{{ L('status_empty') }}</td></tr>
+{% endfor %}
+</tbody></table></div>
+<p class="rows">{{ L('total_rows') }}: {{ v(b.total_rows, p ~ '/total_rows') }}{% if b.truncated %} · {{ L('truncated') }}: {{ v(b.truncated, p ~ '/truncated') }}{% endif %}</p>
+{% elif b.kind == 'prose' %}
+<p class="prose author-{{ b.author }}">{% for part in b.parts %}{% if part.slot is defined %}{{ v(part.value, p ~ '/parts/' ~ loop.index0 ~ '/value', 'slot') }}{% else %}{{ v(part.text, p ~ '/parts/' ~ loop.index0 ~ '/text') }}{% endif %}{% endfor %}</p>
+{% if b.author == 'human' %}<p class="note">{{ L('human_input_note') }}</p>{% endif %}
+{% elif b.kind == 'notice' %}
+<div class="notice n-{{ b.level }}">{{ v(b.text, p ~ '/text') }}{% if b.sha256 %}<br><small>{{ L('sha256') }}: {{ v(b.sha256, p ~ '/sha256', 'hash') }}</small>{% endif %}</div>
+{% endif %}
+</div>
+{%- endmacro -%}
+<!doctype html>
+<html lang="{{ doc.language }}">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{ doc.title }}</title>
+<style>
+:root{color-scheme:light;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#1b1f24;background:#fff}
+body{margin:0 auto;max-width:1200px;padding:1.5rem;line-height:1.45}
+h1{font-size:1.6rem;margin:.2rem 0}h2{font-size:1.25rem;border-bottom:2px solid #d0d7de;padding-bottom:.25rem;margin-top:2rem}
+h3{font-size:1rem;margin:1rem 0 .4rem}
+.lead{color:#57606a}
+dl{display:grid;grid-template-columns:minmax(12rem,22rem) 1fr;gap:.2rem .8rem;margin:.4rem 0}dt{color:#57606a}dd{margin:0;overflow-wrap:anywhere}
+.tw{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:.82rem}
+th,td{border:1px solid #d0d7de;padding:.25rem .4rem;text-align:left;vertical-align:top}th{background:#f6f8fa}
+td.f-quote,td.f-text{white-space:pre-wrap;overflow-wrap:anywhere}td.f-number,td.f-id{text-align:right;font-variant-numeric:tabular-nums}
+.v-hash,td.f-hash{font-family:ui-monospace,monospace;font-size:.75rem;overflow-wrap:anywhere}
+.notice{border-left:4px solid #8c959f;background:#f6f8fa;padding:.5rem .7rem;margin:.5rem 0}
+.n-unavailable,.n-error{border-color:#cf222e;background:#ffebe9}.n-warning{border-color:#bf8700;background:#fff8c5}
+.n-disclaimer{border-color:#0969da;background:#ddf4ff;font-weight:600}
+.status-unavailable h2,.status-error h2{color:#cf222e}
+.rows,.note,.meta{color:#57606a;font-size:.8rem}
+.prose{max-width:60rem}.author-human{border-left:3px solid #8250df;padding-left:.6rem}
+.v-slot{font-weight:600}
+nav ol{columns:2;font-size:.9rem}
+@media print{body{max-width:none;padding:0}.tw{overflow:visible}a{color:inherit}h2{break-after:avoid}tr{break-inside:avoid}}
+</style>
+</head>
+<body>
+<header>
+<h1>{{ v(doc.title, '/title') }}</h1>
+<p class="lead">{{ v(doc.type_label, '/type_label') }} · {{ L('generated_at') }}: {{ v(doc.method.generated_at, '/method/generated_at') }} · {{ L('report_uid') }}: {{ v(doc.report_uid, '/report_uid', 'hash') }}</p>
+<p class="lead">{{ L('content_sha256') }}: {{ v(doc.integrity.content_sha256, '/integrity/content_sha256', 'hash') }}</p>
+</header>
+{% block intro %}{% endblock %}
+<nav><ol>{% for s in doc.sections %}<li><a href="#s-{{ s.section }}">{{ v(s.title, '/sections/' ~ loop.index0 ~ '/title') }}</a></li>{% endfor %}<li><a href="#method">{{ L('method') }}</a></li></ol></nav>
+<main>
+{% for s in doc.sections %}{% set sp = '/sections/' ~ loop.index0 %}
+<section id="s-{{ s.section }}" class="status-{{ s.status }}">
+<h2>{{ v(s.title, sp ~ '/title') }}</h2>
+<p class="meta">{{ L('status') }}: {{ v(s.status_label, sp ~ '/status_label') }}{% if s.reason %} · {{ L('reason') }}: {{ v(s.reason, sp ~ '/reason') }}{% endif %}{% if s.rule %} · {{ L('rule') }}: {{ v(s.rule, sp ~ '/rule') }}{% endif %} · {{ L('provider') }}: {{ v(s.provider_version, sp ~ '/provider_version') }}</p>
+{% for b in s.blocks %}{{ render_block(b, sp ~ '/blocks/' ~ loop.index0) }}{% endfor %}
+</section>
+{% endfor %}
+{% set m = doc.method %}
+<section id="method">
+<h2>{{ L('method') }}</h2>
+<dl>
+<dt>{{ L('report_type') }}</dt><dd>{{ v(m.report_type, '/method/report_type') }}</dd>
+<dt>{{ L('template_id') }}</dt><dd>{{ v(m.template.id, '/method/template/id') }}</dd>
+<dt>{{ L('template_version') }}</dt><dd>{{ v(m.template.version, '/method/template/version') }}</dd>
+<dt>{{ L('ageds_version') }}</dt><dd>{{ v(m.ageds_version, '/method/ageds_version') }}</dd>
+<dt>{{ L('git_commit') }}</dt><dd>{{ v(m.git_commit, '/method/git_commit', 'hash') }}</dd>
+<dt>{{ L('git_dirty') }}</dt><dd>{{ v(m.git_dirty, '/method/git_dirty') }}</dd>
+<dt>{{ L('generated_at') }}</dt><dd>{{ v(m.generated_at, '/method/generated_at') }}</dd>
+<dt>{{ L('language') }}</dt><dd>{{ v(doc.language, '/language') }}</dd>
+<dt>{{ L('parameters_sha256') }}</dt><dd>{{ v(m.parameters_sha256, '/method/parameters_sha256', 'hash') }}</dd>
+<dt>{{ L('requested_from') }}</dt><dd>{{ v(m.data_range.requested_from, '/method/data_range/requested_from') }}</dd>
+<dt>{{ L('requested_to') }}</dt><dd>{{ v(m.data_range.requested_to, '/method/data_range/requested_to') }}</dd>
+<dt>{{ L('numbers_policy') }}</dt><dd>{{ v(m.numbers_policy, '/method/numbers_policy') }}</dd>
+<dt>{{ L('model_prose') }}</dt><dd>{{ v(m.model_prose, '/method/model_prose') }}</dd>
+<dt>{{ L('signed') }}</dt><dd>{{ v(m.signed, '/method/signed') }}</dd>
+<dt>{{ L('canonicalization') }}</dt><dd>{{ v(doc.integrity.canonicalization, '/integrity/canonicalization') }}</dd>
+<dt>{{ L('content_sha256') }}</dt><dd>{{ v(doc.integrity.content_sha256, '/integrity/content_sha256', 'hash') }}</dd>
+</dl>
+{% for b in doc.method_view %}{{ render_block(b, '/method_view/' ~ loop.index0) }}{% endfor %}
+</section>
+</main>
+</body>
+</html>

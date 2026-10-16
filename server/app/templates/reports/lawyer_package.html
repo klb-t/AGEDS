@@ -1,0 +1,3 @@
+{#- Report type "lawyer_package": generic layout plus the type's reading note (label intro_lawyer_package). -#}
+{% extends 'base.html' %}
+{% block intro %}<div class="notice n-info">{{ v(doc.labels['intro_lawyer_package'], '/labels/intro_lawyer_package') }}</div>{% endblock %}

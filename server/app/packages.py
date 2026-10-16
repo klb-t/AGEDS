@@ -33,6 +33,35 @@ OBJECT_TABLES = {
     'tag': 'tags', 'job': 'jobs', 'link': 'links',
 }
 
+# Extension tables (feature areas, schema versions >= 10) travel in a separate,
+# versioned ``extension_tables`` section. The core ``tables``/``integrity``
+# format above is unchanged. Only tables named here are exported: a new table
+# is never included silently. A table present in the database but neither
+# declared, excluded nor internal is listed by name in ``undeclared_tables``.
+EXTENSION_SCHEMA_ID = 'ageds.metadata-extension-tables/v1'
+EXTENSION_TABLES = (
+    'collections', 'catalog_scans', 'catalog_content_groups', 'catalog_entries', 'catalog_entry_times',
+    'catalog_issues', 'catalog_entry_artifacts', 'catalog_marks', 'catalog_profiles',
+    'catalog_description_runs', 'catalog_annotations', 'catalog_annotation_decisions',
+    'event_times', 'record_exports', 'record_export_files', 'record_export_parses',
+    'logical_records', 'logical_occurrences', 'chat_attachment_refs',
+    'contact_observations', 'contact_observation_values', 'recording_name_observations',
+    'event_media_references',
+    'speaker_turns', 'speaker_assignments', 'event_candidates',
+    'annotation_proposals', 'hypothesis_imports', 'relation_hypotheses',
+    'reports',
+)
+EXCLUDED_EXTENSION_TABLES = {
+    'api_tokens': 'credential table: token keys, salts and secret digests are never exported',
+}
+EXCLUDED_EXTENSION_COLUMNS = {
+    'annotation_proposals': {'token_id': 'reference into the excluded credential table api_tokens'},
+}
+# Credential-like column names refused in any exported extension row.
+CREDENTIAL_COLUMNS = frozenset({'secret_sha256', 'salt', 'token_key', 'secret', 'password', 'token'})
+# SQLite internals and the derived, rebuildable full-text index are not metadata.
+INTERNAL_TABLE_PREFIXES = ('sqlite_', 'search_fts')
+
 
 def canonical_json(value: Any) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True,
@@ -51,12 +80,56 @@ def _integrity(payload: dict) -> dict:
     }
 
 
-def export_metadata_package() -> dict:
+def _order_clause(db, name: str) -> str:
+    """Primary-key order; static identifiers from PRAGMA, never user input."""
+    columns = sorted((row[5], row[1]) for row in db.execute(f'PRAGMA table_info("{name}")') if row[5])
+    return ','.join('"' + column.replace('"', '""') + '"' for _, column in columns) or 'rowid'
+
+
+def extension_section(db, existing: set[str]) -> dict:
+    """Declared extension tables in the caller's read transaction.
+
+    Excluded tables and columns are named with their reason; nothing outside
+    ``EXTENSION_TABLES`` is exported. Missing declared tables are explicit.
+    """
+    declared = set(TABLES) | set(EXTENSION_TABLES) | set(EXCLUDED_EXTENSION_TABLES)
+    tables = {}
+    for name in EXTENSION_TABLES:
+        if name not in existing:
+            tables[name] = []
+            continue
+        excluded = EXCLUDED_EXTENSION_COLUMNS.get(name, {})
+        rows = []
+        for row in db.execute(f'SELECT * FROM "{name}" ORDER BY {_order_clause(db, name)}'):
+            item = {key: row[key] for key in row.keys() if key not in excluded}
+            leaked = CREDENTIAL_COLUMNS.intersection(item)
+            if leaked:
+                raise RuntimeError(f'extension table {name} has credential-like columns {sorted(leaked)}; '
+                                   'declare an exclusion in packages.EXCLUDED_EXTENSION_COLUMNS')
+            rows.append(item)
+        tables[name] = rows
+    return {
+        'schema': EXTENSION_SCHEMA_ID,
+        'declared': list(EXTENSION_TABLES),
+        'excluded_tables': dict(sorted(EXCLUDED_EXTENSION_TABLES.items())),
+        'excluded_columns': {table: dict(sorted(columns.items()))
+                             for table, columns in sorted(EXCLUDED_EXTENSION_COLUMNS.items())},
+        'missing_tables': [name for name in EXTENSION_TABLES if name not in existing],
+        'undeclared_tables': sorted(name for name in existing if name not in declared
+                                    and not name.startswith(INTERNAL_TABLE_PREFIXES)),
+        'tables': tables,
+        'table_sha256': {name: _sha(rows) for name, rows in tables.items()},
+    }
+
+
+def export_metadata_package(*, include_extension_tables: bool = True) -> dict:
     """Snapshot all core metadata in one read transaction, without migration.
 
     Older databases can be inspected without rewriting them: missing additive
     tables are explicit, and historical rows are not fabricated. A consumer must
     not treat empty missing tables as evidence that no such history existed.
+    Declared extension tables are added as a separate versioned section; the
+    payload digest covers it, the core table digests are unchanged.
     """
     # Verification can be used in an isolated CLI without importing config,
     # whose initialization creates live storage directories.
@@ -78,6 +151,8 @@ def export_metadata_package() -> dict:
             'missing_tables': [name for name in TABLES if name not in existing],
             'tables': tables,
         }
+        if include_extension_tables:
+            payload['extension_tables'] = extension_section(db, existing)
         # Reject nonfinite numeric database values instead of emitting JSON NaN.
         payload['integrity'] = _integrity(payload)
         db.rollback()
@@ -353,8 +428,78 @@ def validate_metadata_package(package: Any, *, budget: VerificationBudget | None
         for name in missing:
             if rows[name]:
                 error('contradictory_missing_table', f'$.tables.{name}', 'A missing table cannot also contain rows.')
+    if 'extension_tables' in package:
+        _validate_extension_section(package['extension_tables'], error, counts)
     warning('unsigned_metadata_only', '$', 'Digest is not authentication; source bytes and replay are not included or verified.')
     return result()
+
+
+def _validate_extension_section(section: Any, error, counts: dict) -> None:
+    """Structure and per-table digests of the optional extension section.
+
+    Packages without the section (older exports) validate exactly as before.
+    Rows are not cross-checked against core tables here: the section declares
+    and digests what was exported; its semantics belong to each owning area.
+    """
+    base = '$.extension_tables'
+    if not isinstance(section, dict):
+        error('invalid_extension_section', base, 'Extension section must be an object.')
+        return
+    expected = {'schema', 'declared', 'excluded_tables', 'excluded_columns', 'missing_tables',
+                'undeclared_tables', 'tables', 'table_sha256'}
+    if set(section) != expected:
+        error('invalid_extension_section', base, 'Extension section fields differ from v1.')
+        return
+    if section['schema'] != EXTENSION_SCHEMA_ID:
+        error('unsupported_extension_schema', f'{base}.schema', f'Expected {EXTENSION_SCHEMA_ID}.', 'digest')
+        return
+    declared, tables, digests = section['declared'], section['tables'], section['table_sha256']
+    excluded_tables, excluded_columns = section['excluded_tables'], section['excluded_columns']
+    if (not isinstance(declared, list) or any(not isinstance(name, str) for name in declared)
+            or len(set(declared)) != len(declared)):
+        error('invalid_extension_section', f'{base}.declared', 'Declared tables must be unique names.')
+        return
+    if not isinstance(tables, dict) or set(tables) != set(declared):
+        error('undeclared_extension_table', f'{base}.tables', 'Exported tables must equal the declared list.')
+        return
+    if not isinstance(digests, dict) or set(digests) != set(declared):
+        error('invalid_extension_section', f'{base}.table_sha256', 'Each declared table must have a digest.', 'digest')
+        return
+    if not isinstance(excluded_tables, dict) or not isinstance(excluded_columns, dict):
+        error('invalid_extension_section', base, 'Exclusions must be objects with reasons.')
+        return
+    for name in excluded_tables:
+        if name in tables:
+            error('excluded_extension_table_present', f'{base}.tables.{name}', 'An excluded table cannot be exported.')
+    for field in ('missing_tables', 'undeclared_tables'):
+        value = section[field]
+        if not isinstance(value, list) or any(not isinstance(name, str) for name in value):
+            error('invalid_extension_section', f'{base}.{field}', 'Must be a list of table names.')
+    if isinstance(section['missing_tables'], list):
+        for name in section['missing_tables']:
+            if name not in tables:
+                error('invalid_extension_section', f'{base}.missing_tables', 'Missing tables must be declared tables.')
+            elif tables[name]:
+                error('contradictory_missing_table', f'{base}.tables.{name}', 'A missing table cannot also contain rows.')
+    for name in declared:
+        rows = tables[name]
+        path = f'{base}.tables.{name}'
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            error('invalid_extension_table', path, 'Extension table must be an array of objects.')
+            continue
+        counts[f'extension:{name}'] = len(rows)
+        try:
+            if digests.get(name) != _sha(rows):
+                error('extension_table_digest_mismatch', path, 'Extension table digest does not match.', 'digest')
+        except (TypeError, ValueError, OverflowError, UnicodeError, RecursionError) as exc:
+            error('noncanonical_table_json', path, str(exc), 'digest')
+        forbidden = set(excluded_columns.get(name, {})) if isinstance(excluded_columns.get(name), dict) else set()
+        for position, row in enumerate(rows):
+            present = (forbidden | CREDENTIAL_COLUMNS).intersection(row)
+            if present:
+                error('excluded_extension_column_present', f'{path}[{position}]',
+                      'Excluded or credential-like column present: ' + ', '.join(sorted(present)))
+                break
 
 
 def _strict_stored_json(raw: str, *, finite: bool = True, budget: VerificationBudget | None = None) -> Any:

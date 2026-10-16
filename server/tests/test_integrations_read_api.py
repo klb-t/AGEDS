@@ -138,11 +138,11 @@ class ReadApiTests(IntegrationCase):
         missing = self.get(f'/api/read/v1/artifacts/{self.artifact_twin}/citations/{self.anchor["id"]}/packet', self.read)
         self.assertEqual((missing.status_code, missing.json()['detail']['code']), (404, 'not_found'))
 
-    def test_reports_stub_is_explicit(self):
+    def test_reports_listing_is_explicit(self):
+        # The reports area replaced the stub: an empty register is listed as such, never fabricated.
         reports = self.get('/api/read/v1/reports', self.read).json()
-        self.assertEqual((reports['available'], reports['items']), (False, []))
-        self.assertIn('not implemented', reports['reason'])
-        self.assertEqual(reports['detected_report_tables'], [])
+        self.assertEqual((reports['available'], reports['items'], reports['has_more']), (True, [], False))
+        self.assertIs(reports['output_location_included'], False)
 
     def test_reads_never_write_or_touch_sources(self):
         from pathlib import Path

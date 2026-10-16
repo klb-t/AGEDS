@@ -1,0 +1,5 @@
+.report-form{border:1px solid #30363d;border-radius:10px;padding:.6rem .8rem;margin:.6rem 0}.report-form summary{cursor:pointer;font-weight:700}
+.report-fields label{display:block;margin:.35rem 0;color:#8b949e;font-size:.85rem}.report-fields label.check{display:inline-flex;gap:.4rem;align-items:center;margin-right:1rem}
+.report-fields label.check input{width:auto}.report-fields fieldset{border:1px solid #30363d;border-radius:8px;margin:.5rem 0}
+.report-error{border-color:#f85149;color:#ffa198}.report-preview{width:100%;height:75vh;border:1px solid #30363d;border-radius:8px;background:#fff}
+.pill{display:inline-block;padding:0 .35rem;border-radius:6px;background:#21262d;font-size:.75rem;margin:.1rem 0}.pill.s-unavailable,.pill.s-error{background:#5a1e1e}.pill.s-partial{background:#4d3800}

@@ -194,5 +194,23 @@
     "density places items at their sort time; unknown-zone share is reported per bucket",
     "dashboard list on / and /export/events.csv keep their old ordering (outside file scope)",
     "no probability is computed for correlation hypotheses"
-  ]
+  ],
+  "post_merge_check": {
+    "head": "be24f9a (merge of integration tip e1ce8d2 incl. track A catalog)",
+    "backend_full_suite": {
+      "passed": 763,
+      "skipped": 1,
+      "failed": 0,
+      "subtests_passed": 680
+    },
+    "javascript": {
+      "passed": 95,
+      "failed": 0
+    },
+    "browser_timeline_5k": {
+      "cases_passed": 7,
+      "exit_code": 0
+    },
+    "verify_repository": "OK"
+  }
 }

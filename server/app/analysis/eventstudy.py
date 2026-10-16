@@ -9,8 +9,10 @@ Method (all integer arithmetic on UTC milliseconds; no parametric p-values):
   half-open window ``[start_s, end_s)``; lag = outcome time − stimulus time.
 * Detection-bias control: documentation density ``D`` (default: every timed
   event that is neither a stimulus nor an outcome). The normalized statistic is
-  the excess of outcomes over the global documentation share,
-  ``O_w − (|O|/|D|)·D_w``, compared integer-exactly as ``O_w·|D| − |O|·D_w``.
+  the outcome share of documentation inside the windows,
+  ``ΣO_w / Σ(O_w + D_w)`` (``ΣO_w / ΣD_w`` when ``D`` includes outcomes),
+  compared as exact fractions; null draws with an empty denominator are
+  undefined and reported, not counted.
 * Null: the stimulus times are moved ``n`` times by the registered null model
   (circular shift within the observed span, permutation among eligible event
   times, permutation within weekday×hour strata, or block permutation) using
@@ -28,6 +30,7 @@ from __future__ import annotations
 import json
 import math
 import sqlite3
+from fractions import Fraction
 from array import array
 from bisect import bisect_left
 from dataclasses import dataclass
@@ -132,8 +135,8 @@ def _extreme_count(null_values, observed: int, direction: str) -> int:
     return sum(1 for v in null_values if abs(n * v - total) >= distance)
 
 
-def _summary(null_values, observed: int, direction: str, scale: int = 1) -> dict:
-    """Null distribution summary; ``scale`` divides integer statistics for display only."""
+def _summary(null_values, observed, direction: str, scale: int = 1) -> dict:
+    """Null distribution summary over exact values (ints or Fractions); ``scale`` is display only."""
     ordered = sorted(null_values)
     n = len(ordered)
     k = _extreme_count(null_values, observed, direction)
@@ -584,15 +587,28 @@ def compute_event_study(definition: dict, params: dict, loaded: dict, *, fts: di
         })
         normalized = None
         if n_d:
-            excess = [n_d * vo - n_o * vd for vo, vd in zip(null_o[index], null_d[index])]
-            obs_excess = n_d * obs - n_o * observed_d[index]
-            normalized = _summary(excess, obs_excess, direction, scale=n_d)
-            normalized.update({'statistic': 'O_w - (|O|/|D|)*D_w', 'outcome_share_of_documentation': _round(n_o / n_d),
-                               'difference_per_stimulus': _round((obs_excess - sum(excess) / n) / n_d / len(S))})
+            plus_outcomes = params['density_excludes_outcomes']
+
+            def share(o, d):
+                total = o + d if plus_outcomes else d
+                return Fraction(o, total) if total > 0 else None
+            observed_share = share(obs, observed_d[index])
+            null_shares = [v for v in (share(o, d) for o, d in zip(null_o[index], null_d[index])) if v is not None]
+            if observed_share is not None and null_shares:
+                normalized = _summary(null_shares, observed_share, direction)
+                null_share_mean = sum(null_shares) / len(null_shares)
+                normalized.update({
+                    'statistic': 'sum(O_w) / sum(O_w + D_w)' if plus_outcomes else 'sum(O_w) / sum(D_w)',
+                    'n_undefined': n - len(null_shares),
+                    'global_share': _round(Fraction(n_o, n_o + n_d) if plus_outcomes else Fraction(n_o, n_d)),
+                    'share_difference': _round(observed_share - null_share_mean),
+                    'share_ratio': _round(observed_share / null_share_mean) if null_share_mean else None,
+                })
         d_mean = sum(null_d[index]) / n
         windows.append({
             'label': w['label'], 'start_s': w['start_s'], 'end_s': w['end_s'], 'naive': naive,
-            'normalized': normalized if normalized else {'status': 'unavailable', 'reason': 'no density events'},
+            'normalized': normalized if normalized else {'status': 'unavailable',
+                                                         'reason': 'no density events or empty denominators'},
             'density': {'observed': observed_d[index], 'null_mean': _round(d_mean),
                         'ratio': _round(observed_d[index] / d_mean) if d_mean else None},
         })

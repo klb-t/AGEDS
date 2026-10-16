@@ -26,6 +26,10 @@ from .timeutil import US, parse_bound
 UNKNOWN = 'local_as_utc_unknown_zone'
 
 
+# Projection reasons mapped to the analysis item contract (analysis/source.py).
+_ANALYSIS_REASON = {'no_candidates': 'no_time_candidate', 'no_usable_candidate': 'no_parseable_time'}
+
+
 def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc: str | None = None,
                event_types=None, assume_zone: str | None = None, assumption_rule: str | None = None,
                unknown_zone: str = 'exclude', include_hidden: bool = False, rule: Rule | str | None = None,
@@ -82,7 +86,7 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
     for row in db.execute(f'SELECT ref_id, event_type, flags_json FROM timeline_items ti WHERE {where} AND ti.sort_us IS NULL '
                           'ORDER BY ti.ref_id LIMIT ?', (*args, limit + 1)):
         untimed.append({'event_id': row['ref_id'], 'event_type': row['event_type'],
-                        'reason': json.loads(row['flags_json'] or '{}').get('undated_reason', 'no_time_candidate')})
+                        'reason': _ANALYSIS_REASON.get(reason := json.loads(row['flags_json'] or '{}').get('undated_reason'), reason or 'no_time_candidate')})
     return {'rule': f'{resolved.rule_id}@{resolved.version}', 'rule_sha256': resolved.sha256, 'params': params,
             'projection': {'id': projection['id'], 'build_id': projection['build']['id']},
             'assume_zone': assume_zone, 'unknown_zone': unknown_zone, 'items': items, 'untimed': untimed,

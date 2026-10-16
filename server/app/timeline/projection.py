@@ -374,14 +374,29 @@ def ensure_projection(db: sqlite3.Connection, rule: Rule | None = None, params: 
         if build is not None and json.loads(build['watermarks_json']) == watermarks(db):
             return _describe(rule, params, int(row['id']), build, 'fresh')
     started_at, started = _now(), time.perf_counter()
-    db.execute('BEGIN IMMEDIATE')
+    # Inside a caller's transaction (e.g. a report or analysis that already read
+    # in this connection) the refresh joins it as a savepoint, so the caller sees
+    # the refreshed cache in its own snapshot; otherwise it takes its own lock.
+    nested = db.in_transaction
+
+    def _commit():
+        db.execute('RELEASE SAVEPOINT timeline_refresh') if nested else db.commit()
+
+    def _rollback():
+        if nested:
+            db.execute('ROLLBACK TO SAVEPOINT timeline_refresh')
+            db.execute('RELEASE SAVEPOINT timeline_refresh')
+        else:
+            db.rollback()
+
+    db.execute('SAVEPOINT timeline_refresh' if nested else 'BEGIN IMMEDIATE')
     try:
         pid = projection_id(db, rule, params)
         build = _last_build(db, pid)
         current = watermarks(db)
         last = json.loads(build['watermarks_json']) if build is not None else None
         if last == current and not force_full:
-            db.commit()
+            _commit()
             return _describe(rule, params, pid, build, 'fresh')
         plan = None if (last is None or force_full) else _affected(db, last, current)
         if plan is None:
@@ -406,9 +421,9 @@ def ensure_projection(db: sqlite3.Connection, rule: Rule | None = None, params: 
         cur = db.execute('''INSERT INTO timeline_projection_builds(projection_id,mode,started_at,finished_at,duration_ms,
                             watermarks_json,counts_json) VALUES(?,?,?,?,?,?,?)''',
                          (pid, mode, started_at, _now(), duration_ms, canonical_json(current), canonical_json(counts)))
-        db.commit()
+        _commit()
     except Exception:
-        db.rollback()
+        _rollback()
         raise
     build = db.execute('SELECT * FROM timeline_projection_builds WHERE id=?', (cur.lastrowid,)).fetchone()
     return _describe(rule, params, pid, build, 'refreshed')

@@ -33,6 +33,7 @@ fenced transaction as the job completion (``jobs.publish_result``). Job
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
 import socket
@@ -55,6 +56,9 @@ JOB_KIND = 'import_plan_item'
 WORKDIR_PREFIX = 'ageds-importplan-a'
 REQUIRED_ROLES = {'file', 'archive', 'conversations', 'chat_text'}
 RESULT_MAX_BYTES = 64 * 1024
+HEARTBEAT_MIN_INTERVAL_S = 1.0
+HEARTBEAT_RETRY_BASE_S = 0.25
+log = logging.getLogger(__name__)
 
 
 from .limits import RUN_LIMIT_NAMES as LIMIT_NAMES, RunLimits  # noqa: E402,F401  (re-exported)
@@ -214,16 +218,30 @@ def _renew(attempt_id: int, token: str, lease_seconds: int) -> bool:
 
 @contextmanager
 def _heartbeat(attempt_id: int, token: str, lease_seconds: int):
+    """Renew the attempt's lease every third of its length while the item runs.
+
+    A renewal that fails (e.g. ``database is locked`` while another request holds the
+    write lock) is retried with exponential backoff, capped at the regular interval,
+    instead of ending the heartbeat (review 2 finding 10); only a renewal that finds
+    the lease taken over (``_renew`` returns False) stops it.
+    """
     stop = threading.Event()
-    interval = max(1.0, lease_seconds / 3)
+    interval = max(HEARTBEAT_MIN_INTERVAL_S, lease_seconds / 3)
 
     def beat():
-        while not stop.wait(interval):
+        delay, failures = interval, 0
+        while not stop.wait(delay):
             try:
-                if not _renew(attempt_id, token, lease_seconds):
-                    return
-            except Exception:  # pragma: no cover - a failed renewal only shortens the lease
+                renewed = _renew(attempt_id, token, lease_seconds)
+            except Exception as exc:  # transient (busy/locked database): retry sooner, never give up silently
+                failures += 1
+                delay = min(interval, HEARTBEAT_RETRY_BASE_S * 2 ** (failures - 1))
+                log.warning('import plan attempt %s: lease renewal failed (%s), retry %s in %.2f s',
+                            attempt_id, exc, failures, delay)
+                continue
+            if not renewed:
                 return
+            delay, failures = interval, 0
     thread = threading.Thread(target=beat, name=f'importplan-lease-{attempt_id}', daemon=True)
     thread.start()
     try:

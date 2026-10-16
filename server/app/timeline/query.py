@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 
 from ..search import SearchQueryError, validate_query
 from .candidates import lane_key
-from .projection import event_selection, recording_selection
+from .projection import event_selection, label_flags, recording_selection
 from .ruleset import Rule, canonical_json
 from .timeutil import US, add_unit, floor_unit, iso
 
@@ -309,6 +309,7 @@ def hydrate(db, rows, rule: Rule, params: dict, *, candidates: bool, group: str 
                 'kind': r['item_kind'], 'event_type': r['event_type'], 'source_id': r['source_id'],
                 'artifact_id': r['artifact_id'], 'collection_id': r['collection_id'], 'counterparty': r['counterparty'],
                 'chatbot': r['chatbot'], 'thread_id': r['thread_id'], 'hidden': bool(r['hidden']), 'time': _time(r)}
+        label_flags(item['time']['flags'], params)
         if group:
             item['lane'] = r[GROUPS[group]]
         if r['item_kind'] == 'event':

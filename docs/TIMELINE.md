@@ -72,6 +72,17 @@ compares watermarks: unchanged → `fresh`; new events/candidates/transcripts/ob
 decisions → **incremental** recomputation of affected events and recordings; deleted rows →
 full rebuild; a build written by older projection code (`watermarks.projection_code` ≠ the
 current `PROJECTION_CODE`, now 2) is rebuilt in full on first use after an upgrade.
+**Projection identity and cache bound (review finding 7).** A projection is keyed by
+the rule and the *effective zone parameters* (`assume_zone`, `zone_by_source`) only; the
+free-text `assumption_rule` label is not stored in the cache: items keep the placeholder
+`$request.assumption_rule` and every reader (window, item, export, `analysis_items`)
+reports the label of its own request, so a typo or a new label never copies the items
+again. At most `EW_TIMELINE_MAX_PROJECTIONS` (default 8) non-default projections keep
+materialized items; after a full build the least recently built others lose their items
+(rebuildable cache) and an append-only `timeline_projection_evictions` row (schema 32)
+records projection, build, count and reason; their next use rebuilds them in full. The
+default projection (`{}`) is never evicted. Projection and build-log rows stay
+(append-only); reads still write the cache when data or parameters changed.
 Rule versions and operator parameters get separate projections, so a new
 version never overwrites an older one. Measured on 200 000 synthetic events: first build
 ≈ 11 s, incremental refresh after 1 000 new events ≈ 0.15 s, fresh check ≈ 1 ms

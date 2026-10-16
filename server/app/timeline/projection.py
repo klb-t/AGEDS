@@ -10,6 +10,7 @@ accepted correlation hypotheses at any time.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sqlite3
 import time
@@ -67,6 +68,38 @@ def hidden_reason(rule: Rule, event) -> str | None:
     if event['hidden_flag']:
         return 'metadata_flag'
     return None
+
+
+# Review finding 7: the free-text ``assumption_rule`` label is not part of a
+# projection's identity. Items store this placeholder in their flags; readers
+# substitute the label of their own request (``label_flags``). Placement does
+# not depend on the label, only on the effective zone parameters.
+ASSUMPTION_LABEL = '$request.assumption_rule'
+DEFAULT_MAX_PROJECTIONS = 8
+
+
+def max_projections() -> int:
+    """Materialized non-default projections kept (``EW_TIMELINE_MAX_PROJECTIONS``, default 8)."""
+    try:
+        value = int(os.environ.get('EW_TIMELINE_MAX_PROJECTIONS', ''))
+    except ValueError:
+        return DEFAULT_MAX_PROJECTIONS
+    return value if value >= 1 else DEFAULT_MAX_PROJECTIONS
+
+
+def cache_params(params: dict) -> dict:
+    """Projection identity: the effective zone parameters, never the free-text label."""
+    key = {k: v for k, v in params.items() if k != 'assumption_rule'}
+    if key.get('assume_zone') or key.get('zone_by_source'):
+        key['assumption_rule'] = ASSUMPTION_LABEL
+    return key
+
+
+def label_flags(flags: dict, params: dict) -> dict:
+    """Put the requesting call's ``assumption_rule`` where a stored item has the placeholder."""
+    if flags.get('assumption_rule') == ASSUMPTION_LABEL:
+        flags['assumption_rule'] = params.get('assumption_rule')
+    return flags
 
 
 def projection_id(db: sqlite3.Connection, rule: Rule, params: dict) -> int:
@@ -404,25 +437,49 @@ def _last_build(db, pid: int):
     return db.execute('SELECT * FROM timeline_projection_builds WHERE projection_id=? ORDER BY id DESC LIMIT 1', (pid,)).fetchone()
 
 
+def _evicted(db, build) -> bool:
+    return db.execute('SELECT 1 FROM timeline_projection_evictions WHERE projection_id=? AND build_id=?',
+                      (build['projection_id'], build['id'])).fetchone() is not None
+
+
+def _evict_over_cap(db, keep: int) -> list[int]:
+    """Drop the items of the least recently built non-default projections beyond the cap."""
+    cap = max_projections()
+    rows = db.execute('''SELECT p.id AS pid, b.id AS build_id FROM timeline_projections p
+        JOIN timeline_projection_builds b ON b.id=(SELECT MAX(id) FROM timeline_projection_builds WHERE projection_id=p.id)
+        WHERE p.params_json <> '{}' AND NOT EXISTS (SELECT 1 FROM timeline_projection_evictions e
+                                                    WHERE e.projection_id=p.id AND e.build_id=b.id)
+        ORDER BY b.id DESC''').fetchall()
+    victims = [r for r in rows if r['pid'] != keep][max(cap - 1, 0):]
+    for victim in victims:
+        deleted = db.execute('DELETE FROM timeline_items WHERE projection_id=?', (victim['pid'],)).rowcount
+        db.execute('''INSERT INTO timeline_projection_evictions(projection_id,build_id,evicted_at,items_deleted,reason)
+                      VALUES(?,?,?,?,?)''', (victim['pid'], victim['build_id'], _now(), deleted,
+                                             f'over_cap: EW_TIMELINE_MAX_PROJECTIONS={cap} non-default projections'))
+    return [int(v['pid']) for v in victims]
+
+
 def ensure_projection(db: sqlite3.Connection, rule: Rule | None = None, params: dict | None = None, *,
                       force_full: bool = False) -> dict:
     """Return a fresh projection description, refreshing the cache when data changed."""
     rule = rule or load_rule(kind='display_rule')
     params = params or {}
+    key = cache_params(params)
     db.execute('PRAGMA busy_timeout=60000')
     row = db.execute('''SELECT id FROM timeline_projections WHERE rule_id=? AND rule_version=? AND rule_sha256=?
-                        AND params_sha256=?''', (rule.rule_id, rule.version, rule.sha256, params_sha256(params))).fetchone()
+                        AND params_sha256=?''', (rule.rule_id, rule.version, rule.sha256, params_sha256(key))).fetchone()
     if row is not None and not force_full:
         build = _last_build(db, int(row['id']))
-        if build is not None and json.loads(build['watermarks_json']) == watermarks(db):
+        if build is not None and json.loads(build['watermarks_json']) == watermarks(db) and not _evicted(db, build):
             return _describe(rule, params, int(row['id']), build, 'fresh')
     started_at, started = _now(), time.perf_counter()
     db.execute('BEGIN IMMEDIATE')
     try:
-        pid = projection_id(db, rule, params)
+        pid = projection_id(db, rule, key)
         build = _last_build(db, pid)
         current = watermarks(db)
-        last = json.loads(build['watermarks_json']) if build is not None else None
+        evicted = build is not None and _evicted(db, build)
+        last = json.loads(build['watermarks_json']) if build is not None and not evicted else None
         if last == current and not force_full:
             db.commit()
             return _describe(rule, params, pid, build, 'fresh')
@@ -431,8 +488,8 @@ def ensure_projection(db: sqlite3.Connection, rule: Rule | None = None, params: 
         if plan is None:
             mode = 'full'
             db.execute('DELETE FROM timeline_items WHERE projection_id=?', (pid,))
-            counts = _build_events(db, pid, rule, params, None)
-            counts.update(_build_segments(db, pid, rule, params, None))
+            counts = _build_events(db, pid, rule, key, None)
+            counts.update(_build_segments(db, pid, rule, key, None))
         else:
             mode = 'incremental'
             events, artifacts = plan
@@ -440,16 +497,18 @@ def ensure_projection(db: sqlite3.Connection, rule: Rule | None = None, params: 
             for start in range(0, len(events), BATCH):
                 db.execute("DELETE FROM timeline_items WHERE projection_id=? AND item_kind='event' AND ref_id IN (SELECT value FROM json_each(?))",
                            (pid, json.dumps(events[start:start + BATCH])))
-            counts.update(_build_events(db, pid, rule, params, events))
+            counts.update(_build_events(db, pid, rule, key, events))
             if artifacts:
                 db.execute("""DELETE FROM timeline_items WHERE projection_id=? AND item_kind='transcript_segment'
                               AND artifact_id IN (SELECT value FROM json_each(?))""", (pid, json.dumps(artifacts)))
-                counts.update(_build_segments(db, pid, rule, params, artifacts))
+                counts.update(_build_segments(db, pid, rule, key, artifacts))
         counts['max_halfwidth_us'] = _max_halfwidth(db, pid)
         duration_ms = int((time.perf_counter() - started) * 1000)
         cur = db.execute('''INSERT INTO timeline_projection_builds(projection_id,mode,started_at,finished_at,duration_ms,
                             watermarks_json,counts_json) VALUES(?,?,?,?,?,?,?)''',
                          (pid, mode, started_at, _now(), duration_ms, canonical_json(current), canonical_json(counts)))
+        if mode == 'full' and key:
+            _evict_over_cap(db, pid)
         db.commit()
     except Exception:
         db.rollback()

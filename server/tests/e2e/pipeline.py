@@ -106,7 +106,7 @@ NOT_VERIFIABLE_IN_RUN = {
     'K5': ('Not an end-to-end property. The local suite runs (pytest, node, browser scripts) are recorded in '
            'docs/validation/E2E_ACCEPTANCE_2026-10-16.md; Android was not changed by this task.'),
     'N4': ('A review property of the change set, not of a run. This task adds no product feature; its shared '
-           'edits are four defect fixes with regression tests (listed in the receipt).'),
+           'edits are three defect fixes with four regression tests (listed in the receipt).'),
     'N5': ('A documentation property. CLAUDE.md, HANDOFF.md and docs/FEATURES.md keep the five-layer standard as '
            'future work; the report method sections cover layer-1 metadata only and say so.'),
 }

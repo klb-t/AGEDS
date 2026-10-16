@@ -67,6 +67,10 @@ def plan_conversation(conv, element: Element, ctx: FileContext) -> ConversationP
     stats = Counter()
 
     conv_id, _ = first_of(conv, cm['id'])
+    if conv_id is None and first_of(conv, cm['messages'])[0] is None:
+        # Neither an id nor a message list: another format (e.g. a ChatGPT export), not a damaged conversation.
+        issues.add('conversation_shape_not_recognized', loc(''), keys=sorted(str(k) for k in conv)[:20])
+        return None
     if not isinstance(conv_id, str) or not conv_id:
         issues.add('conversation_id_missing', loc(''))
         conv_id = None

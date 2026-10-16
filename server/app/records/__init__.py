@@ -26,6 +26,16 @@ def _json(value) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False)
 
 
+def check_export_binding(*, namespace: str, label: str, collection_id: int | None) -> None:
+    """Read-only pre-check so a conflicting label fails before files are ingested."""
+    from ..db import session
+    with session() as db:
+        for row in db.execute('SELECT collection_id FROM record_exports WHERE namespace=? AND label=?', (namespace, label)):
+            if collection_id is not None and row['collection_id'] != collection_id:
+                raise IntegrityError(f'export label {label!r} is already bound to collection {row["collection_id"]}; '
+                                     'use a different --export-label')
+
+
 def ensure_export(db: sqlite3.Connection, *, case_id: int, namespace: str, label: str, label_origin: str,
                   collection_id: int | None, metadata: dict | None = None) -> int:
     row = db.execute('SELECT id, label_origin, collection_id FROM record_exports WHERE case_id=? AND namespace=? AND label=?',

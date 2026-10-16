@@ -133,6 +133,10 @@ def plan_conversation(conv, element: Element, ctx: FileContext) -> ConversationP
     cm, nm, mm = m['conversation'], m['node'], m['message']
     stats = Counter()
     conv_id, _ = first_of(conv, cm['id'])
+    if conv_id is None and first_of(conv, cm['mapping'])[0] is None:
+        # Neither an id nor a mapping: another format (e.g. a Claude export), not a damaged conversation.
+        issues.add('conversation_shape_not_recognized', loc(''), keys=sorted(str(k) for k in conv)[:20])
+        return None
     if not isinstance(conv_id, str) or not conv_id:
         issues.add('conversation_id_missing', loc(''))
         conv_id = None

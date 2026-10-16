@@ -55,7 +55,7 @@ PARTIAL_CODES = frozenset({
     'conversation_bytes_limit_exceeded', 'conversation_limit_reached', 'node_limit_reached',
     'truncated_json', 'malformed_json_structure', 'malformed_conversation_json',
     'conversation_not_recorded', 'trailing_data_after_array', 'non_object_element',
-    'conversation_not_object',
+    'conversation_not_object', 'conversation_shape_not_recognized',
 })
 FAILED_CODES = frozenset({
     'empty_file', 'top_level_not_array', 'unsupported_encoding', 'file_too_large',
@@ -945,6 +945,9 @@ def run_import(paths: list[Path], *, mapping: ExportMapping, planner: Planner, p
     conversation_files, other_files = discover_inputs(paths, mapping, limits, run_issues, locator_for=locator_for)
     if not conversation_files:
         raise ValueError(f'no {namespace} conversation files among the inputs (patterns: {mapping.data["files"]})')
+    if export_label:
+        # Fail before any acquisition is recorded when the label is bound elsewhere.
+        records.check_export_binding(namespace=namespace, label=export_label, collection_id=collection_id)
     run = ImportRun(namespace=namespace, collection_id=collection_id, limits=limits, issues=run_issues,
                     parser=parser, parser_version=parser_version)
     ingested: list[tuple[InputFile, int, int, str]] = []

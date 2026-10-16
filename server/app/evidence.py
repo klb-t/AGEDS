@@ -76,7 +76,7 @@ def ensure_source(kind: str, label: str, locator: str | None = None, account: st
         cur = db.execute("INSERT INTO sources(case_id,kind,label,locator,account,metadata_json) VALUES (?,?,?,?,?,?)", (case_id,kind,label,locator,account,json.dumps(metadata or {},ensure_ascii=False)))
         return int(cur.lastrowid)
 
-def ingest_file(path: Path, *, source_id: int, source_locator: str | None = None, original_name: str | None = None, mime_type: str | None = None, metadata: dict | None = None, is_raw: bool = True) -> int:
+def ingest_file(path: Path, *, source_id: int, source_locator: str | None = None, original_name: str | None = None, mime_type: str | None = None, metadata: dict | None = None, is_raw: bool = True, collection_id: int | None = None) -> int:
     metadata_json = json.dumps(metadata or {}, ensure_ascii=False)
     observed_at = _utc_now()
     source_stat = path.stat()
@@ -89,6 +89,10 @@ def ingest_file(path: Path, *, source_id: int, source_locator: str | None = None
         source = db.execute('SELECT case_id FROM sources WHERE id=?', (source_id,)).fetchone()
         if source is None:
             raise ValueError('source does not exist')
+        if collection_id is not None:
+            collection = db.execute('SELECT case_id FROM collections WHERE id=?', (collection_id,)).fetchone()
+            if collection is None or collection['case_id'] != source['case_id']:
+                raise IntegrityError('collection does not exist in the source case')
         row = db.execute("SELECT id FROM artifacts WHERE sha256=? AND COALESCE(source_locator,'')=COALESCE(?, '') ORDER BY id LIMIT 1", (digest, source_locator)).fetchone()
         if row:
             aid = int(row['id'])
@@ -122,12 +126,12 @@ def ingest_file(path: Path, *, source_id: int, source_locator: str | None = None
         }
         observation = db.execute('''INSERT INTO source_observations(
             artifact_id,source_id,source_locator,observed_at,acquisition_kind,
-            original_name,mime_type,size_bytes,sha256,source_modified_at,metadata_json)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?)''',
+            original_name,mime_type,size_bytes,sha256,source_modified_at,metadata_json,collection_id)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?)''',
             (aid, source_id, source_locator, observed_at, 'ingest', name, mime, size, digest,
              datetime.fromtimestamp(source_stat.st_mtime, timezone.utc).isoformat(),
-             json.dumps(observation_metadata, ensure_ascii=False)))
-        db.execute("INSERT INTO audit_log(action,object_kind,object_id,details_json) VALUES ('ingest','artifact',?,?)", (aid,json.dumps({'sha256':digest,'source_locator':source_locator,'source_id':source_id,'observation_id':observation.lastrowid,'deduplicated':row is not None},ensure_ascii=False)))
+             json.dumps(observation_metadata, ensure_ascii=False), collection_id))
+        db.execute("INSERT INTO audit_log(action,object_kind,object_id,details_json) VALUES ('ingest','artifact',?,?)", (aid,json.dumps({'sha256':digest,'source_locator':source_locator,'source_id':source_id,'observation_id':observation.lastrowid,'collection_id':collection_id,'deduplicated':row is not None},ensure_ascii=False)))
         return aid
 
 def add_event(*, source_id: int, artifact_id: int | None, event_type: str, ts_start: str | None = None, ts_end: str | None = None, direction: str | None = None, sender: str | None = None, recipients: str | None = None, contact_label: str | None = None, phone_or_address: str | None = None, subject: str | None = None, body: str | None = None, external_id: str | None = None, thread_id: str | None = None, confidence: float | None = None, metadata: dict | None = None) -> int:

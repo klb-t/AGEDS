@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "project": "AGEDS",
-  "state_id": "AGEDS-STATE-20261002-001",
-  "updated_at": "2026-10-02T20:47:52.084022+00:00",
+  "state_id": "AGEDS-STATE-20261016-001",
+  "updated_at": "2026-10-16T17:59:30.885452+00:00",
   "based_on_remote_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
-  "local_branch": "main",
-  "status_summary": "Recovery completed and merged into main via PR5; all82 overnight tasks reconciled, current checks passed, experiments and incremental history preserved. SAF device runtime remains unperformed.",
+  "local_branch": "ccr-d25c3cb3-qgbhql",
+  "status_summary": "Evidence Timeline & Analysis increment started on 9c1d513: Etap 0 report and F0 extension foundation; parallel tracks A-H claimed with disjoint file scopes.",
   "history": {
     "overnight_ledger": "coordination/archive/2026-09-30_2026-10-01/night-20261001.json",
     "original_tasks": 82,
@@ -26,10 +26,11 @@
   "coordination": {
     "transport": "repository_commits_and_stable_ids",
     "state_editor": "coordinator",
-    "active_claim": null,
+    "active_claim": "AGEDS-TASK-20261016 tracks (this session)",
     "scope": "AGEDS only",
     "ci": "manual workflow_dispatch only",
-    "history_is_not_active_schedule": true
+    "history_is_not_active_schedule": true,
+    "plan": "docs/plans/EVIDENCE_TIMELINE_2026-10-16.md"
   },
   "publication": {
     "status": "published_main",
@@ -137,6 +138,207 @@
         "docs/validation/BACKEND_COMPLETION_2026-10-02.json",
         "coordination/publication-20261002.json"
       ]
+    },
+    {
+      "id": "AGEDS-TASK-20261016-F0",
+      "owner": "coordinator",
+      "status": "done",
+      "scope": [
+        "server/app/schema/__init__.py",
+        "server/app/api/__init__.py",
+        "server/app/commands/__init__.py",
+        "server/app/web.py",
+        "server/app/timeinfo.py",
+        "server/app/schema/catalog.py#v10",
+        "server/app/schema/records.py#v20",
+        "server/app/evidence.py#collection_id",
+        "server/tests/corpus/__init__.py",
+        "docs/plans/EVIDENCE_TIMELINE_2026-10-16.md"
+      ],
+      "based_on_commit": "9c1d513b",
+      "acceptance": [
+        "Full backend suite green; migrations idempotent; DST fold/gap explicit."
+      ],
+      "result_refs": []
+    },
+    {
+      "id": "AGEDS-TASK-20261016-A",
+      "owner": "catalog",
+      "status": "claimed",
+      "scope": [
+        "server/app/catalog/",
+        "server/app/schema/catalog.py",
+        "server/app/api/catalog.py",
+        "server/app/commands/catalog.py",
+        "server/app/templates/catalog*.html",
+        "server/app/static/catalog*",
+        "server/tests/corpus/catalog_files.py",
+        "server/tests/test_catalog*.py",
+        "docs/CATALOG.md"
+      ],
+      "based_on_commit": "9c1d513b",
+      "acceptance": [
+        "Nested zip/tar virtual locators, signature-over-extension, content dedup with all observations, coverage gaps, sidecar hypotheses, originals unchanged."
+      ],
+      "result_refs": []
+    },
+    {
+      "id": "AGEDS-TASK-20261016-B",
+      "owner": "importers",
+      "status": "claimed",
+      "scope": [
+        "server/app/importers/ (new files)",
+        "server/app/importers/data/",
+        "server/app/schema/records.py (>=v21)",
+        "server/tests/corpus/chat_exports.py",
+        "server/tests/corpus/communications.py",
+        "server/tests/test_import_*.py",
+        "docs/IMPORTERS.md"
+      ],
+      "based_on_commit": "9c1d513b",
+      "acceptance": [
+        "Tree-preserving chat imports, logical dedup across 3 exports with edit/branch, raw fields, idempotent reimport, explicit tz ambiguity."
+      ],
+      "result_refs": []
+    },
+    {
+      "id": "AGEDS-TASK-20261016-C",
+      "owner": "timeline",
+      "status": "claimed",
+      "scope": [
+        "server/app/timeline/",
+        "server/app/schema/timeline.py",
+        "server/app/api/timeline.py",
+        "server/app/commands/timeline.py",
+        "server/app/main.py#/api/timeline",
+        "server/app/templates/timeline*.html",
+        "server/app/static/timeline*",
+        "server/tests/test_timeline*.py",
+        "server/tests/js/timeline*.test.mjs",
+        "docs/TIMELINE.md"
+      ],
+      "based_on_commit": "9c1d513b",
+      "acceptance": [
+        "Versioned display rule, revocable correlation hypotheses, paginated filtered API keeping old shape, virtualized swimlanes."
+      ],
+      "result_refs": []
+    },
+    {
+      "id": "AGEDS-TASK-20261016-D",
+      "owner": "media",
+      "status": "claimed",
+      "scope": [
+        "server/app/worker.py",
+        "server/app/transcription.py",
+        "server/app/jobs.py",
+        "server/app/media/",
+        "server/app/schema/media.py",
+        "server/app/api/media.py",
+        "server/app/commands/media.py",
+        "server/tests/corpus/audio.py",
+        "server/tests/test_media*.py",
+        "docs/MULTILINGUAL_ASR.md"
+      ],
+      "based_on_commit": "9c1d513b",
+      "acceptance": [
+        "Recipe pinned to job, per-segment language run with alternatives, run comparison, WER/CER tool, OCR/diarization adapters unavailable-explicit."
+      ],
+      "result_refs": []
+    },
+    {
+      "id": "AGEDS-TASK-20261016-E",
+      "owner": "analysis",
+      "status": "claimed",
+      "scope": [
+        "server/app/analysis/",
+        "server/app/schema/analysis.py",
+        "server/app/api/analysis.py",
+        "server/app/commands/analysis.py",
+        "server/app/templates/analysis*.html",
+        "server/app/static/analysis*",
+        "server/tests/corpus/activity.py",
+        "server/tests/test_analysis*.py",
+        "docs/TIME_BUDGET.md",
+        "docs/HYPOTHESES.md"
+      ],
+      "based_on_commit": "9c1d513b",
+      "acceptance": [
+        "Interval-union budgets with bounds, unobserved band, sensitivity grid, preregistered hypotheses, permutation event study with fixed disclaimers."
+      ],
+      "result_refs": []
+    },
+    {
+      "id": "AGEDS-TASK-20261016-F",
+      "owner": "reports",
+      "status": "ready",
+      "scope": [
+        "server/app/reports/",
+        "server/app/schema/reports.py",
+        "server/app/api/reports.py",
+        "server/app/commands/reports.py",
+        "server/app/templates/reports/",
+        "server/app/packages.py#extension_tables",
+        "server/tests/test_reports*.py",
+        "docs/REPORTS.md"
+      ],
+      "based_on_commit": "9c1d513b",
+      "acceptance": [
+        "Every number from code, method section, report manifest verifiable, outputs only to user directory."
+      ],
+      "result_refs": []
+    },
+    {
+      "id": "AGEDS-TASK-20261016-G",
+      "owner": "ecosystem",
+      "status": "claimed",
+      "scope": [
+        "server/app/integrations/",
+        "server/app/schema/integrations.py",
+        "server/app/api/integrations.py",
+        "server/app/commands/integrations.py",
+        "server/tests/test_integrations*.py",
+        "docs/READ_API.md",
+        "docs/ECOSYSTEM_ADAPTERS.md",
+        "chatadhd: engine/ageds_adapter.py (stub) + docs"
+      ],
+      "based_on_commit": "9c1d513b",
+      "acceptance": [
+        "Read contract with local token, ChatADHD stub returning anchored quotes only, Loom graph export with hypothesis quarantine."
+      ],
+      "result_refs": []
+    },
+    {
+      "id": "AGEDS-TASK-20261016-H",
+      "owner": "workbench",
+      "status": "ready",
+      "scope": [
+        "server/app/workbench/",
+        "server/app/schema/workbench.py",
+        "server/app/api/workbench.py",
+        "server/app/commands/workbench.py",
+        "server/app/static/i18n/",
+        "server/app/templates/workbench*.html",
+        "server/tests/test_workbench*.py",
+        "docs/WORKBENCH.md"
+      ],
+      "based_on_commit": "9c1d513b",
+      "acceptance": [
+        "Layer-filtered search, saved searches, bulk tags, folders, bookmarks, theme, PL/NL/EN."
+      ],
+      "result_refs": []
+    },
+    {
+      "id": "AGEDS-TASK-20261016-P",
+      "owner": "coordinator",
+      "status": "ready",
+      "scope": [
+        "scripts/verify_repository.py"
+      ],
+      "based_on_commit": "9c1d513b",
+      "acceptance": [
+        "Privacy heuristics without false positives on current tree."
+      ],
+      "result_refs": []
     }
   ],
   "remaining_boundaries": [
@@ -145,5 +347,9 @@
     "No live restore, signed custody, source media export or connected ecosystem adapters.",
     "No API authentication.",
     "Public Git history retains preexisting case-specific identifiers; current-tree cleanup is not history erasure."
-  ]
+  ],
+  "previous_state": {
+    "state_id": "AGEDS-STATE-20261002-001",
+    "commit": "9c1d513"
+  }
 }

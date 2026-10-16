@@ -6,7 +6,6 @@ from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFi
 from fastapi import Path as PathParameter
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from .db import init_db, session
 from .config import settings
@@ -21,7 +20,9 @@ from .transcription import queue_all_audio, queue_transcription, word_timing_cap
 
 app=FastAPI(title='AGEDS Evidence Workbench',version='0.2.0')
 app.mount('/static',StaticFiles(directory=Path(__file__).parent/'static'),name='static')
-templates=Jinja2Templates(directory=Path(__file__).parent/'templates')
+from .web import templates
+from .api import include_routers
+include_routers(app)
 MAX_SQL_INTEGER = 2**63 - 1
 SqlPathId = Annotated[int, PathParameter(ge=1, le=MAX_SQL_INTEGER)]
 StrictSqlId = Annotated[StrictInt, Field(ge=1, le=MAX_SQL_INTEGER)]

@@ -1,0 +1,37 @@
+{
+  "schema": "ageds.time_budget_params.v1",
+  "note": "Default PRESETS, not rules. Every value can be overridden per run and is stored in the result.",
+  "params": {
+    "granularities": ["day", "week", "month"],
+    "session_gap_s": 900,
+    "typing_chars_per_min": 200,
+    "reading_chars_per_min": 1000,
+    "max_typing_s": 1800,
+    "max_reading_s": 1800,
+    "max_attribution_s": 1800,
+    "overlap_rule": "split_equal",
+    "priority": [],
+    "excluded_event_types": ["chat_conversation"],
+    "chat_content_kinds": ["text", "multimodal"],
+    "include_hidden_chat": false,
+    "typing_directions": ["outgoing"],
+    "typing_event_types": null,
+    "reading_directions": ["incoming"],
+    "reading_event_types": ["chat_message", "chat_message_part"],
+    "wav_header_durations": true,
+    "model_label_run_id": null,
+    "grid_mode": "one_at_a_time",
+    "grid": {
+      "session_gap_s": [300, 900, 1800],
+      "typing_chars_per_min": [120, 200, 300],
+      "reading_chars_per_min": [600, 1000, 1600],
+      "max_attribution_s": [900, 1800, 3600],
+      "overlap_rule": ["split_equal", "priority", "count_both"]
+    },
+    "max_grid_points": 256,
+    "flip_tolerance_s": 60,
+    "max_candle_events": 2000,
+    "max_flip_records": 500,
+    "max_items": 1000000
+  }
+}

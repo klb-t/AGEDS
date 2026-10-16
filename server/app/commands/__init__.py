@@ -18,6 +18,7 @@ COMMAND_MODULES = (
     'workbench',
     'imports_chat',
     'imports_comm',
+    'hypotheses',
 )
 
 

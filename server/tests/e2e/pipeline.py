@@ -1067,4 +1067,5 @@ class Pipeline:
                                     ok=(0, 1))
                 self.check('repository.verify_passes', ['K4'], 'scripts/verify_repository.py (links, snapshots, privacy '
                            'heuristics: e-mails, phone numbers, user paths) passes', process.returncode == 0,
-                           {'rc': process.returncode, 'tail': process.stdout.strip().splitlines()[-3:]})
+                           {'rc': process.returncode, 'tail': process.stdout.strip().splitlines()[-3:],
+                            'problems': process.stderr.strip().splitlines()[-10:]})

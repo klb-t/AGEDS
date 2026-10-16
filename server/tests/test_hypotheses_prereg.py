@@ -182,3 +182,9 @@ def test_registered_at_versus_first_analysed_at(db):
     audit = [r[0] for r in db.execute("SELECT action FROM audit_log WHERE action IN ('hypothesis_version_registered','event_study_run')")]
     assert audit == ['hypothesis_version_registered', 'event_study_run', 'event_study_run']
     assert first['result']['disclaimer'] == DISCLAIMER
+
+
+def test_documented_disclaimer_hashes_match_the_code():
+    from pathlib import Path
+    doc = (Path(__file__).resolve().parents[2] / 'docs' / 'HYPOTHESES.md').read_text(encoding='utf-8')
+    assert DISCLAIMER['pl'] in doc and DISCLAIMER['sha256_pl'] in doc and DISCLAIMER['sha256_en'] in doc

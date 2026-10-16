@@ -198,8 +198,20 @@ HTTP (`server/app/api/media.py`; navigation "Transkrypcje", "Kolejka"):
 `POST /api/media/artifacts/{id}/speaker-assignments`, `/api/media/artifacts/{id}/event-candidates`;
 pages `/media`, `/media/artifact/{id}`, `/media/compare`, `/media/queue`,
 `/media/artifact/{id}/speakers`. CLI: `asr-recipes`, `media-enqueue`, `media-queue`,
-`transcript-compare`, `asr-benchmark`, `media-capabilities`. API authentication is still not
-implemented (see the handoff); use on a trusted network.
+`transcript-compare`, `asr-benchmark`, `media-capabilities`. API authentication is opt-in
+(`EW_REQUIRE_TOKEN`, see [read API](READ_API.md)); otherwise use on a trusted network.
+
+**HTTP overrides are limited (review finding 3, 2026-10-16).** `POST …/jobs` accepts only
+decoding/strategy overrides (`recipe.CLIENT_OVERRIDE_KEYS`): ASR `strategy`, `vad`,
+`word_timestamps`, `language`, `allowed_languages`, `windows`, `detection`,
+`transcribe_options`; OCR `languages`, `psm`, `oem`, `layout`, `pdf.dpi`, `pdf.max_pages`;
+diarization `num_speakers`, `min_speakers`, `max_speakers`. `engine`, `model`, `device`,
+`compute_type`, every `model_options` key, the diarization `pipeline` and all `limits` choose
+code, files or network behaviour on the server: they are operator decisions made in a recipe
+preset (built-in or `EW_MEDIA_RECIPE_DIR`) or through the CLI (`media-enqueue --override`).
+A refused key is a 422 naming the key and the permitted list; the HTML form has no override
+field. Reversal: extend `CLIENT_OVERRIDE_KEYS` (code) — an operator who wants another model
+over HTTP adds a private preset and selects it by id.
 
 ## 9. Not done / open
 

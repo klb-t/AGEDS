@@ -373,3 +373,17 @@ def test_acquisition_keeps_the_catalogued_source_time(world):
         observed = db.execute('SELECT source_modified_at FROM source_observations WHERE source_locator LIKE ?',
                               ('%backup/calls-20240107.xml',)).fetchone()[0]
     assert observed == world.expected['source_mtime_utc']
+
+
+def test_a_run_between_items_is_not_taken_over_without_the_operator(world):
+    plan_id = new_plan(world)['plan']['id']
+    item = all_items(plan_id)[0]
+    plan.decide(plan_id, base_version=1, decisions=[{'item_id': item['id'], 'status': 'approved'}], actor='tester')
+    with dbmod.session() as db:  # another process started a sync run and has not reached its first item yet
+        other = db.execute("""INSERT INTO import_plan_runs(plan_id,plan_version,mode,status,actor,started_at)
+                              VALUES(?,2,'sync','running','other','2026-10-16T00:00:00+00:00')""", (plan_id,)).lastrowid
+    with pytest.raises(plan.Conflict, match='still running'):
+        execute.execute_plan(plan_id, actor='tester', temp_dir=world.work)
+    taken = execute.execute_plan(plan_id, actor='tester', temp_dir=world.work, recover_running=True)
+    assert taken['status'] == 'completed'
+    assert execute.get_run(other)['status'] == 'interrupted'

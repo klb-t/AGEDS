@@ -134,7 +134,7 @@ def recover(plan_id: int | None = None, *, force: bool = False, now: float | Non
             if plan_id is not None:
                 for run in db.execute("SELECT id FROM import_plan_runs WHERE plan_id=? AND status='running' AND mode='sync'", (plan_id,)).fetchall():
                     busy = db.execute("SELECT 1 FROM import_plan_attempts WHERE run_id=? AND status='running' LIMIT 1", (run['id'],)).fetchone()
-                    if not busy and (force or run['id'] in run_ids or not _has_live_attempts(db, run['id'])):
+                    if not busy and (force or run['id'] in run_ids):
                         db.execute("UPDATE import_plan_runs SET status='interrupted', finished_at=?, error=? WHERE id=? AND status='running'",
                                    (_now_iso(), 'run left running by a stopped process', run['id']))
             db.commit()
@@ -145,10 +145,6 @@ def recover(plan_id: int | None = None, *, force: bool = False, now: float | Non
         removed += _remove_workdir(row['workdir'])
     return {'interrupted_attempts': len(recovered), 'workdirs_removed': removed,
             'attempt_ids': [r['id'] for r in recovered]}
-
-
-def _has_live_attempts(db, run_id: int) -> bool:
-    return db.execute("SELECT 1 FROM import_plan_attempts WHERE run_id=? AND status='running' LIMIT 1", (run_id,)).fetchone() is not None
 
 
 def _run_jobs_pending(db, run_id: int) -> int:
@@ -516,9 +512,14 @@ def execute_plan(plan_id: int, *, version: int | None = None, mode: str = 'sync'
             if live or any(_run_jobs_pending(db, r['id']) for r in pending):
                 raise Conflict('this plan has a running attempt or queued items (another process may be working); '
                                'wait, or recover after the lease expired (recover_running=True asserts the process is dead)')
-            for run in pending:  # sync runs left running without attempts (process died between items)
-                db.execute("UPDATE import_plan_runs SET status='interrupted', finished_at=?, error=? WHERE id=? AND status='running'",
-                           (_now_iso(), 'run left running by a stopped process', run['id']))
+            if pending:
+                # A sync run between two items has no running attempt; only the operator can say it is dead.
+                if not recover_running:
+                    raise Conflict(f'run {pending[0]["id"]} of this plan is still running (possibly between items); '
+                                   'wait for it, or pass recover_running=True if its process is dead')
+                for run in pending:
+                    db.execute("UPDATE import_plan_runs SET status='interrupted', finished_at=?, error=? WHERE id=? AND status='running'",
+                               (_now_iso(), 'run left running by a stopped process (operator recovery)', run['id']))
             selected = _selection(db, plan_id, version, rerun_done=rerun_done, item_ids=item_ids)
             options = {'rerun_done': rerun_done, 'recover_running': recover_running, 'selected_items': len(selected),
                        'item_ids': item_ids, 'limits': asdict(limits), 'temp_parent': str(temp_parent)}

@@ -37,6 +37,7 @@ def register(subparsers) -> None:
         window.add_argument(f'--{flag}', dest=name, action='append', help='repeatable or comma-separated')
     window.add_argument('--q', help='FTS5 text query (literal syntax as /api/search)')
     window.add_argument('--transcript-versions', default='latest', help='latest | all | comma-separated version ids')
+    window.add_argument('--include-hidden', action='store_true', help='include items the display rule hides by default')
     window.add_argument('--match', choices=('display', 'overlap'), default='display')
     window.add_argument('--order', choices=('asc', 'desc'), default='asc')
     window.add_argument('--max-rows', type=_positive, default=200_000)
@@ -98,7 +99,8 @@ def handle(args) -> int | None:
                 raise ValueError('choose --format csv|json or an output ending in .csv/.json')
             filters = make_filters(event_types=args.event_type, kinds=args.kind, sources=args.source,
                                    collections=args.collection, counterparties=args.counterparty, chatbots=args.chatbot,
-                                   threads=args.thread, tags=args.tag, q=args.q, transcript_versions=args.transcript_versions)
+                                   threads=args.thread, tags=args.tag, q=args.q, transcript_versions=args.transcript_versions,
+                                   include_hidden=args.include_hidden)
             rule, projection = _projection(db, args)
             payload, meta = export_window(db, projection, rule, fmt=fmt, max_rows=args.max_rows,
                                           start_us=parse_bound(args.from_), end_us=parse_bound(args.to, end=True),

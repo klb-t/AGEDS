@@ -61,3 +61,5 @@
 .tl-linkish:hover{background:none;text-decoration:underline}
 .tl-undated{font-size:.8rem;padding-left:1rem}
 @media(max-width:1100px){.tl-layout{grid-template-columns:1fr}.tl-side{max-height:none}}
+.tl-check span:last-child{display:flex;gap:.4rem;align-items:center;color:#e6edf3}
+.tl-check input{width:auto;margin:0}

@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS timeline_items (
   chatbot TEXT,
   thread_id TEXT,
   is_latest INTEGER NOT NULL DEFAULT 1,
+  hidden INTEGER NOT NULL DEFAULT 0,
   flags_json TEXT NOT NULL DEFAULT '{}',
   PRIMARY KEY(projection_id, item_kind, ref_id, sub_index)
 ) WITHOUT ROWID;

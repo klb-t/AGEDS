@@ -40,8 +40,8 @@
       "start",
       "created",
       "observed",
-      "end",
-      "other"
+      "other",
+      "end"
     ],
     "sms": [
       "received",
@@ -66,6 +66,7 @@
     "chat_message": [
       "created",
       "sent",
+      "start",
       "updated",
       "export_time",
       "other"
@@ -97,6 +98,53 @@
       "created",
       "filename_derived",
       "file_mtime",
+      "observed",
+      "other"
+    ],
+    "chat_conversation": [
+      "created",
+      "updated",
+      "start",
+      "export_time",
+      "other"
+    ],
+    "chat_message_part": [
+      "start",
+      "created",
+      "updated",
+      "end",
+      "other"
+    ],
+    "recording": [
+      "filename_derived",
+      "created",
+      "start",
+      "exif",
+      "observed",
+      "file_mtime",
+      "other"
+    ],
+    "image_capture": [
+      "exif",
+      "created",
+      "filename_derived",
+      "file_mtime",
+      "other"
+    ],
+    "activity": [
+      "created",
+      "start",
+      "observed",
+      "other"
+    ],
+    "presence": [
+      "start",
+      "created",
+      "end",
+      "other"
+    ],
+    "browser_visit": [
+      "created",
       "observed",
       "other"
     ]
@@ -204,10 +252,25 @@
       ],
       "chat_message": [
         "thread_id"
+      ],
+      "chat_conversation": [
+        "thread_id"
+      ],
+      "chat_message_part": [
+        "thread_id"
+      ],
+      "email": [
+        "sender",
+        "recipients",
+        "thread_id",
+        "phone_or_address"
       ]
     },
     "phone_like_key": "separators (space, dash, dot, parentheses) removed from values consisting only of digits, plus and separators; the raw value is kept for display",
-    "chatbot_metadata_path": "$.chatbot"
+    "chatbot_metadata_paths": [
+      "$.chat.chatbot",
+      "$.chatbot"
+    ]
   },
   "recording": {
     "description": "Start-time candidates of a recorded artifact; transcript segments inherit them plus the segment offset.",
@@ -219,6 +282,7 @@
       "media_observation",
       "media_metadata",
       "exif_observation",
+      "image_capture",
       "file_observation",
       "photo"
     ],
@@ -226,5 +290,24 @@
       "recording_call_log"
     ],
     "note": "Events attached to the recorded artifact (artifact_id) whose event_type is listed here contribute their time candidates; another importer's type needs a new rule version."
+  },
+  "end_kinds": {
+    "description": "Candidate kinds that end a duration bar (never the display time when another candidate exists).",
+    "default": [
+      "end"
+    ],
+    "chat_conversation": [
+      "updated",
+      "end"
+    ]
+  },
+  "visibility": {
+    "description": "Items hidden by default in windows and density (still materialized, listed and countable with include_hidden=true). The legacy /api/timeline list is unaffected.",
+    "hidden_event_types": [
+      "chat_message_part"
+    ],
+    "hidden_metadata_flags": [
+      "$.chat.hidden"
+    ]
   }
 }

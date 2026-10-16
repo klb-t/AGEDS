@@ -251,6 +251,8 @@ def select(candidates: list[Candidate], item_type: str, rule: Rule, params: dict
     kinds = data['kind_priority'].get(item_type) or data['kind_priority']['default']
     origins = data['origin_priority']
     precisions = data['precision_priority']
+    end_rules = data.get('end_kinds') or {}
+    end_kinds = end_rules.get(item_type) or end_rules.get('default') or ['end']
     stored_usable = any(c.origin == 'stored' and c.usable and (c.utc or c.local) for c in candidates)
     evaluations = []
     ranked = []
@@ -264,8 +266,8 @@ def select(candidates: list[Candidate], item_type: str, rule: Rule, params: dict
         evaluations.append(entry)
         if not eligible:
             continue
-        if c.kind == 'end':
-            ends.append((_rank(origins, c.origin), c.ref, placement))
+        if c.kind in end_kinds:
+            ends.append((end_kinds.index(c.kind), _rank(origins, c.origin), c.ref, placement))
         key = (_rank(kinds, c.kind), _rank(origins, c.origin), BASIS_RANK.get(placement.basis, 9),
                _rank(precisions, c.precision), c.ref)
         ranked.append((key, c, placement))
@@ -274,7 +276,7 @@ def select(candidates: list[Candidate], item_type: str, rule: Rule, params: dict
     ranked.sort(key=lambda item: item[0])
     _, chosen, placement = ranked[0]
     end_us = None
-    for _, ref, end in sorted(ends, key=lambda item: (item[0], item[1])):
+    for _, _, ref, end in sorted(ends, key=lambda item: item[:3]):
         if ref == chosen.ref:
             continue
         if end.sort_us >= placement.sort_us:

@@ -19,7 +19,7 @@ from pathlib import Path
 
 from .. import timeinfo
 from ..wav_header import MAX_PREFIX_BYTES, probe_wav_header
-from .candidates import Candidate, place
+from .candidates import Candidate, legacy_event_candidates, stored_candidate
 from .projection import ensure_projection, recording_candidates
 from .ruleset import Rule, RuleError, canonical_json, load_rule
 from .timeutil import US, iso, local_text_to_us, utc_text_to_us
@@ -129,11 +129,19 @@ def _finite(value):
     return float(value)
 
 
-def _recording_facts(db, artifact, params: dict, recording_types: list) -> dict:
+def _recording_facts(db, subject: dict, params: dict) -> dict:
     """Number hypothesis and duration of one recording, each with its source."""
-    events = db.execute('''SELECT * FROM events WHERE artifact_id=? AND event_type IN (SELECT value FROM json_each(?))
-                           ORDER BY id''', (artifact['id'], json.dumps(recording_types))).fetchall()
+    artifact, events = subject['artifact'], subject['events']
     number = number_source = duration = duration_source = None
+    if params.get('use_recording_name_observations'):
+        for row in db.execute('''SELECT id, hypotheses_json, status FROM recording_name_observations
+                                 WHERE (artifact_id IS NOT NULL AND artifact_id=?) OR (event_id IS NOT NULL AND event_id IN
+                                   (SELECT value FROM json_each(?))) ORDER BY id''',
+                              (artifact['id'] if artifact else None, json.dumps([int(e['id']) for e in events]))):
+            for path in ('$.number.normalized_candidate', '$.number.raw'):
+                value = _json_path_value(row['hypotheses_json'], path)
+                if number is None and isinstance(value, str) and _digits(value):
+                    number, number_source = value, f"recording_name_observations:{row['id']}:hypotheses{path[1:]} ({row['status']})"
     for event in events:
         for path in params['recording_number_paths']:
             value = _json_path_value(event['metadata_json'], path)
@@ -155,7 +163,7 @@ def _recording_facts(db, artifact, params: dict, recording_types: list) -> dict:
                     duration, duration_source = (b - a) / US, f"events:{event['id']}:ts_end-ts_start"
             except (ValueError, OverflowError):
                 pass
-    if duration is None and params.get('use_wav_header_duration') and artifact['stored_path']:
+    if duration is None and params.get('use_wav_header_duration') and artifact is not None and artifact['stored_path']:
         path = Path(artifact['stored_path'])
         try:
             with path.open('rb') as handle:
@@ -243,38 +251,65 @@ def _calls(db, projection: dict, params: dict, event_types: list[str]) -> tuple[
     return rows[:params['max_calls']], len(rows) > params['max_calls']
 
 
-def _call_seconds(call) -> float | None:
-    value = _finite(_json_path_value(call['metadata_json'], '$.duration.seconds'))
-    if value is None:
-        value = _finite(_json_path_value(call['metadata_json'], '$.duration_seconds'))
-    if value is None and call['end_us'] is not None:
-        value = (call['end_us'] - call['sort_us']) / US
-    return value
+def _call_seconds(call, params: dict) -> tuple[float | None, str | None]:
+    for path in params['call_duration_paths']:
+        value = _finite(_json_path_value(call['metadata_json'], path))
+        if value is not None:
+            return value, f"events:{call['ref_id']}:metadata{path[1:]}"
+    if call['end_us'] is not None:
+        return (call['end_us'] - call['sort_us']) / US, 'projection:end-start'
+    return None, None
+
+
+def _recording_subjects(db, params: dict, display_rule: Rule) -> tuple[list[dict], bool]:
+    """Audio/video artifacts plus file-name recording events that have no acquired artifact."""
+    cap = params['max_recordings']
+    recording_types = display_rule.data['recording']['recording_event_types']
+    subjects = []
+    for artifact in db.execute('''SELECT id,original_name,mime_type,stored_path,size_bytes,source_id FROM artifacts
+                                 WHERE mime_type LIKE 'audio/%' OR mime_type LIKE 'video/%' ORDER BY id LIMIT ?''', (cap + 1,)):
+        events = db.execute('''SELECT * FROM events WHERE artifact_id=? AND event_type IN (SELECT value FROM json_each(?))
+                               ORDER BY id''', (artifact['id'], json.dumps(recording_types))).fetchall()
+        candidates = [c for c in recording_candidates(db, artifact['id'], display_rule, {}) if c.origin != 'derived_correlation']
+        subjects.append({'left_kind': 'artifact', 'left_id': int(artifact['id']), 'artifact': artifact, 'events': events,
+                         'candidates': candidates})
+    for event in db.execute('''SELECT * FROM events WHERE artifact_id IS NULL AND event_type IN (SELECT value FROM json_each(?))
+                              ORDER BY id LIMIT ?''', (json.dumps(params['recording_event_types']), cap + 1)):
+        times = db.execute('SELECT * FROM event_times WHERE event_id=? ORDER BY id', (event['id'],)).fetchall()
+        candidates = [stored_candidate(r) for r in times]
+        if not any(c.usable for c in candidates):
+            candidates += legacy_event_candidates(event, _metadata_dict(event['metadata_json']), display_rule)
+        subjects.append({'left_kind': 'event', 'left_id': int(event['id']), 'artifact': None, 'events': [event],
+                         'candidates': candidates})
+    return subjects[:cap], len(subjects) > cap
+
+
+def _metadata_dict(text) -> dict:
+    try:
+        value = json.loads(text or '{}')
+    except ValueError:
+        return {}
+    return value if isinstance(value, dict) else {}
 
 
 def _recording_call_log(db, rule: Rule, params: dict, projection: dict) -> tuple[list, dict]:
     display_rule = load_rule(kind='display_rule')
     calls, calls_truncated = _calls(db, projection, params, rule.data['right']['event_types'])
     keys = [c['sort_us'] for c in calls]
-    recordings = db.execute('''SELECT id,original_name,mime_type,stored_path,size_bytes,source_id FROM artifacts
-                               WHERE mime_type LIKE 'audio/%' OR mime_type LIKE 'video/%' ORDER BY id LIMIT ?''',
-                            (params['max_recordings'] + 1,)).fetchall()
-    recordings_truncated = len(recordings) > params['max_recordings']
-    recordings = recordings[:params['max_recordings']]
+    recordings, recordings_truncated = _recording_subjects(db, params, display_rule)
     tolerance = int(params['time_tolerance_seconds'] * US)
-    recording_types = display_rule.data['recording']['recording_event_types']
     widest = int(max(abs(params['unknown_zone_offset_hours_min']), abs(params['unknown_zone_offset_hours_max'])) * 3600 * US)
     proposals, unmatched_recordings = [], []
     matched_calls: dict[int, int] = {}
     truncated_candidates = 0
     for recording in recordings:
-        candidates = [c for c in recording_candidates(db, recording['id'], display_rule, {})
-                      if c.origin != 'derived_correlation' and c.usable and c.kind in params['recording_time_kinds']
-                      and (c.utc or c.local)]
+        subject = {'left_kind': recording['left_kind'], 'left_id': recording['left_id']}
+        candidates = [c for c in recording['candidates']
+                      if c.usable and c.kind in params['recording_time_kinds'] and (c.utc or c.local)]
         if not candidates:
-            unmatched_recordings.append({'artifact_id': recording['id'], 'reason': 'no_usable_time_candidate'})
+            unmatched_recordings.append({**subject, 'reason': 'no_usable_time_candidate'})
             continue
-        facts = _recording_facts(db, recording, params, recording_types)
+        facts = _recording_facts(db, recording, params)
         best: dict[int, dict] = {}
         evaluated = 0
         for candidate in candidates:
@@ -323,13 +358,14 @@ def _recording_call_log(db, rule: Rule, params: dict, projection: dict) -> tuple
                     if len(previous['alternatives']) < 10:
                         previous['alternatives'].append(_alternative(time_evidence))
         if not best:
-            unmatched_recordings.append({'artifact_id': recording['id'], 'reason': 'no_call_within_tolerance',
-                                         'evaluated_time_points': evaluated})
+            unmatched_recordings.append({**subject, 'reason': 'no_call_within_tolerance', 'evaluated_time_points': evaluated})
             continue
         accepted = []
         for call_id, match in best.items():
             call = match['call']
-            duration = _duration_evidence(facts['duration'], facts['duration_source'], _call_seconds(call), params)
+            call_seconds, call_seconds_source = _call_seconds(call, params)
+            duration = _duration_evidence(facts['duration'], facts['duration_source'], call_seconds, params)
+            duration['call_duration_source'] = call_seconds_source
             number = _number_evidence(facts['number'], facts['number_source'], call['phone_or_address'],
                                       params['number_suffix_digits'])
             corroborated = duration['status'] == 'agree' or number['status'] in ('exact', 'suffix')
@@ -345,7 +381,7 @@ def _recording_call_log(db, rule: Rule, params: dict, projection: dict) -> tuple
                              {'time': match['time'], 'duration': duration, 'number': number, 'gate': gate,
                               'call_direction': call['direction']}))
         if not accepted:
-            unmatched_recordings.append({'artifact_id': recording['id'], 'reason': 'only_uncorroborated_unknown_zone_matches'})
+            unmatched_recordings.append({**subject, 'reason': 'only_uncorroborated_unknown_zone_matches'})
             continue
         accepted.sort(key=lambda item: (item[0], item[1]))
         if len(accepted) > params['max_candidates_per_recording']:
@@ -353,8 +389,8 @@ def _recording_call_log(db, rule: Rule, params: dict, projection: dict) -> tuple
             accepted = accepted[:params['max_candidates_per_recording']]
         for _, call_id, criteria in accepted:
             matched_calls[call_id] = matched_calls.get(call_id, 0) + 1
-            proposals.append({'left_kind': 'artifact', 'left_id': recording['id'], 'right_kind': 'event', 'right_id': call_id,
-                              'ambiguity_group': f"recording_call_log:artifact:{recording['id']}",
+            proposals.append({**subject, 'right_kind': 'event', 'right_id': call_id,
+                              'ambiguity_group': f"recording_call_log:{subject['left_kind']}:{subject['left_id']}",
                               'candidate_count': len(accepted), 'criteria': criteria})
     for proposal in proposals:
         proposal['criteria']['call_matched_by_recordings'] = matched_calls[proposal['right_id']]
@@ -362,8 +398,8 @@ def _recording_call_log(db, rule: Rule, params: dict, projection: dict) -> tuple
     limit = params['max_unmatched_listed']
     result = {
         'counts': {'recordings_considered': len(recordings), 'calls_considered': len(calls), 'hypotheses': len(proposals),
-                   'recordings_with_candidates': len({p['left_id'] for p in proposals}),
-                   'ambiguous_recordings': len({p['left_id'] for p in proposals if p['candidate_count'] > 1}),
+                   'recordings_with_candidates': len({(p['left_kind'], p['left_id']) for p in proposals}),
+                   'ambiguous_recordings': len({(p['left_kind'], p['left_id']) for p in proposals if p['candidate_count'] > 1}),
                    'recordings_without_call': len(unmatched_recordings), 'calls_without_recording': len(unmatched_calls)},
         'unmatched': {'recordings': unmatched_recordings[:limit], 'calls': unmatched_calls[:limit],
                       'listed_limit': limit},
@@ -459,28 +495,96 @@ def _email_chat(db, rule: Rule, params: dict, projection: dict) -> tuple[list, d
                        'truncated': {'emails': left_truncated, 'chat_messages': right_truncated, 'pairs': pairs_truncated}}
 
 
+def _extent(db, projection: dict, artifact_id: int, thread_id: str) -> dict:
+    row = db.execute('''SELECT COUNT(*), MIN(ti.sort_us), MAX(ti.sort_us) FROM events e
+                         LEFT JOIN timeline_items ti ON ti.projection_id=? AND ti.item_kind='event' AND ti.ref_id=e.id
+                         WHERE e.artifact_id=? AND e.thread_id=?''', (projection['id'], artifact_id, thread_id)).fetchone()
+    return {'events': int(row[0]), 'first': iso(row[1]), 'last': iso(row[2])}
+
+
+def _logical_conversations(db, params: dict, projection: dict) -> tuple[list, dict]:
+    proposals, counts = [], {'conversations_in_several_exports': 0, 'same_artifact_pairs_skipped': 0,
+                             'records_truncated_conversations': 0}
+    convs = db.execute('''SELECT lr.id, lr.case_id, lr.namespace, lr.container_id, lr.record_id,
+                             COUNT(DISTINCT lo.export_id) AS exports
+                           FROM logical_records lr JOIN logical_occurrences lo ON lo.logical_record_id=lr.id
+                           WHERE lr.record_kind=? GROUP BY lr.id HAVING exports >= 2 ORDER BY lr.id LIMIT ?''',
+                        (params['logical_record_kind'], params['max_threads'] + 1)).fetchall()
+    truncated = len(convs) > params['max_threads']
+    limit_examples = params['max_example_ids']
+    for conv in convs[:params['max_threads']]:
+        counts['conversations_in_several_exports'] += 1
+        occurrences = db.execute('''SELECT lo.export_id, MIN(lo.artifact_id) AS artifact_id, re.label, re.label_origin,
+                                       MIN(lo.content_sha256) AS content_sha256, COUNT(*) AS occurrences
+                                     FROM logical_occurrences lo JOIN record_exports re ON re.id=lo.export_id
+                                     WHERE lo.logical_record_id=? GROUP BY lo.export_id ORDER BY lo.export_id''',
+                                 (conv['id'],)).fetchall()[:params['max_artifacts_per_thread']]
+        records: dict[int, dict[str, set]] = {}
+        rows = db.execute('''SELECT lr.record_id, lo.export_id, lo.content_sha256 FROM logical_records lr
+                              JOIN logical_occurrences lo ON lo.logical_record_id=lr.id
+                              WHERE lr.case_id=? AND lr.namespace=? AND lr.container_id=? AND lr.id<>?
+                              ORDER BY lr.id, lo.id LIMIT ?''',
+                           (conv['case_id'], conv['namespace'], conv['container_id'], conv['id'],
+                            params['max_records_per_conversation'] + 1)).fetchall()
+        if len(rows) > params['max_records_per_conversation']:
+            counts['records_truncated_conversations'] += 1
+            rows = rows[:params['max_records_per_conversation']]
+        for row in rows:
+            records.setdefault(int(row['export_id']), {}).setdefault(row['record_id'], set()).add(row['content_sha256'])
+        pairs = [(a, b) for i, a in enumerate(occurrences) for b in occurrences[i + 1:]]
+        for a, b in pairs:
+            if a['artifact_id'] == b['artifact_id']:
+                counts['same_artifact_pairs_skipped'] += 1
+                continue
+            ra, rb = records.get(int(a['export_id']), {}), records.get(int(b['export_id']), {})
+            shared = sorted(set(ra) & set(rb))
+            changed = [r for r in shared if ra[r] != rb[r]]
+            only_a, only_b = sorted(set(ra) - set(rb)), sorted(set(rb) - set(ra))
+
+            def side(o):
+                return {'export_id': int(o['export_id']), 'export_label': o['label'], 'label_origin': o['label_origin'],
+                        'artifact_id': int(o['artifact_id']), 'occurrences': int(o['occurrences']),
+                        **_extent(db, projection, int(o['artifact_id']), conv['container_id'])}
+            proposals.append({
+                'left_kind': 'artifact', 'left_id': int(a['artifact_id']), 'right_kind': 'artifact', 'right_id': int(b['artifact_id']),
+                'ambiguity_group': f"same_conversation:{conv['namespace']}:{conv['container_id']}", 'candidate_count': len(pairs),
+                'criteria': {
+                    'mode': 'logical_records',
+                    'logical_record': {'id': int(conv['id']), 'namespace': conv['namespace'], 'conversation_id': conv['container_id'],
+                                       'status': 'identical_source_conversation_id',
+                                       'semantics': "identity asserted by the export's own conversation id as recorded by the importer"},
+                    'exports': {'left': side(a), 'right': side(b), 'order': 'import order, not export production date'},
+                    'conversation_content': {'left_sha256': a['content_sha256'], 'right_sha256': b['content_sha256'],
+                                             'equal': a['content_sha256'] == b['content_sha256']},
+                    'records': {'shared': len(shared), 'changed_content': len(changed), 'only_left': len(only_a),
+                                'only_right': len(only_b), 'changed_examples': changed[:limit_examples],
+                                'only_left_examples': only_a[:limit_examples], 'only_right_examples': only_b[:limit_examples],
+                                'absence_semantics': 'not observed in that export under this interpretation; never deletion'}}})
+    return proposals, {'counts': counts, 'truncated': {'conversations': truncated}}
+
+
 def _same_conversation(db, rule: Rule, params: dict, projection: dict) -> tuple[list, dict]:
     tables = {r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    logical = [t for t in params['logical_record_tables'] if t in tables]
-    rows = db.execute('''SELECT thread_id, CASE WHEN json_valid(metadata_json) THEN json_extract(metadata_json,'$.chatbot') END AS chatbot,
-                           artifact_id, COUNT(*) AS n, MIN(id) AS first_id, MAX(id) AS last_id
-                         FROM events WHERE event_type IN (SELECT value FROM json_each(?)) AND thread_id IS NOT NULL
-                           AND artifact_id IS NOT NULL GROUP BY thread_id, chatbot, artifact_id
-                         ORDER BY thread_id, chatbot, artifact_id''', (json.dumps(params['event_types']),)).fetchall()
+    logical = {'logical_records', 'logical_occurrences', 'record_exports'} <= tables
+    proposals, result = (_logical_conversations(db, params, projection) if logical
+                         else ([], {'counts': {}, 'truncated': {}}))
+    chatbot = 'COALESCE(' + ','.join(f"json_extract(metadata_json,'{p}')" for p in params['chatbot_metadata_paths']
+                                     if re.fullmatch(r'\$(\.[A-Za-z_][A-Za-z0-9_]{0,63}){1,8}', p)) + ", NULL)"
+    without_logical = 'AND NOT EXISTS (SELECT 1 FROM logical_occurrences lo WHERE lo.event_id=events.id)' if logical else ''
+    rows = db.execute(f'''SELECT thread_id, CASE WHEN json_valid(metadata_json) THEN {chatbot} END AS chatbot,
+                           artifact_id, COUNT(*) AS n FROM events
+                         WHERE event_type IN (SELECT value FROM json_each(?)) AND thread_id IS NOT NULL
+                           AND artifact_id IS NOT NULL {without_logical}
+                         GROUP BY thread_id, chatbot, artifact_id ORDER BY thread_id, chatbot, artifact_id''',
+                      (json.dumps(params['fallback_event_types']),)).fetchall()
     threads: dict = {}
     for row in rows:
         threads.setdefault((row['thread_id'], row['chatbot']), []).append(row)
     shared = {k: v for k, v in threads.items() if len(v) >= 2}
-    threads_truncated = len(shared) > params['max_threads']
-    proposals = []
-    for (thread_id, chatbot), members in list(shared.items())[:params['max_threads']]:
+    result['truncated']['fallback_threads'] = len(shared) > params['max_threads']
+    fallback = 0
+    for (thread_id, bot), members in list(shared.items())[:params['max_threads']]:
         members = members[:params['max_artifacts_per_thread']]
-        extents = {}
-        for m in members:
-            extent = db.execute('''SELECT MIN(ti.sort_us), MAX(ti.sort_us) FROM timeline_items ti JOIN events e ON e.id=ti.ref_id
-                                   WHERE ti.projection_id=? AND ti.item_kind='event' AND e.artifact_id=? AND e.thread_id=?''',
-                                (projection['id'], m['artifact_id'], thread_id)).fetchone()
-            extents[m['artifact_id']] = {'messages': int(m['n']), 'first': iso(extent[0]), 'last': iso(extent[1])}
         pair_count = len(members) * (len(members) - 1) // 2
         for i, a in enumerate(members):
             for b in members[i + 1:]:
@@ -488,19 +592,20 @@ def _same_conversation(db, rule: Rule, params: dict, projection: dict) -> tuple[
                                          AND external_id IS NOT NULL INTERSECT SELECT external_id FROM events WHERE artifact_id=?
                                          AND thread_id=? AND external_id IS NOT NULL)''',
                                     (a['artifact_id'], thread_id, b['artifact_id'], thread_id)).fetchone()[0]
+                fallback += 1
                 proposals.append({'left_kind': 'artifact', 'left_id': a['artifact_id'], 'right_kind': 'artifact',
-                                  'right_id': b['artifact_id'], 'ambiguity_group': f'same_conversation:{chatbot}:{thread_id}',
+                                  'right_id': b['artifact_id'], 'ambiguity_group': f'same_conversation:{bot}:{thread_id}',
                                   'candidate_count': pair_count,
-                                  'criteria': {'thread_id': {'value': thread_id, 'chatbot': chatbot, 'status': 'identical'},
+                                  'criteria': {'mode': 'thread_id_fallback',
+                                               'thread_id': {'value': thread_id, 'chatbot': bot, 'status': 'identical'},
                                                'shared_external_ids': {'count': int(common)},
-                                               'message_counts': {'left': extents[a['artifact_id']],
-                                                                  'right': extents[b['artifact_id']]},
-                                               'logical_record_tables': {'present': logical,
-                                                                         'interpreted': False}}})
-    result = {'counts': {'threads_seen': len(threads), 'threads_in_several_exports': len(shared), 'hypotheses': len(proposals)},
-              'truncated': {'threads': threads_truncated}, 'logical_record_tables_present': logical}
-    if not shared:
-        result['skipped_reason'] = 'no thread_id of the configured event types appears in two artifacts'
+                                               'message_times': {'left': _extent(db, projection, a['artifact_id'], thread_id),
+                                                                 'right': _extent(db, projection, b['artifact_id'], thread_id)}}})
+    result['counts'].update({'fallback_threads_in_several_artifacts': len(shared), 'fallback_hypotheses': fallback,
+                             'hypotheses': len(proposals)})
+    result['logical_records_available'] = logical
+    if not proposals:
+        result['skipped_reason'] = 'no conversation observed in two exports (logical records) or two artifacts (thread fallback)'
     return proposals, result
 
 

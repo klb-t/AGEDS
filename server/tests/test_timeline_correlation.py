@@ -127,8 +127,9 @@ def test_unmatched_recording_and_unmatched_call_are_reported(cx):
     run = cx.run()
     assert run['hypothesis_count'] == 0
     unmatched = run['result']['unmatched']
-    assert {'artifact_id': lonely_recording, 'reason': 'no_call_within_tolerance', 'evaluated_time_points': 1} in unmatched['recordings']
-    assert {'artifact_id': no_time, 'reason': 'no_usable_time_candidate'} in unmatched['recordings']
+    assert {'left_kind': 'artifact', 'left_id': lonely_recording, 'reason': 'no_call_within_tolerance',
+            'evaluated_time_points': 1} in unmatched['recordings']
+    assert {'left_kind': 'artifact', 'left_id': no_time, 'reason': 'no_usable_time_candidate'} in unmatched['recordings']
     assert unmatched['calls'] == [lonely_call]
 
 
@@ -137,7 +138,8 @@ def test_uncorroborated_unknown_zone_match_is_not_proposed(cx):
     recording = cx.recording('2024-06-03 10:15:00', 20, '000000123')
     run = cx.run()
     assert run['hypothesis_count'] == 0
-    assert {'artifact_id': recording, 'reason': 'only_uncorroborated_unknown_zone_matches'} in run['result']['unmatched']['recordings']
+    assert {'left_kind': 'artifact', 'left_id': recording,
+            'reason': 'only_uncorroborated_unknown_zone_matches'} in run['result']['unmatched']['recordings']
     relaxed = cx.run(params={'unknown_zone_requires_corroboration': False})
     [h] = cx.hypotheses(relaxed['id'])
     assert h['criteria']['duration']['status'] == 'disagree' and h['criteria']['number']['status'] == 'mismatch'
@@ -308,6 +310,6 @@ def test_same_conversation_across_exports(cx):
     run = cx.run('same_conversation')
     [h] = cx.hypotheses(run['id'])
     assert (h['left_id'], h['right_id']) == tuple(exports)
+    assert h['criteria']['mode'] == 'thread_id_fallback'
     assert h['criteria']['shared_external_ids']['count'] == 3
-    assert h['criteria']['message_counts']['right']['messages'] == 4
-    assert h['criteria']['logical_record_tables'] == {'present': [], 'interpreted': False}
+    assert h['criteria']['message_times']['right']['events'] == 4

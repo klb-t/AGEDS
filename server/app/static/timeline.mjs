@@ -59,6 +59,7 @@ function formValues() {
       event_type: many('event_type'), kind: many('kind'), chatbot: many('chatbot'), source: many('source'),
       collection: many('collection'), tag: many('tag'), counterparty: split('counterparty'),
       q: String(data.get('q') || '').trim(), transcript_versions: String(data.get('transcript_versions') || 'latest'),
+      include_hidden: data.get('include_hidden') ? 'true' : '',
     },
     zone: {assume_zone: String(data.get('assume_zone') || '').trim(), assumption_rule: String(data.get('assumption_rule') || '').trim()},
   };

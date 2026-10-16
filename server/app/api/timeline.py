@@ -62,10 +62,10 @@ class FilterParams:
                  counterparty: list[str] | None = Query(None), chatbot: list[str] | None = Query(None),
                  thread: list[str] | None = Query(None), tag: list[str] | None = Query(None),
                  q: str | None = Query(None, max_length=4096),
-                 transcript_versions: str = Query('latest', max_length=200)):
+                 transcript_versions: str = Query('latest', max_length=200), include_hidden: bool = False):
         self.kwargs = dict(event_types=event_type, kinds=kind, sources=source, collections=collection,
                            counterparties=counterparty, chatbots=chatbot, threads=thread, tags=tag, q=q,
-                           transcript_versions=transcript_versions)
+                           transcript_versions=transcript_versions, include_hidden=include_hidden)
 
     def build(self) -> Filters:
         return make_filters(**self.kwargs)

@@ -57,9 +57,10 @@ class Filters:
     tags: list = field(default_factory=list)
     q: str | None = None
     transcript_versions: str = 'latest'
+    include_hidden: bool = False
 
     def canonical(self) -> dict:
-        return {k: v for k, v in self.__dict__.items() if v not in (None, [], '')}
+        return {k: v for k, v in self.__dict__.items() if v not in (None, [], '', False)}
 
 
 def _texts(values, name: str) -> list[str]:
@@ -90,7 +91,7 @@ def _ints(values, name: str) -> list[int]:
 
 
 def make_filters(*, event_types=None, kinds=None, sources=None, collections=None, counterparties=None, chatbots=None,
-                 threads=None, tags=None, q=None, transcript_versions='latest') -> Filters:
+                 threads=None, tags=None, q=None, transcript_versions='latest', include_hidden=False) -> Filters:
     kinds_list = _texts(kinds, 'kind')
     if any(k not in KINDS for k in kinds_list):
         raise QueryInputError(f'kind must be one of {", ".join(KINDS)}')
@@ -107,7 +108,7 @@ def make_filters(*, event_types=None, kinds=None, sources=None, collections=None
     keys = [lane_key(v) for v in _texts(counterparties, 'counterparty')]
     return Filters(_texts(event_types, 'event_type'), kinds_list, _ints(sources, 'source'),
                    _ints(collections, 'collection'), sorted({k for k in keys if k}), _texts(chatbots, 'chatbot'),
-                   _texts(threads, 'thread'), _texts(tags, 'tag'), q, versions)
+                   _texts(threads, 'thread'), _texts(tags, 'tag'), q, versions, bool(include_hidden))
 
 
 def _fts_matches(db: sqlite3.Connection, q: str) -> tuple[list[int], list[int], bool]:
@@ -143,6 +144,8 @@ def filter_sql(db, pid: int, f: Filters, alias: str = 'ti') -> tuple[str, list, 
     def values_in(column: str, values: list):
         clauses.append(f'{a}.{column} IN (SELECT value FROM json_each(?))')
         args.append(json.dumps(values))
+    if not f.include_hidden:
+        clauses.append(f'{a}.hidden=0')
     if f.kinds:
         values_in('item_kind', f.kinds)
     if f.event_types:
@@ -305,7 +308,7 @@ def hydrate(db, rows, rule: Rule, params: dict, *, candidates: bool, group: str 
                        + (f":{r['sub_index']}" if r['item_kind'] == 'transcript_segment' else ''),
                 'kind': r['item_kind'], 'event_type': r['event_type'], 'source_id': r['source_id'],
                 'artifact_id': r['artifact_id'], 'collection_id': r['collection_id'], 'counterparty': r['counterparty'],
-                'chatbot': r['chatbot'], 'thread_id': r['thread_id'], 'time': _time(r)}
+                'chatbot': r['chatbot'], 'thread_id': r['thread_id'], 'hidden': bool(r['hidden']), 'time': _time(r)}
         if group:
             item['lane'] = r[GROUPS[group]]
         if r['item_kind'] == 'event':
@@ -401,7 +404,7 @@ def window(db, projection: dict, rule: Rule, *, start_us=None, end_us=None, filt
     qhash = _query_hash(start_us, end_us, match, order, filters.canonical())
     # Selective filters over a long range: a primary-key scan plus a top-N sort beats walking the
     # sort index with a row lookup per candidate. Without filters the sort index pages directly.
-    filtered = any(v for k, v in filters.canonical().items() if k != 'transcript_versions')
+    filtered = any(v for k, v in filters.canonical().items() if k not in ('transcript_versions', 'include_hidden'))
     scan = filtered and _prefer_scan(db, pid, start_us, end_us)
     if scan:
         range_where, range_args = _range_sql(start_us, end_us, match, halfwidth, scan=True)

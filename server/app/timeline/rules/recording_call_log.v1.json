@@ -6,8 +6,8 @@
   "relation": "recording_of_call_hypothesis",
   "description": "Proposes that a recorded artifact may be the recording of a call-log entry. Time agreement is the gate; duration and number agreement are reported as separate evidence. No probability is computed; ambiguity (several calls within tolerance) is kept.",
   "left": {
-    "kind": "artifact",
-    "selector": "artifacts with audio/* or video/* MIME type"
+    "kind": "artifact or event",
+    "selector": "audio/video artifacts; recording events without an acquired artifact (file-name observations) are left events"
   },
   "right": {
     "kind": "event",
@@ -39,10 +39,11 @@
       "hour_12h_ambiguous"
     ],
     "recording_number_paths": [
+      "$.hypotheses.number.normalized_candidate",
+      "$.hypotheses.number.raw",
       "$.filename_number",
       "$.number_hypothesis",
-      "$.filename_derived.number",
-      "$.parsed.number"
+      "$.filename_derived.number"
     ],
     "recording_number_columns": [
       "phone_or_address"
@@ -56,7 +57,16 @@
     "max_recordings": 50000,
     "max_calls": 500000,
     "max_candidates_per_recording": 20,
-    "max_unmatched_listed": 200
+    "max_unmatched_listed": 200,
+    "use_recording_name_observations": true,
+    "call_duration_paths": [
+      "$.duration.seconds",
+      "$.duration.duration_seconds",
+      "$.duration_seconds"
+    ],
+    "recording_event_types": [
+      "recording"
+    ]
   },
   "criteria": {
     "time": "gate: |recording start - call start| <= time_tolerance_seconds for an explicit/epoch/assumed instant; for an unknown-zone wall clock some allowed UTC offset must bring the residual within tolerance; recording candidates are limited to recording_time_kinds (file_mtime excluded by default: copying changes it); every other matching tested point is listed as an alternative",

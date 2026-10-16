@@ -21,12 +21,12 @@ from .ruleset import Rule, canonical_json, load_rule, params_sha256
 from .timeutil import US
 
 BATCH = 5000
-SEGMENT_FLAGS = ('dst', 'date_order_ambiguous', 'ampm_ambiguous', 'hour_12h_ambiguous', 'assumption_rule',
+SEGMENT_FLAGS = ('hidden_reason', 'dst', 'date_order_ambiguous', 'ampm_ambiguous', 'hour_12h_ambiguous', 'assumption_rule',
                  'assumed_zone', 'end_before_start', 'conflicting_correlations')
 _JSON_PATH = re.compile(r'^\$(\.[A-Za-z_][A-Za-z0-9_]{0,63}){1,8}$')
 INSERT = '''INSERT INTO timeline_items(projection_id,item_kind,ref_id,sub_index,sort_us,lo_us,hi_us,end_us,basis,
   precision,candidate_ref,candidate_kind,event_type,source_id,artifact_id,collection_id,counterparty,chatbot,
-  thread_id,is_latest,flags_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'''
+  thread_id,is_latest,hidden,flags_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'''
 
 
 def _now() -> str:
@@ -41,11 +41,32 @@ def _metadata(text) -> dict:
     return value if isinstance(value, dict) else {}
 
 
-def chatbot_path(rule: Rule) -> str:
-    path = rule.data['lanes'].get('chatbot_metadata_path', '$.chatbot')
-    if not _JSON_PATH.match(path):
-        raise ValueError('chatbot_metadata_path must be a simple JSON path')
-    return path
+def _paths(paths) -> list[str]:
+    if not isinstance(paths, list) or not paths or not all(isinstance(p, str) and _JSON_PATH.match(p) for p in paths):
+        raise ValueError('rule metadata paths must be simple JSON paths like $.chat.chatbot')
+    return paths
+
+
+def _chatbot_sql(rule: Rule) -> str:
+    paths = _paths(rule.data['lanes'].get('chatbot_metadata_paths', ['$.chatbot']))
+    return 'COALESCE(' + ','.join(f"json_extract(metadata_json,'{p}')" for p in paths) + ')' if len(paths) > 1 \
+        else f"json_extract(metadata_json,'{paths[0]}')"
+
+
+def _hidden_sql(rule: Rule) -> str:
+    paths = rule.data.get('visibility', {}).get('hidden_metadata_flags') or []
+    if not paths:
+        return '0'
+    return '(' + ' OR '.join(f"json_extract(metadata_json,'{p}') IN (1,'true')" for p in _paths(paths)) + ')'
+
+
+def hidden_reason(rule: Rule, event) -> str | None:
+    visibility = rule.data.get('visibility', {})
+    if event['event_type'] in (visibility.get('hidden_event_types') or []):
+        return f"event_type:{event['event_type']}"
+    if event['hidden_flag']:
+        return 'metadata_flag'
+    return None
 
 
 def projection_id(db: sqlite3.Connection, rule: Rule, params: dict) -> int:
@@ -109,21 +130,25 @@ def _event_row(pid: int, event, time_rows, rule: Rule, params: dict, collections
              collections.get(event['artifact_id']) if event['artifact_id'] is not None else None,
              counterparty(event, rule), event['chatbot'] if isinstance(event['chatbot'], str) else None,
              event['thread_id'])
+    reason = hidden_reason(rule, event)
+    hidden = {'hidden_reason': reason} if reason else {}
     if placement is None:
         status = _metadata(event['metadata_json']).get('timestamp')
-        extra = {'undated_reason': 'no_candidates' if not candidates else 'no_usable_candidate'}
+        extra = {'undated_reason': 'no_candidates' if not candidates else 'no_usable_candidate', **hidden}
         if isinstance(status, dict) and status.get('status'):
             extra['timestamp_status'] = status['status']
         return (pid, 'event', event['id'], 0, None, None, None, None, 'none', 'unknown', None, None, *lanes, 1,
-                json.dumps(extra, sort_keys=True))
+                1 if reason else 0, json.dumps(extra, sort_keys=True))
     return (pid, 'event', event['id'], 0, placement.sort_us, placement.lo_us, placement.hi_us, selection['end_us'],
-            placement.basis, placement.precision, chosen.ref, chosen.kind, *lanes, 1, _flags(placement.flags))
+            placement.basis, placement.precision, chosen.ref, chosen.kind, *lanes, 1, 1 if reason else 0,
+            _flags(placement.flags, hidden))
 
 
 def _events_query(rule: Rule) -> str:
     return f'''SELECT id,event_type,ts_start,ts_end,direction,source_id,artifact_id,phone_or_address,contact_label,
       sender,recipients,thread_id,metadata_json,
-      CASE WHEN json_valid(metadata_json) THEN json_extract(metadata_json,'{chatbot_path(rule)}') END AS chatbot
+      CASE WHEN json_valid(metadata_json) THEN {_chatbot_sql(rule)} END AS chatbot,
+      CASE WHEN json_valid(metadata_json) THEN {_hidden_sql(rule)} ELSE 0 END AS hidden_flag
       FROM events'''
 
 
@@ -282,7 +307,7 @@ def _build_segments(db, pid: int, rule: Rule, params: dict, artifact_ids: list[i
                 start = _finite_seconds(segment.get('start')) if isinstance(segment, dict) else None
                 end = _finite_seconds(segment.get('end')) if isinstance(segment, dict) else None
                 common = ('transcript_segment', artifact['source_id'] if artifact else None, artifact_id,
-                          collections.get(artifact_id), cp, None, None, 1 if int(version['id']) == latest else 0)
+                          collections.get(artifact_id), cp, None, None, 1 if int(version['id']) == latest else 0, 0)
                 if placement is None or start is None:
                     reason = 'no_recording_start' if placement is None else 'segment_offset_invalid'
                     rows.append((pid, 'transcript_segment', int(version['id']), index, None, None, None, None, 'none',

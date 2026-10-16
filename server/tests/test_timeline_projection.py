@@ -476,3 +476,32 @@ def test_scan_plan_and_index_plan_return_identical_pages(tl, monkeypatch):
     scan_keys, scan_plans = pages()
     assert index_plans == {'sort_index'} and scan_plans == {'primary_key_scan'}
     assert index_keys == scan_keys and len(scan_keys) == 12
+
+
+def test_analysis_items_keep_the_interim_contract_without_silent_zones(tl):
+    from server.app.timeline.analysis_items import load_items
+    a = sms(tl, '2024-01-01T10:00:00+00:00', 1704103200000)
+    call = tl.event('call', ts_start='2024-01-01T09:50:00+00:00', ts_end='2024-01-01T10:20:00+00:00')
+    local = whatsapp(tl, '2024-01-01T11:00:00')
+    undated = tl.event('sms', body='no time')
+    part = tl.event('chat_message_part', ts_start='2024-01-01T10:30:00+00:00')
+    with tl.dbmod.session() as db:
+        result = load_items(db, start_utc='2024-01-01T10:00:00Z', end_utc='2024-01-02')
+        interval = load_items(db, start_utc='2024-01-01T10:00:00Z', end_utc='2024-01-02', unknown_zone='interval',
+                              include_hidden=True)
+        zoned = load_items(db, assume_zone='Europe/Warsaw', assumption_rule='analysis-1')
+        with pytest.raises(ruleset.RuleError):
+            load_items(db, assume_zone='Europe/Warsaw')
+    assert result['rule'] == 'display_time@1'
+    assert [i['event_id'] for i in result['items']] == [call, a]  # the call overlaps the window start
+    first = result['items'][0]
+    assert set(first) >= {'event_id', 'event_type', 'source_id', 'artifact_id', 'collection_id', 'thread_id', 'counterparty',
+                          'chatbot', 'direction', 't_start', 't_end', 'time_basis', 'text_chars', 'tags', 't_lo', 't_hi'}
+    assert first['t_end'] - first['t_start'] == 1800
+    reasons = {u['event_id']: u['reason'] for u in result['untimed']}
+    assert reasons[local] == 'unknown_zone' and reasons[undated] == 'no_candidates'
+    included = {i['event_id']: i for i in interval['items']}
+    assert included[local]['t_hi'] - included[local]['t_lo'] == pytest.approx(26 * 3600 + 60, abs=1e-5)
+    assert part in included and included[part]['hidden']
+    zoned_local = next(i for i in zoned['items'] if i['event_id'] == local)
+    assert zoned_local['time_basis']['assumption_rule'] == 'analysis-1' and zoned_local['t_start'] == 1704103200.0

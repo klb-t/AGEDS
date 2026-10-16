@@ -1,0 +1,69 @@
+{
+  "schema": "ageds.chat_export_mapping",
+  "schema_version": 1,
+  "namespace": "claude",
+  "chatbot": "claude",
+  "mapping_version": "1",
+  "description": "Key paths of the Claude.ai data export conversations.json. JSON pointers; '*' expands every list item. Observed-format mapping, not a vendor specification. The export declares no current leaf, so the current path stays unknown.",
+  "files": {
+    "conversations": "conversations\\.json",
+    "shard": null
+  },
+  "time": {
+    "formats": ["iso8601"],
+    "zero_is_placeholder": false,
+    "zone_rule": "ISO-8601 with Z/offset is explicit_offset; without an offset the value stays local with tz_status=unknown"
+  },
+  "conversation": {
+    "id": ["/uuid"],
+    "title": ["/name"],
+    "summary": ["/summary"],
+    "create_time": ["/created_at"],
+    "update_time": ["/updated_at"],
+    "messages": ["/chat_messages"],
+    "account": ["/account/uuid"],
+    "default_model": ["/model"],
+    "current_leaf": [],
+    "raw_exclude": ["chat_messages"]
+  },
+  "message": {
+    "id": ["/uuid"],
+    "role": ["/sender"],
+    "text": ["/text"],
+    "content": ["/content"],
+    "create_time": ["/created_at"],
+    "update_time": ["/updated_at"],
+    "parent": ["/parent_message_uuid"],
+    "model": ["/model"],
+    "attachments": ["/attachments"],
+    "files": ["/files", "/files_v2"],
+    "raw_exclude": ["text", "content", "attachments"]
+  },
+  "root_parent_sentinels": ["00000000-0000-4000-8000-000000000000"],
+  "direction_by_role": {"human": "outgoing", "user": "outgoing", "assistant": "incoming"},
+  "block": {
+    "type": ["/type"],
+    "start_time": ["/start_timestamp"],
+    "stop_time": ["/stop_timestamp"]
+  },
+  "block_types": {
+    "text": {"kind": "text", "visible": true, "text": ["/text"], "join": "\n"},
+    "thinking": {"kind": "reasoning", "visible": false, "text": ["/thinking", {"each": "/summaries/*", "fields": ["/summary"]}], "join": "\n\n"},
+    "redacted_thinking": {"kind": "reasoning", "visible": false, "text": [], "join": "\n"},
+    "tool_use": {"kind": "tool_call", "visible": false, "text": ["/name", {"json": "/input"}], "join": "\n"},
+    "tool_result": {"kind": "tool_output", "visible": false, "text": [{"each": "/content/*", "fields": ["", "/text"]}], "join": "\n"}
+  },
+  "unknown_block_type": {"kind": "unknown", "visible": false, "text": [], "join": "\n"},
+  "visible_text_fallback": ["/text"],
+  "attachment": {
+    "name": ["/file_name"],
+    "size": ["/file_size"],
+    "mime_type": ["/file_type"],
+    "extracted_text": ["/extracted_content"]
+  },
+  "file": {
+    "id": ["/file_uuid", "/uuid"],
+    "name": ["/file_name"]
+  },
+  "attachment_file_match": null
+}

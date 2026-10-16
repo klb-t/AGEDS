@@ -22,6 +22,7 @@
 | WAV observations | [Common-core header probe](WAV_HEADER_PROBE.md), [Server probe](SERVER_WAV_HEADER.md), [Server scan integration](SERVER_WAV_HEADER_SCAN.md), [Android display](ANDROID_WAV_HEADER_UI.md). |
 | Source scan and cache lifecycle | [Production engine](SOURCE_SCAN_ENGINE.md), [Android adapter](ANDROID_SOURCE_SCAN_ADAPTER.md), [Publication gate](SOURCE_SCAN_PUBLICATION_GATE.md), [Guarded cache](SOURCE_SCAN_CACHE_PUBLICATION.md), [ViewModel integration](ANDROID_SCAN_PUBLICATION_INTEGRATION.md). |
 | Device acceptance | [SAF provider harness](ANDROID_SAF_PROVIDER_ACCEPTANCE.md). |
+| AI chat export importers | [ChatGPT/Claude.ai importers and cross-export logical dedup](IMPORTERS_CHAT.md). |
 
 ## Development state and records
 

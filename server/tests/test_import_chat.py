@@ -490,3 +490,27 @@ def test_export_label_is_bound_to_one_collection(corpus, store):
     with pytest.raises(evidence.IntegrityError):
         chatgpt.import_chatgpt_export([corpus['chatgpt_exports']['e1']], export_label='e1', collection_id=second)
     assert rows('SELECT DISTINCT collection_id FROM source_observations') == [{'collection_id': first}]
+
+
+def test_file_limits_empty_files_and_non_standard_constants(corpus, store, tmp_path):
+    shards = sorted(Path(corpus['sharded']['path']).glob('conversations-*.json'))
+    small = min(p.stat().st_size for p in shards)
+    limited = chat_common.ChatImportLimits(max_file_bytes=small)
+    result = chatgpt.import_chatgpt_export([corpus['sharded']['path']], export_label='limited', limits=limited)
+    assert result['coverage'] == 'partial'
+    assert [s['reason'] for s in result['skipped_files']] == ['file_too_large']
+    assert result['run']['issue_counts'] == {'file_too_large': 1}
+    with pytest.raises(ValueError):
+        chatgpt.import_chatgpt_export([corpus['sharded']['path']], limits=chat_common.ChatImportLimits(max_file_bytes=10))
+    empty = tmp_path / 'empty-export'
+    empty.mkdir()
+    (empty / 'conversations.json').write_bytes(b'')
+    result = chatgpt.import_chatgpt_export([empty], export_label='empty')
+    assert result['files'][0]['coverage'] == 'failed' and result['files'][0]['issue_counts'] == {'empty_file': 1}
+    constants = tmp_path / 'nan-export'
+    constants.mkdir()
+    (constants / 'conversations.json').write_text(
+        '[{"id": "nan-conv", "mapping": {}, "create_time": NaN}, {"id": "ok-conv", "mapping": {}}]', encoding='utf-8')
+    result = chatgpt.import_chatgpt_export([constants], export_label='nan')
+    assert result['files'][0]['issue_counts']['malformed_conversation_json'] == 1
+    assert [e['thread_id'] for e in message_events(event_type='chat_conversation') if e['thread_id'] in ('nan-conv', 'ok-conv')] == ['ok-conv']

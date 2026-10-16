@@ -236,3 +236,36 @@ def test_review2_13_fake_provider_needs_the_test_environment(client, monkeypatch
     monkeypatch.setenv(model_runs.TEST_PROVIDER_ENV, '1')
     allowed = client.post('/api/analysis/model-label-runs', json=_body(client, provider='fake', opt_in=True))
     assert allowed.status_code == 200 and allowed.json()['provider'] == 'fake'
+
+
+# --------------------------------------------------------------------- P1
+
+def test_review2_p1_long_declared_duration_starting_before_the_margin_is_loaded(tmp_path, monkeypatch):
+    """A 3-hour call (call-log duration, no end time) that starts 2 h before the window: its last hour is
+    confirmed time inside the window. Pre-fix it was not loaded (start before window - margin), so ``lower``
+    lost it and ``nieobserwowane`` was overstated."""
+    from server.app import db as dbmod, evidence
+    from server.app.config import Settings
+    settings = Settings(data_dir=tmp_path, db_path=tmp_path / 'e.db', store_dir=tmp_path / 'store')
+    monkeypatch.setattr(dbmod, 'settings', settings)
+    monkeypatch.setattr(evidence, 'settings', settings)
+    dbmod.init_db()
+    source = evidence.ensure_source('synthetic', 'long call')
+    evidence.add_event(source_id=source, artifact_id=None, event_type='call', ts_start='2024-05-01T22:00:00+00:00',
+                       metadata={'duration': {'seconds': 3 * 3600}}, external_id='long-call')
+    evidence.add_event(source_id=source, artifact_id=None, event_type='call', ts_start='2024-05-01T23:30:00+00:00',
+                       metadata={'duration': {'seconds': 600}}, external_id='inside-margin')
+    config = cat.parse_config({'schema': cat.CONFIG_SCHEMA, 'version': 't', 'categories': [{'id': 'a'}],
+                               'rules': [{'id': 'r', 'kind': 'event_type', 'values': ['call'], 'weights': {'a': 1}}]})
+    with dbmod.session() as db:
+        out = budget.run_budget(db, config, window_from='2024-05-02', window_to='2024-05-03', zone='UTC',
+                                params={'granularities': ['day']}, persist=False)
+    totals = out['result']['totals']
+    assert totals['categories']['a']['lower'] == pytest.approx(3600)  # pre-fix 0: only the 10-min call reached in
+    assert totals['unobserved']['upper'] == pytest.approx(86400 - 3600)
+    assert out['result']['input']['items_used'] == 2
+    with dbmod.session() as db:  # the look-back is a parameter: 0 restores the bounded pre-fix loading
+        bounded = budget.run_budget(db, config, window_from='2024-05-02', window_to='2024-05-03', zone='UTC',
+                                    params={'granularities': ['day'], 'duration_lookback_s': 0}, persist=False)
+    assert bounded['result']['totals']['categories']['a']['lower'] == 0
+    assert bounded['result']['input']['duration_lookback_s'] == 0

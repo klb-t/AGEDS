@@ -81,7 +81,7 @@ DISCLAIMER = ('Wynik interpretacyjny: szacunek z jawnym modelem i przedziałami,
 
 _RANGES = {'session_gap_s': (0, 7 * 86400), 'typing_chars_per_min': (1, 100_000),
            'reading_chars_per_min': (1, 1_000_000), 'max_typing_s': (0, 86400), 'max_reading_s': (0, 86400),
-           'max_attribution_s': (0, 7 * 86400), 'flip_tolerance_s': (0, 86400),
+           'max_attribution_s': (0, 7 * 86400), 'flip_tolerance_s': (0, 86400), 'duration_lookback_s': (0, 7 * 86400),
            'max_time_uncertainty_s': (0, 366 * 86400)}
 _INTS = {'max_grid_points': (1, 4096), 'max_candle_events': (0, 1_000_000), 'max_flip_records': (0, 100_000),
          'max_items': (1, 10_000_000)}
@@ -591,6 +591,16 @@ def compute_budget(items: list[dict], labels: dict[int, dict], config: cat.Categ
     }
 
 
+MAX_UTC_OFFSET_S = 14 * 3600
+
+
+def _reaches(item: dict, early: float) -> bool:
+    """The item (with its end, declared duration or uncertainty interval) reaches ``early`` or later."""
+    end = max(item['t_start'], item.get('t_end') or item['t_start'], item.get('t_hi') or item['t_start'],
+              item['t_start'] + (item.get('declared_duration_s') or 0))
+    return end >= early
+
+
 def horizon_margin(params: dict, points: list[dict]) -> float:
     return max([params['max_typing_s'], params['max_reading_s']] +
                [max(p['session_gap_s'], p['max_attribution_s']) for p in points]) + 1.0
@@ -727,10 +737,19 @@ def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_t
     cal.days(lo, hi, z)  # validates the window length before any loading
     points, _, _ = grid_points(p)
     margin = horizon_margin(p, points)
-    loaded = load_items(db, start_utc=cal.iso_utc(lo - margin), end_utc=cal.iso_utc(hi + margin),
+    # Review 2 P1: a declared duration (call log, WAV header) is not in the projection's end time, so an
+    # item that starts before the margin can still reach into it. Load ``duration_lookback_s`` earlier
+    # and keep from that extra range only the items whose end or declared duration reaches the margin.
+    early = lo - margin
+    lookback = p['duration_lookback_s']
+    loaded = load_items(db, start_utc=cal.iso_utc(early - lookback), end_utc=cal.iso_utc(hi + margin),
                         assume_zone=assume_zone, assumption_rule=assumption_rule, include_hidden=True,
                         limit=p['max_items'], fields=need_fields or cat.needs_fields(config),
                         media_durations=p['wav_header_durations'], timeline_rule=p['timeline_rule'])
+    if lookback:
+        loaded['items'] = [it for it in loaded['items'] if _reaches(it, early)]
+        loaded['untimed'] = [u for u in loaded['untimed']
+                             if u.get('local_as_utc') is None or u['local_as_utc'] + MAX_UTC_OFFSET_S >= early]
     kept, filtered = [], Counter()
     for it in loaded['items']:
         reason = _filter_reason(it, p)
@@ -767,7 +786,7 @@ def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_t
                           'model_label_run_id': p['model_label_run_id']},
         'input': {'seam': loaded.get('seam'), 'source_rule': loaded['rule'], 'source_rule_sha256': loaded.get('rule_sha256'),
                   'projection': loaded.get('projection'), 'projection_params': loaded.get('params'),
-                  'event_ids_sha256': input_sha, 'items_used': len(kept),
+                  'event_ids_sha256': input_sha, 'items_used': len(kept), 'duration_lookback_s': lookback,
                   'items_in_window': in_window, 'items_in_margin_only': len(kept) - in_window,
                   'items_sha256': sha256_json([[it['event_id'], it['t_start'], it['t_end'], it.get('t_lo'), it.get('t_hi'),
                                                 it.get('basis'), it.get('declared_duration_s'), it.get('text_chars'),

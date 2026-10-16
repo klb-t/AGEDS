@@ -26,6 +26,7 @@
 | Device acceptance | [SAF provider harness](ANDROID_SAF_PROVIDER_ACCEPTANCE.md). |
 | AI chat export importers | [ChatGPT/Claude.ai importers and cross-export logical dedup](IMPORTERS_CHAT.md). |
 | Communication, Takeout and media importers | [MBOX/EML, ICS, VCF, call logs, billing, recording names, My Activity, location, browser history, WhatsApp media, EXIF](IMPORTERS_COMM.md). |
+| Common timeline | [Projection rule, correlation hypotheses, timeline API and swimlane view](TIMELINE.md). |
 
 ## Development state and records
 

@@ -1,0 +1,26 @@
+{
+  "rule_id": "email_chat",
+  "version": 1,
+  "kind": "correlation_rule",
+  "status": "released",
+  "relation": "email_chat_proximity_hypothesis",
+  "description": "Proposes that an e-mail and a chat message may refer to each other: temporal proximity plus (by default required) shared normalized word n-grams. Shared text is reported as evidence, not as a probability.",
+  "left": {"kind": "event", "event_types": ["email", "email_message"]},
+  "right": {"kind": "event", "event_types": ["chat_message", "whatsapp_message", "sms", "mms"]},
+  "parameters": {
+    "max_lag_seconds": 604800,
+    "direction": "either",
+    "require_quote_overlap": true,
+    "ngram_words": 6,
+    "min_shared_ngrams": 1,
+    "max_text_chars": 20000,
+    "max_left": 20000,
+    "max_right": 200000,
+    "max_pairs_evaluated": 2000000,
+    "max_candidates_per_left": 20
+  },
+  "criteria": {
+    "proximity": "gate: the minimum possible |chat - email| over both uncertainty intervals is <= max_lag_seconds (and ordering matches direction)",
+    "quote_overlap": "gate when require_quote_overlap: at least min_shared_ngrams shared word n-grams after Unicode casefold, punctuation removal and whitespace collapse"
+  }
+}

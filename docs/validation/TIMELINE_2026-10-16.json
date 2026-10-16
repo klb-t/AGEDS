@@ -1,0 +1,216 @@
+{
+  "schema": "ageds.validation_receipt.v1",
+  "task": "AGEDS-TASK-20261016-C",
+  "date": "2026-10-16",
+  "branch": "wt-C",
+  "tested_heads": {
+    "backend_js_and_browser_5k_and_existing_acceptance": "18d9e8ddad1fdee1971289f22caf189cd9b5857c",
+    "browser_200k_measurement": "732b5d4a01d7602284f677f738bbd6d98df2700f",
+    "note": "commits between 732b5d4 and 18d9e8d change documentation only",
+    "merged_base": "ccr-d25c3cb3-qgbhql@b468f52 (B1, B2, D, G integrated) merged as e592698"
+  },
+  "environment": {
+    "python": "3.13.16",
+    "sqlite": "3.45.1",
+    "node": "v22.22.0",
+    "chromium": "141.0.7390.37",
+    "playwright": "1.62.1",
+    "os": "Linux container (no GPU, no network models)"
+  },
+  "commands": [
+    "/home/user/wt/venv/bin/python -m pytest server/tests -q",
+    "/home/user/wt/venv/bin/python -m pytest server/tests/test_timeline_projection.py server/tests/test_timeline_correlation.py server/tests/test_timeline_api.py server/tests/test_timeline_integration.py -q",
+    "node --test server/tests/js/*.test.mjs",
+    "python3 scripts/verify_repository.py",
+    "NODE_PATH=<playwright> PYTHON=<venv python> AGEDS_BROWSER_EXECUTABLE=<chromium> node server/tests/browser/timeline.cjs",
+    "NODE_PATH=<playwright> PYTHON=<venv python> AGEDS_BROWSER_EXECUTABLE=<chromium> AGEDS_TIMELINE_BULK=200000 node server/tests/browser/timeline.cjs",
+    "NODE_PATH=<playwright> PYTHON=<venv python> AGEDS_BROWSER_EXECUTABLE=<chromium> node server/tests/browser/acceptance.cjs",
+    "Python timing script over a temporary 200k-event database (scratchpad; same bulk generator as the browser fixture)"
+  ],
+  "results": {
+    "backend_full_suite": {
+      "passed": 654,
+      "skipped": 1,
+      "failed": 0,
+      "subtests_passed": 680
+    },
+    "timeline_python_tests": {
+      "passed": 44,
+      "failed": 0,
+      "files": [
+        "test_timeline_projection.py (24)",
+        "test_timeline_correlation.py (12)",
+        "test_timeline_api.py (6)",
+        "test_timeline_integration.py (2)"
+      ]
+    },
+    "javascript": {
+      "passed": 95,
+      "failed": 0,
+      "timeline_math_tests": 10
+    },
+    "browser_timeline_5k": {
+      "status": "passed",
+      "cases": [
+        "page loads, lanes render, no page errors",
+        "zoom changes level from density to items",
+        "parallel chatbot conversations as side-by-side lanes",
+        "click shows all time candidates; source HTML stays text",
+        "range selection offers disabled report link and export of range",
+        "undated items listed separately",
+        "transcript segment detail shows inherited recording candidates and version"
+      ],
+      "page_errors": [],
+      "console_errors": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ]
+    },
+    "browser_timeline_200k": {
+      "status": "passed",
+      "cases": [
+        "page loads, lanes render, no page errors",
+        "zoom changes level from density to items",
+        "parallel chatbot conversations as side-by-side lanes",
+        "click shows all time candidates; source HTML stays text",
+        "range selection offers disabled report link and export of range",
+        "undated items listed separately",
+        "transcript segment detail shows inherited recording candidates and version"
+      ],
+      "page_errors": []
+    },
+    "browser_existing_acceptance": {
+      "pass_lines": 24,
+      "exit_code": 0
+    },
+    "verify_repository": "OK (relative links and privacy heuristics)"
+  },
+  "measurements_200k": {
+    "dataset": "200 000 bulk synthetic events (sms epoch, whatsapp unknown-zone, chat_message with stored epoch candidates, call with end, email with explicit offset; 1% undated) + hand-made fixture, spread over 3 years, 4 sources, 300 fictional numbers",
+    "bulk_insert": "direct SQL into events/event_times/search_fts (no audit rows), ~7 s",
+    "projection_first_build_ms": 10691,
+    "projection_first_http_request_ms": 10916,
+    "incremental_and_rebuild": {
+      "incremental_1000_new_events_plus_1_new_candidate_ms": 150.5,
+      "incremental_build": {
+        "id": 2,
+        "mode": "incremental",
+        "finished_at": "2026-10-16T18:55:15.111060+00:00",
+        "duration_ms": 134,
+        "counts": {
+          "events": 1001,
+          "max_halfwidth_us": 50400000000,
+          "recomputed_event_ids": 1001,
+          "recomputed_recordings": 0,
+          "undated_events": 10
+        }
+      },
+      "forced_full_rebuild_ms": 11355.1,
+      "db_bytes": 155541504,
+      "timeline_items_rows": 201020
+    },
+    "http_warm_ms_single_request": {
+      "density_full_extent_auto": 339,
+      "density_month_by_type": 350,
+      "window_one_day_1000": 86,
+      "window_one_day_with_candidates_200": 106,
+      "window_full_first_page_1000": 262,
+      "legacy_api_timeline_500": 21
+    },
+    "python_query_ms_best_of_3": {
+      "ensure_projection_fresh_check": 1.2,
+      "density_full_auto_300": 271.1,
+      "density_full_month_by_type": 323.4,
+      "density_full_year_by_counterparty": 793.5,
+      "density_one_month_day_by_source": 51.5,
+      "density_one_day_minute": 33.0,
+      "density_chatbot_filter_week_by_thread": 144.3,
+      "window_one_day_1000_no_candidates": 39.9,
+      "window_one_day_200_with_candidates": 59.2,
+      "window_full_first_page_1000_with_lanes": 160.8,
+      "window_full_page2_1000": 76.3,
+      "window_fts_phrase": 149.0,
+      "window_counterparty_filter_all_time": 134.9,
+      "undated_first_page_100": 6.6,
+      "legacy_api_timeline_500": 4.5,
+      "export_csv_one_month": 665.2
+    },
+    "chromium": {
+      "initial_render_ms": 606,
+      "initial_client_render_ms": 254,
+      "initial_mode": "density",
+      "initial_bucket": "month",
+      "initial_rendered_nodes": 147,
+      "zoom_levels": [
+        "density:week",
+        "density:week",
+        "density:day",
+        "density:day",
+        "density:day",
+        "density:day",
+        "items:hour"
+      ],
+      "items_mode_render_ms": 441,
+      "items_mode_rendered_nodes": 1013
+    },
+    "notes": "initial_render_ms = navigation to first ready render (warm projection); rendered_nodes counts bars/markers/intervals in the DOM; viewport 1500x1000"
+  },
+  "measurements_5k": {
+    "chromium": {
+      "initial_render_ms": 151,
+      "initial_client_render_ms": 49,
+      "initial_rendered_nodes": 147,
+      "items_mode_render_ms": 162,
+      "items_mode_rendered_nodes": 799
+    },
+    "http_warm_ms_single_request": {
+      "density_full_extent_auto": 23,
+      "density_month_by_type": 31,
+      "window_one_day_1000": 10,
+      "window_one_day_with_candidates_200": 14,
+      "window_full_first_page_1000": 133,
+      "legacy_api_timeline_500": 14
+    },
+    "projection_first_build_ms": 233
+  },
+  "runtime_executed": [
+    "projection build/refresh, window, density, undated, item detail, export, facets over HTTP (TestClient and real uvicorn+Chromium)",
+    "correlation runs and reviews over HTTP and CLI subprocesses; links created/removed",
+    "B1 ChatGPT/Claude importers and B2 calls.xml + recording-name observer feeding projection and correlations (pytest)",
+    "swimlane page in real Chromium: density→items zoom, chatbot lanes, hidden-part toggle, item detail with candidates, range selection, undated list, segment detail, no page errors, injected source HTML not executed"
+  ],
+  "unit_tested_only": [
+    "DST fold/gap, AM/PM, quarter-hour offsets and email/chat n-gram evidence (synthetic events, pytest)",
+    "zoom/bucket/virtualization math (node --test)"
+  ],
+  "not_run": [
+    "Android client (unchanged)",
+    "real call recordings or real exports",
+    "reports route /reports/new (track F; link rendered disabled)",
+    "concurrent multi-process refresh under load",
+    "browsers other than Chromium"
+  ],
+  "boundaries": [
+    "first projection build of a large catalog is slow (~11 s per 200k events); later reads are incremental",
+    "density places items at their sort time; unknown-zone share is reported per bucket",
+    "dashboard list on / and /export/events.csv keep their old ordering (outside file scope)",
+    "no probability is computed for correlation hypotheses"
+  ],
+  "post_merge_check": {
+    "head": "be24f9a (merge of integration tip e1ce8d2 incl. track A catalog)",
+    "backend_full_suite": {
+      "passed": 763,
+      "skipped": 1,
+      "failed": 0,
+      "subtests_passed": 680
+    },
+    "javascript": {
+      "passed": 95,
+      "failed": 0
+    },
+    "browser_timeline_5k": {
+      "cases_passed": 7,
+      "exit_code": 0
+    },
+    "verify_repository": "OK"
+  }
+}

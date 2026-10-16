@@ -57,11 +57,9 @@ export function barPath(x, y, width, height, radius = 4) {
 export function bandPath(edges, lows, highs, xs, ys) {
   if (!edges.length || lows.length !== edges.length - 1 || highs.length !== lows.length) return '';
   const top = [], bottom = [];
-  for (let j = 0; j < highs.length; j += 1) {
-    top.push(`${xs(edges[j])},${ys(highs[j])}`, `${xs(edges[j + 1])},${ys(highs[j])}`);
-    bottom.push(`${xs(edges[j + 1])},${ys(lows[j])}`, `${xs(edges[j])},${ys(lows[j])}`);
-  }
-  return `M${top.join('L')}L${bottom.reverse().join('L')}Z`;
+  for (let j = 0; j < highs.length; j += 1) top.push(`${xs(edges[j])},${ys(highs[j])}`, `${xs(edges[j + 1])},${ys(highs[j])}`);
+  for (let j = lows.length - 1; j >= 0; j -= 1) bottom.push(`${xs(edges[j + 1])},${ys(lows[j])}`, `${xs(edges[j])},${ys(lows[j])}`);
+  return `M${top.join('L')}L${bottom.join('L')}Z`;
 }
 
 export function stepPath(edges, values, xs, ys) {

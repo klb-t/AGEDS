@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "AGEDS",
   "state_id": "AGEDS-STATE-20261016-001",
-  "updated_at": "2026-10-16T18:53:15.310908+00:00",
+  "updated_at": "2026-10-16T19:06:07.754679+00:00",
   "based_on_remote_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
   "local_branch": "ccr-d25c3cb3-qgbhql",
   "status_summary": "Evidence Timeline & Analysis increment started on 9c1d513: Etap 0 report and F0 extension foundation; parallel tracks A-H claimed with disjoint file scopes.",
@@ -277,7 +277,7 @@
     {
       "id": "AGEDS-TASK-20261016-C",
       "owner": "timeline",
-      "status": "claimed",
+      "status": "accepted",
       "scope": [
         "server/app/timeline/",
         "server/app/schema/timeline.py",
@@ -294,7 +294,24 @@
       "acceptance": [
         "Versioned display rule, revocable correlation hypotheses, paginated filtered API keeping old shape, virtualized swimlanes."
       ],
-      "result_refs": []
+      "result_refs": [
+        "docs/TIMELINE.md",
+        "docs/validation/TIMELINE_2026-10-16.json"
+      ],
+      "results": {
+        "backend_after_merge": "763 passed, 1 skipped",
+        "js": 95,
+        "browser": "timeline.cjs 7/7 at 5k and 200k events; acceptance.cjs 24 PASS",
+        "perf_200k": {
+          "first_build_s": 10.7,
+          "incremental_1000_s": 0.15,
+          "density_s": "0.27-0.35",
+          "day_window_ms": 40,
+          "first_render_ms": 606
+        }
+      },
+      "behaviour_change": "/api/timeline ordered by projected time desc, undated last by id (no created_at)",
+      "coordinator_followup": "dashboard list and /export/events.csv use projected order; events.csv formula guard apostrophe_prefix_v1"
     },
     {
       "id": "AGEDS-TASK-20261016-D",

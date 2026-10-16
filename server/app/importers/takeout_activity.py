@@ -216,10 +216,9 @@ def import_my_activity(path: Path, *, enable_browser_history: bool = False, sour
             records = json.loads(data.decode('utf-8-sig'))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise ValueError(f'My Activity JSON is not valid: {exc}') from exc
-        if isinstance(records, dict):
-            records = next((v for v in records.values() if isinstance(v, list)), [])
-            issues.add('json_object_wrapper_list_used')
         if not isinstance(records, list):
+            # Never unwrap other Takeout objects (e.g. Timeline.json): that would
+            # import opt-in data such as location history without its opt-in.
             raise ValueError('My Activity JSON must be a list of records')
         items = [(i, r, None) for i, r in enumerate(records)]
     else:
@@ -260,6 +259,9 @@ def import_my_activity(path: Path, *, enable_browser_history: bool = False, sour
         counts['records'] += 1
         if not isinstance(record, dict):
             issues.add('record_not_an_object', record_index=index)
+            continue
+        if not ({'header', 'title', 'products'} & set(record)):
+            issues.add('record_not_my_activity_shape', record_index=index, keys=sorted(record)[:10])
             continue
         if _is_browser_like(record, config) and not enable_browser_history:
             counts['skipped_browser_history_not_enabled'] += 1

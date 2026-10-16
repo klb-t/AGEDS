@@ -774,3 +774,14 @@ def test_mbox_long_lines_split_by_read_bound_never_create_separators(env, tmp_pa
     assert result['messages'] == 2
     first = events(result['artifact_id'], 'email')[0]
     assert first['body'].startswith('x' * 64 + 'From fake')
+
+
+def test_my_activity_refuses_other_takeout_layouts(env, tmp_path):
+    with pytest.raises(ValueError, match='list of records'):
+        takeout_activity.import_my_activity(Path(env['m']['location']['timeline']))
+    assert events(event_type='activity') == []
+    odd = tmp_path / 'odd.json'
+    odd.write_text(json.dumps([{'latitudeE7': 1, 'longitudeE7': 2, 'timestamp': '2024-01-01T00:00:00Z'},
+                               {'header': 'Search', 'title': 'ok', 'time': '2024-01-01T00:00:00Z'}]), encoding='utf-8')
+    result = takeout_activity.import_my_activity(odd)
+    assert result['events'] == 1 and result['issues']['by_code'] == {'record_not_my_activity_shape': 1}

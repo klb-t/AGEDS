@@ -1,0 +1,61 @@
+{
+ "schema_version": 1,
+ "task_id": "AGEDS-TASK-20261016-E",
+ "track": "E2 (Etap 5: hypothesis analyzer, interpretive layer)",
+ "area": "analysis/hypotheses",
+ "recorded_at": "2026-10-16",
+ "branch": "wt-E2",
+ "base_commit": "4fc0627",
+ "merged_in": [
+  "ccr-d25c3cb3-qgbhql @ b181c21 (coordinator note: timeline integrated)",
+  "wt-E @ 15aeb6b (E1 categories/intervals API, permitted by the brief)"
+ ],
+ "tested_source_head": "0b70e7273e26073cb1a1687032e062a040f6ee58",
+ "tested_source_head_note": "receipt commit follows this head and changes no executable code",
+ "commits": ["c7d3be4", "12032a9", "29ebaf0", "2d3eabb", "cfad6cf", "132f8b8", "958850a", "13c1f0b", "8860690", "0b70e72"],
+ "environment": {
+  "python": "3.13.16 (shared venv /home/user/wt/venv, no packages added)",
+  "node": "v22.22.0",
+  "chromium": "/opt/pw-browsers/chromium-1194 via Playwright from the session's browser-tools",
+  "network_or_model_calls": "none; the LLM candidate provider interface ships only provider 'none'"
+ },
+ "commands": [
+  {"command": "/home/user/wt/venv/bin/python -m pytest server/tests -q", "result": "835 passed, 1 skipped, 680 subtests passed, 0 failed (after merges, before E2 tests: 788 passed)"},
+  {"command": "/home/user/wt/venv/bin/python -m pytest server/tests/test_hypotheses_*.py -q", "result": "47 passed, 0 failed"},
+  {"command": "node --test server/tests/js/*.test.mjs", "result": "104 passed, 0 failed (9 new in hypotheses-chart.test.mjs)"},
+  {"command": "NODE_PATH=<browser-tools>/node_modules PYTHON=/home/user/wt/venv/bin/python AGEDS_BROWSER_EXECUTABLE=/opt/pw-browsers/chromium-1194/chrome-linux/chrome node server/tests/browser/hypotheses.cjs", "result": "10 PASS, exit 0"},
+  {"command": "same environment: node server/tests/browser/acceptance.cjs (existing suite)", "result": "24 PASS, exit 0"},
+  {"command": "python3 scripts/verify_repository.py", "result": "passed (see .md)"},
+  {"command": "baseline on 4fc0627 before changes: pytest server/tests -q", "result": "557 passed, 1 skipped, 680 subtests"}
+ ],
+ "runtime_executed": [
+  {"what": "CLI as real subprocesses (python -m server.app.cli): hypothesis-preview/register/version, hypotheses-list, eventstudy-run (--summary, overrides), eventstudy-show (--output; second write refused), dossier-add/-classify/-candidates, thesis-add, disclosure-add, hypothesis-show, NotFound and malformed JSON (duplicate key, NaN) exit 2", "result": "passed inside test_hypotheses_api.py"},
+  {"what": "uvicorn server on a temporary synthetic SQLite + real Chromium: charts rendered from the stored run, disclaimer SHA-256 recomputed with WebCrypto in all six sections, warnings always visible, histogram hover/focus tooltip, inert hostile source text, register with hash preview (browser hash matches server), unchanged definition no-op, version 2 linked, event study via form with recorded deviation, human classification with history, unsupported thesis flag, disclosure text, 390 px width without page scroll", "result": "10/10 PASS"},
+  {"what": "performance probe (scratch script, not committed): 20 000 events, 200 stimuli, 2 000 outcomes, 999 permutations, 28 lag bins, 2 windows", "result": "about 3.5 s per run end-to-end for circular_shift, permutation and stratified_weekday_hour"}
+ ],
+ "unit_tested_only": [
+  "statistical behaviour on generated scenarios: planted lagged effect (after-window p <= 0.02, before-window p > 0.2), density-burst null (raw p <= 0.05 in both windows, density-normalized p >= 0.1, detection_bias flagged high), weekday confound (permutation p <= 0.01, stratified p >= 0.1), clustered stimuli (75 overlapping pairs, circular null band > 1.5x permutation band), unknown-zone and nonexistent-local-time exclusions, day-precision exclusion/keep",
+  "immutability triggers (UPDATE/DELETE refused on all hypothesis tables), version chain trigger (foreign/skipped/wrong-hash predecessors refused), run trigger (unregistered hash or run before registration refused), tamper detection after a dropped trigger",
+  "determinism (same version and data -> identical result hash; seed override -> new hash and recorded deviation), p = (k+1)/(n+1) bounds, SplitMix64 reference value",
+  "category selectors through E1's labeller with a registered configuration hash (missing or different configuration refused)",
+  "chart geometry (scales, ticks, bar paths, null band polygon, control series) in Node"
+ ],
+ "not_run": [
+  "real LLM candidate provider (none exists; interface tested with a fake)",
+  "analysis on a real (private) corpus",
+  "timeline-delegated seam: E1 has not yet made analysis/source.py delegate to timeline.analysis_items; runs currently record rule analysis_source.v1 with rule_sha256 'unknown'",
+  "Android (unchanged)"
+ ],
+ "shared_edits": [
+  "server/app/api/__init__.py: 'hypotheses' appended to ROUTER_MODULES",
+  "server/app/commands/__init__.py: 'hypotheses' appended to COMMAND_MODULES",
+  "server/tests/corpus/__init__.py: 'hypotheses' appended to PARTS",
+  "server/app/schema/analysis.py: E2 block (versions 55-57) appended after E1's tuples via MIGRATIONS = MIGRATIONS + (...)",
+  "docs/README.md and docs/validation/README.md: one index line each"
+ ],
+ "disclaimer": {
+  "pl": "Wynik analizatora jest materiałem pomocniczym dla człowieka/biegłego, nie wnioskiem przyczynowym.",
+  "sha256_pl": "4b0c08a0ce3c680fd97550372383859ef2458a7b877133bf04ff8aab58d48a5c",
+  "sha256_en": "25724ee6b57866f2dfdaa3015f0e9607505193e68d8b5803aa080e3a912f1cf1"
+ }
+}

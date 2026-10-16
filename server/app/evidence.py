@@ -121,8 +121,10 @@ def ingest_file(path: Path, *, source_id: int, source_locator: str | None = None
 
     The parent must already exist in the same case. ``None`` means "not
     stated": a repeated acquisition of the same content/locator without a
-    parent reuses the artifact. Naming a different parent is a visible
-    conflict, never a silent re-parenting.
+    parent reuses the artifact. Naming a different parent never re-parents
+    the artifact (it keeps its first parent) and is not refused either (review
+    finding 5): the new observation records the stated parent with
+    ``parent_relation = 'additional_parent_observed'``, so both provenances stay.
 
     ``source_stat`` says what ``path`` is (review finding 1): ``'path'`` (the
     default outside :func:`temporary_copy_acquisitions`) is the original
@@ -164,6 +166,7 @@ def ingest_file(path: Path, *, source_id: int, source_locator: str | None = None
             if parent_cases != {source['case_id']}:
                 raise IntegrityError('parent artifact does not exist in the source case')
         row = db.execute("SELECT id FROM artifacts WHERE sha256=? AND COALESCE(source_locator,'')=COALESCE(?, '') ORDER BY id LIMIT 1", (digest, source_locator)).fetchone()
+        additional_parent: dict | None = None
         if row:
             aid = int(row['id'])
             provenance_cases = {r['case_id'] for r in db.execute('''
@@ -176,7 +179,8 @@ def ingest_file(path: Path, *, source_id: int, source_locator: str | None = None
             if bool(stored_artifact['is_raw']) != bool(is_raw):
                 raise IntegrityError('raw and derived acquisitions cannot silently share an artifact identity')
             if parent_artifact_id is not None and stored_artifact['parent_artifact_id'] != parent_artifact_id:
-                raise IntegrityError('same content/locator was acquired under a different parent artifact')
+                additional_parent = {'parent_relation': 'additional_parent_observed',
+                                     'artifact_parent_artifact_id': stored_artifact['parent_artifact_id']}
             existing_path = stored_artifact['stored_path']
             if not existing_path or Path(existing_path).is_symlink() or not Path(existing_path).is_file() or sha256_file(Path(existing_path)) != digest:
                 raise IntegrityError('existing artifact content is unavailable or failed SHA-256 verification')
@@ -192,6 +196,9 @@ def ingest_file(path: Path, *, source_id: int, source_locator: str | None = None
             'filesystem_stat_scope': STAT_SCOPES[scope],
             'content_claim': 'captured_bytes_only_not_truth_or_authorship',
         }
+        if parent_artifact_id is not None:
+            observation_metadata['parent_artifact_id'] = parent_artifact_id
+            observation_metadata.update(additional_parent or {})
         if scope == 'path':
             before, after = source_stat_before, source_stat_after
             source_modified_at = datetime.fromtimestamp(before.st_mtime, timezone.utc).isoformat()
@@ -221,7 +228,7 @@ def ingest_file(path: Path, *, source_id: int, source_locator: str | None = None
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?)''',
             (aid, source_id, source_locator, observed_at, 'ingest', name, mime, size, digest,
              source_modified_at, json.dumps(observation_metadata, ensure_ascii=False), collection_id))
-        db.execute("INSERT INTO audit_log(action,object_kind,object_id,details_json) VALUES ('ingest','artifact',?,?)", (aid,json.dumps({'sha256':digest,'source_locator':source_locator,'source_id':source_id,'observation_id':observation.lastrowid,'collection_id':collection_id,'deduplicated':row is not None,**({'parent_artifact_id':parent_artifact_id} if parent_artifact_id is not None else {})},ensure_ascii=False)))
+        db.execute("INSERT INTO audit_log(action,object_kind,object_id,details_json) VALUES ('ingest','artifact',?,?)", (aid,json.dumps({'sha256':digest,'source_locator':source_locator,'source_id':source_id,'observation_id':observation.lastrowid,'collection_id':collection_id,'deduplicated':row is not None,**({'parent_artifact_id':parent_artifact_id} if parent_artifact_id is not None else {}),**(additional_parent or {})},ensure_ascii=False)))
         return aid
 
 def add_event(*, source_id: int, artifact_id: int | None, event_type: str, ts_start: str | None = None, ts_end: str | None = None, direction: str | None = None, sender: str | None = None, recipients: str | None = None, contact_label: str | None = None, phone_or_address: str | None = None, subject: str | None = None, body: str | None = None, external_id: str | None = None, thread_id: str | None = None, confidence: float | None = None, metadata: dict | None = None, db: sqlite3.Connection | None = None) -> int:

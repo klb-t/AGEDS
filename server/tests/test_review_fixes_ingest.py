@@ -179,3 +179,100 @@ def test_finding1_legacy_rows_with_temporary_markers_are_ignored(env, locator, s
         assert candidates[0].metadata['filesystem_stat_scope'] == 'legacy_unmarked_assumed_source_path'
     else:
         assert not candidates[0].usable and candidates[0].unusable_reason == reason
+
+
+# --------------------------------------------------------------------- finding 5
+
+ATTACHMENT = b'%PDF-1.4 same attachment bytes'
+TAKEOUT_NAME = 'All mail Including Spam and Trash.mbox'
+
+
+def _email_counts(env) -> dict:
+    return {'events': env.one("SELECT COUNT(*) FROM events WHERE event_type='email'"),
+            'artifacts': env.one('SELECT COUNT(*) FROM artifacts'),
+            'references': env.one('SELECT COUNT(*) FROM event_media_references')}
+
+
+def test_finding5_two_takeouts_with_the_same_mbox_name_both_import(env):
+    export1 = mbox_message(1, 'hello', ATTACHMENT)
+    export2 = mbox_message(1, 'hello', ATTACHMENT) + mbox_message(2, 'a newer message', ATTACHMENT)
+    results = []
+    with env.client() as http:
+        for data in (export1, export2, export2):
+            response = http.post('/api/imports/comm/email', files={'file': (TAKEOUT_NAME, data, 'application/mbox')})
+            assert response.status_code == 200, response.text
+            results.append(response.json())
+            if len(results) == 2:
+                before_reimport = _email_counts(env)
+    first, second, again = results
+    assert second['artifact_id'] != first['artifact_id'] and again['artifact_id'] == second['artifact_id']
+    assert _email_counts(env) == before_reimport  # the same container again: idempotent
+    assert [(r['artifact_id'], r['external_id']) for r in env.rows(
+        "SELECT artifact_id, external_id FROM events WHERE event_type='email' ORDER BY id")] == [
+        (first['artifact_id'], '<1@example.org>'), (second['artifact_id'], '<1@example.org>'),
+        (second['artifact_id'], '<2@example.org>')]
+    children = env.rows('SELECT a.id, a.parent_artifact_id, a.source_locator, a.sha256, c.sha256 AS container_sha '
+                        'FROM artifacts a JOIN artifacts c ON c.id=a.parent_artifact_id ORDER BY a.id')
+    assert len(children) == 3 and len({c['sha256'] for c in children}) == 1  # one stored copy, three provenances
+    for child in children:
+        assert child['source_locator'].startswith(f"upload:email:{TAKEOUT_NAME}@sha256:{child['container_sha']}!/message/")
+    assert {r['parser_version'] for r in env.rows('SELECT parser_version FROM event_media_references')} == {'2'}
+
+
+def test_finding5_reexported_whatsapp_zip_with_unchanged_media(env, tmp_path):
+    import io
+    import zipfile
+
+    def export(lines: str) -> bytes:
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w') as archive:
+            archive.writestr('WhatsApp Chat with Example.txt', lines)
+            archive.writestr('IMG-20240105-WA0001.jpg', b'unchanged synthetic photo')
+        return buffer.getvalue()
+
+    first_chat = '05/01/2024, 10:15 - Example A: IMG-20240105-WA0001.jpg (file attached)\n'
+    with env.client() as http:
+        for data in (export(first_chat), export(first_chat + '06/01/2024, 09:00 - Example B: later\n'),
+                     export(first_chat) + b''):
+            response = http.post('/api/imports/comm/whatsapp-export',
+                                 files={'file': ('WhatsApp Chat with Example.zip', data, 'application/zip')})
+            assert response.status_code == 200, response.text
+    media = env.rows("SELECT parent_artifact_id, source_locator FROM artifacts WHERE original_name='IMG-20240105-WA0001.jpg' ORDER BY id")
+    assert len(media) == 2 and media[0]['parent_artifact_id'] != media[1]['parent_artifact_id']
+    assert all('@sha256:' in m['source_locator'] for m in media)
+
+
+def test_finding5_same_child_under_another_parent_is_an_additional_observation(env):
+    source = evidence.ensure_source('synthetic', 'parents')
+    parent_a, parent_b, child = (env.root / name for name in ('a.zip', 'b.zip', 'child.bin'))
+    parent_a.write_bytes(b'container a')
+    parent_b.write_bytes(b'container b')
+    child.write_bytes(b'child bytes')
+    a = evidence.ingest_file(parent_a, source_id=source, source_locator='a')
+    b = evidence.ingest_file(parent_b, source_id=source, source_locator='b')
+    first = evidence.ingest_file(child, source_id=source, source_locator='legacy!/child.bin', parent_artifact_id=a)
+    second = evidence.ingest_file(child, source_id=source, source_locator='legacy!/child.bin', parent_artifact_id=b)
+    assert first == second
+    assert env.one('SELECT parent_artifact_id FROM artifacts WHERE id=?', (first,)) == a  # never re-parented
+    rows = _observations(env)
+    stated = [(r['meta'].get('parent_artifact_id'), r['meta'].get('parent_relation')) for r in rows if r['artifact_id'] == first]
+    assert stated == [(a, None), (b, 'additional_parent_observed')]
+    audit = json.loads(env.rows("SELECT details_json FROM audit_log WHERE action='ingest' ORDER BY id DESC LIMIT 1")[0]['details_json'])
+    assert audit['parent_relation'] == 'additional_parent_observed' and audit['artifact_parent_artifact_id'] == a
+
+
+def test_finding5_container_imported_by_version_1_keeps_version_1(env, monkeypatch):
+    from server.app.importers import email_mbox
+    export = mbox_message(1, 'hello', ATTACHMENT)
+    path = env.root / TAKEOUT_NAME
+    path.write_bytes(export)
+    # Simulate the database left by parser version 1 (name-based child locators).
+    monkeypatch.setattr(email_mbox, 'PARSER_VERSION', '1')
+    legacy = email_mbox.import_mbox(path)
+    assert legacy['parser_version'] == '1'
+    child = env.rows('SELECT source_locator FROM artifacts WHERE parent_artifact_id=?', (legacy['artifact_id'],))
+    assert child == [{'source_locator': f'{path}!/message/0/mime-part/2'}]
+    counts = _email_counts(env)
+    monkeypatch.setattr(email_mbox, 'PARSER_VERSION', '2')
+    again = email_mbox.import_mbox(path)
+    assert again['parser_version'] == '1' and _email_counts(env) == counts

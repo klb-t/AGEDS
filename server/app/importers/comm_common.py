@@ -184,6 +184,28 @@ def acquire(path: Path, *, source_kind: str, source_label: str, locator: str | N
     return source_id, artifact_id
 
 
+def container_scheme(artifact_id: int, locator: str, importer: str, current_version: str) -> tuple[str, str]:
+    """(parser version, child locator base) for one import of a container (review finding 5).
+
+    Since version 2 of the container importers a child locator names the
+    container's content identity: ``<locator>@sha256:<container hash>!/...``,
+    so two exports with the same file name never share a child locator. A
+    container that an earlier version-1 import already acquired keeps version
+    1 (``<locator>!/...``): re-importing it stays idempotent instead of
+    conflicting with the events and children recorded then. Existing rows are
+    never rewritten.
+    """
+    with session() as db:
+        row = db.execute('SELECT sha256 FROM artifacts WHERE id=?', (artifact_id,)).fetchone()
+        earlier = {r[0] for r in db.execute(
+            '''SELECT DISTINCT json_extract(metadata_json,'$.source_metadata.parser_version') FROM source_observations
+               WHERE artifact_id=? AND json_extract(metadata_json,'$.source_metadata.importer')=?''',
+            (artifact_id, importer))}
+    if '1' in earlier or row is None or not row['sha256']:
+        return '1', locator
+    return current_version, f"{locator}@sha256:{row['sha256']}"
+
+
 def acquire_bytes(payload: bytes, *, name: str, source_id: int, locator: str, importer: str,
                   parser_version: str, parent_artifact_id: int | None, mime_type: str | None = None,
                   collection_id: int | None = None, is_raw: bool = True,

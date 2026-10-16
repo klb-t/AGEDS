@@ -26,11 +26,14 @@ from pathlib import Path
 from ..db import session
 from ..evidence import ensure_source, temporary_copy_acquisitions
 from . import whatsapp
-from .comm_common import (DEFAULT_LIMITS, CommLimits, Issues, acquire, acquire_bytes, add_media_reference,
+from .comm_common import (DEFAULT_LIMITS, CommLimits, Issues, acquire, acquire_bytes, add_media_reference, container_scheme,
                           load_data, record_import_run, stored_path, walk_files)
 
 PARSER_NAME = 'whatsapp_media'
-PARSER_VERSION = '1'
+# '2' (2026-10-16, review finding 5): members of a zip export are located under
+# the zip's SHA-256 (comm_common.container_scheme); a zip imported by '1' stays '1'.
+# Folder exports keep their filesystem paths in both versions.
+PARSER_VERSION = '2'
 _BIDI = re.compile(r'[‎‏‪-‮⁦-⁩]')
 _CHAT_NAME = re.compile(r'(^_chat\.txt$|whatsapp|czat|chat)', re.IGNORECASE)
 
@@ -58,6 +61,16 @@ def _choose_chat(names: list[str], chat_member: str | None) -> str:
     if len(likely) == 1:
         return likely[0]
     raise ValueError('cannot choose the chat text file; pass chat_member explicitly. Candidates: ' + ', '.join(texts[:20]))
+
+
+def _folder_version(chat_locator: str) -> str:
+    """Folder exports: keep '1' when an earlier import recorded version-1 references for this chat."""
+    with session() as db:
+        earlier = {r[0] for r in db.execute(
+            '''SELECT DISTINCT r.parser_version FROM event_media_references r JOIN events e ON e.id=r.event_id
+               JOIN artifacts a ON a.id=e.artifact_id WHERE a.source_locator=? AND r.parser=?''',
+            (chat_locator, PARSER_NAME))}
+    return '1' if '1' in earlier else PARSER_VERSION
 
 
 def _references(chat_artifact_id: int, patterns: dict):
@@ -105,6 +118,7 @@ def import_whatsapp_export(path: Path, *, chat_label: str | None = None, chat_me
             chat_path = members[chat_name]
             container_id = None
             container_source = None
+            version, member_base = _folder_version(chat_locator), base_locator
         elif zipfile.is_zipfile(path):
             mode = 'zip'
             container_source, container_id = acquire(
@@ -124,7 +138,8 @@ def import_whatsapp_export(path: Path, *, chat_label: str | None = None, chat_me
                 if name.startswith('/') or '..' in Path(name).parts:
                     issues.add('suspicious_member_name_not_used_as_path', member=name[:200])
             chat_name = _choose_chat(sorted(members), chat_member)
-            chat_locator = f'{base_locator}!/{chat_name}'
+            version, member_base = container_scheme(container_id, base_locator, PARSER_NAME, PARSER_VERSION)
+            chat_locator = f'{member_base}!/{chat_name}'
             chat_path = Path(scratch) / 'chat.txt'
             chat_path.write_bytes(archive.read(members[chat_name]))
         else:
@@ -138,7 +153,7 @@ def import_whatsapp_export(path: Path, *, chat_label: str | None = None, chat_me
                 # records its container parent / collection; whatsapp_txt then reuses it.
                 chat_source = ensure_source('whatsapp_export', label, chat_locator)
                 acquire(chat_path, source_kind='whatsapp_export', source_label=label, locator=chat_locator,
-                        importer=PARSER_NAME, parser_version=PARSER_VERSION, original_name=Path(chat_name).name,
+                        importer=PARSER_NAME, parser_version=version, original_name=Path(chat_name).name,
                         collection_id=collection_id, source_id=chat_source, parent_artifact_id=container_id,
                         mime_type='text/plain')
             chat = whatsapp.import_whatsapp_txt(chat_path, chat_label, source_locator=chat_locator,
@@ -162,7 +177,7 @@ def import_whatsapp_export(path: Path, *, chat_label: str | None = None, chat_me
         def media_artifact(name: str) -> int | None:
             if name in acquired:
                 return acquired[name]
-            locator = f'{base_locator}!/{name}' if mode == 'zip' else f'{base_locator}/{name}'
+            locator = f'{member_base}!/{name}' if mode == 'zip' else f'{base_locator}/{name}'
             metadata = {'parent_relation': parent_relation, 'chat_artifact_id': chat_artifact_id}
             if mode == 'zip':
                 info = members[name]
@@ -175,12 +190,12 @@ def import_whatsapp_export(path: Path, *, chat_label: str | None = None, chat_me
                     counts['media_not_extracted'] += 1
                     return None
                 artifact_id = acquire_bytes(archive.read(info), name=Path(name).name, source_id=container_source,
-                                            locator=locator, importer=PARSER_NAME, parser_version=PARSER_VERSION,
+                                            locator=locator, importer=PARSER_NAME, parser_version=version,
                                             parent_artifact_id=parent_id, collection_id=collection_id,
                                             extra_metadata=metadata)
             else:
                 _, artifact_id = acquire(members[name], source_kind='whatsapp_export', source_label=label,
-                                         locator=locator, importer=PARSER_NAME, parser_version=PARSER_VERSION,
+                                         locator=locator, importer=PARSER_NAME, parser_version=version,
                                          original_name=Path(name).name, collection_id=collection_id,
                                          source_id=container_source, parent_artifact_id=parent_id,
                                          extra_metadata=metadata)
@@ -209,7 +224,7 @@ def import_whatsapp_export(path: Path, *, chat_label: str | None = None, chat_me
             add_media_reference(event_id=event_id, artifact_id=artifact_id, reference_kind='whatsapp_media',
                                 reference_key=f'line:{line}:{ordinal}' if line is None else f'line:{line}',
                                 reference_name=name, status=status, parser=PARSER_NAME,
-                                parser_version=PARSER_VERSION, locator=locator,
+                                parser_version=version, locator=locator,
                                 metadata={'export_mode': mode, 'parent_relation': parent_relation})
         unreferenced = sorted(set(n for names in by_key.values() for n in names) - referenced)
         for name in unreferenced:
@@ -222,8 +237,8 @@ def import_whatsapp_export(path: Path, *, chat_label: str | None = None, chat_me
     options = {'pattern_set': patterns['set'], 'mode': mode, 'chat_member': chat_name}
     coverage = {'complete': complete and not counts['media_not_extracted']}
     record_import_run(artifact_id=container_id or chat_artifact_id, importer=PARSER_NAME,
-                      parser_version=PARSER_VERSION, options=options, counts=counts, coverage=coverage, issues=issues)
-    return {'parser_version': PARSER_VERSION, 'mode': mode, 'container_artifact_id': container_id,
+                      parser_version=version, options=options, counts=counts, coverage=coverage, issues=issues)
+    return {'parser_version': version, 'mode': mode, 'container_artifact_id': container_id,
             'chat_artifact_id': chat_artifact_id, 'chat_parser_version': chat['parser_version'], **counts,
             'unreferenced_media': unreferenced[:limits.max_raw_items], 'options': options, 'coverage': coverage,
             'issues': issues.as_dict(), 'chat_issues_count': len(chat['issues'])}

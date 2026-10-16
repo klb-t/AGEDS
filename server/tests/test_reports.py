@@ -245,6 +245,8 @@ def test_catalog_section_uses_area_a_and_chat_dedup(env):
     bases = [row for b in catalog['blocks'] if b['id'].startswith('catalog.bases.') for row in b['rows']]
     assert bases and all(row['tz_status'] for row in bases)
     assert catalog['inputs']['catalog_scans'] and catalog['inputs']['collections']
+    assert catalog['exclusions']['catalog_entries_unsupported'] >= 0 and 'catalog_entries_damaged' in catalog['exclusions']
+    assert 'chat_export_parses_not_complete' in _section(document, 'chat_records')['exclusions']
     sources = _section(document, 'sources')
     values = {row['key']: row['value'] for row in _block(sources, 'sources.summary')['rows']}
     with db.session() as conn:

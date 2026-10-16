@@ -26,6 +26,8 @@ def provide(ctx) -> dict:
     section.input_rows('record_export_parses', parses)
     if not exports:
         section.status('empty', 'no chat exports imported')
+    partial = sum(1 for parse in parses if parse['coverage'] != 'complete')
+    section.exclude('chat_export_parses_not_complete', partial)
     file_counts: dict[int, int] = {}
     for row in files:
         file_counts[row['export_id']] = file_counts.get(row['export_id'], 0) + 1

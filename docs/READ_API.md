@@ -80,7 +80,7 @@ Migration notes for an existing installation:
 | `GET /api/read/v1/timeline?from=&to=&event_type=&phone=&direction=&thread_id=&artifact_id=&source_id=&limit=&cursor=` | read | Event window with keyset cursor and recorded `event_times` candidates. |
 | `GET /api/read/v1/artifacts/{id}` | read | Artifact metadata, source, acquisition observations, content group (same sha256), transcript versions, counts. |
 | `GET /api/read/v1/artifacts/{id}/citations/{anchor_id}/packet` | read | Byte-identical `ageds.citation-evidence/v1` packet ([exchange](EVIDENCE_EXCHANGE.md)). |
-| `GET /api/read/v1/reports` | read | Explicit stub: `available: false`, empty list, reason. |
+| `GET /api/read/v1/reports` | read | Report register (newest first, at most 500, `has_more`); private output paths withheld ([reports](REPORTS.md)). |
 | `GET /api/read/v1/graph/export?from=&to=&include_text=&max_nodes=&max_edges=` | read | `ageds.graph-export/v1` (see adapters doc). |
 | `GET /api/read/v1/intents/schema` | read | `INTENT_SCHEMA` (JSON Schema 2020-12). |
 | `POST /api/read/v1/intents/execute` | read | Anchored items for one intent; never prose. |
@@ -170,8 +170,11 @@ present as described in the prose and may be extended additively.
 ```
 
 ```json
-{"$id": "ageds.read/v1#reports", "type": "object", "required": ["schema", "kind", "available", "items", "reason"],
- "properties": {"kind": {"const": "reports"}, "available": {"const": false}, "items": {"const": []}, "reason": {"type": "string"}}}
+{"$id": "ageds.read/v1#reports", "type": "object", "required": ["schema", "kind", "available", "items", "has_more", "reason", "output_location_included"],
+ "properties": {"kind": {"const": "reports"}, "available": {"type": "boolean"}, "has_more": {"type": "boolean"},
+   "output_location_included": {"const": false}, "reason": {"type": ["string", "null"]},
+   "items": {"type": "array", "items": {"type": "object", "required": ["id", "report_uid", "report_type", "template_id", "params", "content_sha256", "manifest_sha256", "created_at"],
+     "not": {"required": ["output_dir"]}}}}}
 ```
 
 ### Intents (`POST /api/read/v1/intents/execute`)
@@ -271,6 +274,7 @@ schema. `links_written` is always `0` in the import result.
   custody claim. Hash agreement proves byte identity, not authorship or truth.
 - It does not resolve display time, merge duplicate counterparties or verify
   acoustic alignment; `audio_verification` stays `not_performed`.
-- New tables (`api_tokens`, `annotation_proposals`, `hypothesis_imports`,
-  `relation_hypotheses`) are not part of the metadata package until the package
-  declares extension tables (reports area).
+- `annotation_proposals`, `hypothesis_imports` and `relation_hypotheses` travel in
+  the metadata package's declared `extension_tables` section (without
+  `annotation_proposals.token_id`); `api_tokens` is explicitly excluded as a
+  credential table ([reports](REPORTS.md#extension-tables-in-the-metadata-package)).

@@ -55,6 +55,7 @@ def provide(ctx) -> dict:
         section.status('empty', 'no collections')
     scan_ids: set[int] = set()
     any_scan = False
+    problem_totals: dict[str, int] = {}
     for index, collection in enumerate(collections):
         cid = collection['collection_id']
         row = ctx.db.execute('SELECT * FROM collections WHERE id=?', (cid,)).fetchone()
@@ -63,6 +64,9 @@ def provide(ctx) -> dict:
         scan_ids.update(collection.get('scan_ids') or [])
         any_scan = any_scan or bool(collection.get('scan_ids'))
         totals = collection.get('totals') or {}
+        for key in STATUS_KEYS[1:] + ('partial_containers',):
+            if isinstance(totals.get(key), int):
+                problem_totals[key] = problem_totals.get(key, 0) + totals[key]
         block = kv(f'catalog.collection.{index}', [('collection_id', cid), ('collection_label', collection.get('label')),
                                                      ('scans', len(collection.get('scan_ids') or []))]
                    + [(key, value) for key, value in totals.items()], ctx.lang)
@@ -89,6 +93,8 @@ def provide(ctx) -> dict:
                             title_key='time_bases', total_rows=len(basis_rows), truncated=len(basis_rows) > max_rows))
         section.block(table(f'catalog.gaps.{index}', GAP_COLUMNS, gap_rows[:max_rows], ctx.lang,
                             title_key='gaps', total_rows=len(gap_rows), truncated=len(gap_rows) > max_rows))
+    for key, value in sorted(problem_totals.items()):
+        section.exclude(f'catalog_entries_{key}', value)
     if collections and not any_scan:
         section.status('empty', 'no finished catalog scan')
     for scan_id in sorted(scan_ids):

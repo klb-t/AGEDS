@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "AGEDS",
   "state_id": "AGEDS-STATE-20261016-001",
-  "updated_at": "2026-10-16T18:44:48.527456+00:00",
+  "updated_at": "2026-10-16T18:53:15.310908+00:00",
   "based_on_remote_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
   "local_branch": "ccr-d25c3cb3-qgbhql",
   "status_summary": "Evidence Timeline & Analysis increment started on 9c1d513: Etap 0 report and F0 extension foundation; parallel tracks A-H claimed with disjoint file scopes.",
@@ -164,7 +164,7 @@
     {
       "id": "AGEDS-TASK-20261016-A",
       "owner": "catalog",
-      "status": "claimed",
+      "status": "accepted",
       "scope": [
         "server/app/catalog/",
         "server/app/schema/catalog.py",
@@ -180,7 +180,28 @@
       "acceptance": [
         "Nested zip/tar virtual locators, signature-over-extension, content dedup with all observations, coverage gaps, sidecar hypotheses, originals unchanged."
       ],
-      "result_refs": []
+      "result_refs": [
+        "docs/CATALOG.md",
+        "docs/validation/CATALOG_2026-10-16.json"
+      ],
+      "results": {
+        "backend_after_merge": "718 passed, 1 skipped, 680 subtests",
+        "catalog_tests": 108,
+        "browser": "real Chromium 141 page test (catalog)",
+        "originals_unchanged": "tree hash identical before/after scan/export/describe/ingest"
+      },
+      "decisions": [
+        "scan observations stored separately from acquisitions (AGENTS.md wins over prompt wording)",
+        "coverage_report() plain-dict contract for reports"
+      ],
+      "coordinator_followup": "CSV export formula guard (apostrophe_prefix_v1); XLSX already forced string cells",
+      "not_done": [
+        "7z/RAR adapters not executed (py7zr/rarfile absent)",
+        "no large real roots/performance",
+        "HTTP scan synchronous",
+        "abandoned running scan has no close command",
+        "no node unit tests for catalog.mjs"
+      ]
     },
     {
       "id": "AGEDS-TASK-20261016-B",

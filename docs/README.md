@@ -6,6 +6,7 @@
 - [Features and boundaries](FEATURES.md): implemented behavior and precise limitations.
 - [Development](DEVELOPMENT.md): reproducible local checks, acceptance runners and upgrades.
 - [Corpus import](CORPUS_IMPORT.md): optional private catalog workflow.
+- [Source catalog](CATALOG.md): collections, read-only archive-aware catalog scans, signature types, duplicates, coverage gaps, hypotheses and exports.
 - [Change history](../CHANGELOG.md): functional development increments.
 
 ## Architecture and evidence contracts

@@ -4,7 +4,7 @@
   "date": "2026-10-16",
   "branch": "wt-B2",
   "base_commit": "f09e8f7",
-  "git_head_tested": "49eec5b4330e445249c78e9b389155a8904ffde3",
+  "git_head_tested": "c89db799a662392cc808af45ed192ef14d2045f4",
   "head_note": "Code and tests at the tested head; the commit adding this receipt and docs/IMPORTERS_COMM.md changes documentation only.",
   "environment": {
     "python": "3.13.16",
@@ -48,7 +48,7 @@
   },
   "runtime_executed": [
     "CLI subprocesses (in tests): import-email, import-location-history with and without opt-in, observe-recording-names, import-ics with --max-records, missing input error",
-    "CLI manual run of all 12 commands (14 invocations) on a freshly generated corpus at the tested head: exit 0 for imports; exit 2 with JSON error for DTD/entity calls.xml and for location/browser history without opt-in; SHA-256 of all 34 corpus files unchanged",
+    "CLI manual run of all 12 commands (14 import invocations) on a freshly generated corpus at the tested head: all exit 0; 4 refusals exit 2 with a JSON error (DTD/entity calls.xml, location and browser history without opt-in, Timeline.json passed to import-takeout-activity); SHA-256 of all 34 corpus files unchanged",
     "Live uvicorn server: POST /api/imports/comm/email (6 messages, 2 attachments + inline), POST /ics (8 events), POST /location-history 403 without flag and 200 with flag, POST /whatsapp-export/path (present 1, missing 1, omitted 1), GET /calendar/{id}/occurrences (3 DST-shifted UTC instants) (live server run at de48eb4; later commits changed billing typed durations and My Activity input validation, both covered by tests)"
   ],
   "unit_tested_only": [
@@ -69,7 +69,8 @@
     "Hash agreement (e.g. attachment == disk PDF) shows identical bytes only, not authorship or truth"
   ],
   "history": [
-    "de48eb4: first acceptance run (485 backend tests)",
-    "runtime check found that import-takeout-activity unwrapped a Timeline.json object (location data without the location opt-in); fixed in the tested head and covered by test_my_activity_refuses_other_takeout_layouts"
+    "de48eb4: first acceptance run (485 backend tests, live uvicorn smoke)",
+    "5544c49: manual CLI run showed import-takeout-activity unwrapping a Timeline.json object (location data without the location opt-in)",
+    "c89db79: My Activity import accepts only a list and refuses a JSON object before acquisition; regression test added; CLI runtime loop re-run"
   ]
 }

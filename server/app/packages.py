@@ -50,9 +50,16 @@ EXTENSION_TABLES = (
     'speaker_turns', 'speaker_assignments', 'event_candidates',
     'annotation_proposals', 'hypothesis_imports', 'relation_hypotheses',
     'reports',
+    'timeline_correlation_runs', 'timeline_hypotheses', 'timeline_hypothesis_status',
+    'workbench_saved_searches', 'workbench_saved_search_runs', 'workbench_folders', 'workbench_folder_items',
+    'workbench_bookmarks',
 )
 EXCLUDED_EXTENSION_TABLES = {
     'api_tokens': 'credential table: token keys, salts and secret digests are never exported',
+    'timeline_projections': 'derived cache: rebuilt from events/event_times by the versioned display rule',
+    'timeline_items': 'derived cache: rebuilt from events/event_times by the versioned display rule',
+    'timeline_projection_builds': 'derived cache build log (rule hash and watermarks of a rebuildable projection)',
+    'workbench_search_docs': 'derived search index content, rebuilt by workbench-index-check --rebuild',
 }
 EXCLUDED_EXTENSION_COLUMNS = {
     'annotation_proposals': {'token_id': 'reference into the excluded credential table api_tokens'},
@@ -60,7 +67,7 @@ EXCLUDED_EXTENSION_COLUMNS = {
 # Credential-like column names refused in any exported extension row.
 CREDENTIAL_COLUMNS = frozenset({'secret_sha256', 'salt', 'token_key', 'secret', 'password', 'token'})
 # SQLite internals and the derived, rebuildable full-text index are not metadata.
-INTERNAL_TABLE_PREFIXES = ('sqlite_', 'search_fts')
+INTERNAL_TABLE_PREFIXES = ('sqlite_', 'search_fts', 'workbench_fts')
 
 
 def canonical_json(value: Any) -> bytes:

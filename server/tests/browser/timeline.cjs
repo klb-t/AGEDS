@@ -174,7 +174,7 @@ const bulk = Number(process.env.AGEDS_TIMELINE_BULK || 5000);
       await shot('item-detail-candidates');
     });
 
-    await test('range selection offers disabled report link and export of range', async () => {
+    await test('range selection offers a report link to /reports/new and export of range', async () => {
       const box = await page.locator('[data-ruler]').boundingBox();
       await page.mouse.move(box.x + 400, box.y + box.height / 2);
       await page.mouse.down();
@@ -182,8 +182,9 @@ const bulk = Number(process.env.AGEDS_TIMELINE_BULK || 5000);
       await page.mouse.up();
       await page.waitForFunction(() => !document.querySelector('[data-range-panel]').hidden);
       const link = page.locator('[data-report-link]');
-      assert.equal(await link.getAttribute('aria-disabled'), 'true');
-      assert.equal(await link.getAttribute('href'), null);
+      // The reports area is integrated, so the range link is enabled.
+      assert.notEqual(await link.getAttribute('aria-disabled'), 'true');
+      assert.match(await link.getAttribute('href'), /^\/reports\/new\?from=.*&to=/);
       const csv = await page.locator('[data-range-export="csv"]').getAttribute('href');
       assert.match(csv, /from=.*&to=/);
       const response = await fetch(base + csv);

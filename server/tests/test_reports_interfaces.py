@@ -185,7 +185,8 @@ def test_extension_tables_in_metadata_export(env, tmp_path):
     section = package['extension_tables']
     assert section['schema'] == 'ageds.metadata-extension-tables/v1'
     assert section['undeclared_tables'] == [] and 'api_tokens' not in section['tables']
-    assert section['excluded_tables'] == {'api_tokens': packages.EXCLUDED_EXTENSION_TABLES['api_tokens']}
+    assert section['excluded_tables'] == dict(sorted(packages.EXCLUDED_EXTENSION_TABLES.items()))
+    assert 'credential' in section['excluded_tables']['api_tokens']
     assert section['tables']['reports'] and section['tables']['event_times']
     assert all('token_id' not in row for row in section['tables']['annotation_proposals'])
     for name, rows in section['tables'].items():

@@ -152,7 +152,7 @@ def test_timeline_page_and_navigation(client):
     response = client.get('/timeline')
     assert response.status_code == 200
     html = response.text
-    assert 'data-timeline' in html and 'data-reports-available="false"' in html
+    assert 'data-timeline' in html and 'data-reports-available="true"' in html
     assert '/static/timeline.mjs' in html and '<a href="/timeline">Oś czasu</a>' in html
     assert client.get('/static/timeline-math.mjs').status_code == 200
     assert '<a href="/timeline">Oś czasu</a>' in client.get('/').text

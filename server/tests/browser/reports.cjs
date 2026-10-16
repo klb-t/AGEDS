@@ -29,7 +29,7 @@ const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
     for (let i = 0; i < 200; i++) {try {if ((await fetch(base + '/reports')).ok) break;} catch {} await delay(50);}
     browser = await chromium.launch({headless: true, executablePath: process.env.AGEDS_BROWSER_EXECUTABLE || undefined, args: ['--no-sandbox']});
     receipt.browser = browser.version();
-    const context = await browser.newContext({acceptDownloads: true});
+    const context = await browser.newContext({acceptDownloads: true, locale: 'pl-PL'});
     const page = await context.newPage();
     const pageErrors = []; page.on('pageerror', e => pageErrors.push(e.message));
     const foreign = []; context.on('request', r => {if (!r.url().startsWith(base) && !r.url().startsWith('data:') && r.url() !== 'about:blank') foreign.push(r.url());});

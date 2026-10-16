@@ -1,0 +1,108 @@
+{
+  "schema": "ageds.validation-receipt/v1",
+  "task": "AGEDS-TASK-20261016-A",
+  "area": "catalog",
+  "date": "2026-10-16",
+  "branch": "wt-A",
+  "base_commit": "f09e8f7",
+  "tested_source_commit": "d84f245f4fcc6afb4e539460ed9de0788dc909ef",
+  "note": "Code was tested at tested_source_commit; the receipt commit adds only docs/CATALOG.md, docs/README.md and this receipt.",
+  "environment": {
+    "python": "3.13.16 (/home/user/wt/venv)",
+    "fastapi": "0.116.1",
+    "openpyxl": "3.1.5",
+    "node": "v22.22.0",
+    "playwright": "1.56.1",
+    "chromium": "141.0.7390.37 (/opt/pw-browsers)",
+    "optional_adapters": {
+      "py7zr": "not installed",
+      "rarfile": "not installed"
+    },
+    "network_or_model_calls": "none"
+  },
+  "commands": [
+    {
+      "cmd": "/home/user/wt/venv/bin/python -m pytest server/tests -q",
+      "result": "542 passed, 588 subtests passed, 0 failed (baseline at f09e8f7 in this worktree: 434 passed)"
+    },
+    {
+      "cmd": "/home/user/wt/venv/bin/python -m pytest server/tests/test_catalog_*.py -q",
+      "result": "108 passed, 0 failed, 0 skipped",
+      "per_file": {
+        "test_catalog_scan.py": 18,
+        "test_catalog_signatures.py": 67,
+        "test_catalog_api.py": 7,
+        "test_catalog_cli.py": 2,
+        "test_catalog_describe.py": 8,
+        "test_catalog_ingest.py": 5,
+        "test_catalog_browser.py": 1
+      }
+    },
+    {
+      "cmd": "node --test server/tests/js/*.test.mjs",
+      "result": "85 passed, 0 failed (no catalog JS tests exist; module checked in Chromium)"
+    },
+    {
+      "cmd": "python3 scripts/verify_repository.py",
+      "result": "passed after adding this receipt (relative links resolve)"
+    }
+  ],
+  "runtime_executed": [
+    "Read-only catalog scans of the generated corpus (two collections) in-process and through real `python -m server.app.cli` subprocesses; whole-tree bytes, sizes, modes and mtimes identical before/after scans, re-scans, exports, describe and ingest.",
+    "ZIP nested 4 levels, tar.gz containing a zip, tar.xz, tar.bz2, single gzip stream with FNAME/MTIME, truncated ZIP recovered from local headers, CRC-damaged member, encrypted member, high-ratio member, duplicate/absolute/../backslash/cp437/unflagged-UTF-8/control-char/!-slash member names, non-UTF-8 disk name, three symlinks (inside, loop, outside) not followed.",
+    "Signature over extension: .dat PDF, .jpg PNG, .m4a holding isom MP4, .doc holding an xls compound file; 39 type samples.",
+    "Content group of identical PDF bytes on disk, in a zip and in a nested zip across two collections; filename collisions; re-scan without duplicate groups; finished scans/entries immutable (SQLite triggers).",
+    "Limits: members per archive, archive depth, member hash size, file count, compression ratio (declared and observed), expanded bytes - each visible as limit_exceeded/scan issue and scan status partial.",
+    "Coverage with a 235-day gap in filesystem mtimes, separate ZIP DOS (unknown zone) basis, min-gap parameter change.",
+    "CSV/XLSX/HTML exports opened by csv, openpyxl and string checks (escaped <script>, no script tag); no overwrite; refusal inside a source root.",
+    "Profile -> explain (none, fake, fake external with opt-in, failing provider) -> promote/reject with sidecar NDJSON lines and audit entries.",
+    "Ingest of disk files and archive members (depth 4, tar->zip, gzip, xz, recovered zip, duplicate-name member, cp437 member) with re-verified SHA-256, collection on source_observations and catalog links; changed source refused.",
+    "HTTP API through FastAPI TestClient and the /catalog page in real headless Chromium 141 via Playwright (marks, notes edit, fake explain, promote, profile-only message, collection create, conflict filter, pagination, 390px layout without horizontal overflow, no page errors or dialogs)."
+  ],
+  "unit_tested_only": [
+    "Locator escaping round trip on 500 random byte strings and adversarial names.",
+    "OLE compound-file refinement for xls/doc/msg/unknown on generated minimal files."
+  ],
+  "not_run": [
+    "7z and RAR adapters (py7zr/rarfile absent): only the adapter_unavailable path ran.",
+    "Any real LLM provider (none exists; no network/model calls).",
+    "Large real roots, performance and memory measurements; concurrent scans.",
+    "Android (unchanged)."
+  ],
+  "boundaries": [
+    "A catalog scan is a scan observation, not an acquisition; source_observations rows appear only on ingest.",
+    "Hash equality is byte identity only; no authorship, truth or creation time.",
+    "Filesystem and archive times are file times, not event times; ZIP DOS times keep an unknown zone.",
+    "Gaps mean no catalogued time on that basis, not inactivity.",
+    "Descriptions are hypotheses; sidecar format_compat is unknown (UCAF spec unavailable).",
+    "No API authentication; run on a trusted/private network."
+  ],
+  "source_sha256": {
+    "server/app/api/catalog.py": "c5b4f2bf585b1c3028fd855e1199e5e04bf601a7d6d721a3ec624ad76bd7d448",
+    "server/app/catalog/__init__.py": "9a1b984d45b4a9d025731f055a0350992a686069b6bc5bdc0c9be055156134ee",
+    "server/app/catalog/archives.py": "b99afb6a1650f4f32e069e12d948b6b0057074daffe1cd517236d38a036a368b",
+    "server/app/catalog/coverage.py": "c4d0ee8e86664e976eebf243b74beb46aff10912cf21c37c2b5a0b60fbfebc60",
+    "server/app/catalog/data/signatures.json": "46a61fd32282970673d152323fb0584e893c2e4741b56a9eb2d903580382a953",
+    "server/app/catalog/describe.py": "bce1db34e0dd2074938e95bafbafd5c16355605615546778042d94c72e161f1b",
+    "server/app/catalog/export.py": "e0422d4c0e4e7ce8f323aefc0ce1ef461d6a636aa99ef8cdcd41c40fa26c69ca",
+    "server/app/catalog/ingest.py": "49ffa2edcb9698fba0b132afc259a863c3d16a8f7f90ab44a113a4b62c1b920e",
+    "server/app/catalog/limits.py": "11c15ca83d550d496f4ab0ba6095a580ff7f83f0b366c61b8a37dca5979beb3c",
+    "server/app/catalog/locator.py": "2ccb1241d7827a364be359379aac39109744ee14cc5e42ff3106a1f793ec0ef3",
+    "server/app/catalog/scan.py": "eb38383c005ff098dffdc40cafd5e2a28c0f6207316b1f607060899d55cf405e",
+    "server/app/catalog/signatures.py": "358dd0f50edcfad498a63221e8d818531cddbdc90412e3bcf55b69c970e492f7",
+    "server/app/catalog/store.py": "b5df3eada9341f1da96e3c6b456748a97b7a347e732b07753b266ec3dea22ac5",
+    "server/app/commands/catalog.py": "99481729f58a785ae958288819457f997508d503792d235797033be4fbe4b13c",
+    "server/app/schema/catalog.py": "d66ffa8e0134ee31c1aa9a6ff3d48e0ee6ca54b0ef3ecdbec528477adb89fdd6",
+    "server/app/static/catalog.css": "13748942918a1722fab76bce9a07e9f8749122609a142008e65fd37e52aed29b",
+    "server/app/static/catalog.mjs": "235193230424bcefb1f93e903338c8e3b66fbc9923fca738de7b5b3d294e0b60",
+    "server/app/templates/catalog.html": "945f6865cc6ed134a0093d5c5856b7cb457d17728cef78e5a557858e8aa08f69",
+    "server/tests/corpus/catalog_files.py": "27eb7865d821f29d5681c770f681a691c78c3ea6b6920b162f56ac7fad2a2302",
+    "server/tests/test_catalog_api.py": "20169473948aee9883cb01f3d51aa1b15de3300c1e96a8ca89d4d67a6cfff895",
+    "server/tests/test_catalog_browser.py": "d7f103f84ee3e2a26a6693d04ed2a071619e5fcdf12b5c87533d41cadcf96632",
+    "server/tests/test_catalog_cli.py": "c220b78012f08141de4de3a213d930fb2567e839f2500b786f755648a334d66d",
+    "server/tests/test_catalog_describe.py": "00542f9369f94b0abdc622c443453fbff088a385f4e5ea5c2253f1c41b151322",
+    "server/tests/test_catalog_ingest.py": "b9568c3c0df94bc2990f73303b6423cf8c7e248c5b6d393cbeb80e1b8cd65d08",
+    "server/tests/test_catalog_scan.py": "dca8075594e62bf37b85c959b3e91e8ee2748ffe5bc603e21b65765de408306b",
+    "server/tests/test_catalog_signatures.py": "e45dc9be3ed340672334bb200aa1e01e70791d68e5b5de9f5d2b81d4156041d3"
+  }
+}

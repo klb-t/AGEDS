@@ -93,13 +93,15 @@ def artifact_knowledge(artifact_id: int) -> dict:
         recorded.append({'key': 'derived_text', 'value': derived, 'basis': 'derived_text versions by kind'})
     if runs:
         recorded.append({'key': 'processing_runs', 'value': runs, 'basis': 'processing_runs by status'})
-    for field in ('mime_type', 'source_created_at', 'source_modified_at', 'captured_at', 'source_locator'):
+    for field in ('mime_type', 'captured_at', 'source_locator'):
         if art[field] is None:
             unknown.append({'key': f'artifact.{field}', 'reason': 'not_recorded'})
+    # Source-side times may be on the artifact row or on any acquisition observation.
+    for field, missing in (('source_created_at', obs['no_created']), ('source_modified_at', obs['no_modified'])):
+        if art[field] is None and (not obs['n'] or missing == obs['n']):
+            unknown.append({'key': field, 'reason': 'no_acquisition_recorded_it'})
     if obs['legacy']:
         unknown.append({'key': 'acquisition_history', 'reason': 'legacy_snapshot', 'count': obs['legacy']})
-    if obs['n'] and obs['no_created'] == obs['n']:
-        unknown.append({'key': 'source_created_at', 'reason': 'no_acquisition_recorded_it'})
     for item in derived:
         if item['without_recorded_run']:
             unknown.append({'key': f'derived_text.{item["kind"]}.run', 'reason': 'legacy_unknown', 'count': item['without_recorded_run']})

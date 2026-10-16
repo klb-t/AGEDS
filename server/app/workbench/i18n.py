@@ -228,3 +228,25 @@ def install(env) -> None:
 
     env.globals.update(t=t, t_nav=t_nav, ui_lang=ui_lang, ui_html_attrs=ui_html_attrs, ui_shell_config=ui_shell_config,
                        ui_languages=LANGUAGES)
+
+
+def _placeholders(value) -> set[str]:
+    values = value.values() if isinstance(value, dict) else [value]
+    return {name for text in values for name in _PLACEHOLDER.findall(text)}
+
+
+def catalog_report() -> dict:
+    """Completeness against Polish: missing/extra keys and placeholder mismatches (``nav.<path>`` keys are optional)."""
+    base = {k: v for k, v in catalog(DEFAULT_LANGUAGE).items() if k != '_meta'}
+    report = {'default': DEFAULT_LANGUAGE, 'keys': len(base), 'languages': {}}
+    for lang in LANGUAGES:
+        data = {k: v for k, v in catalog(lang).items() if k != '_meta'}
+        optional = lambda key: key.startswith('nav./')
+        report['languages'][lang] = {
+            'keys': len(data),
+            'missing': sorted(k for k in base if k not in data and not optional(k)),
+            'extra': sorted(k for k in data if k not in base and not optional(k)),
+            'placeholder_mismatch': sorted(k for k in base if k in data and _placeholders(base[k]) != _placeholders(data[k])),
+        }
+    report['complete'] = all(not (v['missing'] or v['extra'] or v['placeholder_mismatch']) for v in report['languages'].values())
+    return report

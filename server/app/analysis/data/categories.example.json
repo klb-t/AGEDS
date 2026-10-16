@@ -16,7 +16,7 @@
     {"id": "urzedy-kontrahenci", "version": 1, "kind": "counterparty",
      "values": ["+48 000 000 101", "office@example.org"], "weights": {"sprawy_urzedowe": 1}},
     {"id": "urzedy-domeny", "version": 1, "kind": "email_domain",
-     "values": ["example.gov"], "weights": {"sprawy_urzedowe": 1}},
+     "values": ["urzad.example.org"], "weights": {"sprawy_urzedowe": 1}},
     {"id": "zdrowie-slowa", "version": 1, "kind": "keyword", "fields": ["subject", "body"],
      "values": ["lekarz", "recepta", "wizyta"], "weights": {"zdrowie": 1}},
     {"id": "chatbot-projekty", "version": 1, "kind": "chatbot",

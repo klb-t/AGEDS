@@ -13,8 +13,10 @@ excluded instead of silently shifting them.
 from __future__ import annotations
 
 import json
+import math
 import sqlite3
 from datetime import datetime, timezone
+from pathlib import Path
 
 from ..timeinfo import TimeCandidate, assume_zone as _assume_zone, from_iso
 
@@ -81,9 +83,32 @@ def _confirmed_duration(metadata: dict) -> float | None:
     return None
 
 
+def _wav_duration(db: sqlite3.Connection, artifact_id: int, cache: dict) -> float | None:
+    """Declared WAV duration from the content-store copy's header prefix (never the original)."""
+    if artifact_id in cache:
+        return cache[artifact_id]
+    from ..wav_header import MAX_PREFIX_BYTES, probe_wav_header
+    duration = None
+    row = db.execute('SELECT stored_path, size_bytes, mime_type, original_name FROM artifacts WHERE id=?', (artifact_id,)).fetchone()
+    if row and row['stored_path'] and ((row['mime_type'] or '').startswith('audio/') or
+                                       (row['original_name'] or '').lower().endswith('.wav')):
+        path = Path(row['stored_path'])
+        try:
+            if path.is_file() and not path.is_symlink():
+                with path.open('rb') as handle:
+                    probe = probe_wav_header(handle.read(MAX_PREFIX_BYTES), row['size_bytes'])
+                value = probe.get('declared_duration_sec')
+                if type(value) in (int, float) and math.isfinite(value) and value > 0:
+                    duration = float(value)
+        except (OSError, ValueError):
+            duration = None
+    cache[artifact_id] = duration
+    return duration
+
+
 def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc: str | None = None,
                event_types: tuple[str, ...] | list[str] | None = None, assume_zone: str | None = None,
-               limit: int = 1_000_000, fields: bool = False) -> dict:
+               limit: int = 1_000_000, fields: bool = False, media_durations: bool = False) -> dict:
     """Return ``{'rule', 'items', 'untimed', 'truncated'}``; items sorted by (t_start, event_id).
 
     Item keys: event_id, event_type, source_id, artifact_id, collection_id, thread_id,
@@ -91,7 +116,9 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
     tz_status, source, precision, assumed_zone), text_chars, tags; additive since
     E1: ``chat`` (role, content_kind, hidden, conversation_id, model or None),
     ``end_basis`` (kind/source of the end candidate or None), ``declared_duration_s``
-    (source-declared duration, e.g. call logs) and, with ``fields=True``,
+    (source-declared duration, e.g. call logs; with ``media_durations=True`` also
+    the declared WAV header duration of the event's audio artifact, with
+    ``duration_basis``) and, with ``fields=True``,
     ``fields`` (sender, recipients, subject, contact_label, phone_or_address and
     the first ``FIELD_BODY_CHARS`` characters of body with ``body_truncated``).
     """
@@ -108,7 +135,7 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
     sql += ' ORDER BY e.id LIMIT ?'
     lo = _epoch(start_utc) if start_utc else None
     hi = _epoch(end_utc) if end_utc else None
-    items, untimed = [], []
+    items, untimed, wav_cache = [], [], {}
     rows = db.execute(sql, (*args, limit + 1)).fetchall()
     truncated = len(rows) > limit
     for e in rows[:limit]:
@@ -140,7 +167,12 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
                      'conversation_id': chat.get('conversation_id'), 'model': chat.get('model')} if chat else None,
             'end_basis': {'kind': end.kind, 'source': end.source, 'tz_status': end.tz_status} if end else None,
             'declared_duration_s': _confirmed_duration(metadata),
+            'duration_basis': 'source_declared' if _confirmed_duration(metadata) is not None else None,
         }
+        if item['declared_duration_s'] is None and t1 is None and media_durations and e['artifact_id']:
+            wav = _wav_duration(db, e['artifact_id'], wav_cache)
+            if wav is not None:
+                item['declared_duration_s'], item['duration_basis'] = wav, 'wav_header_declared'
         if fields:
             body = e['body']
             item['fields'] = {'sender': e['sender'], 'recipients': e['recipients'], 'subject': e['subject'],

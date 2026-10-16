@@ -16,7 +16,7 @@ def _config(**over):
         'rules': [
             {'id': 'cp', 'version': 2, 'kind': 'counterparty', 'values': ['+48 000 000 101', 'Office@Example.org'],
              'weights': {'sprawy_urzedowe': 1}},
-            {'id': 'dom', 'kind': 'email_domain', 'values': ['example.gov'], 'weights': {'sprawy_urzedowe': 1}},
+            {'id': 'dom', 'kind': 'email_domain', 'values': ['urzad.example.org'], 'weights': {'sprawy_urzedowe': 1}},
             {'id': 'kw', 'kind': 'keyword', 'values': ['recepta'], 'weights': {'zdrowie': 1}},
             {'id': 'kw-word', 'kind': 'keyword', 'values': ['plan'], 'whole_word': True, 'fields': ['subject'],
              'weights': {'praca_projekty': 0.6, 'zdrowie': 0.4}},
@@ -64,7 +64,7 @@ def test_rules_match_with_provenance_and_weights():
     config = _config()
     items = [
         _item(1, counterparty='+48000000101'),                                   # digits match
-        _item(2, sender='Someone <desk@mail.example.gov>', event_type='email'),  # subdomain
+        _item(2, sender='Someone <desk@mail.urzad.example.org>', event_type='email'),  # subdomain
         _item(3, body='Odbiór RECEPTA jutro'),                                   # case-folded keyword
         _item(4, subject='Planowanie', body=''),                                 # whole word: no match
         _item(5, subject='Nowy plan.', body=''),                                 # whole word: match, split weights

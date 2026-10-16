@@ -50,13 +50,20 @@ def build_small(root: Path) -> dict:
     base = 1761475200  # 2025-10-26T10:40:00Z
     for i in range(6):
         for bot, offset in (('chatgpt', 0), ('claude', 90)):
+            role = 'user' if i % 2 == 0 else 'assistant'
             event = evidence.add_event(source_id=chats, artifact_id=None, event_type='chat_message', thread_id=f'{bot}-conv-1',
-                                       sender='user' if i % 2 == 0 else 'assistant', body=f'{bot} wiadomość {i} ' + LITERAL,
-                                       external_id=f'{bot}:{i}', metadata={'chatbot': bot, 'role': 'user' if i % 2 == 0 else 'assistant'})
+                                       sender=role, contact_label=bot, body=f'{bot} wiadomość {i} ' + LITERAL,
+                                       external_id=f'{bot}:{i}', metadata={'chat': {'chatbot': bot, 'role': role, 'hidden': False}})
             with db.session() as connection:
                 timeinfo.record_event_times(connection, event, [
                     timeinfo.from_epoch('created', base + offset + i * 120, f'synthetic:{bot}:create_time')])
             ids.setdefault(bot, []).append(event)
+    part = evidence.add_event(source_id=chats, artifact_id=None, event_type='chat_message_part', thread_id='claude-conv-1',
+                              contact_label='claude', body='claude wiadomość — część (myślenie) ' + LITERAL, external_id='claude:part:1',
+                              metadata={'chat': {'chatbot': 'claude', 'content_kind': 'reasoning'}})
+    with db.session() as connection:
+        timeinfo.record_event_times(connection, part, [timeinfo.from_epoch('start', base + 95, 'synthetic:claude:block_start')])
+    ids['hidden_part'] = part
     ids['call'] = evidence.add_event(source_id=phone, artifact_id=sms_artifact, event_type='call', direction='incoming',
                                      ts_start='2025-10-26T11:00:00+00:00', ts_end='2025-10-26T11:01:30+00:00',
                                      phone_or_address='+48 000 000 101', external_id='call:1',
@@ -124,7 +131,7 @@ def bulk_events(db_path: Path, count: int, *, seed: int = 20261016, start: int =
         elif kind == 'chat_message':
             bot = ('chatgpt', 'claude', 'gemini')[offset % 3]
             thread = f'{bot}-conv-{offset % 500}'
-            metadata = {'chatbot': bot}
+            metadata = {'chat': {'chatbot': bot}}
             if not undated:
                 times.append((event_id, 'created', str(moment), format_utc(datetime.fromtimestamp(moment, timezone.utc)), None,
                               'utc_epoch', 'UTC', 'second', 'bulk:create_time', '{"epoch_unit": "s"}'))

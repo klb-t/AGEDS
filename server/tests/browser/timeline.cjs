@@ -126,6 +126,18 @@ const bulk = Number(process.env.AGEDS_TIMELINE_BULK || 5000);
       await ready(p3);
       const labels = await page.locator('.tl-lane-label span').allTextContents();
       assert.ok(labels.includes('chatgpt') && labels.includes('claude'), labels.join(','));
+      const visibleMarkers = await page.locator('.tl-item').count();
+      // Hidden chat parts appear only on request.
+      const p4 = await seq();
+      await page.locator('[name=include_hidden]').check();
+      await page.evaluate(() => document.querySelector('[data-filters]').requestSubmit());
+      await ready(p4);
+      assert.equal(await page.locator('.tl-item').count(), visibleMarkers + 1);
+      receipt.hidden_parts_toggle = {visible: visibleMarkers, with_hidden: visibleMarkers + 1};
+      const p5 = await seq();
+      await page.locator('[name=include_hidden]').uncheck();
+      await page.evaluate(() => document.querySelector('[data-filters]').requestSubmit());
+      await ready(p5);
       await shot('chatbot-lanes');
     });
 

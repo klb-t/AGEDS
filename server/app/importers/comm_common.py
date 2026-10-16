@@ -157,12 +157,6 @@ def stored_path(artifact_id: int) -> Path:
     return Path(row['stored_path'])
 
 
-def artifact_row(artifact_id: int) -> dict:
-    with session() as db:
-        row = db.execute('SELECT * FROM artifacts WHERE id=?', (artifact_id,)).fetchone()
-    if row is None:
-        raise ValueError(f'artifact {artifact_id} does not exist')
-    return dict(row)
 
 
 def acquire(path: Path, *, source_kind: str, source_label: str, locator: str | None, importer: str,
@@ -263,10 +257,6 @@ def record_import_run(*, artifact_id: int | None, importer: str, parser_version:
 # ---------------------------------------------------------------------------
 # Time candidates
 
-def _precision(second: int | None, micro: int | None) -> str:
-    if micro:
-        return 'microsecond'
-    return 'minute' if second is None else 'second'
 
 
 def local_candidate(kind: str, raw: str | None, source: str, naive: datetime, precision: str,
@@ -325,10 +315,6 @@ def epoch_candidate(kind: str, raw: str, source: str, *, unit: str, metadata: di
                          precision=precision, metadata={'epoch_unit': unit, **(metadata or {})})
 
 
-def iso_candidate(kind: str, raw: str, source: str, metadata: dict | None = None) -> TimeCandidate:
-    """ISO-8601 with optional offset (``Z`` or ``±hh:mm``); none → unknown zone."""
-    from ..timeinfo import from_iso
-    return from_iso(kind, raw, source, metadata=metadata)
 
 
 def walk_files(root: Path, limits: CommLimits, issues: Issues) -> list[Path]:

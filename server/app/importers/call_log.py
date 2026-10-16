@@ -14,7 +14,7 @@ the same rows; the result reports when the other projection exists.
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from ..db import session

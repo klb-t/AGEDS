@@ -164,3 +164,22 @@ class TagTests(WorkbenchCase):
         self.assertEqual(json.loads(json.dumps(merged.json()))['target']['name'], 'a2')
         form = self.client.post('/workbench/tags/merge', data={'source': [str(a)], 'target': str(a)}, follow_redirects=False)
         self.assertIn('wb_error=invalid_input', form.headers['location'])
+
+
+class CrossSiteWriteTests(WorkbenchCase):
+    def test_cross_site_browser_writes_are_refused_reads_are_not(self):
+        hostile = [{'Sec-Fetch-Site': 'cross-site'}, {'Origin': 'https://attacker.example.com'}, {'Origin': 'null'}]
+        for headers in hostile:
+            with self.subTest(headers=headers):
+                form = self.client.post('/workbench/tags/apply', data={'tag': 'x', 'target': [f'event:{self.events[0]}']},
+                                        headers=headers, follow_redirects=False)
+                self.assertEqual(form.status_code, 403)
+                api = self.client.post('/api/workbench/folders', json={'name': 'x'}, headers=headers)
+                self.assertEqual(api.status_code, 403)
+                self.assertEqual(api.json()['detail']['code'], 'cross_site_write')
+        self.assertEqual(self.count('tags'), 0)
+        self.assertEqual(self.count('workbench_folders'), 0)
+        same = self.client.post('/api/workbench/folders', json={'name': 'ok'},
+                                headers={'Origin': 'http://testserver', 'Sec-Fetch-Site': 'same-origin'})
+        self.assertEqual(same.status_code, 201)
+        self.assertEqual(self.client.get('/api/workbench/tags', headers={'Sec-Fetch-Site': 'cross-site'}).status_code, 200)

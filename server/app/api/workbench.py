@@ -15,9 +15,9 @@ import logging
 import sqlite3
 from pathlib import Path
 from typing import Annotated
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
-from fastapi import APIRouter, Body, Form, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, Form, HTTPException, Query, Request
 from fastapi import Path as PathParameter
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 
@@ -51,7 +51,23 @@ def _template_folders():
 
 templates.env.globals.update(wb_artifact_knowledge=_template_knowledge, wb_folder_choices=_template_folders)
 
-router = APIRouter()
+def _reject_cross_site_writes(request: Request) -> None:
+    """Cheap CSRF guard for workbench writes: refuse browser requests marked cross-site.
+
+    Browsers send ``Sec-Fetch-Site``/``Origin`` on form posts and fetches; local
+    clients (CLI, scripts, tests) usually send neither and are unaffected. This
+    complements, and does not replace, a trusted network or ``EW_REQUIRE_TOKEN``.
+    """
+    if request.method in ('GET', 'HEAD', 'OPTIONS'):
+        return
+    site = request.headers.get('sec-fetch-site')
+    origin = request.headers.get('origin')
+    host = request.headers.get('host', '')
+    if site == 'cross-site' or (origin and origin != 'null' and urlsplit(origin).netloc != host) or origin == 'null':
+        raise HTTPException(403, {'code': 'cross_site_write', 'message': 'Workbench writes must come from this origin.'})
+
+
+router = APIRouter(dependencies=[Depends(_reject_cross_site_writes)])
 NAV: list[tuple[str, str]] = [('/workbench', 'Warsztat'), ('/workbench/folders', 'Teczki'), ('/workbench/bookmarks', 'Zakładki')]
 MAX_SQL_INTEGER = 2**63 - 1
 SqlPathId = Annotated[int, PathParameter(ge=1, le=MAX_SQL_INTEGER)]

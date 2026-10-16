@@ -11,6 +11,7 @@ execution.
 | Native Kotlin/Android | [Report](NATIVE_COMPLETION_2026-10-02.md), [receipt](NATIVE_COMPLETION_2026-10-02.json) |
 | Clean ASR installation and real synthetic inference | [Report](ASR_COMPLETION_2026-10-02.md), [installation/inference receipt](ASR_COMPLETION_2026-10-02.json) |
 | Ecosystem embedding (task G, 2026-10-16) | [Report](INTEGRATIONS_2026-10-16.md), [receipt](INTEGRATIONS_2026-10-16.json) |
+| Workbench conveniences (task H, 2026-10-16) | [Report](WORKBENCH_2026-10-16.md), [receipt](WORKBENCH_2026-10-16.json) |
 
 Native completion: 411 executed JVM tests, main APK signature verification and
 synthetic-provider test APK compilation passed with pinned versions. SAF device

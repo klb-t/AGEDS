@@ -81,10 +81,17 @@ def projection_id(db: sqlite3.Connection, rule: Rule, params: dict) -> int:
     return int(cur.lastrowid)
 
 
+# Bumped when the projection code changes what it derives from unchanged data
+# (2: stat-scoped file_mtime candidates, review finding 1); a build made by
+# other code is rebuilt in full.
+PROJECTION_CODE = 2
+
+
 def watermarks(db: sqlite3.Connection) -> dict:
     def one(sql):
         return int(db.execute(sql).fetchone()[0])
     return {
+        'projection_code': PROJECTION_CODE,
         'events_max_id': one('SELECT COALESCE(MAX(id),0) FROM events'),
         'events_count': one('SELECT COUNT(*) FROM events'),
         'event_times_max_id': one('SELECT COALESCE(MAX(id),0) FROM event_times'),
@@ -206,6 +213,40 @@ def _accepted_correlations(db, artifact_id: int, rule_ids: list[str]):
         ORDER BY h.id''', (artifact_id, json.dumps(rule_ids))).fetchall()
 
 
+_TEMPORARY_SOURCE_KEYS = ('extracted_from', 'catalog_entry_id')
+
+
+def observation_mtime_scope(locator: str | None, meta: dict) -> tuple[str, str | None]:
+    """What an observation's ``source_modified_at`` describes, and why it is unusable (or None).
+
+    Rows since 2026-10-16 carry ``filesystem_stat_scope`` (``evidence.STAT_SCOPES``):
+    only ``source_path`` (a stat of the original location) and ``declared_by_caller``
+    (with its own basis) are usable. A temporary-upload marker in the caller's
+    metadata (``acquisition_kind: uploaded_stream`` or a ``…temporary…`` scope)
+    makes any row unusable: conflicting signals resolve to "not the source".
+    Older rows are judged by the markers they have: those, an
+    ``upload:``/``client-upload:`` locator (server upload routes), a
+    container-member locator (``…!/…``), extraction or catalog-ingest metadata.
+    Older rows without any marker stay usable and are labelled
+    ``legacy_unmarked_assumed_source_path`` (residual ambiguity).
+    """
+    scope = meta.get('filesystem_stat_scope')
+    source_meta = meta.get('source_metadata') if isinstance(meta.get('source_metadata'), dict) else {}
+    declared = str(source_meta.get('filesystem_stat_scope') or '')
+    if 'temporary' in declared or source_meta.get('acquisition_kind') == 'uploaded_stream':
+        return declared or 'uploaded_stream', 'file_mtime_of_temporary_upload'
+    if isinstance(scope, str):
+        if scope in ('source_path', 'declared_by_caller'):
+            return scope, None
+        return scope, 'file_mtime_of_temporary_copy'
+    locator = locator or ''
+    if locator.startswith(('upload:', 'client-upload:')):
+        return 'legacy_server_upload', 'file_mtime_of_temporary_upload'
+    if '!/' in locator or any(key in source_meta for key in _TEMPORARY_SOURCE_KEYS):
+        return 'legacy_temporary_copy', 'file_mtime_of_temporary_copy'
+    return 'legacy_unmarked_assumed_source_path', None
+
+
 def recording_candidates(db, artifact_id: int, rule: Rule, params: dict) -> list[Candidate]:
     """Start-time candidates of a recorded artifact (all visible, each labelled)."""
     out: list[Candidate] = []
@@ -224,20 +265,22 @@ def recording_candidates(db, artifact_id: int, rule: Rule, params: dict) -> list
                                              ref_prefix=f"artifact_event:{event['id']}"):
                 c.metadata = {**c.metadata, 'event_id': int(event['id']), 'event_type': event['event_type']}
                 out.append(c)
-    for obs in db.execute('''SELECT id,source_modified_at,acquisition_kind,metadata_json FROM source_observations
+    for obs in db.execute('''SELECT id,source_locator,source_modified_at,acquisition_kind,metadata_json FROM source_observations
                              WHERE artifact_id=? ORDER BY id''', (artifact_id,)):
         if not obs['source_modified_at']:
             continue
         c = _iso_candidate('file_mtime', obs['source_modified_at'], f"derived:source_observations:{obs['id']}.source_modified_at",
                            f"observation:{obs['id']}", 'derived_observation', ['source_observations.source_modified_at'])
         meta = _metadata(obs['metadata_json'])
-        source_meta = meta.get('source_metadata') if isinstance(meta.get('source_metadata'), dict) else {}
-        scope = str(source_meta.get('filesystem_stat_scope') or '')
+        scope, reason = observation_mtime_scope(obs['source_locator'], meta)
         c.metadata['acquisition_kind'] = obs['acquisition_kind']
+        c.metadata['filesystem_stat_scope'] = scope
         c.metadata['semantics'] = 'filesystem modification time of the acquired copy; copying can change it'
-        if 'temporary' in scope or source_meta.get('acquisition_kind') == 'uploaded_stream':
-            c.usable, c.unusable_reason = False, 'file_mtime_of_temporary_upload'
-            c.metadata['filesystem_stat_scope'] = scope or 'uploaded_stream'
+        if scope == 'declared_by_caller':
+            c.metadata['source_modified_at_basis'] = meta.get('source_modified_at_basis')
+            c.metadata['semantics'] = 'modification time declared by the acquiring code; see source_modified_at_basis'
+        if reason is not None:
+            c.usable, c.unusable_reason = False, reason
         out.append(c)
     for hypothesis in _accepted_correlations(db, artifact_id, recording.get('correlation_rule_ids', [])):
         call = event_selection(db, int(hypothesis['right_id']), rule, params)
@@ -383,7 +426,8 @@ def ensure_projection(db: sqlite3.Connection, rule: Rule | None = None, params: 
         if last == current and not force_full:
             db.commit()
             return _describe(rule, params, pid, build, 'fresh')
-        plan = None if (last is None or force_full) else _affected(db, last, current)
+        stale_code = last is not None and last.get('projection_code') != PROJECTION_CODE
+        plan = None if (last is None or force_full or stale_code) else _affected(db, last, current)
         if plan is None:
             mode = 'full'
             db.execute('DELETE FROM timeline_items WHERE projection_id=?', (pid,))

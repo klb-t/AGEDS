@@ -20,10 +20,11 @@ import json
 import re
 import tempfile
 import zipfile
+from contextlib import nullcontext
 from pathlib import Path
 
 from ..db import session
-from ..evidence import ensure_source
+from ..evidence import ensure_source, temporary_copy_acquisitions
 from . import whatsapp
 from .comm_common import (DEFAULT_LIMITS, CommLimits, Issues, acquire, acquire_bytes, add_media_reference,
                           load_data, record_import_run, stored_path, walk_files)
@@ -129,16 +130,19 @@ def import_whatsapp_export(path: Path, *, chat_label: str | None = None, chat_me
         else:
             raise ValueError('expected a WhatsApp export folder or a .zip file')
         label = chat_label or Path(chat_name).stem
-        if mode == 'zip' or collection_id is not None:
-            # Pre-acquire under the source whatsapp_txt will use, so the chat text
-            # records its container parent / collection; whatsapp_txt then reuses it.
-            chat_source = ensure_source('whatsapp_export', label, chat_locator)
-            acquire(chat_path, source_kind='whatsapp_export', source_label=label, locator=chat_locator,
-                    importer=PARSER_NAME, parser_version=PARSER_VERSION, original_name=Path(chat_name).name,
-                    collection_id=collection_id, source_id=chat_source, parent_artifact_id=container_id,
-                    mime_type='text/plain')
-        chat = whatsapp.import_whatsapp_txt(chat_path, chat_label, source_locator=chat_locator,
-                                            original_name=Path(chat_name).name)
+        # A chat text extracted from the zip is a scratch copy: no source time for it.
+        chat_scope = temporary_copy_acquisitions() if mode == 'zip' else nullcontext()
+        with chat_scope:
+            if mode == 'zip' or collection_id is not None:
+                # Pre-acquire under the source whatsapp_txt will use, so the chat text
+                # records its container parent / collection; whatsapp_txt then reuses it.
+                chat_source = ensure_source('whatsapp_export', label, chat_locator)
+                acquire(chat_path, source_kind='whatsapp_export', source_label=label, locator=chat_locator,
+                        importer=PARSER_NAME, parser_version=PARSER_VERSION, original_name=Path(chat_name).name,
+                        collection_id=collection_id, source_id=chat_source, parent_artifact_id=container_id,
+                        mime_type='text/plain')
+            chat = whatsapp.import_whatsapp_txt(chat_path, chat_label, source_locator=chat_locator,
+                                                original_name=Path(chat_name).name)
         chat_artifact_id = chat['artifact_id']
         counts['messages'] = chat['messages']
         if mode == 'folder':

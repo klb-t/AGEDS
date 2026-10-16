@@ -163,8 +163,12 @@ def acquire(path: Path, *, source_kind: str, source_label: str, locator: str | N
             parser_version: str, original_name: str | None = None, options: dict | None = None,
             collection_id: int | None = None, mime_type: str | None = None,
             source_id: int | None = None, parent_artifact_id: int | None = None,
-            is_raw: bool = True, extra_metadata: dict | None = None) -> tuple[int, int]:
-    """Acquire a file (or an extracted child) through ``evidence.ingest_file``."""
+            is_raw: bool = True, extra_metadata: dict | None = None,
+            source_stat: str | None = None) -> tuple[int, int]:
+    """Acquire a file (or an extracted child) through ``evidence.ingest_file``.
+
+    ``source_stat`` is passed through (``None`` = the caller's context default).
+    """
     locator = locator if locator is not None else str(path)
     if source_id is None:
         source_id = evidence.ensure_source(source_kind, source_label, locator)
@@ -176,7 +180,7 @@ def acquire(path: Path, *, source_kind: str, source_label: str, locator: str | N
     artifact_id = evidence.ingest_file(
         path, source_id=source_id, source_locator=locator, original_name=original_name,
         mime_type=mime_type, metadata=metadata, is_raw=is_raw, collection_id=collection_id,
-        parent_artifact_id=parent_artifact_id)
+        parent_artifact_id=parent_artifact_id, source_stat=source_stat)
     return source_id, artifact_id
 
 
@@ -188,6 +192,7 @@ def acquire_bytes(payload: bytes, *, name: str, source_id: int, locator: str, im
 
     The temporary file lives in the system temp directory, never in a source tree;
     its name carries only a sanitized suffix so the store keeps a useful extension.
+    Its filesystem times describe the extraction, so none is recorded as a source time.
     """
     with tempfile.TemporaryDirectory(prefix='ageds-extract-') as directory:
         temporary = Path(directory) / ('payload' + safe_suffix(name))
@@ -197,7 +202,7 @@ def acquire_bytes(payload: bytes, *, name: str, source_id: int, locator: str, im
             temporary, source_kind='', source_label='', locator=locator, importer=importer,
             parser_version=parser_version, original_name=name, collection_id=collection_id,
             mime_type=mime_type, source_id=source_id, parent_artifact_id=parent_artifact_id,
-            is_raw=is_raw, extra_metadata=extra_metadata)
+            is_raw=is_raw, extra_metadata=extra_metadata, source_stat='temporary_copy')
         return artifact_id
 
 

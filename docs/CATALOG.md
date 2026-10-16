@@ -199,7 +199,13 @@ nothing is ingested), and calls `ingest_file` with
 metadata (entry, scan, container chain). Entries without a verified hash
 (`encrypted`, `limit_exceeded`, `damaged`, `skipped`) are reported as
 `not_ingestible`. Same bytes at another locator remain a separate artifact row;
-repeated ingest adds an acquisition observation, not a new artifact.
+repeated ingest adds an acquisition observation, not a new artifact. The ingested
+path is a temporary copy, so its own mtime is never recorded: the observation
+declares the **catalogued** modification instant (`source_stat='declared'`; the
+`filesystem_stat` time of a disk file, else an archive header time with a UTC basis)
+with `source_modified_at_basis = catalog_entry_times:<id> (<source>, <tz_status>)`,
+or `NULL` when the catalog has no instant (e.g. a zone-less ZIP DOS time) — review
+finding 1.
 
 ## CLI
 

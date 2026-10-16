@@ -166,6 +166,8 @@ python -m server.app.cli import-plan-show PLAN [--importer ics] [--status propos
 python -m server.app.cli import-plan-summary PLAN [--version V]          # dry run: reads the stored plan only
 python -m server.app.cli import-plan-decide PLAN --base-version V --actor NAME [--approve-all-ready] [--approve ID ...] [--skip ID ...] \
         [--importer ID=chatgpt_export] [--opt-in ID=enable_location] [--param ID=profile_id=VALUE] [--note TEXT]
+# --approve/--skip/--propose accept several ids and may be repeated (ids accumulate; before 2026-10-16 a repeated
+# flag silently replaced the earlier list — found by the end-to-end acceptance, docs/ACCEPTANCE.md)
 python -m server.app.cli import-plan-run PLAN [--mode sync|queue] [--recover-running] [--rerun-done] [--temp-dir DIR] [--max-item-bytes N]
 python -m server.app.cli import-plan-work [--max-jobs N]                 # drain queued import_plan_item jobs
 python -m server.app.cli import-plan-runs PLAN [--run RUN] ; import-plan-cross PLAN ; import-plan-list

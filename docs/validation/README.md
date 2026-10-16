@@ -19,6 +19,7 @@ execution.
 | Import plan: catalog → plan → import (task I, 2026-10-16) | [Report](IMPORT_PLAN_2026-10-16.md), [receipt](IMPORT_PLAN_2026-10-16.json) |
 | Integration of all tracks (task X, 2026-10-16) | [Report](INTEGRATION_2026-10-16.md), [receipt](INTEGRATION_2026-10-16.json) |
 | Review fixes @ b181c21 (task R, 2026-10-16) | [Report](REVIEW_FIXES_2026-10-16.md), [receipt](REVIEW_FIXES_2026-10-16.json) |
+| End-to-end acceptance of the whole increment (task Z, 2026-10-16) | [Report](E2E_ACCEPTANCE_2026-10-16.md), [receipt](E2E_ACCEPTANCE_2026-10-16.json), [matrix](../ACCEPTANCE.md) |
 
 Native completion: 411 executed JVM tests, main APK signature verification and
 synthetic-provider test APK compilation passed with pinned versions. SAF device

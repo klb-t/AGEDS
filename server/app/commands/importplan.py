@@ -68,9 +68,11 @@ def register(subparsers) -> None:
     decide.add_argument('--base-version', type=_positive, required=True)
     decide.add_argument('--actor', required=True)
     decide.add_argument('--note', default=None)
-    decide.add_argument('--approve', type=_positive, nargs='*', default=[])
-    decide.add_argument('--skip', type=_positive, nargs='*', default=[])
-    decide.add_argument('--propose', type=_positive, nargs='*', default=[])
+    # 'extend': repeating a flag adds ids (with the default 'store' a second --approve
+    # silently replaced the first list; found by the end-to-end acceptance).
+    decide.add_argument('--approve', type=_positive, nargs='*', action='extend', default=[])
+    decide.add_argument('--skip', type=_positive, nargs='*', action='extend', default=[])
+    decide.add_argument('--propose', type=_positive, nargs='*', action='extend', default=[])
     decide.add_argument('--approve-all-ready', action='store_true', help='bulk-approve every proposed item without blockers')
     decide.add_argument('--importer', type=_pair, action='append', default=[], help='ITEM_ID=IMPORTER')
     decide.add_argument('--opt-in', type=_pair, action='append', default=[], help='ITEM_ID=OPT_IN_NAME (enables it)')

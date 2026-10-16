@@ -273,12 +273,20 @@ def add_media_reference(*, event_id: int, artifact_id: int | None, reference_kin
 
 def record_import_run(*, artifact_id: int | None, importer: str, parser_version: str, options: dict,
                       counts: dict, coverage: dict, issues: Issues) -> None:
-    """Append one audit entry per run: opt-ins, counts, coverage and issue codes."""
+    """Append one audit entry per run: opt-ins, counts, coverage and issue codes.
+
+    A run without an artifact (file-name observations, EXIF over a directory) names
+    no target: ``object_kind`` and ``object_id`` are both NULL. Before 2026-10-16 such
+    rows said ``object_kind='artifact'`` with a NULL id, which the metadata verifier
+    reads as a reference to a missing artifact (found by the end-to-end acceptance,
+    AGEDS-TASK-20261016-Z); those historical rows are kept and verified as warnings.
+    """
     details = {'importer': importer, 'parser_version': parser_version, 'options': options, 'counts': counts,
                'coverage': coverage, 'issue_counts': issues.as_dict()['by_code']}
     with session() as db:
-        db.execute("INSERT INTO audit_log(action,object_kind,object_id,details_json) VALUES ('import_run','artifact',?,?)",
-                   (artifact_id, json.dumps(details, ensure_ascii=False, sort_keys=True)))
+        db.execute("INSERT INTO audit_log(action,object_kind,object_id,details_json) VALUES ('import_run',?,?,?)",
+                   ('artifact' if artifact_id is not None else None, artifact_id,
+                    json.dumps(details, ensure_ascii=False, sort_keys=True)))
 
 
 # ---------------------------------------------------------------------------

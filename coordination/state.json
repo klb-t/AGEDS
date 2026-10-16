@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "AGEDS",
   "state_id": "AGEDS-STATE-20261016-001",
-  "updated_at": "2026-10-16T17:59:30.885452+00:00",
+  "updated_at": "2026-10-16T18:37:07.628388+00:00",
   "based_on_remote_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
   "local_branch": "ccr-d25c3cb3-qgbhql",
   "status_summary": "Evidence Timeline & Analysis increment started on 9c1d513: Etap 0 report and F0 extension foundation; parallel tracks A-H claimed with disjoint file scopes.",
@@ -290,7 +290,7 @@
     {
       "id": "AGEDS-TASK-20261016-G",
       "owner": "ecosystem",
-      "status": "claimed",
+      "status": "accepted",
       "scope": [
         "server/app/integrations/",
         "server/app/schema/integrations.py",
@@ -305,12 +305,30 @@
       "acceptance": [
         "Read contract with local token, ChatADHD stub returning anchored quotes only, Loom graph export with hypothesis quarantine."
       ],
-      "result_refs": []
+      "result_refs": [
+        "docs/validation/INTEGRATIONS_2026-10-16.json",
+        "docs/READ_API.md",
+        "docs/ECOSYSTEM_ADAPTERS.md",
+        "chatadhd ccr-d25c3cb3-qgbhql b0ffa8f (PR klb-t/chatadhd#46)"
+      ],
+      "results": {
+        "integrated_commit": "b6f3dd7",
+        "backend_after_merge": "471 passed, 658 subtests",
+        "chatadhd_unittest": 11,
+        "not_executed": [
+          "live ChatADHD/Loom against live AGEDS",
+          "browser run of /integrations",
+          "Android token setting"
+        ]
+      },
+      "shared_edits": [
+        "server/app/api/__init__.py: install_app hook (accepted)"
+      ]
     },
     {
       "id": "AGEDS-TASK-20261016-H",
-      "owner": "workbench",
-      "status": "ready",
+      "owner": "workbench (Fable)",
+      "status": "claimed",
       "scope": [
         "server/app/workbench/",
         "server/app/schema/workbench.py",
@@ -321,7 +339,7 @@
         "server/tests/test_workbench*.py",
         "docs/WORKBENCH.md"
       ],
-      "based_on_commit": "9c1d513b",
+      "based_on_commit": "887cc55",
       "acceptance": [
         "Layer-filtered search, saved searches, bulk tags, folders, bookmarks, theme, PL/NL/EN."
       ],
@@ -330,7 +348,7 @@
     {
       "id": "AGEDS-TASK-20261016-P",
       "owner": "coordinator",
-      "status": "ready",
+      "status": "accepted",
       "scope": [
         "scripts/verify_repository.py"
       ],
@@ -338,7 +356,14 @@
       "acceptance": [
         "Privacy heuristics without false positives on current tree."
       ],
-      "result_refs": []
+      "result_refs": [],
+      "results": {
+        "commits": [
+          "8c23ea8",
+          "887cc55"
+        ],
+        "tests": "server/tests/test_repository_privacy.py 2 passed"
+      }
     }
   ],
   "remaining_boundaries": [

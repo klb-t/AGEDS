@@ -342,38 +342,48 @@ def _allocate(levels: list[list[tuple]], day_list: list[dict], lo: float, hi: fl
     alloc = [[defaultdict(float) for _ in range(n)] for _ in VARIANTS]
     observed = [[0.0] * n for _ in VARIANTS]
     overlap = [[0.0] * n for _ in VARIANTS]
+    cache: dict = {}
+
+    def resolved_of(basis: dict) -> tuple:
+        """(resolved items, unlabelled remainder, competing-claims flag), memoized per share set."""
+        key = tuple(sorted(basis.items()))
+        hit = cache.get(key)
+        if hit is None:
+            resolved = _resolve(basis, rule, order)
+            total = sum(basis.values())
+            rest = 1.0 - min(1.0, total) if rule == 'count_both' else 1.0 - sum(min(f, 1.0) for f in resolved.values())
+            hit = cache[key] = (tuple(resolved.items()), rest if rest > 1e-12 else 0.0, total > 1 + 1e-9)
+        return hit
+
     for a, b, shares in iv.weighted_segments(tagged, breakpoints):
         if a < lo or b > hi:
             continue
         day = bisect.bisect_right(starts, a) - 1
         dt = b - a
-        per_variant = []
-        for v in range(3):
-            s = {}
-            for (level, c), w in shares.items():
-                if level <= v and w > s.get(c, 0.0):
-                    s[c] = w
-            per_variant.append(s)
+        s0, s1, s2 = {}, {}, {}
+        for (level, c), w in shares.items():
+            if w > s2.get(c, 0.0):
+                s2[c] = w
+            if level <= 1 and w > s1.get(c, 0.0):
+                s1[c] = w
+            if level == 0 and w > s0.get(c, 0.0):
+                s0[c] = w
+        per_variant = (s0, s1, s2)
+        layer = s0 or s1 or s2  # layered: confirmed > estimated > gap attribution
         for v, s in enumerate(per_variant):
             if not s:
                 continue
             observed[v][day] += dt
-            if sum(s.values()) > 1 + 1e-9:
+            items, rest, competing = resolved_of(s)
+            if competing:
                 overlap[v][day] += dt
-        for v, s in enumerate(per_variant):
-            if not s:
-                continue
-            if rule == 'count_both':
-                basis = s
-            else:  # layered: confirmed > estimated > gap attribution
-                basis = next(layer for layer in per_variant if layer)
-            resolved = _resolve(basis, rule, order)
-            for c, f in resolved.items():
-                alloc[v][day][c] += f * dt
-            rest = 1.0 - sum(min(f, 1.0) for f in resolved.values()) if rule != 'count_both' else \
-                1.0 - min(1.0, sum(basis.values()))
-            if rest > 1e-12:
-                alloc[v][day][cat.UNLABELLED] += rest * dt
+            if rule != 'count_both':
+                items, rest, _ = resolved_of(layer)
+            target = alloc[v][day]
+            for c, f in items:
+                target[c] += f * dt
+            if rest:
+                target[cat.UNLABELLED] += rest * dt
     return alloc, observed, overlap
 
 
@@ -671,6 +681,9 @@ def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_t
     if p['model_label_run_id'] is not None:
         model_labels = model_runs.load_outputs(db, p['model_label_run_id'], purpose='labels')
     labels = cat.label_items(kept, config, annotations=annotations, model_labels=model_labels)
+    for it in kept:  # bodies were needed only for keyword rules; free them before the grid computation
+        if it.get('fields'):
+            it['fields'].pop('body', None)
     input_sha = event_set_sha256(ids)
     label_run = None
     if persist:

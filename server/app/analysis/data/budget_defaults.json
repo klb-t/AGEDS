@@ -36,6 +36,6 @@
     "flip_tolerance_s": 60,
     "max_candle_events": 2000,
     "max_flip_records": 500,
-    "max_items": 1000000
+    "max_items": 250000
   }
 }

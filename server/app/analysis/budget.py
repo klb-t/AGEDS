@@ -1,4 +1,4 @@
-"""Time budget with explicit bounds (rule ``time_budget.v2``); an interpretive artifact.
+"""Time budget with explicit bounds (rule ``time_budget.v3``); an interpretive artifact.
 
 Between two observed timestamps the activity is unknown. For every category the
 budget reports three variants built from intervals on the UTC axis:
@@ -52,7 +52,7 @@ from . import intervals as iv
 from .provenance import canonical_json, code_sha256, code_version, event_set_sha256, sha256_json
 from .source import RULE_ID as SOURCE_RULE, load_items
 
-RULE = 'time_budget.v2'
+RULE = 'time_budget.v3'
 # Method-record history. The computation is unchanged between versions; only what the
 # stored method record says changed. Runs stored under an earlier version keep their
 # result and result hash (analysis_runs is append-only) and are read as historical.
@@ -63,6 +63,10 @@ RULE_HISTORY = {
     'time_budget.v2': ('method.source_rule, method.source_rule_sha256 and method.seam name the rule that '
                        'actually placed the items (e.g. display_time@1 with its SHA-256); found by the '
                        'end-to-end acceptance AGEDS-TASK-20261016-Z'),
+    'time_budget.v3': ('count_both: the bez_kategorii remainder is taken from the best-supported layer (confirmed > '
+                       'estimated > gap attribution) like split_equal/priority, so lower <= probable <= upper holds for '
+                       'it too; categories keep their full per-variant union (review 2 finding 8, '
+                       'AGEDS-TASK-20261016-R2)'),
 }
 RESULT_SCHEMA = 'ageds.time_budget_result.v1'
 OVERLAP_RULES = ('split_equal', 'priority', 'count_both')

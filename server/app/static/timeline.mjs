@@ -88,7 +88,7 @@ function normalize(item) {
     key: item.key, kind: item.kind, lane: laneKey(item.lane), title: item.title || item.event_type || item.kind,
     t: t.sort_us == null ? null : t.sort_us / 1000, lo: t.interval ? t.interval.from_us / 1000 : null,
     hi: t.interval ? t.interval.to_us / 1000 : null, end: t.end_us == null ? null : t.end_us / 1000,
-    display: t.display, basis: t.basis, eventType: item.event_type,
+    display: t.display, basis: t.basis, precision: t.precision, eventType: item.event_type,
   };
 }
 
@@ -226,7 +226,8 @@ function drawItems(track, items, width) {
       if (b - x >= 2) track.append(el('div', {class: 'tl-duration', style: {left: `${x}px`, width: `${b - x}px`, top: `${y + 2}px`}}));
     }
     const marker = el('button', {type: 'button', class: `tl-item tl-kind-${item.kind}${item.basis === 'local_as_utc_unknown_zone' ? ' tl-unknown' : ''}`,
-      'data-key': item.key, title: `${item.display} · ${item.title}`, 'aria-label': `${item.title}, ${item.display}`,
+      'data-key': item.key, title: `${item.display} (precyzja: ${item.precision}; ${BASIS[item.basis] ?? item.basis}) · ${item.title}`,
+      'aria-label': `${item.title}, ${item.display}`,
       style: {left: `${x - 4}px`, top: `${y}px`}});
     marker.addEventListener('click', event => {
       event.stopPropagation();

@@ -1,0 +1,18 @@
+{# Knowledge summary of one artifact; expects `k` from workbench.knowledge.artifact_knowledge. #}
+<div data-wb-knowledge="{{ k.artifact.id }}">
+<h3>{{ t('knowledge.recorded') }}</h3>
+<dl>{% for item in k.recorded %}<dt>{{ t('knowledge.key.' ~ item.key) }}</dt><dd>{% if item.key == 'content_identity' %}SHA-256 <code>{{ item.value.sha256 or t('common.unknown') }}</code> · {{ item.value.size_bytes }} B
+{% elif item.key == 'acquisitions' %}{{ t('knowledge.acquisitions', n=item.value.observations, sources=item.value.distinct_sources, locators=item.value.distinct_locators) }}{% for kind, n in item.value.by_kind.items() %} · {{ kind }}: {{ n }}{% endfor %}<br><small>{{ item.value.first_observed_at }} … {{ item.value.last_observed_at }}</small>
+{% elif item.key == 'same_content_elsewhere' %}{% for other in item.value.artifacts %}<a href="/artifact/{{ other.id }}">#{{ other.id }} {{ other.original_name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}{% if item.value.truncated %} …{% endif %}
+{% elif item.key == 'derived_text' %}{% for d in item.value %}<span class="wb-badge wb-badge-{{ d.epistemic_layer }}">{{ d.kind }} · {{ t('epistemic.' ~ d.epistemic_layer) }}</span> {{ t('knowledge.versions', n=d.versions) }}{% if d.languages %} · {{ d.languages|join(', ') }}{% endif %}{% if not loop.last %}<br>{% endif %}{% endfor %}
+{% elif item.key == 'processing_runs' %}{% for status, n in item.value.items() %}{{ status }}: {{ n }}{% if not loop.last %} · {% endif %}{% endfor %}
+{% endif %}<br><small>{{ t('knowledge.basis') }}: {{ item.basis }}</small></dd>{% endfor %}
+<dt>{{ t('knowledge.key.counts') }}</dt><dd>{{ t('knowledge.counts', citations=k.counts.citations, annotations=k.counts.annotations, events=k.counts.events, tags=k.counts.tags, bookmarks=k.counts.bookmarks) }}</dd></dl>
+<h3>{{ t('knowledge.unknown') }}</h3>
+<ul>{% for u in k.not_recorded_or_unknown %}<li><code>{{ u.key }}</code> — {{ t('knowledge.reason.' ~ u.reason) }}{% if u.count %} ({{ u.count }}){% endif %}</li>{% else %}<li>{{ t('knowledge.no_unknowns') }}</li>{% endfor %}</ul>
+<h3>{{ t('knowledge.not_claimed') }}</h3>
+<ul>{% for key in k.not_claimed %}<li>{{ t('knowledge.claim.' ~ key) }}</li>{% endfor %}</ul>
+{% if k.tags %}<p>{{ t('knowledge.tags') }}: {% for tag in k.tags %}<span class="wb-badge wb-badge-human_annotation">{{ tag.name }}</span> {% endfor %}</p>{% endif %}
+{% if k.folders %}<p>{{ t('knowledge.folders') }}: {% for f in k.folders %}<a href="/workbench/folders/{{ f.folder_id }}">{{ f.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+<p class="wb-meta">{{ t('knowledge.computed') }}</p>
+</div>

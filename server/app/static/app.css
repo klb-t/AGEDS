@@ -1,5 +1,49 @@
-:root{font-family:Inter,ui-sans-serif,system-ui;background:#0d1117;color:#e6edf3;color-scheme:dark}*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#0d1117,#10151d)}header{position:sticky;top:0;z-index:3;display:flex;gap:2rem;align-items:center;justify-content:space-between;padding:1rem 2rem;background:#0d1117e8;border-bottom:1px solid #30363d;backdrop-filter:blur(12px)}h1,h2,h3{margin:.2rem 0 .6rem}header p,small{color:#8b949e}main{max-width:1600px;margin:auto;padding:1.5rem}.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:.8rem;margin-bottom:1rem}.stats div,.panel{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:1rem;box-shadow:0 8px 30px #0003}.stats b{display:block;font-size:2rem}.stats span{color:#8b949e}.grid{display:grid;grid-template-columns:1fr 2fr;gap:1rem;margin-bottom:1rem}input,textarea,select,button{width:100%;padding:.7rem;margin:.25rem 0;border-radius:8px;border:1px solid #30363d;background:#0d1117;color:#e6edf3}button{cursor:pointer;background:#238636;border-color:#2ea043;font-weight:700}button:hover{background:#2ea043}table{width:100%;border-collapse:collapse;font-size:.88rem}th,td{padding:.5rem;border-bottom:1px solid #21262d;text-align:left;vertical-align:top}th{color:#8b949e;position:sticky;top:0;background:#161b22}article{padding:.7rem 0;border-bottom:1px solid #21262d}mark{background:#d29922;color:#0d1117;padding:0 .12rem}code{font-size:.78rem;color:#79c0ff}textarea{min-height:140px}.transcript{white-space:pre-wrap;line-height:1.6}dl{display:grid;grid-template-columns:180px 1fr;gap:.3rem}dt{color:#8b949e}dd{margin:0;overflow-wrap:anywhere}a{color:#58a6ff}@media(max-width:900px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}header{position:static;display:block}}
+/* Theme tokens (owner: workbench area). Dark is the default look. A page opts in to the light
+   theme with <html data-theme-support="light dark">; then prefers-color-scheme applies unless the
+   viewer chose a theme explicitly (data-theme="dark"|"light", cookie ageds_theme). Pages whose own
+   CSS still hard-codes dark colours omit data-theme-support and stay dark. Text tokens meet WCAG AA
+   (>= 4.5:1) against --bg, --surface and --input-bg; see docs/WORKBENCH.md and the receipt. */
+:root{
+  color-scheme:dark;
+  --bg:#0d1117;--bg-end:#10151d;--surface:#161b22;--header-bg:#0d1117e8;--input-bg:#0d1117;
+  --border:#30363d;--border-subtle:#21262d;--shadow:#0003;--focus:#1f6feb;
+  --text:#e6edf3;--muted:#8b949e;--link:#58a6ff;--code:#79c0ff;
+  --accent:#1a7f37;--accent-hover:#238636;--accent-border:#2ea043;--on-accent:#ffffff;
+  --neutral-button:#21262d;--neutral-button-hover:#30363d;
+  --mark-bg:#d29922;--mark-text:#0d1117;
+  --danger:#ff7b72;--warning:#e3b341;--ok:#56d364;
+  --badge-raw:#d2a8ff;--badge-parser:#79c0ff;--badge-model:#e3b341;--badge-human:#56d364;--badge-unclassified:#8b949e;
+  font-family:Inter,ui-sans-serif,system-ui;background:var(--bg);color:var(--text)
+}
+@media (prefers-color-scheme:light){:root[data-theme-support~="light"]:not([data-theme="dark"]){
+  color-scheme:light;
+  --bg:#ffffff;--bg-end:#f6f8fa;--surface:#f6f8fa;--header-bg:#ffffffe8;--input-bg:#ffffff;
+  --border:#d0d7de;--border-subtle:#d8dee4;--shadow:#1f232814;--focus:#0969da;
+  --text:#1f2328;--muted:#59636e;--link:#0969da;--code:#0550ae;
+  --accent:#1a7f37;--accent-hover:#116329;--accent-border:#1a7f37;--on-accent:#ffffff;
+  --neutral-button:#eaeef2;--neutral-button-hover:#d0d7de;
+  --mark-bg:#fff8c5;--mark-text:#1f2328;
+  --danger:#cf222e;--warning:#9a6700;--ok:#1a7f37;
+  --badge-raw:#8250df;--badge-parser:#0550ae;--badge-model:#9a6700;--badge-human:#1a7f37;--badge-unclassified:#59636e
+}}
+:root[data-theme-support~="light"][data-theme="light"]{
+  color-scheme:light;
+  --bg:#ffffff;--bg-end:#f6f8fa;--surface:#f6f8fa;--header-bg:#ffffffe8;--input-bg:#ffffff;
+  --border:#d0d7de;--border-subtle:#d8dee4;--shadow:#1f232814;--focus:#0969da;
+  --text:#1f2328;--muted:#59636e;--link:#0969da;--code:#0550ae;
+  --accent:#1a7f37;--accent-hover:#116329;--accent-border:#1a7f37;--on-accent:#ffffff;
+  --neutral-button:#eaeef2;--neutral-button-hover:#d0d7de;
+  --mark-bg:#fff8c5;--mark-text:#1f2328;
+  --danger:#cf222e;--warning:#9a6700;--ok:#1a7f37;
+  --badge-raw:#8250df;--badge-parser:#0550ae;--badge-model:#9a6700;--badge-human:#1a7f37;--badge-unclassified:#59636e
+}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,var(--bg),var(--bg-end));color:var(--text)}header{position:sticky;top:0;z-index:3;display:flex;gap:2rem;align-items:center;justify-content:space-between;padding:1rem 2rem;background:var(--header-bg);border-bottom:1px solid var(--border);backdrop-filter:blur(12px)}h1,h2,h3{margin:.2rem 0 .6rem}header p,small{color:var(--muted)}main{max-width:1600px;margin:auto;padding:1.5rem}.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:.8rem;margin-bottom:1rem}.stats div,.panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem;box-shadow:0 8px 30px var(--shadow)}.stats b{display:block;font-size:2rem}.stats span{color:var(--muted)}.grid{display:grid;grid-template-columns:1fr 2fr;gap:1rem;margin-bottom:1rem}input,textarea,select,button{width:100%;padding:.7rem;margin:.25rem 0;border-radius:8px;border:1px solid var(--border);background:var(--input-bg);color:var(--text)}button{cursor:pointer;background:var(--accent);border-color:var(--accent-border);color:var(--on-accent);font-weight:700}button:hover{background:var(--accent-hover)}table{width:100%;border-collapse:collapse;font-size:.88rem}th,td{padding:.5rem;border-bottom:1px solid var(--border-subtle);text-align:left;vertical-align:top}th{color:var(--muted);position:sticky;top:0;background:var(--surface)}article{padding:.7rem 0;border-bottom:1px solid var(--border-subtle)}mark{background:var(--mark-bg);color:var(--mark-text);padding:0 .12rem}code{font-size:.78rem;color:var(--code)}textarea{min-height:140px}.transcript{white-space:pre-wrap;line-height:1.6}dl{display:grid;grid-template-columns:180px 1fr;gap:.3rem}dt{color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}a{color:var(--link)}:focus-visible{outline:2px solid var(--focus);outline-offset:2px}@media(max-width:900px){.grid{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,1fr)}header{position:static;display:block}}
 
 .citation-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.8rem}.citation-actions{display:flex;gap:.6rem}.citation-actions button{width:auto;flex:1}button:disabled{opacity:.5;cursor:default}pre.transcript{overflow-wrap:anywhere;white-space:pre-wrap}@media(max-width:600px){.citation-controls{grid-template-columns:1fr}.citation-actions{flex-direction:column}}
 
-.ageds-nav{display:flex;flex-wrap:wrap;gap:.2rem 1rem;font-size:.9rem;margin-bottom:.4rem}.ageds-nav a{text-decoration:none}
+.ageds-nav{display:flex;flex-wrap:wrap;align-items:center;gap:.2rem 1rem;font-size:.9rem;margin-bottom:.4rem}.ageds-nav a{text-decoration:none}
+.ageds-tools{display:inline-flex;flex-wrap:wrap;align-items:center;gap:.35rem;margin-left:auto}
+.ageds-tools select,.ageds-tools button{width:auto;margin:0;padding:.2rem .55rem;font-size:.82rem;font-weight:600;border-radius:6px;background:var(--neutral-button);border-color:var(--border);color:var(--text)}
+.ageds-tools button:hover{background:var(--neutral-button-hover)}
+.ageds-tools form{display:inline;margin:0}
+.wb-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}

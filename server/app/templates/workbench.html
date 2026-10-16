@@ -1,0 +1,73 @@
+<!doctype html><html {{ ui_html_attrs() }}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ t('wb.title') }} — Evidence Workbench</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/workbench.css"></head><body>
+<header>{% include '_nav.html' %}<div><h1>{{ t('wb.title') }}</h1><p>{{ t('wb.subtitle') }}</p></div></header>
+<main class="wb-main">
+{% include '_wb_messages.html' %}
+<section class="wb-layout">
+<div class="panel" data-wb-search-panel>
+<h2>{{ t('wb.search.title') }}</h2>
+<form method="get" action="/workbench" data-wb-search-form>
+<div class="wb-row"><label class="wb-sr" for="wb-q">{{ t('wb.search.label') }}</label><input id="wb-q" type="search" name="q" value="{{ q }}" placeholder="{{ t('wb.search.placeholder') }}" data-wb-search>
+<label>{{ t('wb.search.limit') }} <select name="limit">{% for n in [20, 50, 100, 200] %}<option value="{{n}}"{% if n == limit %} selected{% endif %}>{{n}}</option>{% endfor %}</select></label>
+<button>{{ t('wb.search.submit') }}</button></div>
+<fieldset class="wb-layers"><legend class="wb-sr">{{ t('wb.search.layers') }}</legend>{% for name in layer_names %}<label><input type="checkbox" name="layer" value="{{name}}"{% if name in selected_layers %} checked{% endif %}> {{ t('layer.' ~ name) }}</label>{% endfor %}</fieldset>
+<p class="wb-meta">{{ t('wb.search.layers_hint') }}</p>
+</form>
+{% if search_error %}<p class="wb-alert" role="alert">{{ t('wb.error.' ~ search_error[0]) }}{% if search_error[1] %} — <span class="wb-detail">{{ search_error[1] }}</span>{% endif %}</p>{% endif %}
+{% if page %}
+<p data-wb-coverage>{{ t('wb.search.returned', n=page.results|length) }}{% if page.has_more %} — {{ t('wb.search.has_more', limit=page.limit) }}{% endif %}{% if page.layer_filter %} · {{ t('wb.search.filtered') }}{% endif %}</p>
+<ul class="wb-facets" aria-label="{{ t('wb.search.facets') }}" data-wb-facets>{% for name, n in page.facets.items() %}<li data-layer="{{name}}"{% if not n %} data-zero{% endif %}>{{ t('layer.' ~ name) }}: <b>{{ n }}</b></li>{% endfor %}</ul>
+{% if not page.facets_complete %}<p class="wb-meta">{{ t('wb.search.facets_partial', n=page.facet_scan_limit) }}</p>{% endif %}
+<details class="wb-details"><summary>{{ t('wb.search.legend') }}</summary><table><tr><th>{{ t('wb.search.layer') }}</th><th>{{ t('wb.search.epistemic') }}</th><th>{{ t('wb.search.fields') }}</th></tr>{% for row in page.epistemic_legend %}<tr><td>{{ t('layer.' ~ row.layer) }}</td><td>{{ t('epistemic.' ~ row.epistemic_layer) }} — {{ t('epistemic.' ~ row.epistemic_layer ~ '.help') }}</td><td><code>{{ row.indexed_fields }}</code></td></tr>{% endfor %}</table><p class="wb-meta">{{ t('wb.search.index_note') }}</p></details>
+<form method="post" action="/workbench/tags/apply" data-wb-bulk-form>
+<input type="hidden" name="return_to" value="{{ return_to }}">
+<div class="wb-row"><label><input type="checkbox" class="wb-check" data-wb-select-all> {{ t('wb.bulk.select_all') }}</label></div>
+{% for hit in page.results %}
+<article class="wb-hit" data-wb-hit data-layer="{{ hit.layer }}" data-object="{{ hit.object_kind }}:{{ hit.object_id }}">
+<div>{% if hit.object_kind == 'event' %}<input type="checkbox" class="wb-check" name="target" value="event:{{ hit.object_id }}" data-wb-target aria-label="{{ t('wb.bulk.select_event', id=hit.object_id) }}">{% elif hit.artifact_id %}<input type="checkbox" class="wb-check" name="target" value="artifact:{{ hit.artifact_id }}" data-wb-target aria-label="{{ t('wb.bulk.select_artifact', id=hit.artifact_id) }}">{% endif %}</div>
+<div>{% include '_wb_layer_badge.html' %} <small>{{ t('kind.' ~ hit.object_kind) }} #{{ hit.object_id }}{% if hit.subkind %} · {{ hit.subkind }}{% endif %}{% if hit.artifact_id %} · {{ t('kind.artifact') }} #{{ hit.artifact_id }}{% endif %}{% if hit.object_kind == 'derived_text' %} · {{ t('wb.hit.run', status=t('provenance.' ~ hit.provenance.provenance_status), model=hit.provenance.model or t('common.unknown')) }}{% endif %}{% if hit.object_status == 'missing' %} · <span class="wb-status-missing">{{ t('status.missing') }}</span>{% endif %}</small>
+<h3>{% if hit.url %}<a href="{{ hit.url }}">{{ hit.title }}</a>{% else %}{{ hit.title }}{% endif %}</h3>
+<p>{{ hit.snippet }}</p></div>
+</article>
+{% else %}<p>{{ t('common.none') }}</p>{% endfor %}
+{% if page.results %}<fieldset><legend>{{ t('wb.bulk.title') }}</legend>
+<p class="wb-meta">{{ t('wb.bulk.hint') }}</p>
+<div class="wb-row"><input name="tag" required placeholder="{{ t('wb.bulk.tag_placeholder') }}" aria-label="{{ t('wb.bulk.tag') }}" list="wb-tag-names" data-wb-tag-input>
+<input name="extra_targets" placeholder="{{ t('wb.bulk.extra') }}" aria-label="{{ t('wb.bulk.extra') }}">
+<button name="action" value="add" data-wb-tag-add>{{ t('wb.bulk.add') }}</button><button name="action" value="remove" class="wb-secondary" data-wb-tag-remove>{{ t('wb.bulk.remove') }}</button></div>
+</fieldset>{% endif %}
+</form>
+<form method="post" action="/workbench/saved" class="wb-row" data-wb-save-form>
+<input type="hidden" name="q" value="{{ q }}">{% for name in selected_layers %}<input type="hidden" name="layer" value="{{ name }}">{% endfor %}<input type="hidden" name="limit" value="{{ limit }}">
+<input name="name" required placeholder="{{ t('wb.saved.name_placeholder') }}" aria-label="{{ t('wb.saved.name') }}"><button class="wb-secondary">{{ t('wb.saved.save') }}</button>
+</form>
+{% elif not search_error %}<p>{{ t('wb.search.intro') }}</p>{% endif %}
+</div>
+<div>
+<section class="panel" data-wb-saved>
+<h2>{{ t('wb.saved.title') }}</h2><p class="wb-meta">{{ t('wb.saved.hint') }}</p>
+<ul class="wb-list">{% for s in saved %}<li data-wb-saved-item="{{ s.id }}"><b>{{ s.name }}</b> <small><code>{{ s.query }}</code>{% if s.layers %} · {% for l in s.layers %}{{ t('layer.' ~ l) }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}</small><br>
+<small>{% if s.last_run %}{{ t('wb.saved.last_run', at=s.last_run_at, n=s.last_run.returned) }}{% if s.last_run.has_more %} {{ t('wb.saved.more') }}{% endif %}{% else %}{{ t('wb.saved.never') }}{% endif %}</small><br>
+<form method="post" action="/workbench/saved/{{ s.id }}/run" class="wb-inline"><button class="wb-small">{{ t('wb.saved.run') }}</button></form>
+<form method="post" action="/workbench/saved/{{ s.id }}/delete" class="wb-inline" data-wb-confirm="{{ t('wb.saved.confirm_delete', name=s.name) }}"><button class="wb-small wb-secondary">{{ t('common.delete') }}</button></form></li>{% else %}<li>{{ t('common.none') }}</li>{% endfor %}</ul>
+</section>
+<section class="panel" id="tags" data-wb-tags>
+<h2>{{ t('wb.tags.title') }}</h2><p class="wb-meta">{{ t('wb.tags.hint') }}</p>
+<datalist id="wb-tag-names">{% for tag in tags.tags %}<option value="{{ tag.name }}">{% endfor %}</datalist>
+<ul class="wb-list">{% for tag in tags.tags %}<li data-wb-tag="{{ tag.id }}"><b>{{ tag.name }}</b> <small>#{{ tag.id }} · {{ t('wb.tags.counts', artifacts=tag.artifact_count, events=tag.event_count) }}{% if tag.similar_tag_ids %} · {{ t('wb.tags.similar', ids=tag.similar_tag_ids|join(', ')) }}{% endif %}</small>
+<form method="post" action="/workbench/tags/{{ tag.id }}/rename" class="wb-row"><input name="name" value="{{ tag.name }}" aria-label="{{ t('wb.tags.new_name') }}"><button class="wb-small wb-secondary">{{ t('wb.tags.rename') }}</button></form></li>{% else %}<li>{{ t('common.none') }}</li>{% endfor %}</ul>
+{% if tags.tags|length > 1 %}<form method="post" action="/workbench/tags/merge" data-wb-confirm="{{ t('wb.tags.confirm_merge') }}"><h3>{{ t('wb.tags.merge') }}</h3>
+<label>{{ t('wb.tags.merge_sources') }}<select name="source" multiple size="4">{% for tag in tags.tags %}<option value="{{ tag.id }}">{{ tag.name }} (#{{ tag.id }})</option>{% endfor %}</select></label>
+<label>{{ t('wb.tags.merge_target') }}<select name="target">{% for tag in tags.tags %}<option value="{{ tag.id }}">{{ tag.name }} (#{{ tag.id }})</option>{% endfor %}</select></label>
+<button class="wb-secondary">{{ t('wb.tags.merge_submit') }}</button></form>{% endif %}
+</section>
+<section class="panel" data-wb-folder-summary><h2>{{ t('wb.folders.title') }}</h2>
+<ul class="wb-tree">{% for f in folders %}<li style="padding-left:{{ f.depth }}rem"><a href="/workbench/folders/{{ f.id }}">{{ f.name }}</a> <small>{{ t('wb.folders.items', n=f.item_count) }}</small></li>{% else %}<li>{{ t('common.none') }}</li>{% endfor %}</ul>
+<p><a href="/workbench/folders">{{ t('wb.folders.manage') }}</a></p></section>
+<section class="panel" data-wb-shortcuts><h2>{{ t('wb.keys.title') }}</h2><p class="wb-meta">{{ t('wb.keys.hint') }}</p>
+<table><tr><th>{{ t('wb.keys.keys') }}</th><th>{{ t('wb.keys.action') }}</th></tr>{% for b in keys.bindings %}<tr><td>{% for k in b['keys'] %}<kbd>{{ k }}</kbd>{% if not loop.last %} / {% endif %}{% endfor %}</td><td>{{ t(b.label) }}</td></tr>{% endfor %}
+{% for r in keys.reserved %}<tr><td>{% for k in r['keys'] %}<kbd>{{ k }}</kbd> {% endfor %}</td><td>{{ t(r.label) }}</td></tr>{% endfor %}</table></section>
+</div>
+</section>
+</main>
+<script type="module" src="/static/workbench.mjs"></script>
+</body></html>

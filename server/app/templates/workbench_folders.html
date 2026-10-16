@@ -1,0 +1,18 @@
+<!doctype html><html {{ ui_html_attrs() }}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ t('wb.folders.title') }} — Evidence Workbench</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/workbench.css"></head><body>
+<header>{% include '_nav.html' %}<div><h1>{{ t('wb.folders.title') }}</h1><p>{{ t('wb.folders.subtitle') }}</p></div></header>
+<main class="wb-main">
+{% include '_wb_messages.html' %}
+<section class="wb-layout">
+<div class="panel"><h2>{{ t('wb.folders.tree') }}</h2>
+<ul class="wb-tree" data-wb-folder-tree>{% for f in folders %}<li style="padding-left:{{ f.depth * 1.2 }}rem" data-wb-folder="{{ f.id }}"><a href="/workbench/folders/{{ f.id }}">{{ f.name }}</a> <small>#{{ f.id }} · {{ t('wb.folders.items', n=f.item_count) }}</small>{% if f.note %}<br><small>{{ f.note }}</small>{% endif %}</li>{% else %}<li>{{ t('common.none') }}</li>{% endfor %}</ul></div>
+<div class="panel"><h2>{{ t('wb.folders.create') }}</h2>
+<form method="post" action="/workbench/folders" data-wb-folder-create>
+<label>{{ t('wb.folders.name') }}<input name="name" required data-wb-folder-name></label>
+<label>{{ t('wb.folders.parent') }}<select name="parent_id"><option value="">{{ t('wb.folders.no_parent') }}</option>{% for f in folders %}<option value="{{ f.id }}">{{ f.path|join(' / ') }}</option>{% endfor %}</select></label>
+<label>{{ t('wb.folders.note') }}<textarea name="note"></textarea></label>
+<button>{{ t('wb.folders.create_submit') }}</button></form>
+<p class="wb-meta">{{ t('wb.folders.invariant') }}</p></div>
+</section>
+</main>
+<script type="module" src="/static/workbench.mjs"></script>
+</body></html>

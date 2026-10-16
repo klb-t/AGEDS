@@ -96,12 +96,13 @@ def _official_counterparty(item: dict, label: dict, config: cat.CategoryConfig, 
 
 
 def run_features(db, config: cat.CategoryConfig, *, window_from: str, window_to: str, zone: str,
-                 params: dict | None = None, assume_zone: str | None = None, persist: bool = True) -> dict:
+                 params: dict | None = None, assume_zone: str | None = None, assumption_rule: str | None = None,
+                 persist: bool = True) -> dict:
     from . import model_runs, runs
     p = effective_params(params)
     bp = p['budget_params']
     prepared = bud.prepare_inputs(db, config, window_from=window_from, window_to=window_to, zone=zone, params=bp,
-                                  assume_zone=assume_zone, persist=persist)
+                                  assume_zone=assume_zone, assumption_rule=assumption_rule, persist=persist)
     lo, hi = prepared['lo'], prepared['hi']
     z = cal.zone_info(zone)
     day_list = cal.days(lo, hi, z)
@@ -109,8 +110,9 @@ def run_features(db, config: cat.CategoryConfig, *, window_from: str, window_to:
     items = [it for it in prepared['items'] if lo <= it['t_start'] < hi]
     if any('fields' not in it for it in items):
         reloaded = {it['event_id']: it for it in bud.load_items(db, start_utc=cal.iso_utc(lo), end_utc=cal.iso_utc(hi),
-                                                                assume_zone=assume_zone, limit=bp['max_items'],
-                                                                fields=True)['items']}
+                                                                assume_zone=assume_zone, assumption_rule=assumption_rule,
+                                                                include_hidden=True, limit=bp['max_items'], fields=True,
+                                                                timeline_rule=bp['timeline_rule'])['items']}
         items = [reloaded.get(it['event_id'], it) for it in items]
     labels = prepared['labels']
     night_start, night_end = _minutes(p['night_start']), _minutes(p['night_end'])
@@ -192,6 +194,7 @@ def run_features(db, config: cat.CategoryConfig, *, window_from: str, window_to:
     result = {
         'schema': RESULT_SCHEMA, 'artifact_class': 'interpretive', 'disclaimer': bud.DISCLAIMER,
         'method': {'rule': RULE, 'budget_rule': bud.RULE, 'source_rule': prepared['input']['source_rule'],
+                   'source_rule_sha256': prepared['input']['source_rule_sha256'], 'seam': prepared['input']['seam'],
                    'bucketing': 'local date of the start time in the stated zone',
                    'features': {k: {'version': v[0], 'unit': v[1], 'definition': v[2]} for k, v in FEATURES.items()},
                    'model_series': 'separate, labelled, bound to a model run; provider none = not run'},

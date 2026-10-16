@@ -154,8 +154,9 @@ def build(root: Path) -> dict:
             'dst_short_day': '2025-03-30', 'empty_days': ['2025-03-31', '2025-04-01', '2025-04-02'],
             'flip_day': '2025-04-03', 'dst_long_day': '2025-10-26',
             'official_call_s': 1200, 'recording_s': 2.0, 'calendar_split': {'praca_projekty': 1800, 'zdrowie': 1800},
-            'untimed_reasons': {'unknown_zone': 1, 'nonexistent_local_time': 1},
-            'filtered': {'chat_content_kind:reasoning': 1, 'hidden_chat_content': 1},
+            'untimed_reasons': {'unknown_zone': 2},
+            'untimed_reasons_assumed_zone': {'unknown_zone': 1},  # 02:30 does not exist on the DST day
+            'filtered': {'chat_content_kind:reasoning': 1, 'hidden_by_projection': 1},
         },
     }
 

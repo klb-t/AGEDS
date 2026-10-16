@@ -121,10 +121,40 @@ def test_unknown_zone_events_are_excluded_and_reported(corpus):
     assert untimed['by_reason'] == {'unknown_zone': 2}
     assert set(untimed['event_ids']) == {ids['wa-nonexistent'], ids['wa-unknown']}
     assert result['exclusions']['filtered']['by_reason'] == manifest['expect']['filtered']
-    assumed = _run(dbmod, manifest, config, assume_zone=activity.ZONE)['result']
-    assert assumed['exclusions']['untimed']['by_reason'] == {'nonexistent_local_time': 1}
+    assert untimed['by_reason'] == manifest['expect']['untimed_reasons']
+    with pytest.raises(ValueError, match='assumption_rule'):
+        _run(dbmod, manifest, config, assume_zone=activity.ZONE)
+    assumed = _run(dbmod, manifest, config, assume_zone=activity.ZONE, assumption_rule='synthetic-operator-zone')['result']
+    assert assumed['exclusions']['untimed']['by_reason'] == manifest['expect']['untimed_reasons_assumed_zone']
+    assert assumed['exclusions']['untimed']['event_ids'] == [ids['wa-nonexistent']]
     assert assumed['exclusions']['assumed_zone_items'] == 1
     assert assumed['window']['assume_zone'] == activity.ZONE
+    assert assumed['window']['assumption_rule'] == 'synthetic-operator-zone'
+    assert assumed['input']['projection_params'] == {'assume_zone': activity.ZONE,
+                                                     'assumption_rule': 'synthetic-operator-zone'}
+
+
+def test_runs_record_timeline_rule_and_uncertainty(corpus):
+    from server.app.timeline.ruleset import load_rule
+    dbmod, manifest, ids, config = corpus
+    result = _run(dbmod, manifest, config)['result']
+    rule = load_rule(None, kind='display_rule')
+    assert result['input']['seam'] == 'timeline'
+    assert result['input']['source_rule'] == f'{rule.rule_id}@{rule.version}'
+    assert result['input']['source_rule_sha256'] == rule.sha256
+    assert result['input']['time_uncertainty']['mode'] == 'widen_upper'
+    # a minute-precision wall clock under an operator zone has a 60 s interval: upper widens, lower/probable do not
+    assumed = _run(dbmod, manifest, config, assume_zone=activity.ZONE, assumption_rule='synthetic-operator-zone')['result']
+    tu = assumed['input']['time_uncertainty']
+    assert tu['items_with_interval'] >= 1 and tu['max_width_s'] == 60
+    day = _day(assumed, manifest['expect']['dst_short_day'])
+    plain = _day(result, manifest['expect']['dst_short_day'])
+    assert day['categories']['inne']['lower'] == plain['categories']['inne']['lower']
+    strict = _run(dbmod, manifest, config, assume_zone=activity.ZONE, assumption_rule='synthetic-operator-zone',
+                  params={'max_time_uncertainty_s': 30})['result']
+    assert strict['exclusions']['filtered']['by_reason']['time_uncertainty_over_limit'] == 1
+    hidden = _run(dbmod, manifest, config, params={'include_hidden': True})['result']
+    assert 'hidden_by_projection' not in hidden['exclusions']['filtered']['by_reason']
 
 
 def test_manual_override_precedence_with_visible_path(corpus):

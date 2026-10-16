@@ -41,6 +41,8 @@ def _window(parser) -> None:
     parser.add_argument('--zone', required=True, help='IANA zone for calendar buckets, e.g. Europe/Warsaw')
     parser.add_argument('--assume-zone', default=None,
                         help='place wall-clock times with unknown zone in this zone (recorded on every item)')
+    parser.add_argument('--assumption-rule', default=None,
+                        help='required id naming the decision behind --assume-zone (recorded in the projection)')
     parser.add_argument('--params', type=_json_object, default=None, help='JSON object of parameter overrides')
 
 
@@ -125,7 +127,7 @@ def handle(args) -> int | None:
             fn = budget.run_budget if args.command == 'budget-run' else features.run_features
             with session() as db:
                 out = fn(db, config, window_from=args.window_from, window_to=args.window_to, zone=args.zone,
-                         params=args.params, assume_zone=args.assume_zone)
+                         params=args.params, assume_zone=args.assume_zone, assumption_rule=args.assumption_rule)
             written = _write(out['result'], args.output)
             if args.command == 'budget-run':
                 summary = budget_summary(out['run'], out['result'])
@@ -168,7 +170,7 @@ def handle(args) -> int | None:
             with session() as db:
                 prepared = budget.prepare_inputs(db, config, window_from=args.window_from, window_to=args.window_to,
                                                  zone=args.zone, params=args.params, assume_zone=args.assume_zone,
-                                                 persist=False)
+                                                 assumption_rule=args.assumption_rule, persist=False)
                 out = model_runs.run_model(db, prepared['items'], purpose='labels', provider=args.provider,
                                            opt_in=args.opt_in, config=config,
                                            parameters={'window': prepared['window']})

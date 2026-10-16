@@ -95,7 +95,10 @@ def test_import_page_renders_review_table_and_escapes_source_text(api):
     assert '24 pozycji' in page and 'built-in method' not in page
     assert 'takeout-20241001.zip!/Takeout/takeout-inner.zip!/Mail/All mail Including Spam and Trash.mbox' in page
     assert 'opt_in_disabled:enable_location' in page and 'parameter_missing:profile_id' in page
-    assert page.count('<script') == 1 and '<img' not in page
+    # Only the page's own module plus the shared shell (nav) scripts from /static (track H).
+    shell = ('<script type="application/json" id="ageds-shell-config">', '<script type="module" src="/static/workbench-shell.mjs">')
+    assert page.count('<script') == 1 + sum(page.count(tag) for tag in shell) and '<img' not in page
+    assert page.count('<script type="module" src="/static/importplan.mjs">') == 1
     assert '&lt;img src=x onerror=window.__ageds_xss=1&gt;.ics' in page
     filtered = api.client.get('/import', params={'plan': plan_id, 'importer': '', 'status': 'proposed', 'collection': '',
                                                   'ambiguous': 'true', 'q': ''}).text

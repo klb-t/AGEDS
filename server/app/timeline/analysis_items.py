@@ -30,6 +30,25 @@ UNKNOWN = 'local_as_utc_unknown_zone'
 _ANALYSIS_REASON = {'no_candidates': 'no_time_candidate', 'no_usable_candidate': 'no_parseable_time'}
 
 
+def unknown_zone_reason(flags: dict) -> str:
+    """Reason of an item left on the unknown-zone basis, in the analysis item contract.
+
+    An operator zone that cannot place a wall clock (DST gap) leaves the item on the
+    unknown-zone interval with ``flags.dst``; the analysis contract (and the interim
+    seam) names that ``nonexistent_local_time`` rather than a plain ``unknown_zone``.
+    """
+    dst = flags.get('dst') if isinstance(flags, dict) else None
+    if flags.get('assumed_zone') and isinstance(dst, str) and dst != 'ambiguous_fold':
+        return dst
+    return 'unknown_zone'
+
+
+def undated_reason(flags: dict) -> str:
+    """Analysis-contract reason of an item without a usable time (projection ``undated_reason``)."""
+    reason = flags.get('undated_reason') if isinstance(flags, dict) else None
+    return _ANALYSIS_REASON.get(reason, reason or 'no_time_candidate')
+
+
 def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc: str | None = None,
                event_types=None, assume_zone: str | None = None, assumption_rule: str | None = None,
                unknown_zone: str = 'exclude', include_hidden: bool = False, rule: Rule | str | None = None,
@@ -65,11 +84,11 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
     truncated = len(rows) > limit
     items, untimed = [], []
     for row in rows[:limit]:
-        if row['basis'] == UNKNOWN and unknown_zone == 'exclude':
-            untimed.append({'event_id': row['ref_id'], 'event_type': row['event_type'], 'reason': 'unknown_zone',
-                            'local_as_utc': row['sort_us'] / US})
-            continue
         flags = json.loads(row['flags_json'] or '{}')
+        if row['basis'] == UNKNOWN and unknown_zone == 'exclude':
+            untimed.append({'event_id': row['ref_id'], 'event_type': row['event_type'],
+                            'reason': unknown_zone_reason(flags), 'local_as_utc': row['sort_us'] / US})
+            continue
         t0 = row['sort_us'] / US
         t1 = row['end_us'] / US if row['end_us'] is not None and row['end_us'] >= row['sort_us'] else None
         items.append({
@@ -86,7 +105,7 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
     for row in db.execute(f'SELECT ref_id, event_type, flags_json FROM timeline_items ti WHERE {where} AND ti.sort_us IS NULL '
                           'ORDER BY ti.ref_id LIMIT ?', (*args, limit + 1)):
         untimed.append({'event_id': row['ref_id'], 'event_type': row['event_type'],
-                        'reason': _ANALYSIS_REASON.get(reason := json.loads(row['flags_json'] or '{}').get('undated_reason'), reason or 'no_time_candidate')})
+                        'reason': undated_reason(json.loads(row['flags_json'] or '{}'))})
     return {'rule': f'{resolved.rule_id}@{resolved.version}', 'rule_sha256': resolved.sha256, 'params': params,
             'projection': {'id': projection['id'], 'build_id': projection['build']['id']},
             'assume_zone': assume_zone, 'unknown_zone': unknown_zone, 'items': items, 'untimed': untimed,

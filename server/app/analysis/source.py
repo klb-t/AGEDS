@@ -354,12 +354,14 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
         # read as UTC does.
         lo_us, hi_us = int(_epoch(start_utc) * 1_000_000), int(_epoch(end_utc) * 1_000_000)
         seen = {u['event_id'] for u in loaded['untimed']}
+        from ..timeline.analysis_items import unknown_zone_reason
         for row in db.execute(
-                "SELECT ref_id, event_type, sort_us FROM timeline_items WHERE projection_id=? AND item_kind='event' "
+                "SELECT ref_id, event_type, sort_us, flags_json FROM timeline_items WHERE projection_id=? AND item_kind='event' "
                 "AND basis='local_as_utc_unknown_zone' AND lo_us<? AND hi_us>=? ORDER BY ref_id",
                 (loaded['projection']['id'], hi_us, lo_us)):
             if row[0] not in seen and (not event_types or row[1] in event_types):
-                loaded['untimed'].append({'event_id': row[0], 'event_type': row[1], 'reason': 'unknown_zone',
+                loaded['untimed'].append({'event_id': row[0], 'event_type': row[1],
+                                          'reason': unknown_zone_reason(json.loads(row[3] or '{}')),
                                           'local_as_utc': row[2] / 1_000_000})
         loaded['untimed'].sort(key=lambda u: u['event_id'])
     items, hidden = [], []

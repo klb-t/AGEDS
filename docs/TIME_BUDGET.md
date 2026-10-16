@@ -88,9 +88,20 @@ category, weight, path, rule ids, correction id, model run id); an identical lab
 reused. Model runs (`analysis_model_runs`, `analysis_model_outputs`) record provider, model,
 version, parameters and the per-run opt-in. Providers: `none` (default; records that nothing
 ran) and `fake` (deterministic hash of the event id, for tests; explicitly not a model).
+`fake` is a test double: every entry point (HTTP, CLI, Python) refuses it unless the process
+sets `EW_ANALYSIS_TEST_PROVIDERS=1` (review 2 finding 13, like `EW_CATALOG_TEST_PROVIDERS`);
+the test suite sets it only in the tests that use it.
 Any other provider is refused as unavailable — no network adapter exists.
 
-## 4. The budget model (rule `time_budget.v2`)
+## 4. The budget model (rule `time_budget.v3`)
+
+`time_budget.v3` (2026-10-16, review 2 finding 8, task R2): under `count_both` the
+`bez_kategorii` remainder is taken from the best-supported layer (confirmed > estimated > gap
+attribution), as `split_equal`/`priority` always did; before, each variant derived it from its
+own shares, so `lower` could exceed `probable`/`upper` (e.g. a confirmed 0.3-labelled call
+overlapped by a 1.0 session: lower 2520 s, probable 0 s). Categories under `count_both` still
+keep their full per-variant union. `method.rule_history` records every version; stored
+`v1`/`v2` runs stay unchanged.
 
 `time_budget.v2` (2026-10-16, end-to-end acceptance task Z) changes only the method record: `method.seam`,
 `method.source_rule` and `method.source_rule_sha256` now name the rule that actually placed the items (e.g.
@@ -135,7 +146,9 @@ Across categories `overlap_rule` decides:
 
 For `split_equal` and `priority` the variants are **layered**: confirmed time takes
 precedence over estimates, estimates over gap attribution. This keeps
-`lower ≤ probable ≤ upper` per category (an estimate never reduces confirmed time).
+`lower ≤ probable ≤ upper` per category (an estimate never reduces confirmed time). The
+`bez_kategorii` remainder is layered for every rule, `count_both` included (property-tested
+over random seeds across a DST week for all three rules).
 `overlap_s` is time where shares of active categories sum above 1. Observed time whose
 weights sum below 1 goes to `bez_kategorii`, so for non-double-counting rules
 `Σ categories + nieobserwowane = bucket length` (tested).
@@ -146,7 +159,18 @@ weights sum below 1 goes to `bez_kategorii`, so for non-double-counting rules
 
 Items are loaded for the window ± a margin (largest session gap, attribution, typing and
 reading cap in the grid + 1 s) so sessions and gaps crossing the window edge are exact
-inside the window; only time inside the window is allocated.
+inside the window; only time inside the window is allocated. A declared duration (call-log
+`duration`, WAV header) is not part of the projection's end time, so the load starts
+`duration_lookback_s` (default 86 400 s, range 0–7 days) earlier and keeps from that extra
+range only items whose end, declared duration or uncertainty interval reaches the margin
+(review 2 P1: a 3-hour call starting 2 h before the window lost its last hour). A declared
+duration longer than the look-back is still cut; `input.duration_lookback_s` records the value.
+
+**Locking (review 2 finding 2).** Reading, labelling and the whole sensitivity grid run
+without a write transaction; the labelling run and the analysis run (and, for features, the
+tone model run) are stored afterwards in one short `BEGIN IMMEDIATE` transaction. A
+concurrent writer is never blocked by a running budget (tested with a concurrent
+`BEGIN IMMEDIATE` during the computation).
 
 ## 5. Candles
 
@@ -170,6 +194,10 @@ The grid (`grid_mode` `one_at_a_time` around the run's parameters — default 11
 category of a bucket (only when it was a clear winner), and the direction of change between
 consecutive buckets. Any flip sets `sensitivity.unstable`; affected candles list the reason.
 “Reasonable change” means the declared grid; change the grid to change that judgement.
+The grid is enumerated lazily (review 2 finding 3): duplicate axis values count once, the
+enumeration stops after `max_grid_points` (1–4096) distinct points and `points_total` is
+computed from the distinct axis sizes, so a `full` grid of 64 values on each of the five
+axes (the per-axis list cap) is answered without materializing its product.
 
 ## 7. Feature series (rule `feature_series.v1`)
 

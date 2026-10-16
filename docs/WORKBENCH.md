@@ -24,8 +24,9 @@ JSON errors use `{"detail": {"code", "message"}}`: 422 `invalid_input`,
 `/api/workbench` refuses browser requests marked `Sec-Fetch-Site: cross-site`
 or with a foreign/`null` `Origin` (cheap CSRF guard; local scripts send
 neither). With `EW_REQUIRE_TOKEN=1` the integrations middleware also gates
-`/api/workbench/*`; the HTML pages stay on the trusted-network model of the
-rest of the UI.
+`/api/workbench/*` and, since review 2 finding 6, the HTML pages (search result
+snippets included); browsers log in once through `/integrations/session` (see
+[read API](READ_API.md)). The Host allowlist applies always.
 
 ## 1. Search across all layers
 

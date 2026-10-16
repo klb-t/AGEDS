@@ -268,6 +268,7 @@ time-budget report renders one stored run and does not start a run; this revisio
 and no LLM call; English labels fall back to keys where untranslated; the PDF
 layout of very wide tables is not tuned; the report directory is not
 re-verified automatically after creation, so verification runs on request.
-The `/reports/…` HTML and file routes follow the workbench trust model:
-trusted network, no authentication. `/api/reports*` falls under
-`EW_REQUIRE_TOKEN` like other `/api/*` routes.
+Without `EW_REQUIRE_TOKEN` the `/reports/…` HTML and file routes follow the
+workbench trust model (trusted network). With `EW_REQUIRE_TOKEN=1` they need the
+token like `/api/reports*` (review 2 finding 6: `/reports/{id}/files/*`, `/view/*`
+and `/manifest` serve report data); browsers use the session cookie.

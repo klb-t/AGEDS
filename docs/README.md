@@ -33,6 +33,7 @@
 | Hypothesis analyzer (interpretive) | [Preregistration, evidence dossier, thesis typology, permutation event study](HYPOTHESES.md). |
 | Time budget and feature series | [Categories, labels, bounds, candles, sensitivity, feature series](TIME_BUDGET.md). |
 | Adversarial review fixes | [Findings → regression tests → status](validation/REVIEW_FIXES_2026-10-16.md). |
+| Second adversarial review fixes | [Findings → regression tests → status](validation/REVIEW2_FIXES_2026-10-16.md). |
 | End-to-end acceptance | [Criterion → evidence matrix, CLI/HTTP pipeline on a multi-device synthetic layout](ACCEPTANCE.md). |
 
 ## Development state and records

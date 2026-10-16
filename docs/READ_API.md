@@ -40,8 +40,13 @@ counted in `api_token_rejections` (schema 73) per UTC hour, `token_key` and reas
 time; only the first one of each writes a `token_rejected` audit row. After 25 keys in
 one hour further keys are pooled under `*`, so junk bearer tokens cannot grow the
 tables per request. Requests without a token or with a malformed token are refused
-before any database access and are not audited. There is no rate limiting; the
-service remains intended for a trusted/private network.
+before any database access and are not audited. Review 2 P2: only the first rejection per
+hour, key and reason takes the write lock (row + audit); repeats of a (bucket, key, reason)
+this process has already stored are counted in memory and added by a flush at most every
+`REJECTION_FLUSH_SECONDS` (10 s, busy timeout 200 ms, a busy database keeps them pending; the
+`/integrations` page flushes too), so a flood of rejected tokens no longer queues on the write
+lock. Like `use_count`, the counts are therefore a lower bound if the process stops before the
+next flush. There is no rate limiting; the service remains intended for a trusted/private network.
 
 ### Authentication and error model
 
@@ -61,27 +66,46 @@ are `{"detail": {"code": "<stable_code>", "message": "<text>"}}`:
 ### Opt-in enforcement everywhere (`EW_REQUIRE_TOKEN=1`)
 
 With `EW_REQUIRE_TOKEN=1` (also `true`/`yes`/`on`) a pure-ASGI middleware
-requires a valid, unrevoked, unexpired token on **every** `/api/*` and `/export/*`
-route and on **every state-changing request** (any method other than
-GET/HEAD/OPTIONS, e.g. `/upload`, `/import/*`, the `/integrations` and `/media`
-forms) — review finding 6; scopes are not checked there. The token is accepted as
+requires a valid, unrevoked, unexpired token on **every route** — `/api/*`, `/export/*`,
+every state-changing request (review finding 6) and, since review 2 finding 6, every
+HTML page (`/`, `/workbench?q=…` search snippets, `/integrations`, `/timeline`, …), the
+report files (`/reports/{id}/files/*`, `/view/*`, `/manifest`) and `/docs`/`/openapi.json`.
+Only the login form (`GET`/`POST /integrations/session`, `POST /integrations/session/logout`),
+`/static/*` and `/favicon.ico` stay open; empty-shell pages are protected too, since their data
+calls need the same token. A browser `GET` of a page without a token gets the login form (401,
+no evidence data) whose hidden `next` field brings the user back after login (local paths only;
+other targets go to `/integrations`); API clients get the JSON 401. Scopes are not checked there. The token is accepted as
 `Authorization: Bearer …` or as the browser session cookie `ageds_token` (HttpOnly,
 SameSite=Strict, path `/`) that the form `POST /integrations/session` (field
 `token`) sets after verifying it; `POST /integrations/session/logout` clears it.
 The cookie does not grant the scoped `/api/read/v1/*` and `/api/integrations/v1/*`
-routes, which still need the bearer header. Read-only HTML pages (`/`,
-`/artifact/...`, `/integrations`, …) stay open so the login form is reachable. The
-switch is read per request, so it can be toggled without code changes. The
+routes, which still need the bearer header. The switch is read per request, so it can be
+toggled without code changes. The
 middleware is installed through the `install_app` hook that
 `server/app/api/__init__.py` calls for every router module.
+
+### Host allowlist (always on, review 2 finding 5)
+
+The middleware first checks the `Host` header against an allowlist, so a DNS-rebinding page
+(an attacker's name resolving to this machine, sending `Host = Origin = attacker name`) can
+neither write nor read: `localhost`; **any IP literal** (`127.0.0.1`, `[::1]`, the Android
+emulator's `10.0.2.2`, a LAN address such as `192.168.1.20`) — a rebinding page always sends the
+attacker's *hostname*, never an IP literal, so IP access from the phone keeps working without
+configuration; the hosts of `EW_TRUSTED_ORIGINS` (reverse proxy); and `EW_TRUSTED_HOSTS`
+(comma-separated names such as `evidence.lan`, `*.example.lan` suffix wildcards, or `*` to switch
+the check off — an explicit operator decision). Anything else gets 400 `untrusted_host` before any
+route runs. A request without `Host` (HTTP/1.0 tools) passes. The test suite lists
+`testserver` (FastAPI's `TestClient` host) in `server/tests/conftest.py`; production defaults are
+not widened for tests.
 
 ### Cross-site request guard (always on)
 
 Independently of `EW_REQUIRE_TOKEN`, the same middleware refuses (403,
 `cross_site_request`) a state-changing request without an `Authorization` header
 when `Sec-Fetch-Site: cross-site` is sent, or when `Origin` (if absent: `Referer`)
-names another origin than the request's `Host` (default ports ignored; `Origin:
-null` is refused). Reverse proxies can list public origins in `EW_TRUSTED_ORIGINS`
+does not name an allowlisted host that is this server (same host and port as the already
+allowlisted `Host`; default ports ignored; `Origin: null` is refused) or an origin in
+`EW_TRUSTED_ORIGINS`. Reverse proxies can list public origins in `EW_TRUSTED_ORIGINS`
 (comma-separated, e.g. `https://evidence.example.org`). Requests without these
 headers (CLI, curl, scripts, the Android client) and bearer requests are unaffected:
 a cross-site page cannot send `Authorization` without a CORS preflight, which this

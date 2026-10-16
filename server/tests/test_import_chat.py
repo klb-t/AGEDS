@@ -514,3 +514,21 @@ def test_file_limits_empty_files_and_non_standard_constants(corpus, store, tmp_p
     result = chatgpt.import_chatgpt_export([constants], export_label='nan')
     assert result['files'][0]['issue_counts']['malformed_conversation_json'] == 1
     assert [e['thread_id'] for e in message_events(event_type='chat_conversation') if e['thread_id'] in ('nan-conv', 'ok-conv')] == ['ok-conv']
+
+
+def test_node_keys_with_pointer_characters_round_trip(store, tmp_path):
+    export = tmp_path / 'pointer-export'
+    export.mkdir()
+    conversation = {'id': 'ptr', 'current_node': 'a/b~c', 'mapping': {
+        'r': {'id': 'r', 'parent': None, 'children': ['a/b~c'], 'message': None},
+        'a/b~c': {'id': 'a/b~c', 'parent': 'r', 'children': [], 'message': {
+            'id': 'a/b~c', 'author': {'role': 'user'}, 'create_time': 1, 'content': {'content_type': 'text', 'parts': ['slash']}}}}}
+    (export / 'conversations.json').write_text(json.dumps([conversation]), encoding='utf-8')
+    chatgpt.import_chatgpt_export([export], export_label='ptr')
+    [event] = message_events('a/b~c')
+    locator = event['meta']['locator']
+    assert locator['element_pointer'] == '/mapping/a~1b~0c'
+    stored = rows('SELECT stored_path FROM artifacts WHERE id=?', event['artifact_id'])[0]['stored_path']
+    assert chat_common.read_raw(stored, locator['element_byte_range'], locator['element_pointer']) == conversation['mapping']['a/b~c']
+    assert event['meta']['chat']['tree']['on_current_path'] is True
+    assert chat_common.expand({'x': {'k': 1, 'j': 2}}, '/x/*') == [('/x/k', 1), ('/x/j', 2)]

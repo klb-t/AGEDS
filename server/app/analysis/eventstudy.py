@@ -14,11 +14,23 @@ Method (all integer arithmetic on UTC milliseconds; no parametric p-values):
   compared as exact fractions; null draws with an empty denominator are
   undefined and reported, not counted.
 * Null: the stimulus times are moved ``n`` times by the registered null model
-  (circular shift within the observed span, permutation among eligible event
-  times, permutation within weekday×hour strata, or block permutation) using
-  the versioned SplitMix64 generator seeded from the definition.
+  (circular shift within the observed span, permutation among eligible events,
+  permutation within weekday×hour strata, or permutation of the full blocks of
+  the span) using the versioned SplitMix64 generator seeded from the definition.
+  Method ``ageds.event-study-method/v2`` (review 2 findings 1 and 12): a
+  permuted stimulus takes the time of an eligible *event* and is treated as that
+  event, exactly as observed stimuli are treated — outcome events are not
+  eligible while self pairs are excluded, and a borrowed density event is not
+  counted as its own documentation when stimuli are excluded from density; the
+  last, partial block of a block permutation stays in place.
 * Empirical p-value ``(k + 1) / (n + 1)``, where ``k`` counts null statistics at
-  least as extreme as the observed one in the registered direction.
+  least as extreme as the observed one in the registered direction (two-sided:
+  distance from the null mean; for the normalized share the mean is rounded to a
+  double with ``math.fsum`` and the distances are compared exactly).
+* Preregistration check: every run records fingerprints of its selected sets; a
+  later run of the same version compares the events that already existed at the
+  version's first such run and reports changed sets, new events and tag/label
+  edits made after registration (review 2 finding 7).
 
 Warnings (causation, detection bias, seasonality, clustering, dependence,
 unknown-zone exclusions, time basis, preregistration deviations) are always
@@ -42,7 +54,22 @@ from .hypotheses import (HypothesisError, HypothesisNotFound, canonical_json, ca
                          sha256_canonical, utc_now)
 from .preregistration import _analysis, require_registered
 
-RESULT_SCHEMA = 'ageds.event-study-result/v1'
+RESULT_SCHEMA = 'ageds.event-study-result/v2'
+METHOD_ID = 'ageds.event-study-method/v2'
+METHOD_HISTORY = {
+    'ageds.event-study-method/v1': (
+        'permutation and stratified nulls drew stimulus times from every eligible event, including outcome and density '
+        'events, so null placements produced lag-0 pairs with the borrowed event that observed stimuli never have '
+        '(p-values miscalibrated, e.g. decrease p=0.001 on independent data); block_permutation wrapped a full block '
+        'onto the start of the span when the span was not a multiple of block_s; two-sided normalized tests summed '
+        'exact fractions (cost not bounded by max_work); deviation check covered only parameter overrides'),
+    'ageds.event-study-method/v2': (
+        'eligible pool = eligible events minus outcome events while self pairs are excluded; a permuted stimulus that '
+        'borrows a density event does not count that event (density_excludes_stimuli); full blocks are permuted and the '
+        'partial last block stays in place; extremes compared exactly without accumulating fractions, display means by '
+        'math.fsum; selected-set fingerprints and tag/label edits after registration are checked against the version\'s '
+        'first run (review 2, AGEDS-TASK-20261016-R2)'),
+}
 RNG_ID = 'splitmix64.v1'
 QUANTILE_RULE = 'nearest_rank_ceil'
 OVERRIDABLE = ('permutations', 'seed', 'null_model', 'block_s', 'stratify_zone')
@@ -128,14 +155,30 @@ def _quantile(sorted_values, q_permille: int):
     return sorted_values[min(index, n - 1)]
 
 
-def _extreme_count(null_values, observed: int, direction: str) -> int:
+def _mean(values) -> float:
+    """Display mean (correctly rounded sum of the values as doubles); never accumulates exact fractions."""
+    return math.fsum(float(v) for v in values) / len(values)
+
+
+def _extreme_count(null_values, observed, direction: str) -> int:
+    """Null values at least as extreme as ``observed``; every comparison is exact.
+
+    Integer statistics use the exact mean (``|n·v − Σv| ≥ |n·obs − Σv|``). Fractions are
+    compared one by one (cross-multiplication inside ``Fraction``), never summed: the
+    two-sided centre is the null mean rounded to a double (``math.fsum``), an exact dyadic
+    rational, so the cost stays linear (review 2 finding 9).
+    """
     if direction == 'increase':
         return sum(1 for v in null_values if v >= observed)
     if direction == 'decrease':
         return sum(1 for v in null_values if v <= observed)
-    n, total = len(null_values), sum(null_values)
-    distance = abs(n * observed - total)
-    return sum(1 for v in null_values if abs(n * v - total) >= distance)
+    if all(type(v) is int for v in null_values) and type(observed) is int:
+        n, total = len(null_values), sum(null_values)
+        distance = abs(n * observed - total)
+        return sum(1 for v in null_values if abs(n * v - total) >= distance)
+    center = Fraction(_mean(null_values))
+    distance = abs(observed - center)
+    return sum(1 for v in null_values if abs(v - center) >= distance)
 
 
 def _summary(null_values, observed, direction: str, scale: int = 1) -> dict:
@@ -143,7 +186,7 @@ def _summary(null_values, observed, direction: str, scale: int = 1) -> dict:
     ordered = sorted(null_values)
     n = len(ordered)
     k = _extreme_count(null_values, observed, direction)
-    mean = sum(ordered) / n / scale
+    mean = _mean(ordered) / scale
     return {'observed': _round(observed / scale), 'null_mean': _round(mean),
             'null_q025': _round(_quantile(ordered, 25) / scale), 'null_q500': _round(_quantile(ordered, 500) / scale),
             'null_q975': _round(_quantile(ordered, 975) / scale), 'k_extreme': k, 'n_permutations': n,
@@ -165,21 +208,31 @@ def _parse_utc_ms(text: str) -> int:
 # ---------------------------------------------------------------- null models
 
 class _NullModel:
-    def __init__(self, name: str, stimuli: list[int], t0: int, t1: int, eligible: list[int], block_ms: int,
-                 zone: str, rng: SplitMix64):
+    """Moves the stimulus times; ``draw`` returns ``(times, borrowed_density)``.
+
+    ``eligible`` is a list of ``(time_ms, event_id)`` (one entry per eligible event, review
+    2 finding 1); ``borrowed_density`` counts the placements whose borrowed event is in
+    ``density_ids`` — each such placement would otherwise count that very event as
+    documentation at lag 0, which an observed stimulus never does.
+    """
+
+    def __init__(self, name: str, stimuli: list[int], t0: int, t1: int, eligible: list[tuple[int, int]], block_ms: int,
+                 zone: str, rng: SplitMix64, density_ids: frozenset = frozenset()):
         self.name, self.stimuli, self.t0, self.t1, self.rng = name, stimuli, t0, t1, rng
         self.span = t1 - t0
+        self.density_ids = density_ids
         self.info: dict = {'name': name}
         if name == 'permutation':
             if len(eligible) < len(stimuli):
-                raise HypothesisError(f'permutation null needs at least as many eligible times ({len(eligible)}) as stimuli ({len(stimuli)})')
+                raise HypothesisError(f'permutation null needs at least as many eligible events ({len(eligible)}) as '
+                                      f'stimuli ({len(stimuli)})')
             self.eligible = eligible
-            self.info['eligible_times'] = len(eligible)
+            self.info.update({'eligible_events': len(eligible), 'eligible_times': len({t for t, _ in eligible})})
         elif name == 'stratified_weekday_hour':
             tz = ZoneInfo(zone)
-            buckets: dict[tuple[int, int], list[int]] = {}
-            for t in eligible:
-                buckets.setdefault(_weekday_hour(t, tz), []).append(t)
+            buckets: dict[tuple[int, int], list[tuple[int, int]]] = {}
+            for entry in eligible:
+                buckets.setdefault(_weekday_hour(entry[0], tz), []).append(entry)
             groups: dict[tuple[int, int], list[int]] = {}
             for index, s in enumerate(stimuli):
                 groups.setdefault(_weekday_hour(s, tz), []).append(index)
@@ -195,29 +248,41 @@ class _NullModel:
             self.info.update({'zone': zone, 'strata_used': len(self.plan), 'strata_insufficient': insufficient,
                               'stimuli_kept_in_place': len(fixed)})
         elif name == 'block_permutation':
+            # Only full blocks are permuted; the partial block at the end of the span (when the span is
+            # not a multiple of block_s) stays in place with its stimuli (review 2 finding 12).
             self.block = block_ms
-            self.blocks = -(-self.span // block_ms)
+            self.blocks = self.span // block_ms
             if self.blocks < 2:
-                raise HypothesisError('block_permutation needs at least two blocks inside the observed span; decrease block_s')
-            self.info.update({'block_s': block_ms // 1000, 'blocks': self.blocks})
+                raise HypothesisError('block_permutation needs at least two blocks inside the observed span (only full '
+                                      'blocks are permuted); decrease block_s')
+            self.full_end = t0 + self.blocks * block_ms
+            self.info.update({'block_s': block_ms // 1000, 'blocks': self.blocks,
+                              'partial_block_s': (t1 - self.full_end) / 1000,
+                              'stimuli_kept_in_partial_block': sum(1 for s in stimuli if s >= self.full_end)})
         elif name != 'circular_shift':
             raise HypothesisError(f'unknown null model {name}')
 
-    def draw(self) -> list[int]:
+    def _borrowed(self, entries) -> int:
+        return sum(1 for _, eid in entries if eid in self.density_ids) if self.density_ids else 0
+
+    def draw(self) -> tuple[list[int], int]:
         rng, t0, span = self.rng, self.t0, self.span
         if self.name == 'circular_shift':
             u = rng.below(span)
-            return [t0 + (s - t0 + u) % span for s in self.stimuli]
+            return [t0 + (s - t0 + u) % span for s in self.stimuli], 0
         if self.name == 'permutation':
-            return [self.eligible[i] for i in rng.sample_indices(len(self.eligible), len(self.stimuli))]
+            chosen = [self.eligible[i] for i in rng.sample_indices(len(self.eligible), len(self.stimuli))]
+            return [t for t, _ in chosen], self._borrowed(chosen)
         if self.name == 'stratified_weekday_hour':
-            out = list(self.fixed)
+            out, borrowed = list(self.fixed), 0
             for members, pool in self.plan:
-                out.extend(pool[i] for i in rng.sample_indices(len(pool), len(members)))
-            return out
+                chosen = [pool[i] for i in rng.sample_indices(len(pool), len(members))]
+                out.extend(t for t, _ in chosen)
+                borrowed += self._borrowed(chosen)
+            return out, borrowed
         order = rng.permutation(self.blocks)
-        block = self.block
-        return [t0 + (order[(s - t0) // block] * block + (s - t0) % block) % span for s in self.stimuli]
+        block, end = self.block, self.full_end
+        return [t0 + order[(s - t0) // block] * block + (s - t0) % block if s < end else s for s in self.stimuli], 0
 
 
 def _weekday_hour(ms: int, tz: ZoneInfo) -> tuple[int, int]:
@@ -434,23 +499,138 @@ def _warnings(ctx: dict) -> list[dict]:
                  'Część czasów bodźców/wyników pochodzi ze słabych źródeł (np. czas modyfikacji pliku, eksportu).',
                  'Some stimulus/outcome times come from weak bases (e.g. file modification or export time).',
                  {'weak_kinds': list(WEAK_TIME_KINDS), 'weak_count': ctx['weak_time_basis'], 'by_kind': ctx['time_basis']}),
-        _warning('preregistration_deviation', bool(ctx['deviations']), 'high',
-                 'Parametry tego przebiegu różnią się od zarejestrowanych: ' +
-                 ', '.join(d['key'] for d in ctx['deviations']) + '.' if ctx['deviations'] else
-                 'Przebieg użył dokładnie zarejestrowanych parametrów.',
-                 'This run used parameters different from the registered ones: ' +
-                 ', '.join(d['key'] for d in ctx['deviations']) + '.' if ctx['deviations'] else
-                 'The run used exactly the registered parameters.',
-                 {'deviations': ctx['deviations']}),
+        _deviation_warning(ctx['deviations'], ctx['drift']),
     ]
+
+
+def _deviation_warning(deviations: list, drift: dict) -> dict:
+    """Parameter overrides, selection changes since the first run and edits after registration (review 2 #7)."""
+    changed = [c['set'] for c in drift['changed_sets']]
+    edits = drift['edits_after_registration']
+    edited = edits.get('tag_edits', 0) + edits.get('category_corrections', 0)
+    new = drift['new_events_since_baseline']
+    pl, en = [], []
+    if deviations:
+        keys = ', '.join(d['key'] for d in deviations)
+        pl.append(f'Parametry tego przebiegu różnią się od zarejestrowanych: {keys}.')
+        en.append(f'This run used parameters different from the registered ones: {keys}.')
+    elif changed or edited:
+        pl.append('Przebieg użył zarejestrowanych parametrów, ale dane wejściowe filtrów się zmieniły.')
+        en.append('The run used the registered parameters, but the inputs of the filters changed.')
+    else:
+        pl.append('Przebieg użył dokładnie zarejestrowanych parametrów.')
+        en.append('The run used exactly the registered parameters.')
+    if changed:
+        pl.append('Zbiory zdarzeń wybrane przez zarejestrowane filtry zmieniły się od pierwszego przebiegu tej wersji '
+                  f'(run {drift["baseline_run_id"]}) wśród zdarzeń, które już wtedy istniały: {", ".join(changed)} '
+                  '(np. zmiana tagów, kategorii, czasu).')
+        en.append('The event sets selected by the registered filters changed since the first run of this version '
+                  f'(run {drift["baseline_run_id"]}) among events that already existed then: {", ".join(changed)} '
+                  '(e.g. tag, category or time edits).')
+    if edited:
+        pl.append(f'Po rejestracji zmieniono tagi użyte w filtrach ({edits.get("tag_edits", 0)}) lub korekty kategorii '
+                  f'({edits.get("category_corrections", 0)}).')
+        en.append(f'After registration, tags used by the filters were edited ({edits.get("tag_edits", 0)}) or category '
+                  f'corrections were added ({edits.get("category_corrections", 0)}).')
+    if new:
+        pl.append('Nowe zdarzenia od pierwszego przebiegu: ' + ', '.join(f'{k} {v}' for k, v in sorted(new.items())) + '.')
+        en.append('New events since the first run: ' + ', '.join(f'{k} {v}' for k, v in sorted(new.items())) + '.')
+    return _warning('preregistration_deviation', bool(deviations or changed or edited), 'high', ' '.join(pl),
+                    ' '.join(en), {'deviations': deviations, **drift})
+
+
+# ---------------------------------------------------------------- preregistration: selection drift
+
+def selection_record(loaded: dict, sets: dict[str, list[dict]]) -> dict:
+    """Fingerprints of the selected sets plus the largest event id this run could see."""
+    seen = [i['event_id'] for key in ('items', 'untimed', 'hidden_excluded') for i in loaded.get(key) or ()]
+    return {'max_event_id': max(seen, default=0),
+            'sets': {name: {'count': len(items), 'event_ids_sha256': sha256_canonical(sorted(i['event_id'] for i in items))}
+                     for name, items in sets.items()},
+            '_ids': {name: sorted(i['event_id'] for i in items) for name, items in sets.items()}}
+
+
+def selection_drift(selection: dict, baseline: dict | None, edits: dict | None) -> dict:
+    """Compare with the baseline run among events that existed then (``id <= its max_event_id``).
+
+    Identical inputs give an identical record (no run ids unless something changed), so a
+    re-run on unchanged data keeps the same result hash.
+    """
+    ids = selection.pop('_ids')
+    changed, new = [], {}
+    if baseline is not None:
+        limit = baseline['selection']['max_event_id']
+        for name, before in sorted(baseline['selection']['sets'].items()):
+            current = ids.get(name, [])
+            existing = [eid for eid in current if eid <= limit]
+            if sha256_canonical(existing) != before['event_ids_sha256']:
+                changed.append({'set': name, 'baseline_count': before['count'], 'count_among_existing_events': len(existing)})
+            if len(existing) != len(current):
+                new[name] = len(current) - len(existing)
+    record = {'changed_sets': changed, 'new_events_since_baseline': new,
+              'edits_after_registration': edits or {'tag_edits': 0, 'category_corrections': 0}}
+    if changed or new:
+        record['baseline_run_id'] = baseline['run_id']
+    return record
+
+
+TAG_ACTIONS = ('tag_bulk_add', 'tag_bulk_remove', 'tag_rename', 'tag_merge')
+
+
+def edits_after_registration(db: sqlite3.Connection, definition: dict, registered_at: str, event_ids: set[int]) -> dict:
+    """Tag edits touching a tag named in the filters and category corrections of loaded events after registration.
+
+    Audit timestamps have second resolution; an edit in the registration second counts.
+    """
+    names = {t for n in ('stimulus', 'outcome', 'density', 'eligible') for key in ('tags_any', 'tags_all')
+             for t in definition[n].get(key, ())}
+    tag_edits = 0
+    if names:
+        since = registered_at[:19].replace('T', ' ')
+        for row in db.execute('SELECT action, details_json FROM audit_log WHERE action IN (?,?,?,?) AND ts >= ? ORDER BY id',
+                              (*TAG_ACTIONS, since)):
+            try:
+                details = json.loads(row[1] or '{}')
+            except ValueError:
+                details = {}
+            touched = {details.get('tag'), details.get('old_name'), details.get('new_name'),
+                       (details.get('target') or {}).get('name')}
+            touched |= {d.get('name') for d in details.get('sources_deleted') or () if isinstance(d, dict)}
+            if row[0] in ('tag_bulk_add', 'tag_bulk_remove'):
+                changed = ((details.get('targets') or {}).get('event') or {}).get('changed') or []
+                if not changed:
+                    continue
+            if touched & names:
+                tag_edits += 1
+    corrections = 0
+    if any('categories' in definition[n] for n in ('stimulus', 'outcome', 'density', 'eligible')):
+        rows = db.execute('SELECT event_id FROM analysis_label_annotations WHERE substr(created_at, 1, 23) >= ?',
+                          (registered_at[:23],))
+        corrections = sum(1 for r in rows if r[0] in event_ids)
+    return {'tag_edits': tag_edits, 'category_corrections': corrections}
+
+
+def baseline_run(db: sqlite3.Connection, version_id: int) -> dict | None:
+    """The version's first event-study run that recorded selection fingerprints (method v2 and later)."""
+    row = db.execute("""SELECT id, json_extract(result_json, '$.selection') FROM hypothesis_runs
+                        WHERE hypothesis_version_id=? AND kind='event_study'
+                        AND json_extract(result_json, '$.selection') IS NOT NULL ORDER BY id LIMIT 1""",
+                     (version_id,)).fetchone()
+    return None if row is None else {'run_id': int(row[0]), 'selection': json.loads(row[1])}
 
 
 # ---------------------------------------------------------------- core computation
 
 def compute_event_study(definition: dict, params: dict, loaded: dict, *, fts: dict[str, set],
                         categories: dict[str, set], limits: EventStudyLimits = EventStudyLimits(),
-                        deviations: list | None = None, category_info: dict | None = None) -> tuple[dict, str, int]:
-    """Pure computation; returns ``(result_without_run_fields, input_sha256, input_count)``."""
+                        deviations: list | None = None, category_info: dict | None = None,
+                        baseline: dict | None = None, edits: dict | None = None) -> tuple[dict, str, int]:
+    """Pure computation; returns ``(result_without_run_fields, input_sha256, input_count)``.
+
+    ``baseline`` is ``{'run_id', 'selection'}`` of the version's first run that recorded
+    selection fingerprints (None for the first run); ``edits`` counts tag/label edits made
+    after registration (``edits_after_registration``). Both feed the preregistration check.
+    """
     deviations = deviations or []
     items = [dict(i, t_ms=round(i['t_start'] * 1000)) for i in loaded['items']]
     untimed = loaded['untimed']
@@ -494,7 +674,12 @@ def compute_event_study(definition: dict, params: dict, loaded: dict, *, fts: di
     dens_items = [i for i in selected['density']
                   if not (params['density_excludes_stimuli'] and i['event_id'] in stim_ids)
                   and not (params['density_excludes_outcomes'] and i['event_id'] in out_ids)]
-    elig_times = sorted({i['t_ms'] for i in selected['eligible']})
+    # Review 2 finding 1: a permuted stimulus borrows an eligible event's time and stands for that
+    # event. Outcome events are not eligible while self pairs are excluded (an observed stimulus is
+    # never its own outcome); a borrowed density event is discounted per draw (see _NullModel).
+    pool_items = [i for i in selected['eligible'] if not (params['exclude_self_pairs'] and i['event_id'] in out_ids)]
+    eligible = sorted((i['t_ms'], i['event_id']) for i in pool_items)
+    excluded_outcomes = len(selected['eligible']) - len(pool_items)
     S = sorted(i['t_ms'] for i in stim_items)
     O = sorted(i['t_ms'] for i in out_items)
     D = sorted(i['t_ms'] for i in dens_items)
@@ -505,7 +690,8 @@ def compute_event_study(definition: dict, params: dict, loaded: dict, *, fts: di
         'stimulus': sorted([i['event_id'], i['t_ms']] for i in stim_items),
         'outcome': sorted([i['event_id'], i['t_ms']] for i in out_items),
         'density': sorted([i['event_id'], i['t_ms']] for i in dens_items),
-        'eligible_times': elig_times, 'self_pairs_excluded': self_pairs if params['exclude_self_pairs'] else [],
+        'eligible_events': [[eid, t] for t, eid in eligible], 'eligible_excluded_outcomes': excluded_outcomes,
+        'self_pairs_excluded': self_pairs if params['exclude_self_pairs'] else [],
         'untimed': sorted([u['event_id'], u['reason']] for u in untimed), 'outside_span': outside,
         'imprecise': sorted(imprecise_ids), 'uncertainty_policy': [params['imprecise_times'], threshold],
         'source_rule': loaded.get('rule'), 'source_rule_sha256': loaded.get('rule_sha256', 'unknown'),
@@ -513,6 +699,9 @@ def compute_event_study(definition: dict, params: dict, loaded: dict, *, fts: di
     }
     input_sha256 = sha256_canonical(input_record)
     input_count = len(stim_items) + len(out_items) + len(dens_items)
+    selection = selection_record(loaded, {'stimulus': stim_items, 'outcome': out_items, 'density': dens_items,
+                                          'eligible': pool_items})
+    drift = selection_drift(selection, baseline, edits)
 
     windows_ms = [(w['start_s'] * 1000, w['end_s'] * 1000) for w in definition['windows']]
     lags = definition['lags']
@@ -544,7 +733,8 @@ def compute_event_study(definition: dict, params: dict, loaded: dict, *, fts: di
                                **_overlap(S, (w['end_s'] - w['start_s']) * 1000)} for w in definition['windows']]}
 
     base = {
-        'schema': RESULT_SCHEMA, 'disclaimer': disclaimer(), 'rng': RNG_ID, 'seed': params['seed'],
+        'schema': RESULT_SCHEMA, 'method': {'id': METHOD_ID, 'history': METHOD_HISTORY},
+        'disclaimer': disclaimer(), 'rng': RNG_ID, 'seed': params['seed'], 'selection': selection,
         'parameters': params, 'deviations_from_registration': deviations,
         'definition': {'windows': definition['windows'], 'lags': lags, 'direction': definition['direction'],
                        'stimulus': definition['stimulus'], 'outcome': definition['outcome'],
@@ -553,7 +743,9 @@ def compute_event_study(definition: dict, params: dict, loaded: dict, *, fts: di
             'input_sha256': input_sha256, 'rule': loaded['rule'], 'assume_zone': loaded.get('assume_zone'),
             'timed_events': len(items), 'outside_span': outside,
             'span': {'start_utc': _utc_text(t0), 'end_utc': _utc_text(t1)} if t1 > t0 else None,
-            'stimulus_count': len(S), 'outcome_count': len(O), 'density_count': len(D), 'eligible_times': len(elig_times),
+            'stimulus_count': len(S), 'outcome_count': len(O), 'density_count': len(D),
+            'eligible_events': len(eligible), 'eligible_times': len({t for t, _ in eligible}),
+            'eligible_excluded_outcomes': excluded_outcomes,
             'self_pairs': len(self_pairs), 'self_pairs_excluded': params['exclude_self_pairs'],
             'untimed_excluded': {'count': len(untimed), 'by_reason': dict(sorted(by_reason.items())),
                                  'event_ids': sorted(u['event_id'] for u in untimed)[:limits.max_listed_ids],
@@ -572,6 +764,7 @@ def compute_event_study(definition: dict, params: dict, loaded: dict, *, fts: di
            'seasonality': seasonality, 'clustering': clustering, 'null_model': params['null_model'],
            'untimed': base['input']['untimed_excluded'], 'assume_zone': loaded.get('assume_zone'),
            'outcome_cv': _cv(O), 'stimulus_cv': _cv(S), 'density_count': len(D), 'deviations': deviations,
+           'drift': drift,
            'weak_time_basis': sum(v for k, v in time_basis.items() if k in WEAK_TIME_KINDS), 'time_basis': time_basis,
            'uncertainty': uncertainty}
 
@@ -590,7 +783,9 @@ def compute_event_study(definition: dict, params: dict, loaded: dict, *, fts: di
         return base, input_sha256, input_count
 
     n = params['permutations']
-    work = n * len(S) * (4 * len(windows_ms) + len(edges_ms))
+    # The null loop plus the summaries: sorting and comparing n values per window, also for the
+    # normalized share (exact fractions, compared one by one; review 2 finding 9).
+    work = n * len(S) * (4 * len(windows_ms) + len(edges_ms)) + 2 * n * len(windows_ms) * (2 + n.bit_length())
     if work > limits.max_work:
         raise HypothesisError(f'event study work estimate {work} exceeds max_work {limits.max_work}; '
                               'reduce permutations or stimuli, or raise the limit explicitly')
@@ -598,8 +793,19 @@ def compute_event_study(definition: dict, params: dict, loaded: dict, *, fts: di
     if cells > limits.max_null_cells:
         raise HypothesisError(f'null distribution needs {cells} cells, above max_null_cells {limits.max_null_cells}')
 
+    if params['null_model'] in ('permutation', 'stratified_weekday_hour') and all(eid in stim_ids for _, eid in eligible):
+        raise HypothesisError(
+            f'{params["null_model"]} null: every eligible event is a stimulus (outcome events are not eligible while '
+            'exclude_self_pairs is on), so every permutation would reproduce the observed data; use circular_shift or '
+            'block_permutation, or let other documented events be eligible')
     rng = SplitMix64(params['seed'])
-    null = _NullModel(params['null_model'], S, t0, t1, elig_times, params['block_s'] * 1000, params['stratify_zone'], rng)
+    density_ids = frozenset(i['event_id'] for i in dens_items) if params['density_excludes_stimuli'] else frozenset()
+    null = _NullModel(params['null_model'], S, t0, t1, eligible, params['block_s'] * 1000, params['stratify_zone'], rng,
+                      density_ids=density_ids)
+    null.info.update({'eligible_selected': len(selected['eligible']), 'eligible_excluded_outcomes': excluded_outcomes,
+                      'borrowed_density_events_discounted': bool(density_ids) and params['null_model'] in
+                      ('permutation', 'stratified_weekday_hour')})
+    lag0 = [lo <= 0 < hi for lo, hi in windows_ms]
     observed_o = _window_counts(S, O, windows_ms)
     observed_d = _window_counts(S, D, windows_ms)
     observed_hist = _histogram(S, O, edges_ms)
@@ -607,11 +813,11 @@ def compute_event_study(definition: dict, params: dict, loaded: dict, *, fts: di
     null_d = [array('q') for _ in windows_ms]
     null_h = [array('q') for _ in range(nb)]
     for _ in range(n):
-        shifted = null.draw()
+        shifted, borrowed = null.draw()
         for index, value in enumerate(_window_counts(shifted, O, windows_ms)):
             null_o[index].append(value)
         for index, value in enumerate(_window_counts(shifted, D, windows_ms)):
-            null_d[index].append(value)
+            null_d[index].append(value - borrowed if lag0[index] else value)
         for index, value in enumerate(_histogram(shifted, O, edges_ms)):
             null_h[index].append(value)
 
@@ -622,7 +828,7 @@ def compute_event_study(definition: dict, params: dict, loaded: dict, *, fts: di
         lo, hi = windows_ms[index]
         obs = observed_o[index]
         naive = _summary(null_o[index], obs, direction)
-        naive_mean = sum(null_o[index]) / n
+        naive_mean = _mean(null_o[index])
         naive.update({
             'observed_per_stimulus': _round(obs / len(S)), 'null_mean_per_stimulus': _round(naive_mean / len(S)),
             'difference_per_stimulus': _round((obs - naive_mean) / len(S)),
@@ -641,15 +847,15 @@ def compute_event_study(definition: dict, params: dict, loaded: dict, *, fts: di
             null_shares = [v for v in (share(o, d) for o, d in zip(null_o[index], null_d[index])) if v is not None]
             if observed_share is not None and null_shares:
                 normalized = _summary(null_shares, observed_share, direction)
-                null_share_mean = sum(null_shares) / len(null_shares)
+                null_share_mean = _mean(null_shares)
                 normalized.update({
                     'statistic': 'sum(O_w) / sum(O_w + D_w)' if plus_outcomes else 'sum(O_w) / sum(D_w)',
                     'n_undefined': n - len(null_shares),
                     'global_share': _round(Fraction(n_o, n_o + n_d) if plus_outcomes else Fraction(n_o, n_d)),
-                    'share_difference': _round(observed_share - null_share_mean),
-                    'share_ratio': _round(observed_share / null_share_mean) if null_share_mean else None,
+                    'share_difference': _round(float(observed_share) - null_share_mean),
+                    'share_ratio': _round(float(observed_share) / null_share_mean) if null_share_mean else None,
                 })
-        d_mean = sum(null_d[index]) / n
+        d_mean = _mean(null_d[index])
         windows.append({
             'label': w['label'], 'start_s': w['start_s'], 'end_s': w['end_s'], 'naive': naive,
             'normalized': normalized if normalized else {'status': 'unavailable',
@@ -730,9 +936,11 @@ def run_event_study(db: sqlite3.Connection, version_id: int, *, overrides: dict 
     definition = version['definition']
     params, deviations = effective_parameters(definition, overrides)
     loaded, fts, categories, category_info = load_inputs(db, definition, params, limits=limits, category_config=category_config)
-    result, input_sha256, input_count = compute_event_study(definition, params, loaded, fts=fts, categories=categories,
-                                                            limits=limits, deviations=deviations,
-                                                            category_info=category_info)
+    loaded_ids = {i['event_id'] for i in loaded['items']}
+    result, input_sha256, input_count = compute_event_study(
+        definition, params, loaded, fts=fts, categories=categories, limits=limits, deviations=deviations,
+        category_info=category_info, baseline=baseline_run(db, version_id),
+        edits=edits_after_registration(db, definition, version['registered_at'], loaded_ids))
     result['hypothesis'] = {'hypothesis_id': version['hypothesis_id'], 'version_id': version['version_id'],
                             'version_number': version['version_number'], 'definition_sha256': version['definition_sha256'],
                             'registered_at': version['registered_at'], 'title': definition['title']}

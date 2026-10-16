@@ -1,0 +1,52 @@
+{
+  "schema": "ageds.validation-receipt",
+  "task": "AGEDS-TASK-20261016-B (part 2: communications, Takeout and media importers; track B2)",
+  "date": "2026-10-16",
+  "branch": "wt-B2",
+  "base_commit": "f09e8f7",
+  "git_head_tested": "de48eb415f414a8ff359f9a4d956cb83578f985e",
+  "head_note": "Code and tests at the tested head; the commit adding this receipt and docs/IMPORTERS_COMM.md changes documentation only.",
+  "environment": {
+    "python": "3.13.16",
+    "venv": "/home/user/wt/venv (shared, no new packages installed)",
+    "packages": {"fastapi": "0.116.1", "starlette": "0.47.3", "python-dateutil": "2.9.0.post0", "openpyxl": "3.1.5"},
+    "node": "v22.22.0",
+    "network_or_model_calls": "none"
+  },
+  "commands": [
+    "/home/user/wt/venv/bin/python -m pytest server/tests -q",
+    "/home/user/wt/venv/bin/python -m pytest server/tests/test_import_comm.py server/tests/test_import_comm_api.py -q",
+    "node --test server/tests/js/*.test.mjs",
+    "python3 scripts/verify_repository.py",
+    "uvicorn server.app.main:app (EW_DATA_DIR/EW_DB_PATH/EW_STORE_DIR/EW_SCAN_ROOTS in a scratch directory) + curl uploads/path import/occurrence projection",
+    "python -m server.app.cli <each of the 12 new commands> on a freshly generated corpus in a scratch directory"
+  ],
+  "results": {
+    "backend": {"passed": 485, "failed": 0, "subtests_passed": 588, "baseline_before_task": 434},
+    "new_tests": {"server/tests/test_import_comm.py": 47, "server/tests/test_import_comm_api.py": 4, "failed": 0},
+    "node": {"tests": 85, "passed": 85, "failed": 0, "note": "no JavaScript changed; run as regression check"},
+    "verify_repository": "passed (exit 0) with this receipt and docs/IMPORTERS_COMM.md present"
+  },
+  "runtime_executed": [
+    "CLI subprocesses (in tests): import-email, import-location-history with and without opt-in, observe-recording-names, import-ics with --max-records, missing input error",
+    "CLI manual run of all 12 commands on the synthetic corpus: exit 0 for imports, exit 2 with JSON error for DTD/entity calls.xml and for location/browser history without opt-in; corpus SHA-256 of all 34 files unchanged",
+    "Live uvicorn server: POST /api/imports/comm/email (6 messages, 2 attachments + inline), POST /ics (8 events), POST /location-history 403 without flag and 200 with flag, POST /whatsapp-export/path (present 1, missing 1, omitted 1), GET /calendar/{id}/occurrences (3 DST-shifted UTC instants)"
+  ],
+  "unit_tested_only": [
+    "API endpoints beyond the live smoke above were exercised through FastAPI TestClient (in-process)",
+    "RFC 5322 date table, RFC 2047 decoding, EXIF IFD loop/PNG eXIf, parent_artifact_id validation, append-only triggers"
+  ],
+  "not_run": [
+    "Real Gmail/Google Takeout/WhatsApp/operator exports (none available; synthetic corpus only)",
+    "Real call-recorder app file names (shipped patterns are labelled examples)",
+    "XLS (BIFF8) billing tables (reader reused from the scanner; no XLS fixture generated)",
+    "Android client, browser UI (no UI added)"
+  ],
+  "boundaries": [
+    "Shipped billing profiles, recording-name patterns, Takeout locale tables and WhatsApp marker patterns are examples, not verified against real exports",
+    "No correlation is written; recording/call, contact/participant and JSON/HTML activity matching are inputs for the timeline track",
+    "Location history stays coarse in metadata; exact coordinates remain only in the preserved original",
+    "Unknown RFC 5322 alphabetic zones are not converted to UTC (deliberate deviation, RFC reading kept as alternative)",
+    "Hash agreement (e.g. attachment == disk PDF) shows identical bytes only, not authorship or truth"
+  ]
+}

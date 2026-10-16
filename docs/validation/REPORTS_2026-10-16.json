@@ -1,0 +1,105 @@
+{
+  "task": "AGEDS-TASK-20261016-F",
+  "date": "2026-10-16",
+  "tested_git_head": "2b9b8d92984d05df7d30224ece9bb6466ac437fa",
+  "base": {
+    "branch": "wt-F",
+    "base_commit": "b468f52",
+    "merged": "ccr-d25c3cb3-qgbhql @ e1ce8d2 (track A integrated; fast-forward)"
+  },
+  "environment": {
+    "python": "3.13.16",
+    "fastapi": "0.116.1",
+    "jinja2": "3.1.6",
+    "openpyxl": "3.1.5",
+    "node": "v22.22.0",
+    "playwright": "1.62.1",
+    "chromium": "141.0.7390.37",
+    "chromium_executable": "/opt/pw-browsers/chromium-1194/chrome-linux/chrome (test environment path, not a dependency)"
+  },
+  "commands": [
+    {
+      "command": "/home/user/wt/venv/bin/python -m pytest server/tests -q",
+      "result": "750 passed, 1 skipped (pre-existing opt-in scale test), 680 subtests passed",
+      "exit": 0
+    },
+    {
+      "command": "/home/user/wt/venv/bin/python -m pytest server/tests/test_reports.py server/tests/test_reports_interfaces.py -q -rs",
+      "result": "31 passed, 0 skipped",
+      "exit": 0
+    },
+    {
+      "command": "node --test server/tests/js/*.test.mjs",
+      "result": "85 passed",
+      "exit": 0
+    },
+    {
+      "command": "EW_PDF_CHROMIUM=<chromium> NODE_PATH=<playwright> PYTHON=<venv python> AGEDS_BROWSER_EXECUTABLE=<chromium> node server/tests/browser/reports.cjs",
+      "result": "9 PASS (PDF requested from the form, written and downloaded)",
+      "exit": 0
+    },
+    {
+      "command": "NODE_PATH=<playwright> PYTHON=<venv python> AGEDS_BROWSER_EXECUTABLE=<chromium> node server/tests/browser/reports.cjs",
+      "result": "9 PASS (PDF not requested)",
+      "exit": 0
+    },
+    {
+      "command": "NODE_PATH=<playwright> PYTHON=<venv python> AGEDS_BROWSER_EXECUTABLE=<chromium> node server/tests/browser/acceptance.cjs",
+      "result": "24 PASS (existing suite, run after the reports UI was added)",
+      "exit": 0
+    },
+    {
+      "command": "python3 scripts/verify_repository.py",
+      "result": "ok after this receipt was added",
+      "exit": 0
+    }
+  ],
+  "browser_cases": [
+    "reports page lists forms for every type and an empty register",
+    "timeline link prefills the range on /reports/new",
+    "invalid naive time is refused with a visible error and no report",
+    "timeline report created from the form verifies and previews in a sandboxed frame",
+    "downloaded report.json matches the SHA-256 listed in the manifest table",
+    "lawyer package with a typed question previews; packet link navigates inside the frame",
+    "register lists both reports; earlier report remains after regeneration",
+    "tampering with a file blocks the preview and shows the mismatch",
+    "no page errors and no requests outside the local server"
+  ],
+  "runtime_executed": [
+    "report generation for all five types on a database built from synthetic corpus parts chat_exports (3 ChatGPT exports + Claude), communications (MBOX, calls.xml), catalog_files (two catalog scans) and planted hard cases",
+    "HTML/JSON cross-check: every data-k span equals its report.json value and no numeral occurs outside spans (all five types)",
+    "real subprocess CLI: report-create, report-list, report-verify (valid, tampered exit 1), refusals exit 2 (repository, scan root, unknown parameter), citation-bundle-export (--citation, --report), citation-bundle-inspect, citation-export byte identity",
+    "report-verify in a fresh process without importing server.app.config or server.app.db",
+    "standalone bundle consumer: python -I server/app/reports/bundle_consumer.py (valid; tampered packet exit 1)",
+    "PDF adapter: headless Chromium --print-to-pdf of report.html (pytest and browser run); unavailable path recorded when EW_PDF_CHROMIUM is unset",
+    "XLSX via openpyxl: formula text kept as string cell (data_type 's'); control character escaped and counted",
+    "HTTP: TestClient for /api/reports*, /reports pages, /reports/{id}/files|view|manifest, /api/read/v1/reports with a token",
+    "real Chromium: /reports forms, /reports/new prefill, sandboxed preview without script execution, packet link inside the frame, download hash = manifest, tamper → invalid + preview blocked + 409",
+    "metadata package with extension_tables: export, validation, tamper detection, inert archive byte-exact roundtrip, undeclared table named not exported",
+    "scale probe (scratch script, synthetic): 20,000 events → timeline report in 4.3 s, verify 0.3 s, 24 files, 15.3 MB, max RSS 149 MB; chronology section 'partial' at max_rows=2000 as designed"
+  ],
+  "unit_tested_only": [
+    "provider registry override (register/unregister) and contract validation",
+    "generic adapter for upstream dicts (C/E1/E2 results) — exercised with a synthetic dict, not with real C/E1/E2 output",
+    "model-prose numeral refusal (no model-written prose exists in this revision)"
+  ],
+  "not_run": [
+    "timeline projection of area C, time-budget runs of E1, hypothesis dossiers/event studies of E2 (modules not present on this head; sections are explicitly 'unavailable' or the seam fallback)",
+    "any LLM or external provider call (none exists in reports)",
+    "PDF layout review of very wide tables",
+    "Android (not changed)"
+  ],
+  "boundaries": [
+    "Manifest and report hashes detect change; they are not signatures and do not authenticate the producer.",
+    "Numbers are computed from the rows listed in method.inputs at generation time; later database changes are not reflected in an existing report.",
+    "Catalog coverage and the chat dedup report are read through their public functions in separate read transactions (recorded per section).",
+    "CSV text cells are guarded with an apostrophe (apostrophe_prefix_v1); exact values are in report.json, HTML and XLSX."
+  ],
+  "shared_edits": [
+    "server/app/integrations/read_api.py: read_reports() stub replaced by the register listing (output paths withheld); REPORTS_LIST_LIMIT constant",
+    "server/tests/test_integrations_read_api.py: stub test replaced by test_reports_listing_is_explicit",
+    "docs/READ_API.md: reports route row, JSON schema, extension-table note",
+    "server/app/packages.py: additive extension_tables section (export + validation); core format unchanged",
+    "docs/README.md and docs/validation/README.md: one index line each"
+  ]
+}

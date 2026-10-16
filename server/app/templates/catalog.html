@@ -45,8 +45,8 @@
     <button>Zapisz (poprzednie wartości trafiają do historii)</button>
   </form>
   <details><summary>Historia zmian ({{selected.history|length}})</summary><ul class="catalog-history">{% for h in selected.history %}<li><small>{{h.ts}} · {{h.actor}} · {{h.action}}</small> <code>{{h.details|tojson}}</code></li>{% endfor %}</ul></details>
-  <details><summary>Skany ({{scans|length}})</summary><table><tr><th>ID</th><th>status</th><th>bieżący</th><th>start</th><th>koniec</th><th>niekompletne</th></tr>
-  {% for s in scans %}<tr><td>{{s.id}}</td><td>{{s.status}}</td><td>{{'tak' if s.current else 'nie'}}</td><td>{{s.started_at}}</td><td>{{s.finished_at or ''}}</td><td><code>{{s.coverage.incomplete_reasons|tojson if s.coverage else ''}}</code></td></tr>{% endfor %}</table></details>
+  <details><summary>Skany ({{scans|length}})</summary><div class="catalog-scroll"><table><tr><th>ID</th><th>status</th><th>bieżący</th><th>start</th><th>koniec</th><th>niekompletne</th></tr>
+  {% for s in scans %}<tr><td>{{s.id}}</td><td>{{s.status}}</td><td>{{'tak' if s.current else 'nie'}}</td><td>{{s.started_at}}</td><td>{{s.finished_at or ''}}</td><td><code>{{s.coverage.incomplete_reasons|tojson if s.coverage else ''}}</code></td></tr>{% endfor %}</table></div></details>
 </section>
 {% if coverage %}
 <section class="panel" aria-labelledby="coverage-title">
@@ -110,11 +110,11 @@
 </section>
 <div class="catalog-pair">
 <section class="panel" aria-labelledby="groups-title"><h2 id="groups-title">Te same bajty w wielu miejscach</h2>
-  <table><tr><th>grupa</th><th>sha256</th><th>wpisy</th><th>kolekcje</th><th>artefakty</th></tr>
-  {% for g in groups %}<tr><td><a href="{{ query(group=g.id, after=None) }}">#{{g.id}}</a></td><td><code>{{g.sha256[:16]}}</code></td><td>{{g.entries}}</td><td>{{g.collections}}</td><td>{{g.artifacts}}</td></tr>{% else %}<tr><td colspan="5">Brak.</td></tr>{% endfor %}</table></section>
+  <div class="catalog-scroll"><table><tr><th>grupa</th><th>sha256</th><th>wpisy</th><th>kolekcje</th><th>artefakty</th></tr>
+  {% for g in groups %}<tr><td><a href="{{ query(group=g.id, after=None) }}">#{{g.id}}</a></td><td><code>{{g.sha256[:16]}}</code></td><td>{{g.entries}}</td><td>{{g.collections}}</td><td>{{g.artifacts}}</td></tr>{% else %}<tr><td colspan="5">Brak.</td></tr>{% endfor %}</table></div></section>
 <section class="panel" aria-labelledby="collisions-title"><h2 id="collisions-title">Kolizje nazw (różne bajty)</h2>
-  <table><tr><th>nazwa</th><th>warianty</th><th>lokatory</th></tr>
-  {% for c in collisions %}<tr><td>{{c.name}}</td><td>{{c.variants}}</td><td>{% for l in c.locations %}<div><code>{{l.locator}}</code></div>{% endfor %}</td></tr>{% else %}<tr><td colspan="3">Brak.</td></tr>{% endfor %}</table></section>
+  <div class="catalog-scroll"><table><tr><th>nazwa</th><th>warianty</th><th>lokatory</th></tr>
+  {% for c in collisions %}<tr><td>{{c.name}}</td><td>{{c.variants}}</td><td>{% for l in c.locations %}<div><code>{{l.locator}}</code></div>{% endfor %}</td></tr>{% else %}<tr><td colspan="3">Brak.</td></tr>{% endfor %}</table></div></section>
 </div>
 </div>
 </div>

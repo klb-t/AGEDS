@@ -8,7 +8,17 @@ from __future__ import annotations
 
 import importlib
 
-COMMAND_MODULES = ('catalog', 'timeline', 'media', 'analysis', 'reports', 'integrations', 'workbench', 'imports_chat')
+COMMAND_MODULES = (
+    'catalog',
+    'timeline',
+    'media',
+    'analysis',
+    'reports',
+    'integrations',
+    'workbench',
+    'imports_chat',
+    'imports_comm',
+)
 
 
 def _modules():

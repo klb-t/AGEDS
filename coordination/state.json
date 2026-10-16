@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "AGEDS",
   "state_id": "AGEDS-STATE-20261016-001",
-  "updated_at": "2026-10-16T18:41:16.718342+00:00",
+  "updated_at": "2026-10-16T19:06:07.754679+00:00",
   "based_on_remote_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
   "local_branch": "ccr-d25c3cb3-qgbhql",
   "status_summary": "Evidence Timeline & Analysis increment started on 9c1d513: Etap 0 report and F0 extension foundation; parallel tracks A-H claimed with disjoint file scopes.",
@@ -164,7 +164,7 @@
     {
       "id": "AGEDS-TASK-20261016-A",
       "owner": "catalog",
-      "status": "claimed",
+      "status": "accepted",
       "scope": [
         "server/app/catalog/",
         "server/app/schema/catalog.py",
@@ -180,12 +180,33 @@
       "acceptance": [
         "Nested zip/tar virtual locators, signature-over-extension, content dedup with all observations, coverage gaps, sidecar hypotheses, originals unchanged."
       ],
-      "result_refs": []
+      "result_refs": [
+        "docs/CATALOG.md",
+        "docs/validation/CATALOG_2026-10-16.json"
+      ],
+      "results": {
+        "backend_after_merge": "718 passed, 1 skipped, 680 subtests",
+        "catalog_tests": 108,
+        "browser": "real Chromium 141 page test (catalog)",
+        "originals_unchanged": "tree hash identical before/after scan/export/describe/ingest"
+      },
+      "decisions": [
+        "scan observations stored separately from acquisitions (AGENTS.md wins over prompt wording)",
+        "coverage_report() plain-dict contract for reports"
+      ],
+      "coordinator_followup": "CSV export formula guard (apostrophe_prefix_v1); XLSX already forced string cells",
+      "not_done": [
+        "7z/RAR adapters not executed (py7zr/rarfile absent)",
+        "no large real roots/performance",
+        "HTTP scan synchronous",
+        "abandoned running scan has no close command",
+        "no node unit tests for catalog.mjs"
+      ]
     },
     {
       "id": "AGEDS-TASK-20261016-B",
       "owner": "importers",
-      "status": "in_progress",
+      "status": "accepted",
       "scope": [
         "server/app/importers/ (new files)",
         "server/app/importers/data/",
@@ -223,14 +244,40 @@
           ]
         },
         "B2_comm": {
-          "status": "claimed"
+          "status": "accepted",
+          "integrated_commit": "merge of wt-B2 de29aaf",
+          "result_refs": [
+            "docs/IMPORTERS_COMM.md",
+            "docs/validation/IMPORT_COMM_2026-10-16.json"
+          ],
+          "results": {
+            "backend_after_merge": "610 passed, 1 skipped, 680 subtests",
+            "cli_runtime": "12 commands, 14 import runs exit 0, 4 refusals exit 2, 34 corpus files hashes unchanged"
+          },
+          "shared_edits": [
+            "evidence.ingest_file(parent_artifact_id=None)",
+            "records.py COMM_MIGRATIONS 25-27",
+            "imports_comm registration"
+          ],
+          "deviations": [
+            "alphabetic email zones (CET) not converted; RFC 5322 -0000 reading kept as alternative",
+            "ICS TZID stored as explicit_offset + zone_declaration",
+            "ts_start/ts_end filled only when UTC instant fixed"
+          ],
+          "not_done": [
+            "correlations (track C)",
+            "XLS billing",
+            "PNG tEXt",
+            "TNEF/uuencode",
+            "UI"
+          ]
         }
       }
     },
     {
       "id": "AGEDS-TASK-20261016-C",
       "owner": "timeline",
-      "status": "claimed",
+      "status": "accepted",
       "scope": [
         "server/app/timeline/",
         "server/app/schema/timeline.py",
@@ -247,7 +294,24 @@
       "acceptance": [
         "Versioned display rule, revocable correlation hypotheses, paginated filtered API keeping old shape, virtualized swimlanes."
       ],
-      "result_refs": []
+      "result_refs": [
+        "docs/TIMELINE.md",
+        "docs/validation/TIMELINE_2026-10-16.json"
+      ],
+      "results": {
+        "backend_after_merge": "763 passed, 1 skipped",
+        "js": 95,
+        "browser": "timeline.cjs 7/7 at 5k and 200k events; acceptance.cjs 24 PASS",
+        "perf_200k": {
+          "first_build_s": 10.7,
+          "incremental_1000_s": 0.15,
+          "density_s": "0.27-0.35",
+          "day_window_ms": 40,
+          "first_render_ms": 606
+        }
+      },
+      "behaviour_change": "/api/timeline ordered by projected time desc, undated last by id (no created_at)",
+      "coordinator_followup": "dashboard list and /export/events.csv use projected order; events.csv formula guard apostrophe_prefix_v1"
     },
     {
       "id": "AGEDS-TASK-20261016-D",

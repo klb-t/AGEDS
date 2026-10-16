@@ -154,7 +154,7 @@ def duplicate_keys(value) -> list[str]:
     return []
 
 
-_TOKEN = re.compile(rb'"[^"\\]*(?:\\.[^"\\]*)*"|[\[\]{}]')
+_TOKEN = re.compile(rb'"[^"\\]*(?:\\.[^"\\]*)*"|[\[\]{}]', re.DOTALL)
 _NONWS = re.compile(rb'\S')
 _NONSEP = re.compile(rb'[^\s,]')
 _ITEM = re.compile(rb'[^\s,]+')
@@ -491,6 +491,8 @@ def time_candidate(kind: str, value, source: str, *, formats: list[str], zero_is
             numeric = bool(re.fullmatch(r'\s*-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?\s*', value))
         except ValueError:
             numeric = False
+    if meta.get('raw_truncated'):
+        numeric = False  # never interpret a shortened spelling
     if 'epoch_seconds' in formats and numeric:
         try:
             if zero_is_placeholder and float(raw) == 0:
@@ -499,7 +501,7 @@ def time_candidate(kind: str, value, source: str, *, formats: list[str], zero_is
             return from_epoch(kind, raw.strip(), source, metadata={**meta, 'parse_status': 'parsed', 'format': 'epoch_seconds'})
         except (ValueError, OverflowError, OSError):
             pass
-    if 'iso8601' in formats and isinstance(value, str):
+    if 'iso8601' in formats and isinstance(value, str) and not meta.get('raw_truncated'):
         try:
             return from_iso(kind, value, source, metadata={**meta, 'parse_status': 'parsed', 'format': 'iso8601'})
         except (ValueError, OverflowError):
@@ -853,11 +855,12 @@ def write_plan(plan: ConversationPlan, ctx: FileContext, export_id: int, index: 
 
 # --- Raw recovery ---------------------------------------------------------------------
 
-def read_raw(stored_path: Path | str, byte_range: list[int], pointer: str):
+def read_raw(stored_path: Path | str, byte_range: list[int], pointer: str, duplicate_index: int = 0):
     """Recover the raw JSON value an event was parsed from (exact stored bytes).
 
-    ``pointer`` is relative to the element; a ``#dupN`` suffix selects the N-th
-    later duplicate of the final key. Returns MISSING if it cannot be found.
+    ``pointer`` is relative to the element (``locator.element_pointer``);
+    ``duplicate_index`` (``locator.duplicate_index``) selects the N-th later
+    duplicate of the pointer's final key. Returns MISSING if it cannot be found.
     """
     start, end = byte_range
     with open(stored_path, 'rb') as handle:
@@ -867,20 +870,14 @@ def read_raw(stored_path: Path | str, byte_range: list[int], pointer: str):
         value = loads(data)
     except UnicodeDecodeError:
         value = loads(data.decode('utf-8', errors='replace'))
-    duplicate = 0
-    if '#dup' in pointer:
-        pointer, _, number = pointer.rpartition('#dup')
-        duplicate = int(number)
     tokens = _tokens(pointer)
     current = value
     for position, token in enumerate(tokens):
         last = position == len(tokens) - 1
         if isinstance(current, dict):
-            if last and duplicate:
-                matches = [v for k, v in (current.duplicates or []) if k == token]
-                if len(matches) < duplicate:
-                    return MISSING
-                return matches[duplicate - 1]
+            if last and duplicate_index:
+                matches = [v for k, v in (getattr(current, 'duplicates', None) or []) if k == token]
+                return matches[duplicate_index - 1] if len(matches) >= duplicate_index else MISSING
             if token not in current:
                 return MISSING
             current = current[token]
@@ -926,6 +923,24 @@ class ImportRun:
                                            shard_index=None, file_name=item.name)
         self._attachments[item.locator] = artifact_id
         return artifact_id
+
+
+RELEASE_STEP = 16 * 1024 * 1024
+
+
+def _release_pages(buf, upto: int, released: int) -> int:
+    """Drop already-scanned file-backed pages from residency (Linux MADV_DONTNEED).
+
+    The element's bytes were copied before this call; the mapping is read-only,
+    so a later access would simply fault the page in again from the file.
+    """
+    if buf is None or not hasattr(mmap, 'MADV_DONTNEED'):
+        return released
+    aligned = (upto // mmap.PAGESIZE) * mmap.PAGESIZE
+    if aligned - released < RELEASE_STEP:
+        return released
+    buf.madvise(mmap.MADV_DONTNEED, released, aligned - released)
+    return aligned
 
 
 def _coverage(codes: set[str]) -> str:
@@ -1008,9 +1023,11 @@ def run_import(paths: list[Path], *, mapping: ExportMapping, planner: Planner, p
                 elements = iter_array_elements(buf, max_element_bytes=limits.max_conversation_bytes,
                                                max_elements=limits.max_conversations_per_file,
                                                issues=issues, file_label=item.name)
+            released = 0
             try:
                 for element in elements:
                     stats['elements'] += 1
+                    released = _release_pages(buf, element.end, released)
                     if element.status != 'ok':
                         continue
                     value = decode_element(element, issues, f'{item.name}#/{element.index}')

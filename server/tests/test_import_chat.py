@@ -281,7 +281,7 @@ def test_edge_nodes_cycles_and_unknown_types_do_not_crash(corpus, store):
     assert [e['meta']['locator']['duplicate_index'] for e in dup] == [0, 1]
     stored = rows('SELECT stored_path FROM artifacts WHERE id=?', dup[1]['artifact_id'])[0]['stored_path']
     loc = dup[1]['meta']['locator']
-    second = chat_common.read_raw(stored, loc['element_byte_range'], loc['element_pointer'] + '#dup1')
+    second = chat_common.read_raw(stored, loc['element_byte_range'], loc['element_pointer'], loc['duplicate_index'])
     assert second['message']['content']['parts'] == ['second copy in file order']
     # The repeated conversation in one file is a second occurrence in the same export.
     interpretation = the_interpretation(dedup_report(namespace='chatgpt', conversation_id='edge-cycle'))

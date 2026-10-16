@@ -257,6 +257,7 @@ trusted/private network.
 | Document containers not expanded by default. | A user needs their embedded media catalogued (`--expand-document-containers`). |
 | Display unflagged valid UTF-8 ZIP names as UTF-8 (cp437 kept as alternative). | A corpus shows real cp437 names that happen to be valid UTF-8. |
 | HTTP scans are synchronous. | Real roots make requests time out; then move scans to the job queue. |
+| Each catalog write (entry with its times, issue, entry update) is its own short transaction on a `synchronous=NORMAL` WAL connection; no write lock is held while content is read or hashed (review finding 4; measured: 5,000 small files 1.1 s → 2.2 s). Entries of a running scan become visible as they are written; they stay immutable once the scan finishes. | Commit cost dominates on real roots; then buffer rows read-ahead and write them in short batches after reading. |
 | CSV keeps raw text (no formula guard prefix). | Users open CSV directly in spreadsheet software and need the guard; XLSX is the safe default meanwhile. |
 
 ## Not done / not verified

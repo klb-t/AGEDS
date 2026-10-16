@@ -22,6 +22,7 @@ FLAG_KEYS = ('dst', 'utc_alternatives', 'date_order_ambiguous', 'ampm_ambiguous'
 BASIS_RANK = {'explicit_offset': 0, 'utc_epoch': 1, 'assumed_zone': 2, 'assumed_zone_operator': 2,
               'local_as_utc_unknown_zone': 3}
 _PHONE_LIKE = re.compile(r'^\+?[0-9 ().\-]{3,40}$')
+_SEPARATORS = re.compile(r'[ ().\-]')
 
 
 @dataclass
@@ -259,8 +260,7 @@ def select(candidates: list[Candidate], item_type: str, rule: Rule, params: dict
         eligible = placement is not None
         if eligible and c.origin == 'derived_legacy' and stored_usable:
             eligible, reason = False, 'stored_candidate_present'
-        entry = {'ref': c.ref, 'eligible': eligible, 'reason': reason,
-                 'placement': placement.as_dict() if placement else None}
+        entry = {'ref': c.ref, 'eligible': eligible, 'reason': reason, 'placement': placement}
         evaluations.append(entry)
         if not eligible:
             continue
@@ -294,8 +294,10 @@ def lane_key(value) -> str | None:
     text = str(value).strip()
     if not text:
         return None
-    if _PHONE_LIKE.match(text) and sum(ch.isdigit() for ch in text) >= 3:
-        return re.sub(r'[ ().\-]', '', text)
+    if _PHONE_LIKE.match(text):
+        compact = _SEPARATORS.sub('', text)
+        if len(compact.lstrip('+')) >= 3:
+            return compact
     return text[:500]
 
 

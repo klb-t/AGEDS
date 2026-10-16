@@ -260,7 +260,8 @@ def _candidate_payload(selection: dict) -> list[dict]:
         entry['eligible'] = evaluation.get('eligible', False)
         entry['not_eligible_reason'] = evaluation.get('reason')
         entry['selected'] = evaluation.get('selected', False)
-        entry['placement'] = evaluation.get('placement')
+        placement = evaluation.get('placement')
+        entry['placement'] = placement.as_dict() if placement is not None else None
         out.append(entry)
     return out
 

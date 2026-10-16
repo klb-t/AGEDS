@@ -106,6 +106,55 @@ def _wav_duration(db: sqlite3.Connection, artifact_id: int, cache: dict) -> floa
     return duration
 
 
+def _describe(db: sqlite3.Connection, e: sqlite3.Row, fields: bool) -> dict:
+    """Item keys that do not depend on the time choice."""
+    metadata = json.loads(e['metadata_json'] or '{}')
+    chat = metadata.get('chat') if isinstance(metadata.get('chat'), dict) else {}
+    tags = [r[0] for r in db.execute('SELECT t.name FROM event_tags et JOIN tags t ON t.id=et.tag_id WHERE et.event_id=? ORDER BY t.name', (e['id'],))]
+    declared = _confirmed_duration(metadata)
+    item = {
+        'event_id': e['id'], 'event_type': e['event_type'], 'source_id': e['source_id'],
+        'artifact_id': e['artifact_id'], 'collection_id': e['collection_id'], 'thread_id': e['thread_id'],
+        'counterparty': e['contact_label'] or e['phone_or_address'], 'chatbot': chat.get('chatbot'),
+        'direction': e['direction'],
+        'text_chars': len(e['body']) if e['body'] is not None else None, 'tags': tags,
+        'chat': {'role': chat.get('role'), 'content_kind': chat.get('content_kind'), 'hidden': chat.get('hidden'),
+                 'conversation_id': chat.get('conversation_id'), 'model': chat.get('model')} if chat else None,
+        'declared_duration_s': declared,
+        'duration_basis': 'source_declared' if declared is not None else None,
+    }
+    if fields:
+        body = e['body']
+        item['fields'] = {'sender': e['sender'], 'recipients': e['recipients'], 'subject': e['subject'],
+                          'contact_label': e['contact_label'], 'phone_or_address': e['phone_or_address'],
+                          'body': body[:FIELD_BODY_CHARS] if body is not None else None,
+                          'body_truncated': body is not None and len(body) > FIELD_BODY_CHARS}
+    return item
+
+
+_EVENT_SQL = ('SELECT e.*, (SELECT o.collection_id FROM source_observations o WHERE o.artifact_id=e.artifact_id '
+              'ORDER BY o.id LIMIT 1) AS collection_id FROM events e')
+
+
+def event_item(db: sqlite3.Connection, event_id: int, *, assume_zone: str | None = None) -> dict:
+    """One event as an item with ``fields``; time keys are None and ``untimed_reason`` set when not placeable."""
+    db.row_factory = sqlite3.Row
+    e = db.execute(_EVENT_SQL + ' WHERE e.id=?', (event_id,)).fetchone()
+    if e is None:
+        raise LookupError(f'event {event_id} not found')
+    times = db.execute('SELECT * FROM event_times WHERE event_id=? ORDER BY id', (event_id,)).fetchall()
+    chosen = _choose_time(times, e['ts_start'], e['ts_end'], assume_zone)
+    item = _describe(db, e, True)
+    start, end = chosen['start'], chosen['end']
+    t0 = _epoch(start.utc) if start else None
+    t1 = _epoch(end.utc) if start and end else None
+    item.update({'t_start': t0, 't_end': t1 if t1 is not None and t1 >= t0 else None,
+                 'time_basis': {'kind': start.kind, 'tz_status': start.tz_status, 'source': start.source,
+                                'precision': start.precision, 'assumed_zone': start.metadata.get('assumed_zone')}
+                 if start else None, 'untimed_reason': chosen['reason'], 'rule': RULE_ID})
+    return item
+
+
 def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc: str | None = None,
                event_types: tuple[str, ...] | list[str] | None = None, assume_zone: str | None = None,
                limit: int = 1_000_000, fields: bool = False, media_durations: bool = False) -> dict:
@@ -128,8 +177,7 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
     if event_types:
         where.append('e.event_type IN (%s)' % ','.join('?' * len(event_types)))
         args.extend(event_types)
-    sql = ('SELECT e.*, (SELECT o.collection_id FROM source_observations o WHERE o.artifact_id=e.artifact_id '
-           'ORDER BY o.id LIMIT 1) AS collection_id FROM events e')
+    sql = _EVENT_SQL
     if where:
         sql += ' WHERE ' + ' AND '.join(where)
     sql += ' ORDER BY e.id LIMIT ?'
@@ -151,34 +199,18 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
             t1 = None
         if (lo is not None and (t1 or t0) < lo) or (hi is not None and t0 >= hi):
             continue
-        metadata = json.loads(e['metadata_json'] or '{}')
-        chat = metadata.get('chat') if isinstance(metadata.get('chat'), dict) else {}
-        tags = [r[0] for r in db.execute('SELECT t.name FROM event_tags et JOIN tags t ON t.id=et.tag_id WHERE et.event_id=? ORDER BY t.name', (e['id'],))]
         end = chosen['end'] if t1 is not None else None
-        item = {
-            'event_id': e['id'], 'event_type': e['event_type'], 'source_id': e['source_id'],
-            'artifact_id': e['artifact_id'], 'collection_id': e['collection_id'], 'thread_id': e['thread_id'],
-            'counterparty': e['contact_label'] or e['phone_or_address'], 'chatbot': chat.get('chatbot'),
-            'direction': e['direction'], 't_start': t0, 't_end': t1,
+        item = _describe(db, e, fields)
+        item.update({
+            't_start': t0, 't_end': t1,
             'time_basis': {'kind': start.kind, 'tz_status': start.tz_status, 'source': start.source,
                            'precision': start.precision, 'assumed_zone': start.metadata.get('assumed_zone')},
-            'text_chars': len(e['body']) if e['body'] is not None else None, 'tags': tags,
-            'chat': {'role': chat.get('role'), 'content_kind': chat.get('content_kind'), 'hidden': chat.get('hidden'),
-                     'conversation_id': chat.get('conversation_id'), 'model': chat.get('model')} if chat else None,
             'end_basis': {'kind': end.kind, 'source': end.source, 'tz_status': end.tz_status} if end else None,
-            'declared_duration_s': _confirmed_duration(metadata),
-            'duration_basis': 'source_declared' if _confirmed_duration(metadata) is not None else None,
-        }
+        })
         if item['declared_duration_s'] is None and t1 is None and media_durations and e['artifact_id']:
             wav = _wav_duration(db, e['artifact_id'], wav_cache)
             if wav is not None:
                 item['declared_duration_s'], item['duration_basis'] = wav, 'wav_header_declared'
-        if fields:
-            body = e['body']
-            item['fields'] = {'sender': e['sender'], 'recipients': e['recipients'], 'subject': e['subject'],
-                              'contact_label': e['contact_label'], 'phone_or_address': e['phone_or_address'],
-                              'body': body[:FIELD_BODY_CHARS] if body is not None else None,
-                              'body_truncated': body is not None and len(body) > FIELD_BODY_CHARS}
         items.append(item)
     items.sort(key=lambda i: (i['t_start'], i['event_id']))
     return {'rule': RULE_ID, 'assume_zone': assume_zone, 'items': items, 'untimed': untimed, 'truncated': truncated}

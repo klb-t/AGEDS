@@ -628,10 +628,10 @@ def run_catalog_scan(root: str | Path, collection_id: int, *, limits: CatalogLim
         root_kind = 'file'
     else:
         raise ValueError('Source root must be a directory or a regular file')
-    temp_root = Path(temp_dir or tempfile.gettempdir()).resolve()
-    temp_root.mkdir(parents=True, exist_ok=True)
+    temp_root = Path(temp_dir or tempfile.gettempdir()).expanduser().resolve(strict=False)
     scan_root = source if root_kind == 'directory' else source.parent
-    _validate_paths(source, temp_root)
+    _validate_paths(source, temp_root)  # before creating anything
+    temp_root.mkdir(parents=True, exist_ok=True)
     with closing(dbmod.connect()) as db:
         collection = db.execute('SELECT id, case_id FROM collections WHERE id=?', (collection_id,)).fetchone()
         if collection is None:

@@ -104,7 +104,9 @@ def _frame_sync(prefix: bytes, at: int = 0) -> str | None:
         return 'aac' if (prefix[at + 1] & 0xF6) == 0xF0 and ((prefix[at + 2] >> 2) & 0xF) < 13 else None
     bitrate = prefix[at + 2] >> 4
     rate = (prefix[at + 2] >> 2) & 3
-    if version_bits == 1 or bitrate in (0, 15) or rate == 3:
+    # Only Layer III is reported as mp3; Layer I/II sync patterns also occur in
+    # other data (for example the UTF-16 BOM FF FE), so they stay unrecognized.
+    if version_bits == 1 or layer != 1 or bitrate in (0, 15) or rate == 3:
         return None
     return 'mp3'
 
@@ -193,6 +195,8 @@ def sniff(prefix: bytes, *, complete: bool = False) -> Sniff:
                 found = Sniff(rule['type'], 'signature', rule['id'], details={'header_offset': position})
                 return found
         elif rule.get('frame_sync'):
+            if prefix.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE, codecs.BOM_UTF8)):
+                continue  # a byte-order mark is text evidence, not an audio frame
             kind = _frame_sync(prefix)
             if kind:
                 return Sniff(kind, 'signature', rule['id'])

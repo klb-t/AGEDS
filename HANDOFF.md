@@ -1,86 +1,74 @@
 # AGEDS — current handoff
 
-Recovery and repository cleanup: **2026-10-02**. Read
-[CLAUDE.md](CLAUDE.md), [current coordination](coordination/state.json) and
-[validation index](docs/validation/README.md) before continuing.
+State: **2026-10-16**, branch `ccr-d25c3cb3-qgbhql` (draft PR #6), based on `main`
+@ `9c1d513`. Read [CLAUDE.md](CLAUDE.md), [current coordination](coordination/state.json),
+the [increment plan](docs/plans/EVIDENCE_TIMELINE_2026-10-16.md) and the
+[validation index](docs/validation/README.md) before continuing. The previous
+handoff (2026-10-02 recovery) is preserved in Git history at `9c1d513`.
 
-The earlier PR #4 line is preserved at `b6abe86`; it contains 49 commits beyond
-the previously published main `8c3efb9`. The foundation branch is already
-integrated. The standalone branch's functional changes were incorporated by
-`1e71cf8`; it needs no duplicate cherry-pick. Keep these branches as history.
-Merged into `main` through PR #5 (`b861757`). The checked source tree is
-unchanged by the merge. [Publication mapping](coordination/publication-20261002.json)
-resolves local commit IDs in receipts to their published equivalents.
-Current publication status is recorded in `coordination/state.json`.
+## What this increment added
 
-## Implemented workflow
+Work ran as parallel tracks with disjoint file scopes, integrated sequentially.
+Each area owns its migrations (reserved version ranges), router, CLI module,
+templates and corpus part through the registries in
+`server/app/{schema,api,commands}/__init__.py` and `server/tests/corpus/__init__.py`.
 
-| Stage | Behavior |
+| Stage | Behavior | Contract |
+|---|---|---|
+| Catalog | Collections per device/account/export; read-only scans through nested ZIP/TAR with virtual locators (`a.zip!/b.zip!/c`); byte signatures over extensions; content groups by SHA-256 with every observation; collisions; coverage with per-basis ranges and gaps; profile → explain → promote descriptions (model output only as hypotheses). | [CATALOG](docs/CATALOG.md) |
+| Import plan | Detectors propose importers for catalogued files and archive members; ambiguous items need a human choice, opt-ins stay off; idempotent, resumable runs with verified materialization outside source roots. | [IMPORT_PLAN](docs/IMPORT_PLAN.md) |
+| Importers | ChatGPT (tree, shards) and Claude.ai with logical identity across exports; MBOX/EML, ICS, VCF, call logs, billing profiles, recording-name hypotheses, Takeout activity, opt-in location/browser history, WhatsApp media, EXIF. | [chat](docs/IMPORTERS_CHAT.md), [communications](docs/IMPORTERS_COMM.md) |
+| Time | `event_times` keeps every observed time with kind, zone status and precision; unknown zones stay unknown; DST folds/gaps are reported. | [plan §5](docs/plans/EVIDENCE_TIMELINE_2026-10-16.md), [timeline](docs/TIMELINE.md) |
+| Timeline | Versioned display rule with uncertainty intervals, undated list, transcript segments, swimlanes, density, bookmarks; correlation hypotheses with reviewed status. | [TIMELINE](docs/TIMELINE.md) |
+| Media | ASR recipes pinned to jobs; per-segment language strategy (allowed languages, e.g. pl/nl/en); run comparison; WER/CER tool; OCR and diarization adapters. | [MULTILINGUAL_ASR](docs/MULTILINGUAL_ASR.md) |
+| Interpretation | Time budgets (lower/probable/upper, unobserved band, sensitivity), feature series; preregistered hypotheses, dossier, thesis typology, permutation event study with warnings and a fixed disclaimer. | [TIME_BUDGET](docs/TIME_BUDGET.md), [HYPOTHESES](docs/HYPOTHESES.md) |
+| Reports | Five report types; HTML primary, JSON/CSV/XLSX, optional PDF; method section; every number traceable to `report.json`; verifiable manifests; citation bundles; private output directory only. | [REPORTS](docs/REPORTS.md) |
+| Ecosystem | Read API v1 with local hashed tokens, optional enforcement, CSRF and host checks; ChatADHD intents (anchored quotes) and proposals; Loom graph export with quarantine. ChatADHD client stub: klb-t/chatadhd#46. | [READ_API](docs/READ_API.md), [ECOSYSTEM_ADAPTERS](docs/ECOSYSTEM_ADAPTERS.md) |
+| Workbench | Layered search with epistemic labels, saved searches, bulk tags, folders, bookmarks, shortcuts, command palette, light/dark themes, PL/NL/EN. | [WORKBENCH](docs/WORKBENCH.md) |
+
+## Acceptance (this session, synthetic data only)
+
+| Check | Evidence |
 |---|---|
-| Discover | Android SAF or server/local read-only scan of CSV/TSV, bounded BIFF8 XLS, XLSX and WAV; inventory other files. Limits, ambiguity and omissions remain visible. |
-| Preserve | Content-addressed original bytes, separate acquisition observations, raw source fields and additive database migrations. |
-| Process | Renewable leased transcription jobs; one processing run per attempt; fenced publication and a new text version per successful run. |
-| Review | Search, bounded version histories, separate annotations, segment/word citation selection and range playback. |
-| Cite | Version, occurrence, exact raw text, hash and selector remain pinned; returned save data must match the frozen selection before success/history updates. |
-| Exchange | Metadata and citation packages with digests and graph checks; exact canonical roundtrip through a separate inert SQLite archive. |
-
-A private corpus seed is optional. Case-specific defaults now come from the
-seed's `defaultPresetIds`, filtered to existing preset IDs. Legacy seeds without
-this field start with no selected groups; the user can select them manually.
-The app contains no hardcoded case identities.
-
-## Recovery and acceptance
-
-The overnight ledger had 82 tasks: 78 accepted and four blocked on test/runtime
-execution. The native implementation was already saved; it was not absent.
-All four blocked tasks now have actual acceptance. The recovery re-runs the concrete acceptance instead of implementing it twice.
-
-| Check | Current evidence |
-|---|---|
-| Backend | 429 tests + 588 subtests passed; generated fixtures and fresh Python environment. |
-| JavaScript | 85 tests passed, including exact occurrence and Python numeric parity. |
-| Browser | 25 real Chromium scenarios passed, including all four previously unexecuted N83 cases, real WAV/HTTP playback and history budgets. |
-| Native/JVM/APK | Pinned Gradle 9.7.0/JDK 21/Kotlin 2.4.20/AGP 9.4/SDK 37: 411 JVM tests passed (135 core, 276 Android), APK signature verified; test APK compiled, zero SAF runtime. |
-| ASR environment | Fresh installation of nine declared pins, 14 imports and `pip check` passed. |
-| Real ASR | New tiny.en CPU/int8 inference through production VerifiedReader passed; word citation and inert archive roundtrip retained exact output. |
-| CLI | Real subprocess acceptance for CSV raw records, bounded WAV scanning and archive budgets passed without changing synthetic sources. |
-| History | Byte-preserved documentation/coordination snapshots and their original-path/hash manifests. |
-
-All receipts and commands are in [validation](docs/validation/README.md).
-Failures from earlier attempts remain in the [historical documentation
-index](docs/archive/2026-09-30_2026-10-01/README.md). Full task history is in
-[historical coordination](coordination/archive/2026-09-30_2026-10-01/README.md).
-These snapshots can contain old paths, expired claims and superseded next steps.
+| Backend | Full `pytest server/tests`: see the latest receipt in [validation](docs/validation/README.md) (1074 passed, 1 opt-in skip at `3ae1b24`, before the second review's fixes). |
+| JavaScript | `node --test server/tests/js/*.test.mjs`: 127 passed. |
+| Browser | Real Chromium: acceptance, timeline, workbench, reports, time budget, hypotheses, import plan, media scripts and the catalog page check (86 PASS lines at `be61c3b`). |
+| End to end | [ACCEPTANCE](docs/ACCEPTANCE.md): one run of the real CLI and service on a generated multi-device layout; 19 of 22 criteria met, 3 not verifiable by a run (covered by suites or by change-set/documentation properties). |
+| Reviews | Two adversarial reviews; findings fixed with regression tests ([first](docs/validation/REVIEW_FIXES_2026-10-16.md); second in `REVIEW2_FIXES_2026-10-16`). |
+| Privacy | `scripts/verify_repository.py` flags e-mails outside example domains, phone-like numbers outside fictional ranges and home-directory paths in tracked files. |
 
 ## Concrete remaining boundaries
 
-- SAF device/provider execution has not happened. Six instrumentation tests
-  are prepared; a successful APK or instrumentation compilation does not pass
-  them. Follow [the device harness](docs/ANDROID_SAF_PROVIDER_ACCEPTANCE.md) on an
-  available Android runtime, then separately test picker and persisted grants.
-- Synthetic English ASR does not validate Polish speech quality or word
-  alignment. Keep the uncorrected recognition result and use a separate consented
-  corpus for a quality experiment.
-- API authentication is not implemented; operate the current service on a
-  trusted/private network. Hash agreement is not authorship, truth or custody.
-- The inert archive has no source media, live restore, job replay or signature.
-- On-device JNI is an unconnected prototype, not a functioning ASR provider.
-- Full five-layer legal analysis, Live Explainer, signed custody and partner
-  integrations remain future work. Do not equate a retained design with a
-  deployed feature or manufacture numerical certainty.
-- Current files were cleared of case-specific identities. Those identifiers
-  already exist in the repository's public Git history; this work preserves
-  history and does not claim to erase that earlier exposure.
+- **No real inference ran here.** Hugging Face was blocked and Tesseract/pyannote
+  are absent: multilingual ASR, OCR and diarization were exercised with fake
+  engines only. Run `asr-benchmark` on a consented corpus before relying on any
+  strategy for Polish/Dutch speech.
+- **No real exports were available.** Chat, Takeout, MBOX and billing layouts
+  follow public observations and data-file mappings; check them against a real
+  export (mapping changes need no code change).
+- 7z/RAR archive adapters were written but not executed (libraries absent).
+- Time budgets and hypothesis results are interpretive: bounds depend on recorded
+  parameters, `nieobserwowane` is missing data, and a temporal association is not
+  causation. Every result records its method and parameters.
+- No user accounts; tokens protect the read API and, with `EW_REQUIRE_TOKEN=1`,
+  data-bearing and state-changing routes. Android has no token setting yet.
+- Manifests and packages are hashed, not signed. Hash agreement is byte identity,
+  not authorship, truth or custody.
+- Android and SAF device execution remain as described in the 2026-10-02 handoff;
+  Android code was not changed in this increment.
+- The five-layer legal-analysis standard, Live Explainer and signed custody remain
+  future work.
+- Public Git history retains the earlier case-specific identifiers noted on
+  2026-10-02.
 
 ## Continue without restarting completed work
 
-Use local checks from [Development](docs/DEVELOPMENT.md). GitHub Actions now runs
-only by explicit manual dispatch. No Actions jobs or paid model calls were used
-for recovery. Never restore an expired overnight claim or infer an active agent
-from a historical schedule. Record a new task ID, file owner, source revision,
-acceptance and result in the current ledger. Preserve rejected attempts and
-experiments off the main documentation path.
-
-Before upgrading a live deployment, stop old workers and back up SQLite and the
-content store. Existing loaded workers do not gain lease fencing from edited
-files on disk.
+Use the local checks in [Development](docs/DEVELOPMENT.md) plus
+`pytest server/tests/test_e2e_acceptance.py` and the browser scripts listed in
+the receipts. GitHub Actions remains manual-only; no paid model calls were made.
+Before upgrading a live installation: stop workers, back up SQLite and the
+content store; migrations are additive (versions 1, 10–99) and the timeline cache
+rebuilds once (`PROJECTION_CODE`). New tables must be classified in
+`server/app/packages.py` (exported or excluded with a reason) — a test enforces it.
+Record new work as a task in `coordination/state.json` with scope, base revision
+and acceptance; add new receipts instead of editing old ones.

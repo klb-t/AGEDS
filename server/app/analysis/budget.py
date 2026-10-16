@@ -1,4 +1,4 @@
-"""Time budget with explicit bounds (rule ``time_budget.v1``); an interpretive artifact.
+"""Time budget with explicit bounds (rule ``time_budget.v2``); an interpretive artifact.
 
 Between two observed timestamps the activity is unknown. For every category the
 budget reports three variants built from intervals on the UTC axis:
@@ -52,7 +52,18 @@ from . import intervals as iv
 from .provenance import canonical_json, code_sha256, code_version, event_set_sha256, sha256_json
 from .source import RULE_ID as SOURCE_RULE, load_items
 
-RULE = 'time_budget.v1'
+RULE = 'time_budget.v2'
+# Method-record history. The computation is unchanged between versions; only what the
+# stored method record says changed. Runs stored under an earlier version keep their
+# result and result hash (analysis_runs is append-only) and are read as historical.
+RULE_HISTORY = {
+    'time_budget.v1': ('method.source_rule always said analysis_source.v1 (the interim seam) even when the '
+                       'items came through the timeline seam; the true rule and hash were only in '
+                       'input.source_rule / input.source_rule_sha256'),
+    'time_budget.v2': ('method.source_rule, method.source_rule_sha256 and method.seam name the rule that '
+                       'actually placed the items (e.g. display_time@1 with its SHA-256); found by the '
+                       'end-to-end acceptance AGEDS-TASK-20261016-Z'),
+}
 RESULT_SCHEMA = 'ageds.time_budget_result.v1'
 OVERLAP_RULES = ('split_equal', 'priority', 'count_both')
 GRID_KEYS = ('session_gap_s', 'typing_chars_per_min', 'reading_chars_per_min', 'max_attribution_s', 'overlap_rule')
@@ -644,9 +655,20 @@ def _r(x: float) -> float:
     return round(float(x), 3) + 0.0
 
 
-def method_record(params: dict) -> dict:
+def method_record(params: dict, source: dict | None = None) -> dict:
+    """Method description of a run; ``source`` is the run's ``input`` (seam, rule id and rule SHA-256).
+
+    Without ``source`` (a description of the method only, no run) the seam is ``unknown`` rather than
+    the interim rule, which earlier versions named unconditionally.
+    """
+    source = source or {}
     return {
-        'rule': RULE, 'source_rule': SOURCE_RULE, 'session_rule': iv.SESSION_RULE, 'labeller': cat.LABELLER_ID,
+        'rule': RULE, 'rule_history': RULE_HISTORY,
+        'seam': source.get('seam') or 'unknown',
+        'source_rule': source.get('source_rule') or 'unknown',
+        'source_rule_sha256': source.get('source_rule_sha256') or 'unknown',
+        'interim_fallback_rule': SOURCE_RULE,
+        'session_rule': iv.SESSION_RULE, 'labeller': cat.LABELLER_ID,
         'artifact_class': 'interpretive',
         'variants': {
             'lower': 'confirmed ranges only: source end time or declared duration (call log, WAV header)',
@@ -812,7 +834,7 @@ def run_budget(db, config: cat.CategoryConfig, *, window_from: str, window_to: s
                               zone_name=zone, params=p)
     result = {
         'schema': RESULT_SCHEMA, 'artifact_class': 'interpretive', 'disclaimer': DISCLAIMER,
-        'method': method_record(p), 'parameters': p,
+        'method': method_record(p, prepared['input']), 'parameters': p,
         'code': {'version': code_version(), 'sha256': code_sha256()},
         'window': prepared['window'], 'config': config.describe(), 'categories': computed['palette'],
         'labels': prepared['labels_record'], 'input': prepared['input'], 'exclusions': prepared['exclusions'],

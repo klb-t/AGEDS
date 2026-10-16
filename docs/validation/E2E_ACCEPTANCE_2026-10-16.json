@@ -1,0 +1,3953 @@
+{
+ "schema": "ageds.validation-receipt/v1",
+ "task": "AGEDS-TASK-20261016-Z",
+ "area": "e2e_acceptance",
+ "date": "2026-10-16",
+ "branch": "wt-Z",
+ "base_commit": "8e491f7",
+ "tested_source_commit": "48994d27245af42e9ace19380cf4cebbcee4b4ef",
+ "note": "The two end-to-end receipts below ran at tested_source_commit on a clean tree. The full pytest run ran at c7a3182; between c7a3182 and 48994d2 only two strings of server/tests/e2e/pipeline.py changed (event-study evidence without p-values, the N4 note); the e2e and regression modules were re-run at 48994d2. The receipt commit adds only docs/ACCEPTANCE.md, docs/README.md, docs/validation/README.md and this receipt pair.",
+ "environment": {
+  "python": "3.13.16 (/home/user/wt/venv)",
+  "fastapi": "0.116.1",
+  "uvicorn": "0.35.0",
+  "openpyxl": "3.1.5",
+  "node": "v22.22.0",
+  "playwright": "1.62.1",
+  "chromium": "141.0.7390.37 (/opt/pw-browsers/chromium-1194)",
+  "faster_whisper": "not installed (fake module from server/tests/corpus/audio.py used by the e2e worker)",
+  "tesseract": "not installed",
+  "pyannote": "not installed",
+  "network_or_model_calls": "none (HTTP only to the local service on 127.0.0.1)",
+  "new_python_dependencies": "none"
+ },
+ "commands": [
+  {
+   "cmd": "/home/user/wt/venv/bin/python -m pytest server/tests -q -p no:cacheprovider",
+   "at": "c7a3182",
+   "result": "1074 passed, 1 skipped, 764 subtests passed, 0 failed in 251 s (base 8e491f7: 1047 backend tests; +4 regression tests, +23 e2e tests)"
+  },
+  {
+   "cmd": "/home/user/wt/venv/bin/python -m pytest server/tests/test_e2e_acceptance.py server/tests/test_e2e_regressions.py -q",
+   "at": "48994d2",
+   "result": "27 passed in 31 s"
+  },
+  {
+   "cmd": "AGEDS_E2E_HEAVY=1 AGEDS_E2E_PDF_CHROMIUM=/opt/pw-browsers/chromium-1194/chrome-linux/chrome /home/user/wt/venv/bin/python -m pytest server/tests/test_e2e_acceptance.py -q",
+   "at": "be61c3b",
+   "result": "23 passed in 44 s"
+  },
+  {
+   "cmd": "git stash push server/app && pytest server/tests/test_e2e_regressions.py",
+   "at": "before the fixes",
+   "result": "4 failed (each regression test fails without its fix); 4 passed with the fixes"
+  },
+  {
+   "cmd": "/home/user/wt/venv/bin/python scripts/e2e_acceptance.py <new dir> --pdf-chromium /opt/pw-browsers/chromium-1194/chrome-linux/chrome",
+   "at": "48994d2",
+   "result": "52/52 checks passed, 19 criteria met, 3 not verifiable in a run, 0 not met; 98 commands; 36.9 s"
+  },
+  {
+   "cmd": "/home/user/wt/venv/bin/python scripts/e2e_acceptance.py <new dir> --heavy --pdf-chromium /opt/pw-browsers/chromium-1194/chrome-linux/chrome",
+   "at": "48994d2",
+   "result": "53/53 checks passed; 105 commands; 43.2 s"
+  },
+  {
+   "cmd": "node --test server/tests/js/*.test.mjs",
+   "at": "c7a3182",
+   "result": "127 passed, 0 failed"
+  },
+  {
+   "cmd": "NODE_PATH=.../browser-tools/node_modules PYTHON=/home/user/wt/venv/bin/python AGEDS_BROWSER_EXECUTABLE=/opt/pw-browsers/chromium-1194/chrome-linux/chrome node server/tests/browser/<script>.cjs",
+   "at": "be61c3b (no UI change afterwards)",
+   "result": "8 scripts, all exit 0: acceptance 24 PASS, analysis_budget 9, hypotheses 10, importplan 9, media 7, reports 10, timeline 8, workbench 9 (86 PASS, 0 FAIL)"
+  },
+  {
+   "cmd": "python3 scripts/verify_repository.py",
+   "at": "receipt commit",
+   "result": "exit 0 (also executed inside every e2e run as check repository.verify_passes)"
+  }
+ ],
+ "shared_edits": [
+  {
+   "file": "server/app/importers/comm_common.py",
+   "change": "record_import_run writes object_kind NULL when artifact_id is None"
+  },
+  {
+   "file": "server/app/packages.py",
+   "change": "non-strict (audit_log) reference with a known kind and NULL id -> warning audit_target_id_missing instead of broken_object_reference; dangling ids stay errors, links stay strict"
+  },
+  {
+   "file": "server/app/commands/importplan.py",
+   "change": "--approve/--skip/--propose use action='extend' (repeated flags accumulate)"
+  },
+  {
+   "file": "server/app/analysis/budget.py",
+   "change": "RULE time_budget.v2 + RULE_HISTORY; method_record(params, source) names seam, source_rule and source_rule_sha256 from the run input; interim rule kept as interim_fallback_rule. Only method_record naming; no computation change"
+  },
+  {
+   "file": "docs/TIME_BUDGET.md, docs/IMPORT_PLAN.md",
+   "change": "one paragraph / one comment line documenting the two behaviour changes"
+  }
+ ],
+ "defects_found_and_fixed": [
+  {
+   "id": 1,
+   "found_by": "metadata stage (metadata-verify failed with 15 broken_object_reference errors)",
+   "defect": "file-name recording import runs wrote audit rows object_kind='artifact' with NULL id; every database with such an import failed metadata-verify (and metadata-archive-import)",
+   "regression_tests": [
+    "test_file_name_import_run_audit_names_no_target_and_package_verifies",
+    "test_historical_audit_rows_with_kind_but_no_id_verify_as_warnings"
+   ]
+  },
+  {
+   "id": 2,
+   "found_by": "import_plan stage (an explicitly approved ambiguous item stayed proposed)",
+   "defect": "import-plan-decide --approve A ... --approve B kept only the last list (argparse store)",
+   "regression_tests": [
+    "test_repeated_decision_flags_accumulate"
+   ]
+  },
+  {
+   "id": 3,
+   "found_by": "known from the brief; confirmed in the time_budget stage",
+   "defect": "time-budget method.source_rule said analysis_source.v1 while the timeline seam display_time@1 placed the items",
+   "regression_tests": [
+    "test_budget_method_record_names_the_rule_that_placed_the_items"
+   ]
+  }
+ ],
+ "runtime_executed": [
+  "catalog collections, read-only scans of three roots (plus an adversarial fourth in the heavy variant), coverage with the planted 235-day gap, duplicates across drives, name collisions, signature typing of the .dat PDF, zip-in-zip virtual locators, deterministic description with provider none, CSV export",
+  "import plan: detection, bulk approval leaving ambiguous/parameter/opt-in items to a person, explicit importer and billing profile, run of 24 items through the real importers, plain re-run, --rerun-done, re-scan + second plan (no evidence rows added)",
+  "ASR: two pinned recipes through the real worker loop with the fake faster-whisper (tones), two runs and versions, deterministic comparison, word citation across a language switch via HTTP",
+  "timeline projection, windows (json/csv), correlations recording<->call log (ambiguous and unmatched cases), same conversation across exports (edit, branch, regenerated answer), email<->chat",
+  "time budget from a private categories file outside the repository: unobserved band, union of overlapping chatbot sessions (one-category total = separate unions - measured overlap = split_equal total), parameter change -> new run, old run re-hashed identical, same parameters reused",
+  "hypothesis preregistration, seeded event study twice (identical result hash), dossier candidates (provider none), anchor item, classification, theses (one flagged unsupported), disclosure",
+  "five report types with HTML/JSON/CSV/XLSX/PDF (local Chromium), report-verify of each, crosscheck of every data-k span on every report, time-budget report = stored run, tampered copy fails verification",
+  "citation bundle export/inspect, single packet export/inspect, metadata export/verify",
+  "read API with EW_REQUIRE_TOKEN=1: refusal without token, search, timeline window, artifact, citation packet byte-identical to the CLI export, refusal after token revocation",
+  "originals tree state (sha256, size, mode, mtime of every node) identical before/after; nothing written into the repository; scripts/verify_repository.py"
+ ],
+ "unit_tested_only": [
+  "the historical-row branch of the verifier fix (rows written before the fix) is exercised by the regression test, not by the e2e run (the e2e run only produces post-fix rows)"
+ ],
+ "not_run_or_not_verified": [
+  "real ASR inference (no model weights; Hugging Face blocked): recognition quality of Polish/Dutch/English speech is not claimed",
+  "event-study statistical calibration: only determinism and warnings are asserted (null models are being fixed separately; no p-value is claimed)",
+  "OCR (tesseract) and diarization (pyannote) adapters: unavailable here, not part of the run",
+  "queue-mode import plan with separate worker processes; crash/recovery (covered by the import-plan unit tests, not by this run)",
+  "Android/SAF: not changed, not run",
+  "Loom/ChatADHD adapters beyond the read API"
+ ],
+ "boundaries": [
+  "All data is synthetic and generated at run time outside the repository; the receipt shows paths relative to <work>.",
+  "The orchestrator reads SQLite read-only for some evidence (table counts, time candidates); every product action is a CLI subprocess or an HTTP request.",
+  "The time-budget overlap identity uses the two rule categories only; the count_both bez_kategorii remainder is under review (finding 8 of the second review).",
+  "Wall-clock timings are single measurements on this container; reports dominate because each PDF is a Chromium print."
+ ],
+ "e2e_run_default_with_pdf": {
+  "schema": "ageds.e2e-acceptance-receipt/v1",
+  "task": "AGEDS-TASK-20261016-Z",
+  "started_at": "2026-10-16T21:19:03Z",
+  "wall_seconds": 36.945,
+  "variant": "default",
+  "git": {
+   "head": "48994d27245af42e9ace19380cf4cebbcee4b4ef",
+   "dirty": false
+  },
+  "python": "3.13.16",
+  "platform": "Linux-6.18.44-fc-v139-x86_64-with-glibc2.39",
+  "environment": {
+   "fresh_data_dir": true,
+   "scan_roots": [
+    "<work>/sources/phone_a",
+    "<work>/sources/drive_b",
+    "<work>/sources/drive_c"
+   ],
+   "reports_dir": "<work>/reports",
+   "pdf_chromium": "/opt/pw-browsers/chromium-1194/chrome-linux/chrome",
+   "asr_model": "FakeFasterWhisper (server.tests.corpus.audio): synthetic tones, NOT speech; real inference not run (no model weights, Hugging Face blocked)",
+   "http": "uvicorn server.app.main:app with EW_REQUIRE_TOKEN=1 on 127.0.0.1"
+  },
+  "error": null,
+  "stages": [
+   {
+    "name": "layout",
+    "commands": [],
+    "seconds": 0.343,
+    "status": "ok"
+   },
+   {
+    "name": "collections",
+    "commands": [
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "catalog-collection-add",
+       "Telefon A (syntetyczny)",
+       "--device-or-account",
+       "phone A (synthetic)",
+       "--export-date-raw",
+       "2024-01-07",
+       "--acquisition-method",
+       "directory copy",
+       "--operator",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 0.228
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "catalog-collection-add",
+       "Dysk konto B (syntetyczny)",
+       "--device-or-account",
+       "account B drive (synthetic)",
+       "--export-date-raw",
+       "2025-03",
+       "--acquisition-method",
+       "takeout + exports",
+       "--operator",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 0.166
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "catalog-collection-add",
+       "Dysk C kopia (syntetyczny)",
+       "--device-or-account",
+       "second drive C (synthetic)",
+       "--export-date-raw",
+       "2025-04",
+       "--acquisition-method",
+       "manual copy",
+       "--operator",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 0.135
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "catalog-collection-list"
+      ],
+      "rc": 0,
+      "seconds": 0.142
+     }
+    ],
+    "seconds": 0.671,
+    "status": "ok"
+   },
+   {
+    "name": "catalog",
+    "commands": [
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "catalog-scan",
+       "<work>/sources/phone_a",
+       "--collection",
+       "1",
+       "--temp-dir",
+       "<work>/spool"
+      ],
+      "rc": 0,
+      "seconds": 0.135
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "catalog-scan",
+       "<work>/sources/drive_b",
+       "--collection",
+       "2",
+       "--temp-dir",
+       "<work>/spool"
+      ],
+      "rc": 0,
+      "seconds": 0.146
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "catalog-scan",
+       "<work>/sources/drive_c",
+       "--collection",
+       "3",
+       "--temp-dir",
+       "<work>/spool"
+      ],
+      "rc": 0,
+      "seconds": 0.131
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "catalog-coverage",
+       "--min-gap-days",
+       "30"
+      ],
+      "rc": 0,
+      "seconds": 0.129
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "catalog-duplicates",
+       "--limit",
+       "500"
+      ],
+      "rc": 0,
+      "seconds": 0.172
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "catalog-collisions",
+       "--limit",
+       "500"
+      ],
+      "rc": 0,
+      "seconds": 0.125
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "catalog-entries",
+       "--collection",
+       "2",
+       "--q",
+       "file-DAT1"
+      ],
+      "rc": 0,
+      "seconds": 0.127
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "catalog-entries",
+       "--collection",
+       "2",
+       "--q",
+       "takeout-inner.zip!/",
+       "--limit",
+       "50"
+      ],
+      "rc": 0,
+      "seconds": 0.149
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "catalog-describe",
+       "--collection",
+       "1"
+      ],
+      "rc": 0,
+      "seconds": 0.139
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "catalog-export",
+       "<work>/outputs/catalog.csv",
+       "--format",
+       "csv"
+      ],
+      "rc": 0,
+      "seconds": 0.147
+     }
+    ],
+    "seconds": 1.4,
+    "status": "ok"
+   },
+   {
+    "name": "import_plan",
+    "commands": [
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "import-plan-create",
+       "--collection",
+       "1",
+       "--collection",
+       "2",
+       "--collection",
+       "3",
+       "--billing-profile",
+       "example_semicolon_daymonth_v1",
+       "--temp-dir",
+       "<work>/importwork",
+       "--actor",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 0.207
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "import-plan-show",
+       "1",
+       "--limit",
+       "500"
+      ],
+      "rc": 0,
+      "seconds": 0.124
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "import-plan-decide",
+       "1",
+       "--base-version",
+       "1",
+       "--actor",
+       "e2e",
+       "--approve-all-ready",
+       "--note",
+       "plan 1: approve every item without blockers"
+      ],
+      "rc": 0,
+      "seconds": 0.132
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "import-plan-decide",
+       "1",
+       "--base-version",
+       "2",
+       "--actor",
+       "e2e",
+       "--importer",
+       "15=chatgpt_export",
+       "--param",
+       "12=profile_id=example_datetime_infer_order_v1",
+       "--approve",
+       "15",
+       "--approve",
+       "12",
+       "--note",
+       "plan 1: explicit importer for the ambiguous unit, explicit billing profile"
+      ],
+      "rc": 0,
+      "seconds": 0.135
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "import-plan-summary",
+       "1"
+      ],
+      "rc": 0,
+      "seconds": 0.132
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "import-plan-run",
+       "1",
+       "--temp-dir",
+       "<work>/importwork",
+       "--actor",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 3.339
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "import-plan-show",
+       "1",
+       "--limit",
+       "500"
+      ],
+      "rc": 0,
+      "seconds": 0.139
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "import-plan-cross",
+       "1"
+      ],
+      "rc": 0,
+      "seconds": 0.142
+     }
+    ],
+    "seconds": 4.361,
+    "status": "ok"
+   },
+   {
+    "name": "reimport",
+    "commands": [
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "import-plan-run",
+       "1",
+       "--temp-dir",
+       "<work>/importwork",
+       "--actor",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 0.149
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "import-plan-run",
+       "1",
+       "--temp-dir",
+       "<work>/importwork",
+       "--actor",
+       "e2e",
+       "--rerun-done"
+      ],
+      "rc": 0,
+      "seconds": 2.634
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "catalog-scan",
+       "<work>/sources/phone_a",
+       "--collection",
+       "1",
+       "--temp-dir",
+       "<work>/spool"
+      ],
+      "rc": 0,
+      "seconds": 0.157
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "catalog-scan",
+       "<work>/sources/drive_b",
+       "--collection",
+       "2",
+       "--temp-dir",
+       "<work>/spool"
+      ],
+      "rc": 0,
+      "seconds": 0.193
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "catalog-scan",
+       "<work>/sources/drive_c",
+       "--collection",
+       "3",
+       "--temp-dir",
+       "<work>/spool"
+      ],
+      "rc": 0,
+      "seconds": 0.158
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "import-plan-create",
+       "--collection",
+       "1",
+       "--collection",
+       "2",
+       "--collection",
+       "3",
+       "--billing-profile",
+       "example_semicolon_daymonth_v1",
+       "--temp-dir",
+       "<work>/importwork",
+       "--actor",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 0.279
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "import-plan-show",
+       "2",
+       "--limit",
+       "500"
+      ],
+      "rc": 0,
+      "seconds": 0.12
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "import-plan-decide",
+       "2",
+       "--base-version",
+       "1",
+       "--actor",
+       "e2e",
+       "--approve-all-ready",
+       "--note",
+       "plan 2 (rescan): approve every item without blockers"
+      ],
+      "rc": 0,
+      "seconds": 0.13
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "import-plan-decide",
+       "2",
+       "--base-version",
+       "2",
+       "--actor",
+       "e2e",
+       "--importer",
+       "42=chatgpt_export",
+       "--param",
+       "39=profile_id=example_datetime_infer_order_v1",
+       "--approve",
+       "42",
+       "--approve",
+       "39",
+       "--note",
+       "plan 2 (rescan): explicit importer for the ambiguous unit, explicit billing profile"
+      ],
+      "rc": 0,
+      "seconds": 0.143
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "import-plan-run",
+       "2",
+       "--temp-dir",
+       "<work>/importwork",
+       "--actor",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 2.539
+     }
+    ],
+    "seconds": 7.521,
+    "status": "ok"
+   },
+   {
+    "name": "catalog_ingest",
+    "commands": [
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "catalog-entries",
+       "--collection",
+       "1",
+       "--q",
+       "raport.pdf"
+      ],
+      "rc": 0,
+      "seconds": 0.121
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "catalog-ingest",
+       "61",
+       "--temp-dir",
+       "<work>/importwork",
+       "--actor",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 0.144
+     }
+    ],
+    "seconds": 0.268,
+    "status": "ok"
+   },
+   {
+    "name": "asr",
+    "commands": [
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "media-enqueue",
+       "3"
+      ],
+      "rc": 0,
+      "seconds": 0.099
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "media-enqueue",
+       "3",
+       "--recipe",
+       "per-segment-pl-nl-en"
+      ],
+      "rc": 0,
+      "seconds": 0.11
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.tests.e2e.fake_asr_worker",
+       "--iterations",
+       "3"
+      ],
+      "rc": 0,
+      "seconds": 0.643
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "transcript-compare",
+       "1",
+       "2",
+       "--output",
+       "<work>/outputs/compare-1.json"
+      ],
+      "rc": 0,
+      "seconds": 0.098
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "transcript-compare",
+       "1",
+       "2",
+       "--output",
+       "<work>/outputs/compare-2.json"
+      ],
+      "rc": 0,
+      "seconds": 0.138
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "media-queue",
+       "--status",
+       "done"
+      ],
+      "rc": 0,
+      "seconds": 0.115
+     }
+    ],
+    "seconds": 1.211,
+    "status": "ok"
+   },
+   {
+    "name": "service_and_citation",
+    "commands": [
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "token-create",
+       "--label",
+       "e2e-client",
+       "--scope",
+       "read",
+       "--scope",
+       "propose"
+      ],
+      "rc": 0,
+      "seconds": 0.105
+     },
+     {
+      "http": "POST /api/artifacts/3/citations",
+      "bearer": false,
+      "status": 401,
+      "seconds": 0.002
+     },
+     {
+      "http": "POST /api/artifacts/3/citations",
+      "bearer": true,
+      "status": 200,
+      "seconds": 0.024
+     },
+     {
+      "http": "POST /api/artifacts/3/citations",
+      "bearer": true,
+      "status": 200,
+      "seconds": 0.013
+     }
+    ],
+    "seconds": 1.202,
+    "status": "ok"
+   },
+   {
+    "name": "timeline",
+    "commands": [
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "timeline-rebuild"
+      ],
+      "rc": 0,
+      "seconds": 0.127
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "timeline-window",
+       "<work>/outputs/timeline-parallel.json",
+       "--from",
+       "2025-03-01",
+       "--to",
+       "2025-03-01"
+      ],
+      "rc": 0,
+      "seconds": 0.128
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "timeline-window",
+       "<work>/outputs/timeline-all.csv",
+       "--from",
+       "2024-01-01",
+       "--to",
+       "2025-12-31"
+      ],
+      "rc": 0,
+      "seconds": 0.138
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "correlate",
+       "--rule",
+       "recording_call_log",
+       "--actor",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 0.116
+     },
+     {
+      "http": "GET /api/timeline/correlations/runs/1",
+      "bearer": true,
+      "status": 200,
+      "seconds": 0.015
+     },
+     {
+      "http": "GET /api/timeline/correlations?run_id=1",
+      "bearer": true,
+      "status": 200,
+      "seconds": 0.01
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "correlate",
+       "--rule",
+       "same_conversation",
+       "--actor",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 0.126
+     },
+     {
+      "http": "GET /api/timeline/correlations?run_id=2",
+      "bearer": true,
+      "status": 200,
+      "seconds": 0.015
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "correlate",
+       "--rule",
+       "email_chat",
+       "--actor",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 0.12
+     }
+    ],
+    "seconds": 0.825,
+    "status": "ok"
+   },
+   {
+    "name": "time_budget",
+    "commands": [
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "budget-run",
+       "--config",
+       "<work>/private/categories.json",
+       "--from",
+       "2025-02-24",
+       "--to",
+       "2025-03-10",
+       "--zone",
+       "Europe/Warsaw",
+       "<work>/outputs/budget-1.json"
+      ],
+      "rc": 0,
+      "seconds": 0.19
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "budget-run",
+       "--config",
+       "<work>/private/categories.json",
+       "--from",
+       "2025-03-01",
+       "--to",
+       "2025-03-02",
+       "--zone",
+       "Europe/Warsaw",
+       "<work>/outputs/budget-overlap-one.json"
+      ],
+      "rc": 0,
+      "seconds": 0.137
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "budget-run",
+       "--config",
+       "<work>/private/categories_split.json",
+       "--from",
+       "2025-03-01",
+       "--to",
+       "2025-03-02",
+       "--zone",
+       "Europe/Warsaw",
+       "--params",
+       "{\"overlap_rule\": \"count_both\"}",
+       "<work>/outputs/budget-overlap-count_both.json"
+      ],
+      "rc": 0,
+      "seconds": 0.189
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "budget-run",
+       "--config",
+       "<work>/private/categories_split.json",
+       "--from",
+       "2025-03-01",
+       "--to",
+       "2025-03-02",
+       "--zone",
+       "Europe/Warsaw",
+       "--params",
+       "{\"overlap_rule\": \"split_equal\"}",
+       "<work>/outputs/budget-overlap-split_equal.json"
+      ],
+      "rc": 0,
+      "seconds": 0.171
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "budget-run",
+       "--config",
+       "<work>/private/categories.json",
+       "--from",
+       "2025-02-24",
+       "--to",
+       "2025-03-10",
+       "--zone",
+       "Europe/Warsaw",
+       "--params",
+       "{\"reading_chars_per_min\": 500, \"typing_chars_per_min\": 100}",
+       "<work>/outputs/budget-2.json"
+      ],
+      "rc": 0,
+      "seconds": 0.191
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "budget-show",
+       "1",
+       "<work>/outputs/budget-1-show.json"
+      ],
+      "rc": 0,
+      "seconds": 0.192
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "budget-run",
+       "--config",
+       "<work>/private/categories.json",
+       "--from",
+       "2025-02-24",
+       "--to",
+       "2025-03-10",
+       "--zone",
+       "Europe/Warsaw"
+      ],
+      "rc": 0,
+      "seconds": 0.196
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "budget-list",
+       "--kind",
+       "time_budget"
+      ],
+      "rc": 0,
+      "seconds": 0.139
+     }
+    ],
+    "seconds": 1.41,
+    "status": "ok"
+   },
+   {
+    "name": "hypothesis",
+    "commands": [
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "hypothesis-register",
+       "<work>/private/hypothesis.json",
+       "--actor",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 0.126
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "eventstudy-run",
+       "1",
+       "--summary",
+       "--actor",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 0.164
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "eventstudy-run",
+       "1",
+       "--summary",
+       "--actor",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 0.16
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "dossier-candidates",
+       "1",
+       "--actor",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 0.23
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "dossier-add",
+       "1",
+       "anchor",
+       "1",
+       "--classification",
+       "context",
+       "--rationale",
+       "quote from the synthetic code-switch fixture",
+       "--actor",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 0.173
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "dossier-classify",
+       "1",
+       "supporting",
+       "--rationale",
+       "synthetic decision",
+       "--actor",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 0.15
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "thesis-add",
+       "1",
+       "--type",
+       "inference_chain",
+       "--text",
+       "Synthetic thesis with evidence pointers.",
+       "--evidence",
+       "1,7",
+       "--actor",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 0.125
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "thesis-add",
+       "1",
+       "--type",
+       "speculation",
+       "--text",
+       "Synthetic thesis without an evidence pointer.",
+       "--actor",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 0.13
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "disclosure-add",
+       "1",
+       "known_unknowns",
+       "Synthetic corpus: WhatsApp wall clocks and recording file names have no time zone.",
+       "--actor",
+       "e2e"
+      ],
+      "rc": 0,
+      "seconds": 0.115
+     }
+    ],
+    "seconds": 1.373,
+    "status": "ok"
+   },
+   {
+    "name": "reports",
+    "commands": [
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "report-create",
+       "--type",
+       "catalog",
+       "--params",
+       "{\"formats\": [\"html\", \"json\", \"csv\", \"xlsx\", \"pdf\"]}",
+       "--output",
+       "<work>/reports"
+      ],
+      "rc": 0,
+      "seconds": 2.472
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "report-create",
+       "--type",
+       "timeline",
+       "--params",
+       "{\"formats\": [\"html\", \"json\", \"csv\", \"xlsx\", \"pdf\"], \"from\": \"2024-01-01T00:00:00Z\", \"to\": \"2025-04-01T00:00:00Z\"}",
+       "--output",
+       "<work>/reports"
+      ],
+      "rc": 0,
+      "seconds": 2.523
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "report-create",
+       "--type",
+       "time_budget",
+       "--params",
+       "{\"formats\": [\"html\", \"json\", \"csv\", \"xlsx\", \"pdf\"], \"budget_run_id\": 1}",
+       "--output",
+       "<work>/reports"
+      ],
+      "rc": 0,
+      "seconds": 2.062
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "report-create",
+       "--type",
+       "hypothesis_dossier",
+       "--params",
+       "{\"formats\": [\"html\", \"json\", \"csv\", \"xlsx\", \"pdf\"], \"hypothesis_id\": 1}",
+       "--output",
+       "<work>/reports"
+      ],
+      "rc": 0,
+      "seconds": 2.523
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "report-create",
+       "--type",
+       "lawyer_package",
+       "--params",
+       "{\"formats\": [\"html\", \"json\", \"csv\", \"xlsx\", \"pdf\"], \"open_questions\": [\"Synthetic: which time zone applies to the WhatsApp wall clocks?\"]}",
+       "--output",
+       "<work>/reports"
+      ],
+      "rc": 0,
+      "seconds": 2.576
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "report-verify",
+       "<work>/reports/ageds-report-catalog-20261016T211924Z-00ffbd676fb0/manifest.json",
+       "--expected-manifest-sha256",
+       "a7f06df5db36dd471f9f6afb241a10eb01aaaafb3643bc0be531d4dbb1a8c1de"
+      ],
+      "rc": 0,
+      "seconds": 0.129
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "report-verify",
+       "<work>/reports/ageds-report-timeline-20261016T211926Z-8648b7b6f202/manifest.json",
+       "--expected-manifest-sha256",
+       "2e030735012bb2fb7f1d8d7db85d1ebffeabf9dc1f4088b57f213e91c656848a"
+      ],
+      "rc": 0,
+      "seconds": 0.175
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "report-verify",
+       "<work>/reports/ageds-report-time_budget-20261016T211928Z-88f1d7af6f32/manifest.json",
+       "--expected-manifest-sha256",
+       "db04b9a57c2c19374c0bd361265c62d1f33efb509c24e0d87ab393de0bd5e875"
+      ],
+      "rc": 0,
+      "seconds": 0.157
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "report-verify",
+       "<work>/reports/ageds-report-hypothesis_dossier-20261016T211931Z-dc956ccb102e/manifest.json",
+       "--expected-manifest-sha256",
+       "82861e95cdf8efdebf5b44a7a5d36cf19f22934dfedd26cdc6a1b38a05e2c3bc"
+      ],
+      "rc": 0,
+      "seconds": 0.123
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "report-verify",
+       "<work>/reports/ageds-report-lawyer_package-20261016T211933Z-8e88846e939a/manifest.json",
+       "--expected-manifest-sha256",
+       "be79f0b41f3c8e13daa1a592eba4edae3795e322667d77591210345f1b79e763"
+      ],
+      "rc": 0,
+      "seconds": 0.18
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.tests.e2e.report_check",
+       "--budget-run",
+       "1",
+       "<work>/reports/ageds-report-catalog-20261016T211924Z-00ffbd676fb0",
+       "<work>/reports/ageds-report-timeline-20261016T211926Z-8648b7b6f202",
+       "<work>/reports/ageds-report-time_budget-20261016T211928Z-88f1d7af6f32",
+       "<work>/reports/ageds-report-hypothesis_dossier-20261016T211931Z-dc956ccb102e",
+       "<work>/reports/ageds-report-lawyer_package-20261016T211933Z-8e88846e939a"
+      ],
+      "rc": 0,
+      "seconds": 0.331
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "report-verify",
+       "<work>/tampered-report/manifest.json"
+      ],
+      "rc": 1,
+      "seconds": 0.129
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "report-verify",
+       "<work>/reports/ageds-report-lawyer_package-20261016T211933Z-8e88846e939a/manifest.json"
+      ],
+      "rc": 0,
+      "seconds": 0.135
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "report-list"
+      ],
+      "rc": 0,
+      "seconds": 0.227
+     }
+    ],
+    "seconds": 13.76,
+    "status": "ok"
+   },
+   {
+    "name": "citations",
+    "commands": [
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "citation-bundle-export",
+       "<work>/outputs/bundle",
+       "--report",
+       "5"
+      ],
+      "rc": 0,
+      "seconds": 0.204
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "citation-bundle-inspect",
+       "<work>/outputs/bundle"
+      ],
+      "rc": 0,
+      "seconds": 0.093
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "citation-export",
+       "3",
+       "1",
+       "<work>/outputs/packet-a3-c1.json"
+      ],
+      "rc": 0,
+      "seconds": 0.148
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "citation-inspect",
+       "<work>/outputs/packet-a3-c1.json"
+      ],
+      "rc": 0,
+      "seconds": 0.107
+     }
+    ],
+    "seconds": 0.553,
+    "status": "ok"
+   },
+   {
+    "name": "metadata",
+    "commands": [
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "metadata-export",
+       "<work>/outputs/metadata-package.json"
+      ],
+      "rc": 0,
+      "seconds": 0.255
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "metadata-verify",
+       "<work>/outputs/metadata-package.json"
+      ],
+      "rc": 0,
+      "seconds": 0.391
+     }
+    ],
+    "seconds": 0.646,
+    "status": "ok"
+   },
+   {
+    "name": "read_api",
+    "commands": [
+     {
+      "http": "GET /api/read/v1/search?q=Parallel",
+      "bearer": false,
+      "status": 401,
+      "seconds": 0.003
+     },
+     {
+      "http": "GET /api/read/v1/search?q=Parallel&limit=20",
+      "bearer": true,
+      "status": 200,
+      "seconds": 0.015
+     },
+     {
+      "http": "GET /api/read/v1/timeline?from=2025-03-01&to=2025-03-02&limit=100",
+      "bearer": true,
+      "status": 200,
+      "seconds": 0.015
+     },
+     {
+      "http": "GET /api/read/v1/artifacts/3",
+      "bearer": true,
+      "status": 200,
+      "seconds": 0.013
+     },
+     {
+      "http": "GET /api/read/v1/artifacts/3/citations/1/packet",
+      "bearer": true,
+      "status": 200,
+      "seconds": 0.016
+     },
+     {
+      "argv": [
+       "python",
+       "-m",
+       "server.app.cli",
+       "token-revoke",
+       "1",
+       "--note",
+       "end of e2e run"
+      ],
+      "rc": 0,
+      "seconds": 0.177
+     },
+     {
+      "http": "GET /api/read/v1/search?q=Parallel",
+      "bearer": true,
+      "status": 401,
+      "seconds": 0.012
+     }
+    ],
+    "seconds": 0.252,
+    "status": "ok"
+   },
+   {
+    "name": "originals",
+    "commands": [],
+    "seconds": 0.171,
+    "status": "ok"
+   },
+   {
+    "name": "repository",
+    "commands": [
+     {
+      "argv": [
+       "python",
+       "scripts/verify_repository.py"
+      ],
+      "rc": 0,
+      "seconds": 0.97
+     }
+    ],
+    "seconds": 0.976,
+    "status": "ok"
+   }
+  ],
+  "checks": [
+   {
+    "id": "layout.private_outside_repo",
+    "criteria": [
+     "N1"
+    ],
+    "stage": "layout",
+    "description": "category configuration, hypothesis definition and outputs are outside the repository",
+    "passed": true,
+    "evidence": {
+     "private": "<work>/private"
+    }
+   },
+   {
+    "id": "collections.created",
+    "criteria": [
+     "K1.k"
+    ],
+    "stage": "collections",
+    "description": "one collection per device/account/drive",
+    "passed": true,
+    "evidence": {
+     "collections": {
+      "phone_a": 1,
+      "drive_b": 2,
+      "drive_c": 3
+     },
+     "listed": 3
+    }
+   },
+   {
+    "id": "catalog.scans_complete",
+    "criteria": [
+     "K1.k"
+    ],
+    "stage": "catalog",
+    "description": "every core collection scan completed with complete coverage",
+    "passed": true,
+    "evidence": {
+     "phone_a": {
+      "status": "completed",
+      "entries": 29,
+      "members": 3
+     },
+     "drive_b": {
+      "status": "completed",
+      "entries": 22,
+      "members": 15
+     },
+     "drive_c": {
+      "status": "completed",
+      "entries": 7,
+      "members": 5
+     }
+    }
+   },
+   {
+    "id": "catalog.gap_found",
+    "criteria": [
+     "K1.h"
+    ],
+    "stage": "catalog",
+    "description": "coverage reports the planted long gap (days without any observation)",
+    "passed": true,
+    "evidence": {
+     "gap": [
+      {
+       "collection_id": 1,
+       "type": "txt",
+       "source": "filesystem_stat",
+       "last_observed_day": "2024-01-09",
+       "next_observed_day": "2024-09-01",
+       "empty_days": 235
+      }
+     ],
+     "all_gaps": 1,
+     "interpretation": "a gap means no catalogued item carries a time in that period on that basis; it does not mean nothing happened, and file times are not event times"
+    }
+   },
+   {
+    "id": "catalog.export_copy_on_second_drive",
+    "criteria": [
+     "K1.k"
+    ],
+    "stage": "catalog",
+    "description": "the ChatGPT export zip is one content group observed in two collections (copy on a second drive)",
+    "passed": true,
+    "evidence": {
+     "id": 28,
+     "sha256": "5d53a1907daa413245c7c862d6c70ecd2ad77fcb78ba2eba71e8fd23f359c701",
+     "size_bytes": 2402,
+     "entries": 2,
+     "collections": 2,
+     "max_depth": 0,
+     "artifacts": 0,
+     "empty_content": false
+    }
+   },
+   {
+    "id": "catalog.dat_in_both_drives",
+    "criteria": [
+     "K1.j",
+     "K1.k"
+    ],
+    "stage": "catalog",
+    "description": "the .dat member is one content group in two collections",
+    "passed": true,
+    "evidence": {
+     "id": 32,
+     "sha256": "06ca2af9de197e08e8c0241989771cdd06e3400dbe3e495a339832140c9578c0",
+     "size_bytes": 136,
+     "entries": 2,
+     "collections": 2,
+     "max_depth": 1,
+     "artifacts": 0,
+     "empty_content": false
+    }
+   },
+   {
+    "id": "catalog.pdf_on_disk_and_in_whatsapp",
+    "criteria": [
+     "K1.b"
+    ],
+    "stage": "catalog",
+    "description": "the PDF on disk and the WhatsApp DOC member are one content group (the MBOX attachment is inside a MIME body; it is matched after import)",
+    "passed": true,
+    "evidence": {
+     "id": 3,
+     "sha256": "0b9780a718019acf82448bb292d1f042ffe74da20e403522787f6a706311fe1d",
+     "size_bytes": 111,
+     "entries": 2,
+     "collections": 1,
+     "max_depth": 1,
+     "artifacts": 0,
+     "empty_content": false
+    }
+   },
+   {
+    "id": "catalog.name_collision",
+    "criteria": [
+     "K1.e"
+    ],
+    "stage": "catalog",
+    "description": "same file name with different bytes in two collections is listed",
+    "passed": true,
+    "evidence": {
+     "name": "todo.txt",
+     "variants": 2,
+     "collections": 2,
+     "locations": [
+      [
+       1,
+       "notes/todo.txt",
+       "10a68a735280b243"
+      ],
+      [
+       2,
+       "todo.txt",
+       "5ca66be0dafd00cc"
+      ]
+     ]
+    }
+   },
+   {
+    "id": "catalog.dat_is_pdf",
+    "criteria": [
+     "K1.j"
+    ],
+    "stage": "catalog",
+    "description": "the .dat member is typed pdf by signature (extension conflict kept)",
+    "passed": true,
+    "evidence": {
+     "locator": "chatgpt-export-2025-03.zip!/file-DAT1.dat",
+     "extension": "dat",
+     "sniffed_type": "pdf",
+     "sniff_basis": "signature",
+     "type_relation": "opaque_extension",
+     "type_conflict": 1,
+     "sha256": "06ca2af9de197e08e8c0241989771cdd06e3400dbe3e495a339832140c9578c0"
+    }
+   },
+   {
+    "id": "catalog.zip_in_zip",
+    "criteria": [
+     "K1.i"
+    ],
+    "stage": "catalog",
+    "description": "members of the nested zip inside the Takeout zip are catalogued with a virtual locator (depth 2), nothing unpacked into the source",
+    "passed": true,
+    "evidence": [
+     [
+      "takeout-20241001.zip!/Takeout/takeout-inner.zip!/Mail/All mail Including Spam and Trash.mbox",
+      2,
+      "ok"
+     ],
+     [
+      "takeout-20241001.zip!/Takeout/takeout-inner.zip!/Calendar/Example.ics",
+      2,
+      "ok"
+     ],
+     [
+      "takeout-20241001.zip!/Takeout/takeout-inner.zip!/Contacts/All Contacts/All Contacts.vcf",
+      2,
+      "ok"
+     ],
+     [
+      "takeout-20241001.zip!/Takeout/takeout-inner.zip!/My Activity/Gemini Apps/MyActivity.json",
+      2,
+      "ok"
+     ],
+     [
+      "takeout-20241001.zip!/Takeout/takeout-inner.zip!/My Activity/Search/MyActivity.html",
+      2,
+      "ok"
+     ],
+     [
+      "takeout-20241001.zip!/Takeout/takeout-inner.zip!/My Activity/YouTube/MyActivity.json",
+      2,
+      "ok"
+     ]
+    ]
+   },
+   {
+    "id": "catalog.describe_without_provider",
+    "criteria": [
+     "N1"
+    ],
+    "stage": "catalog",
+    "description": "the collection description is the deterministic profile only; no model is called without a provider and an explicit per-run opt-in",
+    "passed": true,
+    "evidence": {
+     "status": "not_run",
+     "provider": "none",
+     "profile_sha256": "53e1fbeb7daf56c42b1a0403da7a37805ca339a5526f2f3126b82de60c508ba9"
+    }
+   },
+   {
+    "id": "catalog.export_outside_sources",
+    "criteria": [
+     "N3"
+    ],
+    "stage": "catalog",
+    "description": "catalog export is a new file outside every source root",
+    "passed": true,
+    "evidence": {
+     "rows": 58,
+     "format": "csv",
+     "output": "<work>/outputs/catalog.csv"
+    }
+   },
+   {
+    "id": "plan.bulk_approval_leaves_choices_to_a_person",
+    "criteria": [
+     "N1"
+    ],
+    "stage": "import_plan",
+    "description": "approve-all-ready approves only unblocked items: the ambiguous unit, the billing table without a profile and the three opt-in importers stay unapproved",
+    "passed": true,
+    "evidence": {
+     "not_applied": {
+      "12": [
+       "parameter_missing:profile_id"
+      ],
+      "15": [
+       "importer_not_chosen:ambiguous_detection"
+      ],
+      "18": [
+       "opt_in_disabled:enable_browser_history"
+      ],
+      "19": [
+       "opt_in_disabled:enable_location"
+      ],
+      "25": [
+       "opt_in_disabled:enable_browser_history"
+      ]
+     },
+     "items": 27,
+     "blocker_kinds": [
+      "importer_not_chosen:ambiguous_detection",
+      "opt_in_disabled:enable_browser_history",
+      "opt_in_disabled:enable_location",
+      "parameter_missing:profile_id"
+     ]
+    }
+   },
+   {
+    "id": "plan.explicit_choices_applied",
+    "criteria": [],
+    "stage": "import_plan",
+    "description": "the ambiguous unit and the billing profile are chosen explicitly; two repeated --approve flags both apply (regression)",
+    "passed": true,
+    "evidence": {
+     "by_status": {
+      "proposed": 3,
+      "approved": 24,
+      "skipped": 0,
+      "running": 0,
+      "done": 0,
+      "failed": 0,
+      "refused": 0
+     },
+     "version": 3
+    }
+   },
+   {
+    "id": "plan.run_completed",
+    "criteria": [
+     "K2.a"
+    ],
+    "stage": "import_plan",
+    "description": "every approved item finished done through the real importers",
+    "passed": true,
+    "evidence": {
+     "run_id": 1,
+     "selected": 24,
+     "statuses": [
+      "done"
+     ],
+     "events_new": 121,
+     "artifacts_new": 30
+    }
+   },
+   {
+    "id": "plan.opt_ins_stay_off",
+    "criteria": [
+     "N1"
+    ],
+    "stage": "import_plan",
+    "description": "location and browsing history items were never run and nothing from them was acquired",
+    "passed": true,
+    "evidence": {
+     "items": {
+      "25": [
+       "proposed",
+       {
+        "enable_browser_history": false
+       }
+      ],
+      "18": [
+       "proposed",
+       {
+        "enable_browser_history": false
+       }
+      ],
+      "19": [
+       "proposed",
+       {
+        "enable_location": false
+       }
+      ]
+     },
+     "artifacts_from_opt_in_locators": 0
+    }
+   },
+   {
+    "id": "reimport.plain_rerun_selects_nothing",
+    "criteria": [
+     "K2.a"
+    ],
+    "stage": "reimport",
+    "description": "a plain re-run selects no item and changes no table except its own run row and audit entries",
+    "passed": true,
+    "evidence": {
+     "changed": {
+      "audit_log": [
+       230,
+       232
+      ],
+      "import_plan_runs": [
+       1,
+       2
+      ]
+     }
+    }
+   },
+   {
+    "id": "reimport.rerun_done_creates_no_evidence_rows",
+    "criteria": [
+     "K2.a"
+    ],
+    "stage": "reimport",
+    "description": "forced re-import of every done item through the importers adds no row to any table except re-observations (source_observations), audit entries and the run/attempt bookkeeping",
+    "passed": true,
+    "evidence": {
+     "grown": {
+      "audit_log": [
+       232,
+       444
+      ],
+      "import_plan_attempts": [
+       24,
+       48
+      ],
+      "import_plan_runs": [
+       2,
+       3
+      ],
+      "source_observations": [
+       39,
+       78
+      ]
+     },
+     "selected": 24,
+     "unchanged_tables": 90
+    }
+   },
+   {
+    "id": "reimport.rescan_and_new_plan_creates_no_evidence_rows",
+    "criteria": [
+     "K2.a"
+    ],
+    "stage": "reimport",
+    "description": "scanning the same roots again and running a new plan adds catalog and plan rows only",
+    "passed": true,
+    "evidence": {
+     "grown": {
+      "audit_log": [
+       444,
+       665
+      ],
+      "catalog_entries": [
+       58,
+       116
+      ],
+      "catalog_entry_artifacts": [
+       30,
+       60
+      ],
+      "catalog_entry_times": [
+       58,
+       116
+      ],
+      "catalog_scans": [
+       3,
+       6
+      ],
+      "import_plan_attempts": [
+       48,
+       72
+      ],
+      "import_plan_decisions": [
+       24,
+       48
+      ],
+      "import_plan_item_members": [
+       38,
+       76
+      ],
+      "import_plan_items": [
+       27,
+       54
+      ],
+      "import_plan_runs": [
+       3,
+       4
+      ],
+      "import_plan_versions": [
+       3,
+       6
+      ],
+      "import_plans": [
+       1,
+       2
+      ],
+      "source_observations": [
+       78,
+       117
+      ]
+     },
+     "plan_id": 2,
+     "selected": 24
+    }
+   },
+   {
+    "id": "reimport.no_duplicate_events",
+    "criteria": [
+     "K2.a"
+    ],
+    "stage": "reimport",
+    "description": "no (artifact, external id) pair occurs twice",
+    "passed": true,
+    "evidence": {
+     "duplicates": []
+    }
+   },
+   {
+    "id": "ingest.same_pdf_three_provenances",
+    "criteria": [
+     "K1.b"
+    ],
+    "stage": "catalog_ingest",
+    "description": "the PDF on disk, the e-mail attachment extracted from the MBOX in the nested Takeout zip and the WhatsApp document share one SHA-256 and keep three separate acquisitions",
+    "passed": true,
+    "evidence": {
+     "sha256": "0b9780a718019acf82448bb292d1f042ffe74da20e403522787f6a706311fe1d",
+     "locators": [
+      "catalog:collection/1/WhatsApp/export.zip@sha256:67510dd1ee00b0dfd1af0cf105df4d7ddaaf87d4f97a282baee33ab8fe0c1f11!/DOC-20240105-WA0003.pdf",
+      "catalog:collection/2/takeout-20241001.zip!/Takeout/takeout-inner.zip!/Mail/All mail Including Spam and Trash.mbox@sha256:5fe1c826b9ce86269f41e3a0ddb5126239ff09e041242fe71e7786828a78bc5c!/message/0/mime-part/2",
+      "catalog:collection/1/Documents/raport.pdf"
+     ]
+    }
+   },
+   {
+    "id": "asr.two_recipes_two_runs_two_versions",
+    "criteria": [
+     "K1.c"
+    ],
+    "stage": "asr",
+    "description": "two pinned recipes → two jobs, two processing runs, two transcript versions (auto per file vs per-segment language); fixture labelled synthetic tones, fake model, no real inference",
+    "passed": true,
+    "evidence": {
+     "jobs": [
+      {
+       "id": 1,
+       "kind": "transcribe",
+       "artifact_id": 3,
+       "status": "done",
+       "error": null
+      },
+      {
+       "id": 2,
+       "kind": "transcribe",
+       "artifact_id": 3,
+       "status": "done",
+       "error": null
+      }
+     ],
+     "recipes": [
+      {
+       "id": "legacy",
+       "sha256": "78921f93a049506cbeab800d125a8e08d7d94e3477554592061485dcd0678548",
+       "kind": "asr"
+      },
+      {
+       "id": "per-segment-pl-nl-en",
+       "sha256": "b5530b0e5f3dac066426e869c7f718287df413416236d5162d7a14bed7149171",
+       "kind": "asr"
+      }
+     ],
+     "strategies": [
+      "auto_per_file",
+      "per_segment_language"
+     ],
+     "version_languages": [
+      "pl",
+      "mul"
+     ],
+     "segment_languages": [
+      "en",
+      "nl",
+      "pl"
+     ],
+     "fixture_label": "synthetic sine tones and silence; NOT speech, not a recording",
+     "model": "FakeFasterWhisper (tests only)"
+    }
+   },
+   {
+    "id": "asr.comparison_deterministic",
+    "criteria": [
+     "K1.c"
+    ],
+    "stage": "asr",
+    "description": "run comparison (word diff, per-segment language, timing) is written to a new file and is deterministic",
+    "passed": true,
+    "evidence": {
+     "content_sha256": "cebe385fe6177b8f9de449e8ce48c1501c7be318bc54c163ee02549e0a3aaf3c",
+     "language_relations": [
+      "different",
+      "same"
+     ]
+    }
+   },
+   {
+    "id": "service.token_required",
+    "criteria": [],
+    "stage": "service_and_citation",
+    "description": "with EW_REQUIRE_TOKEN=1 a state-changing request without a token is refused",
+    "passed": true,
+    "evidence": {
+     "status": 401
+    }
+   },
+   {
+    "id": "service.word_citation_across_language_switch",
+    "criteria": [
+     "K1.c"
+    ],
+    "stage": "service_and_citation",
+    "description": "a word citation crossing the pl→nl switch is pinned to the per-segment version; a second anchor pins the legacy version (versions never move each other's anchors)",
+    "passed": true,
+    "evidence": {
+     "anchor": {
+      "id": 1,
+      "derived_text_id": 2,
+      "start_ms": 4300,
+      "end_ms": 5950,
+      "quote_text": " pl nl~pl nl~pl",
+      "quote_sha256": "6396a2c0b5fdeebdbe3160bc06ca4234385fda1495bd88a4b3a4a6e7b85eb9ea"
+     },
+     "languages": [
+      "pl",
+      "nl"
+     ],
+     "legacy_anchor": 2
+    }
+   },
+   {
+    "id": "timeline.two_chatbots_overlap",
+    "criteria": [
+     "K1.g"
+    ],
+    "stage": "timeline",
+    "description": "the projected window shows ChatGPT and Claude conversations whose message spans overlap in time (separate lanes by chatbot)",
+    "passed": true,
+    "evidence": {
+     "spans_utc": {
+      "claude": [
+       "2025-03-01T08:07:00Z",
+       "2025-03-01T10:20:00Z"
+      ],
+      "chatgpt": [
+       "2025-03-01T10:02:00Z",
+       "2025-03-01T10:28:00Z"
+      ]
+     },
+     "rows": 9,
+     "rule": "display_time@1"
+    }
+   },
+   {
+    "id": "timeline.ampm_unknown_zone_dst",
+    "criteria": [
+     "K1.f"
+    ],
+    "stage": "timeline",
+    "description": "AM/PM is parsed with both day/month readings kept, unknown zones stay unknown, DST gap and fold are flagged (fold with both UTC alternatives)",
+    "passed": true,
+    "evidence": {
+     "ampm": [
+      [
+       "04/05/2024 11:00 PM",
+       "2024-05-04T23:00:00"
+      ],
+      [
+       "04/05/2024 11:00 PM",
+       "2024-04-05T23:00:00"
+      ]
+     ],
+     "dst_flags": [
+      "ambiguous_fold",
+      "nonexistent_local_time"
+     ],
+     "unknown_zone_event_types": [
+      "activity",
+      "calendar_event",
+      "call",
+      "chat_message",
+      "email",
+      "image_capture",
+      "recording",
+      "sms"
+     ]
+    }
+   },
+   {
+    "id": "timeline.long_gap_without_events",
+    "criteria": [
+     "K1.h"
+    ],
+    "stage": "timeline",
+    "description": "no time candidate of any source falls into the planted event gap",
+    "passed": true,
+    "evidence": {
+     "gap": {
+      "from": "2024-10-28",
+      "to": "2024-12-01",
+      "note": "no event of any source between the DST-fold calendar entry and the old Claude conversation"
+     },
+     "utc": 0,
+     "local": 0
+    }
+   },
+   {
+    "id": "timeline.recording_call_cases_visible",
+    "criteria": [
+     "K1.d"
+    ],
+    "stage": "timeline",
+    "description": "recordings without a call and calls without a recording are listed by the run; a recording near two call entries gives one ambiguity group with two hypotheses",
+    "passed": true,
+    "evidence": {
+     "counts": {
+      "ambiguous_recordings": 1,
+      "calls_considered": 9,
+      "calls_without_recording": 7,
+      "hypotheses": 2,
+      "recordings_considered": 6,
+      "recordings_with_candidates": 1,
+      "recordings_without_call": 5
+     },
+     "recordings_without_call": [
+      {
+       "left_id": 3,
+       "left_kind": "artifact",
+       "reason": "only_uncorroborated_unknown_zone_matches"
+      },
+      {
+       "evaluated_time_points": 1,
+       "left_id": 4,
+       "left_kind": "artifact",
+       "reason": "no_call_within_tolerance"
+      },
+      {
+       "left_id": 5,
+       "left_kind": "artifact",
+       "reason": "no_usable_time_candidate"
+      },
+      {
+       "left_id": 6,
+       "left_kind": "artifact",
+       "reason": "only_uncorroborated_unknown_zone_matches"
+      },
+      {
+       "left_id": 13,
+       "left_kind": "artifact",
+       "reason": "no_usable_time_candidate"
+      }
+     ],
+     "calls_without_recording_number_b": [
+      16,
+      22,
+      26,
+      27
+     ],
+     "ambiguity_groups": [
+      [
+       1,
+       2
+      ]
+     ]
+    }
+   },
+   {
+    "id": "timeline.same_conversation_three_exports",
+    "criteria": [
+     "K1.a",
+     "K1.k"
+    ],
+    "stage": "timeline",
+    "description": "conversation C is observed in three distinct exports plus a byte-identical copy; e1↔e3 shows the edited message (changed), the branch only in e1 and the regenerated answer only in e3",
+    "passed": true,
+    "evidence": {
+     "exports": [
+      "catalog:collection/2/chatgpt-export-2025-03.zip",
+      "catalog:collection/2/exports/chatgpt-2024-12",
+      "catalog:collection/3/copy/chatgpt-export-2025-03.zip",
+      "catalog:collection/3/later-export"
+     ],
+     "e1_vs_e3": {
+      "absence_semantics": "not observed in that export under this interpretation; never deletion",
+      "changed_content": 1,
+      "changed_examples": [
+       "u2"
+      ],
+      "only_left": 1,
+      "only_left_examples": [
+       "a1x"
+      ],
+      "only_right": 3,
+      "only_right_examples": [
+       "a3",
+       "a3b",
+       "u3"
+      ],
+      "shared": 7
+     },
+     "pairs": 6
+    }
+   },
+   {
+    "id": "timeline.nothing_auto_accepted",
+    "criteria": [
+     "N2"
+    ],
+    "stage": "timeline",
+    "description": "every correlation hypothesis is proposed (none accepted automatically) and no hypothesis carries a probability",
+    "passed": true,
+    "evidence": {
+     "hypotheses": 10,
+     "statuses": [
+      "proposed"
+     ],
+     "email_chat_counts": {
+      "chat_messages_considered": 61,
+      "emails_considered": 6,
+      "hypotheses": 0,
+      "pairs_evaluated": 72
+     }
+    }
+   },
+   {
+    "id": "budget.method_names_real_rule",
+    "criteria": [
+     "K3.a"
+    ],
+    "stage": "time_budget",
+    "description": "the method record names the rule and hash that placed the items (regression: it said analysis_source.v1)",
+    "passed": true,
+    "evidence": {
+     "rule": "time_budget.v2",
+     "seam": "timeline",
+     "source_rule": "display_time@1",
+     "source_rule_sha256": "dd319c389520f09b498aa49bd0e961252ae1870b4dff526d1c1fa0d3568e0aa4"
+    }
+   },
+   {
+    "id": "budget.unobserved_band",
+    "criteria": [
+     "K1.h",
+     "N2"
+    ],
+    "stage": "time_budget",
+    "description": "days without observations are nieobserwowane for their full length in every variant, the band is part of the palette and the disclaimer says it is not inactivity",
+    "passed": true,
+    "evidence": {
+     "empty_days": 12,
+     "days": 14,
+     "disclaimer": "Wynik interpretacyjny: szacunek z jawnym modelem i przedziałami, nie obserwacja. „nieobserwowane” oznacza brak obserwacji, a nie bezczynność. Interpretive result: an estimate with an explicit model and bounds, not an observation; \"nieobserwowane\" means no observation, never idleness."
+    }
+   },
+   {
+    "id": "budget.parallel_chatbots_not_double_counted",
+    "criteria": [
+     "K1.g",
+     "K3.a"
+    ],
+    "stage": "time_budget",
+    "description": "with both chatbots in one category the day total is the union: it equals the sum of the separate per-chatbot unions minus their measured overlap, and the split_equal total; it is below the plain sum",
+    "passed": true,
+    "evidence": {
+     "union_one_category": 496.18,
+     "sum_separate_count_both": 556.68,
+     "overlap_s": 60.5,
+     "split_equal_sum": 496.18,
+     "run": 2
+    }
+   },
+   {
+    "id": "budget.parameter_change_new_run_old_kept",
+    "criteria": [
+     "K3.b"
+    ],
+    "stage": "time_budget",
+    "description": "changing parameters stores a new run with a new hash and different numbers; the old run is still retrievable and its stored result re-hashes to the original hash; the same parameters reuse it",
+    "passed": true,
+    "evidence": {
+     "first": {
+      "run_id": 1,
+      "reused": false,
+      "result_sha256": "79a5dda31edfa4565642ee0b65f9518168c34f264031bca1b82bd6ac7e7c0201",
+      "parameters_sha256": "6db683555f073132bdd312373691a9ff439ce9edd08716a30df838af8e1566ad",
+      "created_at": "2026-10-16T21:19:21.209Z"
+     },
+     "changed": {
+      "run_id": 5,
+      "reused": false,
+      "result_sha256": "d834c8a30d95d38fa859edf98429f7f04803fbfdedbb905372060a5cf1a21bee",
+      "parameters_sha256": "b41c70dc8ac685021c5fe581994cb69ecd684d8d20ce2297f780758f5a4d6b66",
+      "created_at": "2026-10-16T21:19:21.889Z"
+     },
+     "recomputed_old_hash": "79a5dda31edfa4565642ee0b65f9518168c34f264031bca1b82bd6ac7e7c0201",
+     "rerun_same_params": {
+      "run_id": 1,
+      "reused": true,
+      "result_sha256": "79a5dda31edfa4565642ee0b65f9518168c34f264031bca1b82bd6ac7e7c0201",
+      "parameters_sha256": "6db683555f073132bdd312373691a9ff439ce9edd08716a30df838af8e1566ad",
+      "created_at": "2026-10-16T21:19:21.209Z"
+     },
+     "runs_listed": 5
+    }
+   },
+   {
+    "id": "hypothesis.eventstudy_reproducible",
+    "criteria": [
+     "K3.a",
+     "K3.b"
+    ],
+    "stage": "hypothesis",
+    "description": "the preregistered, seeded event study gives the same result hash on a re-run and lists the earlier run",
+    "passed": true,
+    "evidence": {
+     "definition_sha256": "bf323014c78051279812681da235e78cc8ae49d8a671b5c04424de84ca55159a",
+     "seed": 20261016,
+     "input_sha256": "9e1ca89a79adf93c8ef0eb91106a3e7749b5fcebbba181869d195c21bd438514",
+     "result_sha256": "aa3ab5f336d290e7ebfa2edbdf129c8c3b306316ab279a759c6453cd7873d6b2",
+     "second_run": 2,
+     "observed_pairs": {
+      "after-1d": 2.0
+     }
+    }
+   },
+   {
+    "id": "hypothesis.causation_warning",
+    "criteria": [
+     "N2"
+    ],
+    "stage": "hypothesis",
+    "description": "the causation warning is always flagged and the hashed disclaimer says the result is auxiliary material, not a causal conclusion",
+    "passed": true,
+    "evidence": {
+     "flagged": [
+      "causation",
+      "detection_bias",
+      "seasonality",
+      "clustering",
+      "unknown_zone_excluded"
+     ],
+     "disclaimer_sha256_pl": "4b0c08a0ce3c680fd97550372383859ef2458a7b877133bf04ff8aab58d48a5c"
+    }
+   },
+   {
+    "id": "hypothesis.no_provider_call",
+    "criteria": [
+     "N1"
+    ],
+    "stage": "hypothesis",
+    "description": "candidate search used no model provider and no opt-in",
+    "passed": true,
+    "evidence": {
+     "name": "none",
+     "opt_in": false,
+     "external": false,
+     "returned": 0
+    }
+   },
+   {
+    "id": "hypothesis.thesis_without_evidence_flagged",
+    "criteria": [
+     "N2"
+    ],
+    "stage": "hypothesis",
+    "description": "a thesis without an evidence pointer is flagged unsupported automatically",
+    "passed": true,
+    "evidence": {
+     "supported": [],
+     "unsupported": [
+      "unsupported"
+     ]
+    }
+   },
+   {
+    "id": "reports.five_types_written",
+    "criteria": [
+     "K3.a"
+    ],
+    "stage": "reports",
+    "description": "all five report types are generated into the private output directory with HTML, JSON, CSV and XLSX",
+    "passed": true,
+    "evidence": {
+     "catalog": {
+      "formats": {
+       "html": "written",
+       "json": "written",
+       "csv": "written",
+       "xlsx": "written",
+       "pdf": "written"
+      },
+      "sections": {
+       "catalog": "ok",
+       "sources": "ok",
+       "chat_records": "ok",
+       "media": "ok",
+       "integrations": "empty"
+      },
+      "files": 42
+     },
+     "timeline": {
+      "formats": {
+       "html": "written",
+       "json": "written",
+       "csv": "written",
+       "xlsx": "written",
+       "pdf": "written"
+      },
+      "sections": {
+       "timeline": "ok",
+       "communications": "ok",
+       "citations": "ok",
+       "annotations": "empty"
+      },
+      "files": 33
+     },
+     "time_budget": {
+      "formats": {
+       "html": "written",
+       "json": "written",
+       "csv": "written",
+       "xlsx": "written",
+       "pdf": "written"
+      },
+      "sections": {
+       "time_budget": "ok"
+      },
+      "files": 27
+     },
+     "hypothesis_dossier": {
+      "formats": {
+       "html": "written",
+       "json": "written",
+       "csv": "written",
+       "xlsx": "written",
+       "pdf": "written"
+      },
+      "sections": {
+       "hypothesis_dossier": "ok",
+       "citations": "ok"
+      },
+      "files": 30
+     },
+     "lawyer_package": {
+      "formats": {
+       "html": "written",
+       "json": "written",
+       "csv": "written",
+       "xlsx": "written",
+       "pdf": "written"
+      },
+      "sections": {
+       "counterparties": "ok",
+       "citations": "ok",
+       "documents": "ok",
+       "annotations": "empty",
+       "open_questions": "ok"
+      },
+      "files": 43
+     }
+    }
+   },
+   {
+    "id": "reports.pdf_via_chromium",
+    "criteria": [
+     "K3.a"
+    ],
+    "stage": "reports",
+    "description": "PDF printed by the configured Chromium for every report",
+    "passed": true,
+    "evidence": {
+     "pdf": {
+      "catalog": "written",
+      "timeline": "written",
+      "time_budget": "written",
+      "hypothesis_dossier": "written",
+      "lawyer_package": "written"
+     },
+     "chromium": "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"
+    }
+   },
+   {
+    "id": "reports.manifests_verify",
+    "criteria": [
+     "K3.a"
+    ],
+    "stage": "reports",
+    "description": "report-verify accepts every manifest against its registered SHA-256 (digest, files, content, citation bundle)",
+    "passed": true,
+    "evidence": {
+     "catalog": {
+      "valid": true,
+      "files_valid": true,
+      "bundle_valid": true,
+      "warnings": [
+       "unsigned_manifest"
+      ]
+     },
+     "timeline": {
+      "valid": true,
+      "files_valid": true,
+      "bundle_valid": true,
+      "warnings": [
+       "unsigned_manifest"
+      ]
+     },
+     "time_budget": {
+      "valid": true,
+      "files_valid": true,
+      "bundle_valid": true,
+      "warnings": [
+       "unsigned_manifest"
+      ]
+     },
+     "hypothesis_dossier": {
+      "valid": true,
+      "files_valid": true,
+      "bundle_valid": true,
+      "warnings": [
+       "unsigned_manifest"
+      ]
+     },
+     "lawyer_package": {
+      "valid": true,
+      "files_valid": true,
+      "bundle_valid": true,
+      "warnings": [
+       "unsigned_manifest"
+      ]
+     }
+    }
+   },
+   {
+    "id": "reports.numbers_traceable",
+    "criteria": [
+     "K3.a"
+    ],
+    "stage": "reports",
+    "description": "every data-k span in each report HTML equals its value in report.json and no numeral appears outside the spans (the reports tests' crosscheck, run on this corpus)",
+    "passed": true,
+    "evidence": [
+     {
+      "report_type": "catalog",
+      "spans": 2243,
+      "mismatches": 0,
+      "mismatch_examples": [],
+      "stray_numerals": 0,
+      "stray_examples": [],
+      "title_ok": true
+     },
+     {
+      "report_type": "timeline",
+      "spans": 2450,
+      "mismatches": 0,
+      "mismatch_examples": [],
+      "stray_numerals": 0,
+      "stray_examples": [],
+      "title_ok": true
+     },
+     {
+      "report_type": "time_budget",
+      "spans": 1119,
+      "mismatches": 0,
+      "mismatch_examples": [],
+      "stray_numerals": 0,
+      "stray_examples": [],
+      "title_ok": true
+     },
+     {
+      "report_type": "hypothesis_dossier",
+      "spans": 963,
+      "mismatches": 0,
+      "mismatch_examples": [],
+      "stray_numerals": 0,
+      "stray_examples": [],
+      "title_ok": true
+     },
+     {
+      "report_type": "lawyer_package",
+      "spans": 1973,
+      "mismatches": 0,
+      "mismatch_examples": [],
+      "stray_numerals": 0,
+      "stray_examples": [],
+      "title_ok": true
+     }
+    ]
+   },
+   {
+    "id": "reports.budget_numbers_equal_stored_run",
+    "criteria": [
+     "K3.a"
+    ],
+    "stage": "reports",
+    "description": "the time-budget report shows exactly the totals and candles of the stored run it names (result hash re-verified)",
+    "passed": true,
+    "evidence": {
+     "run_id": 1,
+     "equal": true,
+     "totals_rows": 6,
+     "candle_rows_compared": 22,
+     "result_sha256": "79a5dda31edfa4565642ee0b65f9518168c34f264031bca1b82bd6ac7e7c0201",
+     "recomputed_sha256": "79a5dda31edfa4565642ee0b65f9518168c34f264031bca1b82bd6ac7e7c0201",
+     "mismatches": []
+    }
+   },
+   {
+    "id": "reports.tamper_detected",
+    "criteria": [
+     "K3.a"
+    ],
+    "stage": "reports",
+    "description": "changing one byte-range of one table in a copy makes report-verify fail (exit 1, file_digest_mismatch); the original still verifies",
+    "passed": true,
+    "evidence": {
+     "errors": [
+      {
+       "code": "file_digest_mismatch",
+       "path": "tables/000-counterparties__counterparties.summary.csv",
+       "message": "File size or SHA-256 differs from the manifest."
+      }
+     ],
+     "tampered_file": "000-counterparties__counterparties.summary.csv"
+    }
+   },
+   {
+    "id": "citations.bundle_and_packet_verify",
+    "criteria": [],
+    "stage": "citations",
+    "description": "the report's citation bundle and a single packet export and inspect as valid without source access",
+    "passed": true,
+    "evidence": {
+     "bundle_packets": 2,
+     "bundle_excluded": [],
+     "inspection": [
+      {
+       "path": "packets/a3-c1.json",
+       "artifact_id": 3,
+       "anchor_id": 1,
+       "derived_text_id": 2,
+       "quote_sha256": "6396a2c0b5fdeebdbe3160bc06ca4234385fda1495bd88a4b3a4a6e7b85eb9ea",
+       "verification": "matches_included_pinned_transcript"
+      },
+      {
+       "path": "packets/a3-c2.json",
+       "artifact_id": 3,
+       "anchor_id": 2,
+       "derived_text_id": 1,
+       "quote_sha256": "e6b372ad50f6aa3e7daffd73dc030f676d9ced9d694984d2f761de8ccbd81831",
+       "verification": "matches_included_pinned_transcript"
+      }
+     ],
+     "packet_payload_sha256": "1ab3f4f77ff8981737d70825904bb28992db1f55620d43b476954050f0dfafdd"
+    }
+   },
+   {
+    "id": "metadata.export_verifies",
+    "criteria": [],
+    "stage": "metadata",
+    "description": "the metadata package of the whole run verifies (digest, relationships, anchors; regression: file-name import runs named a missing artifact)",
+    "passed": true,
+    "evidence": {
+     "errors": [],
+     "warning_codes": [
+      "unknown_audit_target_kind",
+      "unsigned_metadata_only"
+     ],
+     "counts": {
+      "cases": 1,
+      "sources": 24,
+      "artifacts": 37,
+      "source_observations": 118,
+      "events": 125,
+      "processing_runs": 2,
+      "derived_text": 2,
+      "annotations": 0,
+      "evidence_anchors": 2,
+      "tags": 0,
+      "artifact_tags": 0,
+      "event_tags": 0,
+      "links": 0,
+      "jobs": 2,
+      "audit_log": 699,
+      "schema_migrations": 36
+     }
+    }
+   },
+   {
+    "id": "read_api.token_search_window_packet",
+    "criteria": [],
+    "stage": "read_api",
+    "description": "the read API refuses a request without a token and, with the token, answers search, the timeline window and a citation packet byte-identical to the CLI export",
+    "passed": true,
+    "evidence": {
+     "search_items": 14,
+     "window_items": 9,
+     "chatbots": [
+      "chatgpt",
+      "claude"
+     ],
+     "artifact_versions": 2,
+     "packet_bytes": 23905
+    }
+   },
+   {
+    "id": "read_api.revoked_token_refused",
+    "criteria": [],
+    "stage": "read_api",
+    "description": "a revoked token is refused",
+    "passed": true,
+    "evidence": {
+     "status": 401,
+     "revoked": "revoked"
+    }
+   },
+   {
+    "id": "originals.unchanged",
+    "criteria": [
+     "K2.b",
+     "N3"
+    ],
+    "stage": "originals",
+    "description": "every source root is byte-, size-, mode- and mtime-identical after the whole run (no file added, removed or touched)",
+    "passed": true,
+    "evidence": {
+     "changed": {},
+     "tree_sha256": {
+      "phone_a": "ae7949f8a958c0888dcdcb4b82f6b9ad5daa50f7130207ecaafa7b754007f9f1",
+      "drive_b": "673e87420c1edc96fdeeb401aaa6d434fe98873af89164843e33d3cbe55fa178",
+      "drive_c": "4f8a1b34646a028bdff8fbfe222e0bd1bb110cf6d4db740c01b7de3c84ad2fa7"
+     }
+    }
+   },
+   {
+    "id": "repository.untouched_by_run",
+    "criteria": [
+     "K4",
+     "N3"
+    ],
+    "stage": "repository",
+    "description": "the run wrote nothing into the repository checkout",
+    "passed": true,
+    "evidence": {
+     "new_entries": []
+    }
+   },
+   {
+    "id": "repository.verify_passes",
+    "criteria": [
+     "K4"
+    ],
+    "stage": "repository",
+    "description": "scripts/verify_repository.py (links, snapshots, privacy heuristics: e-mails, phone numbers, user paths) passes",
+    "passed": true,
+    "evidence": {
+     "rc": 0,
+     "tail": [
+      "Historical snapshots: 108; active pages: 74; relative links: 349; privacy-scanned files: 628"
+     ],
+     "problems": []
+    }
+   }
+  ],
+  "summary": {
+   "checks": 52,
+   "passed": 52,
+   "failed": [],
+   "criteria": {
+    "met": [
+     "K1.a",
+     "K1.b",
+     "K1.c",
+     "K1.d",
+     "K1.e",
+     "K1.f",
+     "K1.g",
+     "K1.h",
+     "K1.i",
+     "K1.j",
+     "K1.k",
+     "K2.a",
+     "K2.b",
+     "K3.a",
+     "K3.b",
+     "K4",
+     "N1",
+     "N2",
+     "N3"
+    ],
+    "not_met": [],
+    "not_verifiable_in_run": [
+     "K5",
+     "N4",
+     "N5"
+    ]
+   }
+  },
+  "criteria": {
+   "K1.a": {
+    "criterion": "Corpus: the same ChatGPT conversation in three exports with one edit and one branch",
+    "status": "met",
+    "checks": [
+     "timeline.same_conversation_three_exports"
+    ],
+    "note": null
+   },
+   "K1.b": {
+    "criterion": "Corpus: an e-mail attachment that is the same PDF as a file on disk",
+    "status": "met",
+    "checks": [
+     "catalog.pdf_on_disk_and_in_whatsapp",
+     "ingest.same_pdf_three_provenances"
+    ],
+    "note": null
+   },
+   "K1.c": {
+    "criterion": "Corpus: a recording with interleaved PL/NL/EN (synthetic TTS or a labelled fixture)",
+    "status": "met",
+    "checks": [
+     "asr.two_recipes_two_runs_two_versions",
+     "asr.comparison_deterministic",
+     "service.word_citation_across_language_switch"
+    ],
+    "note": null
+   },
+   "K1.d": {
+    "criterion": "Corpus: a recording without a call-log entry and a call-log entry without a recording",
+    "status": "met",
+    "checks": [
+     "timeline.recording_call_cases_visible"
+    ],
+    "note": null
+   },
+   "K1.e": {
+    "criterion": "Corpus: a file-name collision (same name, different bytes)",
+    "status": "met",
+    "checks": [
+     "catalog.name_collision"
+    ],
+    "note": null
+   },
+   "K1.f": {
+    "criterion": "Corpus: AM/PM, an unknown zone and a DST change",
+    "status": "met",
+    "checks": [
+     "timeline.ampm_unknown_zone_dst"
+    ],
+    "note": null
+   },
+   "K1.g": {
+    "criterion": "Corpus: parallel conversations with two chatbots overlapping in time",
+    "status": "met",
+    "checks": [
+     "timeline.two_chatbots_overlap",
+     "budget.parallel_chatbots_not_double_counted"
+    ],
+    "note": null
+   },
+   "K1.h": {
+    "criterion": "Corpus: a long gap without data",
+    "status": "met",
+    "checks": [
+     "catalog.gap_found",
+     "timeline.long_gap_without_events",
+     "budget.unobserved_band"
+    ],
+    "note": null
+   },
+   "K1.i": {
+    "criterion": "Corpus: a zip inside a zip",
+    "status": "met",
+    "checks": [
+     "catalog.zip_in_zip"
+    ],
+    "note": null
+   },
+   "K1.j": {
+    "criterion": "Corpus: a .dat file that is a PDF",
+    "status": "met",
+    "checks": [
+     "catalog.dat_in_both_drives",
+     "catalog.dat_is_pdf"
+    ],
+    "note": null
+   },
+   "K1.k": {
+    "criterion": "Corpus: at least two collections (devices/accounts) and a copy of an export on a second drive",
+    "status": "met",
+    "checks": [
+     "collections.created",
+     "catalog.scans_complete",
+     "catalog.export_copy_on_second_drive",
+     "catalog.dat_in_both_drives",
+     "timeline.same_conversation_three_exports"
+    ],
+    "note": null
+   },
+   "K2.a": {
+    "criterion": "Re-import duplicates nothing",
+    "status": "met",
+    "checks": [
+     "plan.run_completed",
+     "reimport.plain_rerun_selects_nothing",
+     "reimport.rerun_done_creates_no_evidence_rows",
+     "reimport.rescan_and_new_plan_creates_no_evidence_rows",
+     "reimport.no_duplicate_events"
+    ],
+    "note": null
+   },
+   "K2.b": {
+    "criterion": "Originals keep their hashes (and mtimes) before/after",
+    "status": "met",
+    "checks": [
+     "originals.unchanged"
+    ],
+    "note": null
+   },
+   "K3.a": {
+    "criterion": "Every number in a report is reproducible from stored parameters / traceable to code",
+    "status": "met",
+    "checks": [
+     "budget.method_names_real_rule",
+     "budget.parallel_chatbots_not_double_counted",
+     "hypothesis.eventstudy_reproducible",
+     "reports.five_types_written",
+     "reports.pdf_via_chromium",
+     "reports.manifests_verify",
+     "reports.numbers_traceable",
+     "reports.budget_numbers_equal_stored_run",
+     "reports.tamper_detected"
+    ],
+    "note": null
+   },
+   "K3.b": {
+    "criterion": "A parameter change gives a new result; the old one stays retrievable unchanged",
+    "status": "met",
+    "checks": [
+     "budget.parameter_change_new_run_old_kept",
+     "hypothesis.eventstudy_reproducible"
+    ],
+    "note": null
+   },
+   "K4": {
+    "criterion": "No private data in tracked files (scripts/verify_repository.py with privacy heuristics)",
+    "status": "met",
+    "checks": [
+     "repository.untouched_by_run",
+     "repository.verify_passes"
+    ],
+    "note": null
+   },
+   "K5": {
+    "criterion": "Backend/JS/browser tests run locally; Android only if changed",
+    "status": "not_verifiable_in_run",
+    "checks": [],
+    "note": "Not an end-to-end property. The local suite runs (pytest, node, browser scripts) are recorded in docs/validation/E2E_ACCEPTANCE_2026-10-16.md; Android was not changed by this task."
+   },
+   "N1": {
+    "criterion": "No private material sent to external APIs without an explicit per-run opt-in",
+    "status": "met",
+    "checks": [
+     "layout.private_outside_repo",
+     "catalog.describe_without_provider",
+     "plan.bulk_approval_leaves_choices_to_a_person",
+     "plan.opt_ins_stay_off",
+     "hypothesis.no_provider_call"
+    ],
+    "note": null
+   },
+   "N2": {
+    "criterion": "Unobserved is never presented as inactivity; correlation never as cause",
+    "status": "met",
+    "checks": [
+     "timeline.nothing_auto_accepted",
+     "budget.unobserved_band",
+     "hypothesis.causation_warning",
+     "hypothesis.thesis_without_evidence_flagged"
+    ],
+    "note": null
+   },
+   "N3": {
+    "criterion": "Originals, names, numbers and dates are not modified",
+    "status": "met",
+    "checks": [
+     "catalog.export_outside_sources",
+     "originals.unchanged",
+     "repository.untouched_by_run"
+    ],
+    "note": null
+   },
+   "N4": {
+    "criterion": "Already accepted functions are not re-implemented",
+    "status": "not_verifiable_in_run",
+    "checks": [],
+    "note": "A review property of the change set, not of a run. This task adds no product feature; its shared edits are three defect fixes with four regression tests (listed in the receipt)."
+   },
+   "N5": {
+    "criterion": "The five standard layers are not declared as implemented",
+    "status": "not_verifiable_in_run",
+    "checks": [],
+    "note": "A documentation property. CLAUDE.md, HANDOFF.md and docs/FEATURES.md keep the five-layer standard as future work; the report method sections cover layer-1 metadata only and say so."
+   }
+  },
+  "facts": {
+   "layout": {
+    "files_per_root": {
+     "phone_a": 26,
+     "drive_b": 7,
+     "drive_c": 2
+    },
+    "tree_sha256_before": {
+     "phone_a": "ae7949f8a958c0888dcdcb4b82f6b9ad5daa50f7130207ecaafa7b754007f9f1",
+     "drive_b": "673e87420c1edc96fdeeb401aaa6d434fe98873af89164843e33d3cbe55fa178",
+     "drive_c": "4f8a1b34646a028bdff8fbfe222e0bd1bb110cf6d4db740c01b7de3c84ad2fa7"
+    },
+    "audio_label": "synthetic sine tones and silence; NOT speech, not a recording"
+   },
+   "plan": {
+    "plan_id": 1,
+    "items": 27,
+    "run_id": 1,
+    "cross_export": {
+     "command": "import-plan-cross",
+     "before_import": {
+      "basis": "plan time: identical conversation-file bytes and conversation ids read from files within the scan bound",
+      "identical_conversation_files": [
+       {
+        "conversation_files_sha256": [
+         "756b73322ee0d4e0b42b323217dbd7bbc64a58244d93f5ed61d9d85f494930c6",
+         "cf9569d458a5ad28ff93f2d0e8c1e4ac9aa2e4cf3aebf0cc646a3f756ae98762"
+        ],
+        "item_ordinals": [
+         14,
+         26
+        ]
+       }
+      ],
+      "policy": "every occurrence is imported; nothing is deduplicated or deleted",
+      "shared_conversations": [
+       {
+        "conversation_id": "6b1f0c2e-0000-4000-8000-00000000c001",
+        "item_ordinals": [
+         14,
+         16,
+         26,
+         27
+        ],
+        "namespace": "chatgpt"
+       },
+       {
+        "conversation_id": "6b1f0c2e-0000-4000-8000-00000000c002",
+        "item_ordinals": [
+         14,
+         26
+        ],
+        "namespace": "chatgpt"
+       },
+       {
+        "conversation_id": "6b1f0c2e-0000-4000-8000-00000000c0d1",
+        "item_ordinals": [
+         14,
+         26
+        ],
+        "namespace": "chatgpt"
+       }
+      ],
+      "shared_conversations_total": 3,
+      "shared_conversations_truncated": 0,
+      "units": [
+       {
+        "collection_id": 2,
+        "conversation_ids": 3,
+        "issues": {},
+        "locator": "chatgpt-export-2025-03.zip",
+        "namespaces": [
+         "chatgpt"
+        ],
+        "ordinal": 14,
+        "scanned": true
+       },
+       {
+        "collection_id": 2,
+        "conversation_ids": 0,
+        "issues": {},
+        "locator": "exports/ambiguous",
+        "namespaces": [
+         "chatgpt",
+         "claude"
+        ],
+        "ordinal": 15,
+        "scanned": true
+       },
+       {
+        "collection_id": 2,
+        "conversation_ids": 2,
+        "issues": {},
+        "locator": "exports/chatgpt-2024-12",
+        "namespaces": [
+         "chatgpt"
+        ],
+        "ordinal": 16,
+        "scanned": true
+       },
+       {
+        "collection_id": 2,
+        "conversation_ids": 2,
+        "issues": {},
+        "locator": "exports/claude",
+        "namespaces": [
+         "claude"
+        ],
+        "ordinal": 17,
+        "scanned": true
+       },
+       {
+        "collection_id": 3,
+        "conversation_ids": 3,
+        "issues": {},
+        "locator": "copy/chatgpt-export-2025-03.zip",
+        "namespaces": [
+         "chatgpt"
+        ],
+        "ordinal": 26,
+        "scanned": true
+       },
+       {
+        "collection_id": 3,
+        "conversation_ids": 1,
+        "issues": {},
+        "locator": "later-export",
+        "namespaces": [
+         "chatgpt"
+        ],
+        "ordinal": 27,
+        "scanned": true
+       }
+      ]
+     },
+     "after_import": {
+      "basis": "after import: logical records of the chat importers (dedup report has the details)",
+      "exports": [
+       {
+        "export_id": 1,
+        "label": "catalog:collection/2/chatgpt-export-2025-03.zip",
+        "item_id": 14,
+        "collection_id": 2
+       },
+       {
+        "export_id": 2,
+        "label": "catalog:collection/2/exports/ambiguous",
+        "item_id": 15,
+        "collection_id": 2
+       },
+       {
+        "export_id": 3,
+        "label": "catalog:collection/2/exports/chatgpt-2024-12",
+        "item_id": 16,
+        "collection_id": 2
+       },
+       {
+        "export_id": 4,
+        "label": "catalog:collection/2/exports/claude",
+        "item_id": 17,
+        "collection_id": 2
+       },
+       {
+        "export_id": 5,
+        "label": "catalog:collection/3/copy/chatgpt-export-2025-03.zip",
+        "item_id": 26,
+        "collection_id": 3
+       },
+       {
+        "export_id": 6,
+        "label": "catalog:collection/3/later-export",
+        "item_id": 27,
+        "collection_id": 3
+       }
+      ],
+      "conversations": [
+       {
+        "namespace": "chatgpt",
+        "conversation_id": "6b1f0c2e-0000-4000-8000-00000000c001",
+        "exports": [
+         {
+          "export_id": 1,
+          "label": "catalog:collection/2/chatgpt-export-2025-03.zip",
+          "item_id": 14,
+          "collection_id": 2
+         },
+         {
+          "export_id": 3,
+          "label": "catalog:collection/2/exports/chatgpt-2024-12",
+          "item_id": 16,
+          "collection_id": 2
+         },
+         {
+          "export_id": 5,
+          "label": "catalog:collection/3/copy/chatgpt-export-2025-03.zip",
+          "item_id": 26,
+          "collection_id": 3
+         },
+         {
+          "export_id": 6,
+          "label": "catalog:collection/3/later-export",
+          "item_id": 27,
+          "collection_id": 3
+         }
+        ],
+        "title_variants": 2,
+        "dedup_report": "/api/imports/chat/dedup-report?namespace=chatgpt"
+       },
+       {
+        "namespace": "chatgpt",
+        "conversation_id": "6b1f0c2e-0000-4000-8000-00000000c002",
+        "exports": [
+         {
+          "export_id": 1,
+          "label": "catalog:collection/2/chatgpt-export-2025-03.zip",
+          "item_id": 14,
+          "collection_id": 2
+         },
+         {
+          "export_id": 5,
+          "label": "catalog:collection/3/copy/chatgpt-export-2025-03.zip",
+          "item_id": 26,
+          "collection_id": 3
+         }
+        ],
+        "title_variants": 1,
+        "dedup_report": "/api/imports/chat/dedup-report?namespace=chatgpt"
+       },
+       {
+        "namespace": "chatgpt",
+        "conversation_id": "6b1f0c2e-0000-4000-8000-00000000c0d1",
+        "exports": [
+         {
+          "export_id": 1,
+          "label": "catalog:collection/2/chatgpt-export-2025-03.zip",
+          "item_id": 14,
+          "collection_id": 2
+         },
+         {
+          "export_id": 5,
+          "label": "catalog:collection/3/copy/chatgpt-export-2025-03.zip",
+          "item_id": 26,
+          "collection_id": 3
+         }
+        ],
+        "title_variants": 1,
+        "dedup_report": "/api/imports/chat/dedup-report?namespace=chatgpt"
+       }
+      ],
+      "conversations_total": 3,
+      "truncated": false,
+      "policy": "every occurrence is imported; nothing is deduplicated or deleted"
+     }
+    }
+   },
+   "table_counts_after_import": {
+    "artifacts": 36,
+    "audit_log": 665,
+    "cases": 1,
+    "catalog_content_groups": 49,
+    "catalog_entries": 116,
+    "catalog_entry_artifacts": 60,
+    "catalog_entry_times": 116,
+    "catalog_profiles": 1,
+    "catalog_scans": 6,
+    "chat_attachment_refs": 6,
+    "collections": 3,
+    "contact_observation_values": 9,
+    "contact_observations": 4,
+    "event_media_references": 10,
+    "event_times": 161,
+    "events": 125,
+    "import_plan_attempts": 72,
+    "import_plan_decisions": 48,
+    "import_plan_item_members": 76,
+    "import_plan_items": 54,
+    "import_plan_runs": 4,
+    "import_plan_versions": 6,
+    "import_plans": 2,
+    "logical_occurrences": 73,
+    "logical_records": 34,
+    "record_export_files": 10,
+    "record_export_parses": 8,
+    "record_exports": 6,
+    "recording_name_observations": 5,
+    "schema_migrations": 36,
+    "search_fts": 165,
+    "search_fts_config": 1,
+    "search_fts_content": 165,
+    "search_fts_data": 14,
+    "search_fts_docsize": 165,
+    "search_fts_idx": 12,
+    "source_observations": 117,
+    "sources": 24,
+    "workbench_fts": 161,
+    "workbench_fts_config": 1,
+    "workbench_fts_data": 8,
+    "workbench_fts_docsize": 161,
+    "workbench_fts_idx": 6,
+    "workbench_search_docs": 161
+   },
+   "asr": {
+    "wav_artifact": 3,
+    "versions": [
+     1,
+     2
+    ],
+    "queue_jobs": 2
+   },
+   "timeline": {
+    "projection_counts": {
+     "events": 125,
+     "malformed_transcript_versions": 0,
+     "max_halfwidth_us": 129599999999,
+     "segments": 11,
+     "transcript_versions": 2,
+     "undated_events": 12,
+     "undated_segments": 0
+    },
+    "rule_sha256": "dd319c389520f09b498aa49bd0e961252ae1870b4dff526d1c1fa0d3568e0aa4"
+   },
+   "budget": {
+    "run_id": 1,
+    "totals": {
+     "window_length_s": 1209600.0,
+     "categories": {
+      "praca_projekty": {
+       "lower": 7.0,
+       "probable": 520.66,
+       "upper": 12392.38,
+       "wick_low": 7.0,
+       "wick_high": 22884.48,
+       "body_low": 513.06,
+       "body_high": 1592.38
+      },
+      "sprawy_urzedowe": {
+       "lower": 0.0,
+       "probable": 0.0,
+       "upper": 0.0,
+       "wick_low": 0.0,
+       "wick_high": 0.0,
+       "body_low": 0.0,
+       "body_high": 0.0
+      },
+      "zdrowie": {
+       "lower": 0.0,
+       "probable": 0.0,
+       "upper": 0.0,
+       "wick_low": 0.0,
+       "wick_high": 0.0,
+       "body_low": 0.0,
+       "body_high": 0.0
+      },
+      "inne": {
+       "lower": 0.0,
+       "probable": 0.0,
+       "upper": 0.0,
+       "wick_low": 0.0,
+       "wick_high": 0.0,
+       "body_low": 0.0,
+       "body_high": 0.0
+      },
+      "bez_kategorii": {
+       "lower": 0.0,
+       "probable": 0.0,
+       "upper": 0.0,
+       "wick_low": 0.0,
+       "wick_high": 0.0,
+       "body_low": 0.0,
+       "body_high": 0.0
+      }
+     },
+     "unobserved": {
+      "lower": 1197207.62,
+      "probable": 1209079.34,
+      "upper": 1209593.0,
+      "wick_low": 1186715.52,
+      "wick_high": 1209593.0
+     },
+     "observed": {
+      "lower": 7.0,
+      "probable": 520.66,
+      "upper": 12392.38
+     },
+     "overlap_s": {
+      "lower": 0.0,
+      "probable": 0.0,
+      "upper": 0.0
+     },
+     "double_counted_probable_s": 0.0
+    },
+    "exclusions": {
+     "untimed": {
+      "count": 13,
+      "by_reason": {
+       "no_time_candidate": 12,
+       "unknown_zone": 1
+      },
+      "event_ids": [
+       18,
+       37,
+       54,
+       69,
+       70,
+       72,
+       73,
+       74,
+       94,
+       95,
+       98,
+       100,
+       117
+      ],
+      "event_ids_truncated": false,
+      "scope": "unknown-zone wall clocks that could fall in the loaded window under any real UTC offset, and every event without a usable time (undated)"
+     },
+     "filtered": {
+      "count": 5,
+      "by_reason": {
+       "excluded_event_type:chat_conversation": 4,
+       "hidden_by_projection": 1
+      }
+     },
+     "assumed_zone_items": 0,
+     "hidden_excluded_by_seam": 0,
+     "ambiguous_fold_items_carried": 0,
+     "source_truncated": false
+    }
+   },
+   "pdf": {
+    "status": {
+     "catalog": "written",
+     "timeline": "written",
+     "time_budget": "written",
+     "hypothesis_dossier": "written",
+     "lawyer_package": "written"
+    },
+    "executable": "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"
+   },
+   "reports": {
+    "catalog": {
+     "report_id": 1,
+     "manifest_sha256": "a7f06df5db36dd471f9f6afb241a10eb01aaaafb3643bc0be531d4dbb1a8c1de",
+     "content_sha256": "f7f427be3039540937d6a73cd87f15e5de995d982dfe39881a6ffbcf81aae254"
+    },
+    "timeline": {
+     "report_id": 2,
+     "manifest_sha256": "2e030735012bb2fb7f1d8d7db85d1ebffeabf9dc1f4088b57f213e91c656848a",
+     "content_sha256": "3723b3cae363b9f8eae4720357b4ceafda2841402daf9d467a56a4285909464a"
+    },
+    "time_budget": {
+     "report_id": 3,
+     "manifest_sha256": "db04b9a57c2c19374c0bd361265c62d1f33efb509c24e0d87ab393de0bd5e875",
+     "content_sha256": "8de79f633a6f176f6607592b8ac97533d68250c22a8d3ff64917eb7e7c5ff50f"
+    },
+    "hypothesis_dossier": {
+     "report_id": 4,
+     "manifest_sha256": "82861e95cdf8efdebf5b44a7a5d36cf19f22934dfedd26cdc6a1b38a05e2c3bc",
+     "content_sha256": "9df8023129581b51594823653d9bd5332a03b23b5535a49c95a4c3d26a28aa82"
+    },
+    "lawyer_package": {
+     "report_id": 5,
+     "manifest_sha256": "be79f0b41f3c8e13daa1a592eba4edae3795e322667d77591210345f1b79e763",
+     "content_sha256": "8c459b3501431342f8c4c7661f02a8996d69152aa6000932aa63be3f9d404422"
+    }
+   },
+   "reports_registered": 5
+  }
+ },
+ "e2e_run_heavy": {
+  "variant": "heavy",
+  "git": {
+   "head": "48994d27245af42e9ace19380cf4cebbcee4b4ef",
+   "dirty": false
+  },
+  "wall_seconds": 43.195,
+  "error": null,
+  "summary": {
+   "checks": 53,
+   "passed": 53,
+   "failed": [],
+   "criteria": {
+    "met": [
+     "K1.a",
+     "K1.b",
+     "K1.c",
+     "K1.d",
+     "K1.e",
+     "K1.f",
+     "K1.g",
+     "K1.h",
+     "K1.i",
+     "K1.j",
+     "K1.k",
+     "K2.a",
+     "K2.b",
+     "K3.a",
+     "K3.b",
+     "K4",
+     "N1",
+     "N2",
+     "N3"
+    ],
+    "not_met": [],
+    "not_verifiable_in_run": [
+     "K5",
+     "N4",
+     "N5"
+    ]
+   }
+  },
+  "stages": [
+   {
+    "name": "layout",
+    "seconds": 0.648,
+    "status": "ok",
+    "commands": 0
+   },
+   {
+    "name": "collections",
+    "seconds": 0.697,
+    "status": "ok",
+    "commands": 5
+   },
+   {
+    "name": "catalog",
+    "seconds": 1.791,
+    "status": "ok",
+    "commands": 11
+   },
+   {
+    "name": "import_plan",
+    "seconds": 4.596,
+    "status": "ok",
+    "commands": 8
+   },
+   {
+    "name": "reimport",
+    "seconds": 8.228,
+    "status": "ok",
+    "commands": 10
+   },
+   {
+    "name": "heavy_adversarial_plan",
+    "seconds": 2.363,
+    "status": "ok",
+    "commands": 4
+   },
+   {
+    "name": "catalog_ingest",
+    "seconds": 0.296,
+    "status": "ok",
+    "commands": 2
+   },
+   {
+    "name": "asr",
+    "seconds": 1.167,
+    "status": "ok",
+    "commands": 6
+   },
+   {
+    "name": "service_and_citation",
+    "seconds": 1.235,
+    "status": "ok",
+    "commands": 4
+   },
+   {
+    "name": "timeline",
+    "seconds": 1.032,
+    "status": "ok",
+    "commands": 9
+   },
+   {
+    "name": "time_budget",
+    "seconds": 1.807,
+    "status": "ok",
+    "commands": 9
+   },
+   {
+    "name": "hypothesis",
+    "seconds": 1.368,
+    "status": "ok",
+    "commands": 9
+   },
+   {
+    "name": "reports",
+    "seconds": 14.862,
+    "status": "ok",
+    "commands": 14
+   },
+   {
+    "name": "citations",
+    "seconds": 0.51,
+    "status": "ok",
+    "commands": 4
+   },
+   {
+    "name": "metadata",
+    "seconds": 1.498,
+    "status": "ok",
+    "commands": 2
+   },
+   {
+    "name": "read_api",
+    "seconds": 0.178,
+    "status": "ok",
+    "commands": 7
+   },
+   {
+    "name": "originals",
+    "seconds": 0.189,
+    "status": "ok",
+    "commands": 0
+   },
+   {
+    "name": "repository",
+    "seconds": 0.727,
+    "status": "ok",
+    "commands": 1
+   }
+  ],
+  "criteria": {
+   "K1.a": "met",
+   "K1.b": "met",
+   "K1.c": "met",
+   "K1.d": "met",
+   "K1.e": "met",
+   "K1.f": "met",
+   "K1.g": "met",
+   "K1.h": "met",
+   "K1.i": "met",
+   "K1.j": "met",
+   "K1.k": "met",
+   "K2.a": "met",
+   "K2.b": "met",
+   "K3.a": "met",
+   "K3.b": "met",
+   "K4": "met",
+   "K5": "not_verifiable_in_run",
+   "N1": "met",
+   "N2": "met",
+   "N3": "met",
+   "N4": "not_verifiable_in_run",
+   "N5": "not_verifiable_in_run"
+  },
+  "heavy_facts": {
+   "heavy_catalog": {
+    "status": "partial",
+    "coverage": {
+     "complete": false,
+     "incomplete_reasons": {
+      "hash_not_complete": 1,
+      "member_read_failed": 1,
+      "encrypted_content": 1,
+      "container_not_expanded": 2,
+      "container_damaged": 1,
+      "member_damaged": 1,
+      "limit:compression_ratio_declared": 1
+     },
+     "entries": 94,
+     "by_status": {
+      "damaged": 3,
+      "encrypted": 1,
+      "limit_exceeded": 1,
+      "ok": 83,
+      "skipped": 4,
+      "unsupported": 2
+     },
+     "type_conflicts": 6,
+     "containers": 16,
+     "archive_members": 31,
+     "directories_seen": 23,
+     "hash_bytes_read": 4232035,
+     "expanded_bytes_read": 67149,
+     "limit_hits": {
+      "compression_ratio_declared": 1
+     },
+     "walk_issues": {
+      "symlink_skipped": 3
+     }
+    }
+   },
+   "budget_full_grid": {
+    "run": {
+     "run_id": 6,
+     "reused": false,
+     "result_sha256": "c0cabcddd3592a2f8024e1173ea14a6a2795437f08dd20c53ee2958d2e4cf118",
+     "parameters_sha256": "38f02e39d74bef6fa204cf6ab6598ad3ea2af85ae7ece93f9d35375176c8f09b",
+     "created_at": "2026-10-16T21:20:04.192Z"
+    },
+    "grid": {
+     "mode": "full",
+     "points_evaluated": 243,
+     "points_total": 243,
+     "truncated": false,
+     "keys": [
+      "session_gap_s",
+      "typing_chars_per_min",
+      "reading_chars_per_min",
+      "max_attribution_s",
+      "overlap_rule"
+     ]
+    }
+   }
+  },
+  "heavy_check": {
+   "id": "heavy.adversarial_plan_bounded",
+   "criteria": [
+    "K2.a"
+   ],
+   "stage": "heavy_adversarial_plan",
+   "description": "the adversarial collection (evil names, bomb, encrypted, truncated, malformed and oversized chat exports) is planned and run without a crash; a second run retries only unfinished items and adds no evidence rows",
+   "passed": true,
+   "evidence": {
+    "plan_id": 3,
+    "items": 7,
+    "outcomes": {
+     "done": 7
+    },
+    "not_planned": {
+     "archive_container_members_considered": 16,
+     "covered_by_unit": 7,
+     "no_detector_matched": 51,
+     "probe_not_possible": 1,
+     "structure_probe_did_not_match": 14
+    },
+    "second_run_selected": 0,
+    "grown": {
+     "audit_log": [
+      736,
+      738
+     ],
+     "import_plan_runs": [
+      5,
+      6
+     ]
+    }
+   }
+  }
+ }
+}

@@ -144,7 +144,12 @@ Click → detail with every candidate, its placement and eligibility, the rule h
 to the artifact page/citation workspace. Drag on the ruler or empty lane area → range panel
 with zoom, CSV/JSON export of the range and a "raport z zakresu" link to
 `/reports/new?from=&to=` that is rendered disabled with a tooltip while that route does
-not exist. "Całość" fits the extent of the current filters.
+not exist. "Całość" fits the extent of the current filters. Workbench bookmarks
+(`/api/workbench/bookmarks` for the fetched window) are drawn in a separate strip
+above the lanes as a human annotation layer: point flags and range bars, never
+event markers. Zone-less bookmarks have no UTC instant; they are counted, not
+placed. Clicking one shows it and opens its linked event or segment. Colours use the
+`app.css` theme tokens, and the page has not opted in to the light theme yet.
 
 ## 7. CLI
 
@@ -168,6 +173,13 @@ database with schema versions 30–31 (start the service once after a backup).
   `t_lo`/`t_hi`, `basis`, `candidate_ref`, `hidden`. Unknown-zone items go to `untimed`
   (`reason=unknown_zone`) unless `unknown_zone='interval'` or an operator zone with its
   assumption id is given.
+  Projection undated reasons are mapped to that contract (`no_candidates` →
+  `no_time_candidate`, `no_usable_candidate` → `no_parseable_time`); a wall clock an
+  operator zone cannot place (DST gap) is `nonexistent_local_time`, not `unknown_zone`.
+  `refresh=False` reads without writing (`read_projection`, `PRAGMA query_only`): a
+  stale projection raises `ProjectionNotFresh` instead of being refreshed or read stale.
+* `server.app.timeline.report.report_section(db, ...)` feeds the report section
+  (`docs/REPORTS.md`) from the caller's read-only snapshot.
 * `server.app.timeline.project_window(start, end, filters=...)` and
   `iter_projected_items(...)` return/stream window items (events and transcript segments)
   with `time.sort_us`, `time.interval`, `time.end_us`, `time.basis`, `time.precision`.

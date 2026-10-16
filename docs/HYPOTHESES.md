@@ -208,4 +208,6 @@ manual pointers and decision history; theses; the four disclosure quadrants.
 * Pairs in overlapping windows are dependent; the warning reports it, the circular/block nulls preserve
   stimulus clustering, but outcome dependence still widens the true spread.
 * No real LLM provider is implemented or called.
-* Tables of this layer are not part of the metadata package export yet (task F declares extension tables).
+* Tables of this layer are declared extension tables of the metadata package (integration 2026-10-16).
+  The `hypothesis_dossier` report section uses `analysis.dossier_report.report_payload` and reuses
+  `DISCLAIMER` from this module, re-hashed by the reports layer.

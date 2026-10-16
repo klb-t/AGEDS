@@ -13,7 +13,7 @@ import sys
 from contextlib import closing
 from pathlib import Path
 
-COMMANDS = ('hypothesis-register', 'hypothesis-version', 'hypothesis-preview', 'hypothesis-list', 'hypothesis-show',
+COMMANDS = ('hypothesis-register', 'hypothesis-version', 'hypothesis-preview', 'hypotheses-list', 'hypothesis-show',
             'dossier-add', 'dossier-classify', 'dossier-candidates', 'dossier-list', 'thesis-add', 'disclosure-add',
             'eventstudy-run', 'eventstudy-show')
 MAX_DEFINITION_BYTES = 1024 * 1024
@@ -76,7 +76,7 @@ def register(subparsers) -> None:
     p.add_argument('--change-note', default=None)
     p = subparsers.add_parser('hypothesis-preview', help='validate, normalize and hash a definition without storing it')
     p.add_argument('file', type=Path)
-    p = subparsers.add_parser('hypothesis-list', help='registered hypotheses with registered/first-analysed times')
+    p = subparsers.add_parser('hypotheses-list', help='preregistered analyzer hypotheses (registered/first-analysed times); hypothesis-list belongs to the Loom quarantine')
     p.add_argument('--limit', type=_positive, default=200)
     p.add_argument('--offset', type=_nonnegative, default=0)
     p = subparsers.add_parser('hypothesis-show', help='versions, runs, dossier, theses and disclosure of one hypothesis')
@@ -160,7 +160,7 @@ def _dispatch(args, db) -> dict:
                                                 change_note=args.change_note)
     if c == 'hypothesis-preview':
         return preregistration.preview(read_definition(args.file))
-    if c == 'hypothesis-list':
+    if c == 'hypotheses-list':
         return {'disclaimer': disclaimer(), **preregistration.list_hypotheses(db, limit=args.limit, offset=args.offset)}
     if c == 'hypothesis-show':
         return {'disclaimer': disclaimer(), 'versions': preregistration.list_versions(db, args.hypothesis_id),

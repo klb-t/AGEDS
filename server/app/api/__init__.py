@@ -21,6 +21,7 @@ ROUTER_MODULES = (
     'imports_chat',
     'imports_comm',
     'hypotheses',
+    'importplan',
 )
 
 

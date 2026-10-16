@@ -23,7 +23,9 @@ exceed it), ``priority`` (``priority`` list, then configuration order) or
 counted time are reported). For ``split_equal``/``priority`` the variants are
 layered: confirmed time takes precedence over estimates and estimates over gap
 attribution, so lower <= probable <= upper per category. Observed time whose
-label weights sum below 1 is assigned to ``bez_kategorii``.
+label weights sum below 1 is assigned to ``bez_kategorii``; that remainder is
+always taken from the best-supported layer (also under ``count_both``), so it
+keeps the same ordering.
 
 ``nieobserwowane`` is the time no observation covers in a variant: its lower
 value is ``length - observed(U)`` and its upper value ``length - observed(L)``.
@@ -157,23 +159,50 @@ def effective_params(overrides: dict | None = None) -> dict:
     return {key: _check(key, params[key]) for key in sorted(params)}
 
 
-def grid_points(params: dict) -> tuple[list[dict], int, bool]:
-    """Grid points; index 0 is always the run's own parameters."""
-    base = {k: params[k] for k in GRID_KEYS}
-    grid = params['grid']
-    if params['grid_mode'] == 'one_at_a_time':
-        candidates = [base] + [{**base, k: v} for k in GRID_KEYS for v in grid.get(k, []) if v != base[k]]
-    else:
-        axes = [grid.get(k) or [base[k]] for k in GRID_KEYS]
-        candidates = [base] + [dict(zip(GRID_KEYS, combo)) for combo in itertools.product(*axes)]
-    points, seen = [], set()
-    for p in candidates:
-        key = canonical_json(p)
+def _distinct_values(values: list) -> list:
+    """Axis values without repeats (canonical JSON identity), first occurrence first."""
+    out, seen = [], set()
+    for value in values:
+        key = canonical_json(value)
         if key not in seen:
             seen.add(key)
-            points.append(p)
-    total = len(points)
-    return points[:params['max_grid_points']], total, total > params['max_grid_points']
+            out.append(value)
+    return out
+
+
+def grid_points(params: dict) -> tuple[list[dict], int, bool]:
+    """Grid points; index 0 is always the run's own parameters.
+
+    Returns ``(points, points_total, truncated)``. The grid is enumerated lazily
+    and stops after ``max_grid_points`` distinct points; ``points_total`` is
+    computed from the distinct axis values (review 2 finding 3), so a ``full``
+    grid of 64 values on every axis never materializes its Cartesian product.
+    """
+    base = {k: params[k] for k in GRID_KEYS}
+    grid = params['grid']
+    cap = params['max_grid_points']
+    if params['grid_mode'] == 'one_at_a_time':
+        axes = {k: [v for v in _distinct_values(grid.get(k, [])) if v != base[k]] for k in GRID_KEYS}
+        total = 1 + sum(len(values) for values in axes.values())
+        candidates = ({**base, k: v} for k in GRID_KEYS for v in axes[k])
+    else:
+        axes_list = [_distinct_values(grid.get(k) or [base[k]]) for k in GRID_KEYS]
+        base_key = canonical_json(base)
+        base_in_product = all(canonical_json(base[k]) in {canonical_json(v) for v in values}
+                              for k, values in zip(GRID_KEYS, axes_list))
+        total = (0 if base_in_product else 1)
+        size = 1
+        for values in axes_list:
+            size *= len(values)
+        total += size
+        candidates = (point for point in (dict(zip(GRID_KEYS, combo)) for combo in itertools.product(*axes_list))
+                      if canonical_json(point) != base_key)
+    points = [base]
+    for point in candidates:
+        if len(points) >= cap:
+            break
+        points.append(point)
+    return points, total, total > cap
 
 
 # ------------------------------------------------------------------ preparation
@@ -379,6 +408,11 @@ def _allocate(levels: list[list[tuple]], day_list: list[dict], lo: float, hi: fl
                 overlap[v][day] += dt
             if rule != 'count_both':
                 items, rest, _ = resolved_of(layer)
+            else:
+                # Each category keeps its own union per variant, but the unlabelled remainder is derived
+                # from the best-supported layer like the other rules, so lower <= probable <= upper
+                # holds for bez_kategorii too (review 2 finding 8).
+                rest = resolved_of(layer)[1]
             target = alloc[v][day]
             for c, f in items:
                 target[c] += f * dt

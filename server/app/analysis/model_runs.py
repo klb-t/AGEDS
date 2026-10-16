@@ -42,8 +42,8 @@ def test_providers_enabled() -> bool:
     return os.environ.get(TEST_PROVIDER_ENV, '').strip().lower() in ('1', 'true', 'yes', 'on')
 
 
-def run_model(db: sqlite3.Connection, items: list[dict], *, purpose: str, provider: str = 'none',
-              opt_in: bool = False, config: CategoryConfig | None = None, parameters: dict | None = None) -> dict:
+def check_provider(purpose: str, provider: str, opt_in: bool, config: CategoryConfig | None = None) -> None:
+    """Refuse an unknown purpose/provider, a missing opt-in or a disabled test double (no database access)."""
     if purpose not in PURPOSES:
         raise ValueError(f'purpose must be one of {PURPOSES}')
     if provider not in PROVIDERS:
@@ -55,6 +55,11 @@ def run_model(db: sqlite3.Connection, items: list[dict], *, purpose: str, provid
                          f'the server/CLI process sets {TEST_PROVIDER_ENV}=1 (tests)')
     if purpose == 'labels' and provider != 'none' and config is None:
         raise ValueError('label hypotheses need a category configuration')
+
+
+def run_model(db: sqlite3.Connection, items: list[dict], *, purpose: str, provider: str = 'none',
+              opt_in: bool = False, config: CategoryConfig | None = None, parameters: dict | None = None) -> dict:
+    check_provider(purpose, provider, opt_in, config)
     ids = [it['event_id'] for it in items]
     status = 'not_run' if provider == 'none' else 'done'
     metadata = {'artifact_class': 'interpretive', 'output_is_hypothesis': True,

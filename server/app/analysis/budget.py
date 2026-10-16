@@ -43,6 +43,7 @@ import bisect
 import itertools
 import json
 from collections import Counter, defaultdict
+from contextlib import contextmanager
 from pathlib import Path
 
 from . import calendar as cal
@@ -686,6 +687,8 @@ def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_t
     """Validate, load items (window plus margin), filter, label and (optionally) store the labelling run.
 
     Call it before writing in the same connection: the timeline projection refreshes in its own transaction.
+    ``run_budget``/``run_features`` pass ``persist=False`` and store the labelling run only after the
+    computation, in one short write transaction (``persist_labels``; review 2 finding 2).
     """
     from . import model_runs
     p = effective_params(params)
@@ -720,9 +723,6 @@ def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_t
             it['fields'].pop('body', None)
     input_sha = event_set_sha256(ids)
     label_run = None
-    if persist:
-        label_run = cat.record_label_run(db, labels, config, input_sha256=input_sha, code_version=code_version(),
-                                         parameters={'model_label_run_id': p['model_label_run_id']})
     untimed = loaded['untimed']
     in_window = sum(1 for it in kept if it['t_start'] < hi and max(it['t_start'], it['t_end'] or it['t_start']) >= lo)
     window = {'from': window_from, 'to': window_to, 'zone': zone, 'from_utc': cal.iso_utc(lo), 'to_utc': cal.iso_utc(hi),
@@ -731,7 +731,7 @@ def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_t
     day_starts = [d['start'] for d in cal.days(lo, hi, z)]
     crossing = sum(1 for it in kept if it.get('t_hi') is not None and
                    bisect.bisect_right(day_starts, it['t_lo']) != bisect.bisect_right(day_starts, it['t_hi']))
-    return {
+    prepared = {
         'params': p, 'lo': lo, 'hi': hi, 'zone': zone, 'window': window, 'items': kept, 'labels': labels,
         'label_run': label_run, 'input_sha256': input_sha,
         'labels_record': {'label_run_id': label_run['label_run_id'] if label_run else None,
@@ -762,14 +762,51 @@ def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_t
             'source_truncated': loaded['truncated'],
         },
     }
+    if persist:
+        persist_labels(db, prepared, config)
+    return prepared
+
+
+@contextmanager
+def write_transaction(db):
+    """One short write transaction for storing a finished computation (a savepoint inside the caller's)."""
+    if db.in_transaction:
+        db.execute('SAVEPOINT analysis_persist')
+        try:
+            yield db
+        except BaseException:
+            db.execute('ROLLBACK TO SAVEPOINT analysis_persist')
+            db.execute('RELEASE SAVEPOINT analysis_persist')
+            raise
+        db.execute('RELEASE SAVEPOINT analysis_persist')
+        return
+    db.execute('BEGIN IMMEDIATE')
+    try:
+        yield db
+    except BaseException:
+        db.rollback()
+        raise
+    db.commit()
+
+
+def persist_labels(db, prepared: dict, config: cat.CategoryConfig) -> dict:
+    """Store (or reuse) the labelling run of ``prepared`` and record its id in ``labels_record``."""
+    label_run = cat.record_label_run(db, prepared['labels'], config, input_sha256=prepared['input_sha256'],
+                                     code_version=code_version(),
+                                     parameters={'model_label_run_id': prepared['params']['model_label_run_id']})
+    prepared['label_run'] = label_run
+    prepared['labels_record'] = {**prepared['labels_record'], 'label_run_id': label_run['label_run_id']}
+    return label_run
 
 
 def run_budget(db, config: cat.CategoryConfig, *, window_from: str, window_to: str, zone: str,
                params: dict | None = None, assume_zone: str | None = None, assumption_rule: str | None = None,
                persist: bool = True) -> dict:
     from . import runs
+    # Read and compute without a write transaction; the label run and the analysis run are stored
+    # together afterwards in one short transaction (review 2 finding 2: no lock during the grid).
     prepared = prepare_inputs(db, config, window_from=window_from, window_to=window_to, zone=zone, params=params,
-                              assume_zone=assume_zone, assumption_rule=assumption_rule, persist=persist)
+                              assume_zone=assume_zone, assumption_rule=assumption_rule, persist=False)
     p = prepared['params']
     computed = compute_budget(prepared['items'], prepared['labels'], config, lo=prepared['lo'], hi=prepared['hi'],
                               zone_name=zone, params=p)
@@ -783,8 +820,11 @@ def run_budget(db, config: cat.CategoryConfig, *, window_from: str, window_to: s
     }
     stored = None
     if persist:
-        stored = runs.store_run(db, kind='time_budget', parameters={'params': p, 'window': result['window']},
-                                config_sha256=config.sha256, config_version=config.version, source_rule=RULE,
-                                input_sha256=prepared['input_sha256'],
-                                label_run_id=prepared['labels_record']['label_run_id'], result=result)
+        with write_transaction(db):
+            persist_labels(db, prepared, config)
+            result['labels'] = prepared['labels_record']
+            stored = runs.store_run(db, kind='time_budget', parameters={'params': p, 'window': result['window']},
+                                    config_sha256=config.sha256, config_version=config.version, source_rule=RULE,
+                                    input_sha256=prepared['input_sha256'],
+                                    label_run_id=prepared['labels_record']['label_run_id'], result=result)
     return {'run': stored, 'result': result}

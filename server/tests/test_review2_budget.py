@@ -8,13 +8,65 @@ temporary synthetic databases; nothing depends on the reviewer's scratch reprodu
 from __future__ import annotations
 
 import itertools
+import json
 import random
+import sqlite3
+import threading
 
 import pytest
 
-from server.app.analysis import budget, calendar as cal, categories as cat, model_runs
+from server.app.analysis import budget, calendar as cal, categories as cat, features, model_runs
 from server.app.analysis.provenance import canonical_json
+from server.tests.corpus import activity
+from server.tests.test_analysis_budget import corpus  # noqa: F401 (fixture)
 from server.tests.test_analysis_budget_api import _body, client  # noqa: F401 (fixture)
+
+
+# --------------------------------------------------------------------- finding 2
+
+@pytest.mark.parametrize('kind', ['time_budget', 'feature_series'])
+def test_review2_2_no_write_lock_is_held_while_the_grid_is_computed(corpus, monkeypatch, kind):  # noqa: F811
+    dbmod, manifest, ids, config = corpus
+    entered, release = threading.Event(), threading.Event()
+    real = budget.compute_budget
+
+    def slow_compute(*args, **kwargs):  # stands in for a long sensitivity grid
+        entered.set()
+        assert release.wait(30)
+        return real(*args, **kwargs)
+    monkeypatch.setattr(budget, 'compute_budget', slow_compute)
+    out = {}
+
+    def run():
+        fn = budget.run_budget if kind == 'time_budget' else features.run_features
+        try:
+            with dbmod.session() as db:
+                out['run'] = fn(db, config, window_from=manifest['window']['from'], window_to=manifest['window']['to'],
+                                zone=activity.ZONE)['run']
+        except Exception as exc:  # reported below
+            out['error'] = exc
+    worker = threading.Thread(target=run)
+    worker.start()
+    try:
+        assert entered.wait(60)
+        other = sqlite3.connect(str(dbmod.settings.db_path), timeout=0.2)
+        try:  # pre-fix: the label run INSERT held the write lock -> "database is locked"
+            other.execute('BEGIN IMMEDIATE')
+            other.execute("INSERT INTO audit_log(action) VALUES ('concurrent_writer_during_budget')")
+            other.commit()
+        finally:
+            other.close()
+    finally:
+        release.set()
+        worker.join(60)
+    assert 'error' not in out, out.get('error')
+    with dbmod.session() as db:
+        row = db.execute('SELECT kind, label_run_id, result_json FROM analysis_runs WHERE id=?',
+                         (out['run']['run_id'],)).fetchone()
+        assert row['kind'] == kind and row['label_run_id'] is not None
+        assert json.loads(row['result_json'])['labels']['label_run_id'] == row['label_run_id']
+        assert db.execute('SELECT COUNT(*) FROM analysis_label_runs').fetchone()[0] == 1
+        assert db.execute("SELECT COUNT(*) FROM audit_log WHERE action='concurrent_writer_during_budget'").fetchone()[0] == 1
 
 
 # --------------------------------------------------------------------- finding 3

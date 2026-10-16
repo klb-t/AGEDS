@@ -101,8 +101,12 @@ def run_features(db, config: cat.CategoryConfig, *, window_from: str, window_to:
     from . import model_runs, runs
     p = effective_params(params)
     bp = p['budget_params']
+    tone_spec = p['model_features'].get('tone', {'provider': 'none', 'opt_in': False})
+    model_runs.check_provider('feature:tone', tone_spec.get('provider', 'none'), bool(tone_spec.get('opt_in', False)))
+    # Read and compute without a write transaction; labels, the tone model run and the analysis run are
+    # stored afterwards in one short transaction (review 2 finding 2).
     prepared = bud.prepare_inputs(db, config, window_from=window_from, window_to=window_to, zone=zone, params=bp,
-                                  assume_zone=assume_zone, assumption_rule=assumption_rule, persist=persist,
+                                  assume_zone=assume_zone, assumption_rule=assumption_rule, persist=False,
                                   need_fields=True)
     lo, hi = prepared['lo'], prepared['hi']
     z = cal.zone_info(zone)
@@ -131,16 +135,30 @@ def run_features(db, config: cat.CategoryConfig, *, window_from: str, window_to:
             row['resp'].append(it['text_chars'])
     computed = bud.compute_budget(prepared['items'], labels, config, lo=lo, hi=hi, zone_name=zone,
                                   params={**bp, 'grid_mode': 'one_at_a_time', 'grid': {}})
-    tone = {}
-    tone_spec = p['model_features'].get('tone', {'provider': 'none', 'opt_in': False})
-    tone_run = None
-    if persist:
+
+    def build(tone_run, tone):
+        return _result(p, bp, prepared, config, computed, day_list, starts, items, per_day, tone_run, tone)
+    if not persist:
+        return {'run': None, 'result': build(None, {})}
+    with bud.write_transaction(db):
+        bud.persist_labels(db, prepared, config)
         texts = [it for it in items if it.get('text_chars')]
         tone_run = model_runs.run_model(db, texts, purpose='feature:tone', provider=tone_spec.get('provider', 'none'),
                                         opt_in=bool(tone_spec.get('opt_in', False)), parameters=tone_spec)
+        tone = {}
         if tone_run['status'] == 'done':
             tone = {eid: out['value'] for eid, out in model_runs.load_outputs(db, tone_run['model_run_id'],
                                                                              purpose='feature:tone').items()}
+        result = build(tone_run, tone)
+        stored = runs.store_run(db, kind='feature_series', parameters={'params': p, 'window': result['window']},
+                                config_sha256=config.sha256, config_version=config.version, source_rule=RULE,
+                                input_sha256=prepared['input_sha256'],
+                                label_run_id=prepared['labels_record']['label_run_id'], result=result)
+    return {'run': stored, 'result': result}
+
+
+def _result(p, bp, prepared, config, computed, day_list, starts, items, per_day, tone_run, tone) -> dict:
+    """Assemble the series and the result (cheap: per bucket, no database access)."""
     tone_by_day = [[] for _ in day_list]
     for it in items:
         if it['event_id'] in tone:
@@ -198,10 +216,4 @@ def run_features(db, config: cat.CategoryConfig, *, window_from: str, window_to:
         'labels': prepared['labels_record'], 'input': prepared['input'], 'exclusions': prepared['exclusions'],
         'series': [series[k] for k in sorted(series)],
     }
-    stored = None
-    if persist:
-        stored = runs.store_run(db, kind='feature_series', parameters={'params': p, 'window': result['window']},
-                                config_sha256=config.sha256, config_version=config.version, source_rule=RULE,
-                                input_sha256=prepared['input_sha256'],
-                                label_run_id=prepared['labels_record']['label_run_id'], result=result)
-    return {'run': stored, 'result': result}
+    return result

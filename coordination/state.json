@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "AGEDS",
   "state_id": "AGEDS-STATE-20261016-001",
-  "updated_at": "2026-10-16T18:39:47.604513+00:00",
+  "updated_at": "2026-10-16T18:41:16.718342+00:00",
   "based_on_remote_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
   "local_branch": "ccr-d25c3cb3-qgbhql",
   "status_summary": "Evidence Timeline & Analysis increment started on 9c1d513: Etap 0 report and F0 extension foundation; parallel tracks A-H claimed with disjoint file scopes.",
@@ -252,7 +252,7 @@
     {
       "id": "AGEDS-TASK-20261016-D",
       "owner": "media",
-      "status": "claimed",
+      "status": "accepted",
       "scope": [
         "server/app/worker.py",
         "server/app/transcription.py",
@@ -269,7 +269,28 @@
       "acceptance": [
         "Recipe pinned to job, per-segment language run with alternatives, run comparison, WER/CER tool, OCR/diarization adapters unavailable-explicit."
       ],
-      "result_refs": []
+      "result_refs": [
+        "docs/MULTILINGUAL_ASR.md",
+        "docs/validation/MEDIA_2026-10-16.json"
+      ],
+      "results": {
+        "backend_after_merge": "556 passed, 1 skipped, 680 subtests",
+        "real_inference": "not executed (HF blocked; whisper/tesseract/pyannote absent)",
+        "runtime_executed": [
+          "CLI subprocess asr-recipes/media-capabilities/asr-benchmark hypotheses mode",
+          "uvicorn pages",
+          "worker explicit unavailable failures",
+          "poppler rasterization in OCR job"
+        ]
+      },
+      "coordinator_followup": "HTTP enqueue refuses model_options download_root/local_files_only (operator-only)",
+      "not_done": [
+        "real Whisper/Tesseract/pyannote",
+        "browser acceptance of /media pages",
+        "PDF text layer",
+        "event candidate review/promotion",
+        "B-AG-01 audit probes unavailable"
+      ]
     },
     {
       "id": "AGEDS-TASK-20261016-E",

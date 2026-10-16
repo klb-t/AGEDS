@@ -31,6 +31,8 @@ class MediaApiTests(MediaCase):
         self.assertNotEqual(first['recipe']['sha256'], second['recipe']['sha256'])
         self.post(f'/api/media/artifacts/{self.aid}/jobs', {'recipe': 'nope'}, 422)
         self.post(f'/api/media/artifacts/{self.aid}/jobs', {'overrides': {'id': 'x'}}, 422)
+        self.post(f'/api/media/artifacts/{self.aid}/jobs', {'overrides': {'model_options': {'download_root': '/tmp/x'}}}, 422)
+        self.post(f'/api/media/artifacts/{self.aid}/jobs', {'overrides': {'model_options': {'local_files_only': False}}}, 422)
         self.post(f'/api/media/artifacts/{self.aid}/jobs', {'kind': 'summarize'}, 422)
         self.post(f'/api/media/artifacts/{self.aid}/jobs', {'unexpected': 1}, 422)
         self.post('/api/media/artifacts/999/jobs', {}, 404)

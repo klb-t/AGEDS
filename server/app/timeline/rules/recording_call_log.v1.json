@@ -5,10 +5,25 @@
   "status": "released",
   "relation": "recording_of_call_hypothesis",
   "description": "Proposes that a recorded artifact may be the recording of a call-log entry. Time agreement is the gate; duration and number agreement are reported as separate evidence. No probability is computed; ambiguity (several calls within tolerance) is kept.",
-  "left": {"kind": "artifact", "selector": "artifacts with audio/* or video/* MIME type"},
-  "right": {"kind": "event", "event_types": ["call"]},
+  "left": {
+    "kind": "artifact",
+    "selector": "artifacts with audio/* or video/* MIME type"
+  },
+  "right": {
+    "kind": "event",
+    "event_types": [
+      "call"
+    ]
+  },
   "parameters": {
     "time_tolerance_seconds": 120,
+    "recording_time_kinds": [
+      "filename_derived",
+      "exif",
+      "created",
+      "start",
+      "observed"
+    ],
     "duration_tolerance_seconds": 10,
     "duration_tolerance_ratio": 0.1,
     "number_suffix_digits": 9,
@@ -19,10 +34,24 @@
     "assume_zone": null,
     "assumption_rule": null,
     "consider_ampm_ambiguity": true,
-    "ampm_ambiguity_metadata_keys": ["ampm_ambiguous", "hour_12h_ambiguous"],
-    "recording_number_paths": ["$.filename_number", "$.number_hypothesis", "$.filename_derived.number", "$.parsed.number"],
-    "recording_number_columns": ["phone_or_address"],
-    "recording_duration_paths": ["$.duration_seconds", "$.duration.seconds", "$.declared_duration_sec"],
+    "ampm_ambiguity_metadata_keys": [
+      "ampm_ambiguous",
+      "hour_12h_ambiguous"
+    ],
+    "recording_number_paths": [
+      "$.filename_number",
+      "$.number_hypothesis",
+      "$.filename_derived.number",
+      "$.parsed.number"
+    ],
+    "recording_number_columns": [
+      "phone_or_address"
+    ],
+    "recording_duration_paths": [
+      "$.duration_seconds",
+      "$.duration.seconds",
+      "$.declared_duration_sec"
+    ],
     "use_wav_header_duration": true,
     "max_recordings": 50000,
     "max_calls": 500000,
@@ -30,7 +59,7 @@
     "max_unmatched_listed": 200
   },
   "criteria": {
-    "time": "gate: |recording start - call start| <= time_tolerance_seconds for an explicit/epoch/assumed instant; for an unknown-zone wall clock some allowed UTC offset must bring the residual within tolerance",
+    "time": "gate: |recording start - call start| <= time_tolerance_seconds for an explicit/epoch/assumed instant; for an unknown-zone wall clock some allowed UTC offset must bring the residual within tolerance; recording candidates are limited to recording_time_kinds (file_mtime excluded by default: copying changes it); every other matching tested point is listed as an alternative",
     "duration": "evidence: |recording duration - call duration| <= max(duration_tolerance_seconds, duration_tolerance_ratio * call duration)",
     "number": "evidence: normalized digits of the filename-derived number hypothesis equal the call number or share the last number_suffix_digits digits"
   }

@@ -29,7 +29,6 @@ TRANSITIONS = {'accept': ({'proposed', 'revoked'}, 'accepted'), 'reject': ({'pro
                'revoke': ({'proposed', 'accepted', 'rejected'}, 'revoked')}
 MAX_REASON = 2000
 MAX_ACTOR = 200
-RECORDING_TIME_KINDS = ('filename_derived', 'exif', 'created', 'start', 'observed', 'file_mtime')
 
 
 class CorrelationError(ValueError):
@@ -225,6 +224,15 @@ def _recording_time_points(candidate: Candidate, params: dict) -> list[dict]:
     return points
 
 
+def _alternative(evidence: dict) -> dict:
+    point = evidence['tested_point']
+    return {'mode': evidence['mode'], 'residual_seconds': evidence['residual_seconds'],
+            'implied_utc_offset_minutes': evidence.get('implied_utc_offset_minutes'),
+            'ampm_alternative': point.get('ampm_alternative'), 'dst': point.get('dst'),
+            'recording_candidate_ref': evidence['recording_candidate']['ref'],
+            'tested': point.get('utc') or point.get('local')}
+
+
 def _calls(db, projection: dict, params: dict, event_types: list[str]) -> tuple[list, bool]:
     rows = db.execute('''SELECT ti.ref_id, ti.sort_us, ti.end_us, ti.basis, ti.candidate_ref, e.phone_or_address,
                            e.metadata_json, e.direction FROM timeline_items ti JOIN events e ON e.id=ti.ref_id
@@ -261,7 +269,7 @@ def _recording_call_log(db, rule: Rule, params: dict, projection: dict) -> tuple
     truncated_candidates = 0
     for recording in recordings:
         candidates = [c for c in recording_candidates(db, recording['id'], display_rule, {})
-                      if c.origin != 'derived_correlation' and c.usable and c.kind in RECORDING_TIME_KINDS
+                      if c.origin != 'derived_correlation' and c.usable and c.kind in params['recording_time_kinds']
                       and (c.utc or c.local)]
         if not candidates:
             unmatched_recordings.append({'artifact_id': recording['id'], 'reason': 'no_usable_time_candidate'})
@@ -307,8 +315,13 @@ def _recording_call_log(db, rule: Rule, params: dict, projection: dict) -> tuple
                     if mode_note := {'same_unknown_zone_assumed': 'both wall clocks lack a zone; compared as if in the same zone'}.get(time_evidence['mode']):
                         time_evidence['note'] = mode_note
                     previous = best.get(call['ref_id'])
-                    if previous is None or time_evidence['residual_seconds'] < previous['time']['residual_seconds']:
-                        best[call['ref_id']] = {'time': time_evidence, 'call': call}
+                    if previous is None:
+                        best[call['ref_id']] = {'time': time_evidence, 'call': call, 'alternatives': []}
+                        continue
+                    if time_evidence['residual_seconds'] < previous['time']['residual_seconds']:
+                        time_evidence, previous['time'] = previous['time'], time_evidence
+                    if len(previous['alternatives']) < 10:
+                        previous['alternatives'].append(_alternative(time_evidence))
         if not best:
             unmatched_recordings.append({'artifact_id': recording['id'], 'reason': 'no_call_within_tolerance',
                                          'evaluated_time_points': evaluated})
@@ -327,6 +340,7 @@ def _recording_call_log(db, rule: Rule, params: dict, projection: dict) -> tuple
             if gate['corroboration_required'] and not corroborated:
                 continue
             match['time']['evaluated_time_points'] = evaluated
+            match['time']['other_matching_points'] = match['alternatives']
             accepted.append((match['time']['residual_seconds'], call_id,
                              {'time': match['time'], 'duration': duration, 'number': number, 'gate': gate,
                               'call_direction': call['direction']}))

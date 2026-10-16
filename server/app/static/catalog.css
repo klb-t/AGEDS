@@ -1,0 +1,32 @@
+.catalog-layout{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:1rem;align-items:start}
+.catalog-main{display:grid;gap:1rem;min-width:0}
+.catalog-tree ul{list-style:none;margin:0 0 1rem;padding:0}
+.catalog-tree li{padding:.35rem .4rem .35rem calc(.4rem + var(--depth,0) * 1rem);border-radius:6px}
+.catalog-tree li.active{background:#1f6feb33}
+.catalog-tree li small{display:block}
+.catalog-form label,.catalog-inline label{display:block;font-size:.85rem;color:#8b949e}
+.catalog-inline{display:flex;flex-wrap:wrap;gap:.5rem;align-items:flex-end}
+.catalog-inline label{flex:1 1 140px}
+.catalog-inline label.wide{flex:3 1 280px}
+.catalog-inline label.check{flex:0 0 auto;display:flex;gap:.3rem;align-items:center}
+.catalog-inline label.check input{width:auto}
+.catalog-inline button{width:auto}
+button.secondary{background:#30363d;border-color:#484f58}
+.catalog-search{display:flex;gap:.4rem;min-width:260px}
+.catalog-search button{width:auto}
+.catalog-scroll{overflow-x:auto}
+.catalog-entries code,.catalog-history code{overflow-wrap:anywhere;word-break:break-all}
+.catalog-mark{display:flex;gap:.25rem;min-width:180px}
+.catalog-mark input[name=priority]{width:4.2rem}
+.catalog-mark button{width:auto;padding:.4rem .6rem}
+.catalog-totals{display:flex;flex-wrap:wrap;gap:.4rem 1rem;font-size:.85rem}
+.catalog-totals b{color:#e6edf3}
+.badge{display:inline-block;padding:0 .4rem;border-radius:999px;font-size:.75rem;background:#30363d}
+.badge-ok{background:#23863655}.badge-damaged,.badge-unreadable,.badge-unstable{background:#da363355}
+.badge-limit_exceeded,.badge-encrypted,.badge-unsupported{background:#9e6a0355}.badge-conflict{background:#d2992255}
+tr.is-conflict{background:#d2992214}tr.is-problem{background:#da363314}
+.catalog-annotation{border-bottom:1px solid #21262d}
+.catalog-pair{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.catalog-status:empty{display:none}
+.catalog-status{padding:.6rem;border:1px solid #d29922;border-radius:8px}
+@media(max-width:900px){.catalog-layout,.catalog-pair{grid-template-columns:1fr}.catalog-search{min-width:0}}

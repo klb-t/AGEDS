@@ -34,7 +34,7 @@ COLUMNS = (
     'archive_time_source', 'archive_time_raw', 'archive_time_utc', 'archive_time_local', 'archive_time_tz_status',
     'times_json', 'mark_priority', 'mark_note',
 )
-_CONTROL = re.compile('[\x00-\x08\x0b-\x1f\x7f-\x9f]')
+_CONTROL = re.compile('[\x00-\x1f\x7f-\x9f]')
 
 
 def _clean(value):
@@ -273,7 +273,7 @@ def _write_html(path: Path, rows, report: dict, groups: dict, collisions: dict, 
             out.write(f'<tr{css}>' + ''.join(f'<td>{e(row[c])}</td>' for c in COLUMNS if c != 'times_json') + '</tr>')
             count += 1
         about = about_fn(count)
-        out.write('</table></section><section><h2>Parametry</h2><pre>' + e(json.dumps(about, ensure_ascii=False, indent=2)) + '</pre></section>')
+        out.write('</table></section><section><h2>Parametry</h2><pre>' + html.escape(json.dumps(about, ensure_ascii=True, indent=2)) + '</pre></section>')
         out.write('</body></html>\n')
     return count
 

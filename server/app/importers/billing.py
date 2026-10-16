@@ -293,6 +293,8 @@ def import_billing(path: Path, *, profile_id: str | None = None, profiles_path: 
                    collection_id: int | None = None, label: str | None = None,
                    limits: CommLimits = DEFAULT_LIMITS) -> dict:
     profiles = load_profiles(profiles_path)
+    if profile_id is not None and profile_id not in {p['id'] for p in profiles['profiles']}:
+        raise ValueError(f'billing profile not found: {profile_id}')
     name = original_name or path.name
     extension = Path(name).suffix.lower()
     if extension not in ('.csv', '.tsv', '.xlsx', '.xls'):

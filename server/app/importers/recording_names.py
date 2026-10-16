@@ -209,3 +209,19 @@ def observe_artifacts(artifact_ids: list[int], *, patterns_path: Path | None = N
     record_import_run(artifact_id=None, importer=PARSER_NAME, parser_version=PARSER_VERSION, options=options,
                       counts=counts_total, coverage={'complete': not issues.counts.get('artifact_not_found')}, issues=issues)
     return {'parser_version': PARSER_VERSION, **counts_total, 'options': options, 'issues': issues.as_dict()}
+
+
+def observe_names(names: list[str], *, label: str | None = None, locator_prefix: str = 'names',
+                  patterns_path: Path | None = None, limits: CommLimits = DEFAULT_LIMITS) -> dict:
+    """Observe bare file names (e.g. a catalog listing sent over HTTP); nothing is read."""
+    patterns = load_patterns(patterns_path)
+    issues = Issues(limits.max_issues)
+    entries = [{'locator': f'{locator_prefix}:{name}', 'file_name': name} for name in names[:limits.max_records]]
+    source_id = ensure_source('recording_names', label or 'Recording file names', f'recording-names:{locator_prefix}')
+    counts = observe(entries, source_id=source_id, patterns=patterns, issues=issues)
+    options = {'pattern_set': f"{patterns['schema']}/v{patterns['version']}", 'audio_read': False}
+    coverage = {'complete': len(names) <= limits.max_records}
+    record_import_run(artifact_id=None, importer=PARSER_NAME, parser_version=PARSER_VERSION, options=options,
+                      counts=counts, coverage=coverage, issues=issues)
+    return {'source_id': source_id, 'parser_version': PARSER_VERSION, **counts, 'options': options,
+            'coverage': coverage, 'issues': issues.as_dict()}

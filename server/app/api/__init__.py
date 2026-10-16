@@ -10,7 +10,7 @@ import importlib
 
 from ..web import NAV
 
-ROUTER_MODULES = ('catalog', 'timeline', 'media', 'analysis', 'reports', 'integrations', 'workbench')
+ROUTER_MODULES = ('catalog', 'timeline', 'media', 'analysis', 'reports', 'integrations', 'workbench', 'imports_comm')
 
 
 def include_routers(app) -> None:

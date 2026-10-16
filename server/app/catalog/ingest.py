@@ -97,6 +97,21 @@ def _materialize(chain: list[dict], scan: dict, workdir: Path, limits: CatalogLi
     return target
 
 
+def declared_mtime(db, entry_id: int) -> tuple[str | None, str]:
+    """The catalogued modification instant of an entry and its basis (review finding 1).
+
+    The ingested path is a temporary copy, so its own mtime means nothing; the
+    scan recorded the original's mtime (filesystem stat, or an archive header
+    time with a UTC basis). A zone-less ZIP DOS time is not an instant: None.
+    """
+    rows = db.execute('''SELECT id, source, utc, tz_status FROM catalog_entry_times
+                         WHERE entry_id=? AND kind='file_mtime' AND utc IS NOT NULL ORDER BY id''', (entry_id,)).fetchall()
+    chosen = next((r for r in rows if r['source'] == 'filesystem_stat'), rows[0] if rows else None)
+    if chosen is None:
+        return None, f'catalog entry {entry_id}: no file_mtime with a UTC instant (zone unknown or absent)'
+    return chosen['utc'], f"catalog_entry_times:{chosen['id']} ({chosen['source']}, {chosen['tz_status']})"
+
+
 class _closing_stream:
     def __init__(self, stream):
         self.stream = stream
@@ -123,6 +138,7 @@ def ingest_entries(entry_ids: list[int], *, actor: str = 'user', temp_dir: str |
             chain = [entry]
             while chain[0]['parent_entry_id'] is not None:
                 chain.insert(0, dict(db.execute('SELECT * FROM catalog_entries WHERE id=?', (chain[0]['parent_entry_id'],)).fetchone()))
+            mtime, mtime_basis = declared_mtime(db, entry_id)
         if entry['status'] != 'ok' or not entry['sha256']:
             results.append({'entry_id': entry_id, 'status': 'not_ingestible',
                             'reason': f"entry status {entry['status']}, hash {entry['hash_status']}"})
@@ -145,7 +161,9 @@ def ingest_entries(entry_ids: list[int], *, actor: str = 'user', temp_dir: str |
                         'acquisition': 'copied from the catalogued location via a temporary file outside the source root',
                         'catalog_sha256_verified_before_ingest': True}
             artifact_id = evidence.ingest_file(payload, source_id=source_id, source_locator=locator, original_name=entry['name'],
-                                               mime_type=entry['sniffed_mime'], metadata=metadata, collection_id=entry['collection_id'])
+                                               mime_type=entry['sniffed_mime'], metadata=metadata, collection_id=entry['collection_id'],
+                                               source_stat='declared', declared_source_modified_at=mtime,
+                                               declared_time_basis=mtime_basis)
         finally:
             shutil.rmtree(workdir, ignore_errors=True)
         with closing(dbmod.connect()) as db:

@@ -97,9 +97,14 @@ def acquire_entry(ctx: RunContext, item: MaterializedFile, *, importer: str) -> 
                 'importer': importer,
                 'acquisition': 'copied from the catalogued location via a temporary file outside the source root',
                 'catalog_sha256_verified_before_ingest': True}
+    from ..catalog.ingest import declared_mtime
+    with dbmod.session() as db:
+        mtime, basis = declared_mtime(db, item.entry_id)
+    # The path is a temporary copy; the catalogue knows the original's mtime (review finding 1).
     return evidence.ingest_file(item.path, source_id=source_id, source_locator=item.source_locator,
                                 original_name=item.name, mime_type=item.mime, metadata=metadata,
-                                collection_id=ctx.collection_id)
+                                collection_id=ctx.collection_id, source_stat='declared',
+                                declared_source_modified_at=mtime, declared_time_basis=basis)
 
 
 # ------------------------------------------------------------------- shims

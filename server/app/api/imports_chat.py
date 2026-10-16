@@ -45,7 +45,7 @@ def _receive(files: list[UploadFile], directory: Path) -> list[Path]:
 
 
 def _import(namespace: str, files: list[UploadFile], export_label: str, collection_id: int | None) -> dict:
-    from ..evidence import IntegrityError
+    from ..evidence import IntegrityError, temporary_copy_acquisitions
     if namespace == 'chatgpt':
         from ..importers.chatgpt import import_chatgpt_export as run
     else:
@@ -54,8 +54,9 @@ def _import(namespace: str, files: list[UploadFile], export_label: str, collecti
     try:
         paths = _receive(files, directory)
         try:
-            return run(paths, export_label=export_label or None, collection_id=collection_id,
-                       locator_for=lambda p: f'upload:{namespace}:{p.name}')
+            with temporary_copy_acquisitions():  # the private copies' mtimes are the upload instant
+                return run(paths, export_label=export_label or None, collection_id=collection_id,
+                           locator_for=lambda p: f'upload:{namespace}:{p.name}')
         except IntegrityError as exc:
             raise HTTPException(409, str(exc)) from exc
         except ValueError as exc:

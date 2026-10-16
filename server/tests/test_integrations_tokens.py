@@ -62,7 +62,12 @@ class TokenStorageTests(IntegrationCase):
             tokens.verify_token(expired['token'])
         self.assertEqual(ctx.exception.reason, 'expired_token')
         rejected = self.audit('token_rejected')
-        self.assertEqual(len(rejected), 6, "missing/malformed tokens are refused before any database access")
+        # Missing/malformed tokens are refused before any database access. Review finding 8:
+        # the two secret mismatches of one key in one hour share one audit row and a count of 2.
+        self.assertEqual(len(rejected), 5)
+        with db.session() as conn:
+            counts = {(r['reason'], r['count']) for r in conn.execute('SELECT reason, count FROM api_token_rejections')}
+        self.assertEqual(counts, {('unknown_key', 1), ('secret_mismatch', 2), ('scope', 1), ('revoked', 1), ('expired', 1)})
         secret = created['token'].split('.', 1)[1]
         self.assertFalse(any(secret in row['details_json'] for row in rejected))
         self.assertEqual({json.loads(r['details_json'])['reason'] for r in rejected} >= {'unknown_key', 'secret_mismatch', 'revoked', 'expired', 'scope'}, True)

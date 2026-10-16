@@ -28,13 +28,20 @@ database stores `token_key` (public lookup id), a random salt and
 `hmac.compare_digest`. Scopes are `read` (all `/api/read/v1/*` and listing
 routes) and `propose` (submitting annotation proposals and relation
 hypotheses). Revocation and expiry are timestamps; rows are kept.
-`last_used_at`/`use_count` are updated on every accepted request.
+Verification of a valid token is read-only (review finding 8): `last_used_at` and
+`use_count` are written at most once per minute per token and server process
+(`TOUCH_INTERVAL_SECONDS`); uses in between are counted in memory and added on the
+next write, so `use_count` is a lower bound (uses since the last write are lost if the
+process stops) and a busy database never fails a valid request.
 
-`audit_log` records `token_create`, `token_revoke` and every rejection
-(`token_rejected` with `token_key` and reason: `unknown_key`, `secret_mismatch`,
-`revoked`, `expired`, `scope`). Requests without a token or with a malformed
-token are refused before any database access and are not audited. There is no
-rate limiting; the service remains intended for a trusted/private network.
+`audit_log` records `token_create`, `token_revoke` and rejections. Rejections are
+counted in `api_token_rejections` (schema 73) per UTC hour, `token_key` and reason
+(`unknown_key`, `secret_mismatch`, `revoked`, `expired`, `scope`) with first/last
+time; only the first one of each writes a `token_rejected` audit row. After 25 keys in
+one hour further keys are pooled under `*`, so junk bearer tokens cannot grow the
+tables per request. Requests without a token or with a malformed token are refused
+before any database access and are not audited. There is no rate limiting; the
+service remains intended for a trusted/private network.
 
 ### Authentication and error model
 
@@ -54,11 +61,31 @@ are `{"detail": {"code": "<stable_code>", "message": "<text>"}}`:
 ### Opt-in enforcement everywhere (`EW_REQUIRE_TOKEN=1`)
 
 With `EW_REQUIRE_TOKEN=1` (also `true`/`yes`/`on`) a pure-ASGI middleware
-requires a valid, unrevoked, unexpired token on **every** `/api/*` route; scopes
-are not checked there. HTML pages (`/`, `/artifact/...`, `/integrations`) are
-not covered. The switch is read per request, so it can be toggled without code
-changes. The middleware is installed through the `install_app` hook that
+requires a valid, unrevoked, unexpired token on **every** `/api/*` and `/export/*`
+route and on **every state-changing request** (any method other than
+GET/HEAD/OPTIONS, e.g. `/upload`, `/import/*`, the `/integrations` and `/media`
+forms) — review finding 6; scopes are not checked there. The token is accepted as
+`Authorization: Bearer …` or as the browser session cookie `ageds_token` (HttpOnly,
+SameSite=Strict, path `/`) that the form `POST /integrations/session` (field
+`token`) sets after verifying it; `POST /integrations/session/logout` clears it.
+The cookie does not grant the scoped `/api/read/v1/*` and `/api/integrations/v1/*`
+routes, which still need the bearer header. Read-only HTML pages (`/`,
+`/artifact/...`, `/integrations`, …) stay open so the login form is reachable. The
+switch is read per request, so it can be toggled without code changes. The
+middleware is installed through the `install_app` hook that
 `server/app/api/__init__.py` calls for every router module.
+
+### Cross-site request guard (always on)
+
+Independently of `EW_REQUIRE_TOKEN`, the same middleware refuses (403,
+`cross_site_request`) a state-changing request without an `Authorization` header
+when `Sec-Fetch-Site: cross-site` is sent, or when `Origin` (if absent: `Referer`)
+names another origin than the request's `Host` (default ports ignored; `Origin:
+null` is refused). Reverse proxies can list public origins in `EW_TRUSTED_ORIGINS`
+(comma-separated, e.g. `https://evidence.example.org`). Requests without these
+headers (CLI, curl, scripts, the Android client) and bearer requests are unaffected:
+a cross-site page cannot send `Authorization` without a CORS preflight, which this
+server never grants.
 
 Migration notes for an existing installation:
 

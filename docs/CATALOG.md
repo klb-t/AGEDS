@@ -97,13 +97,15 @@ Both claims are stored; nothing is renamed or corrected.
 | ZIP with unreadable central directory | local-header walk | Container `damaged`; members recovered from local headers (stored/deflate, CRC checked); a cut member is `damaged` (`member_data_truncated`). |
 | TAR, TAR.GZ/TGZ, TAR.BZ2, TAR.XZ | `tarfile` | `encoding=utf-8, errors=surrogateescape`; symlink/hardlink members recorded with their link text, never followed; a missing end-of-archive marker marks the container `damaged`. |
 | gzip/bzip2/xz that is not a tar | single stream | One member; gzip `FNAME` and `MTIME` are recorded. |
-| 7z, RAR | `py7zr`, `rarfile` (optional) | Not installed in this session → entry `unsupported`, issue `adapter_unavailable` (container bytes are still hashed). The adapter code paths are **not run**. |
+| 7z, RAR | `py7zr`, `rarfile` (optional) | Not installed in this session → entry `unsupported`, issue `adapter_unavailable` (container bytes are still hashed). The adapter code paths are **not run**. The 7z adapter reads a member into memory: `py7zr` 0.22 bounds each member by its declared size (source inspected, review U5), and since `read(targets=[name])` extracts every member of that name, the precheck adds the declared sizes of same-named members (unit-tested with a stand-in module). |
 
 Document containers (docx/xlsx/pptx/odt/ods/odp/epub/apk) are recognized by their
 members and not expanded unless `expand_document_containers` is set. Nested
 archives are spooled to memory or an unnamed temporary file in a directory that
 must be outside the source root (checked before anything is created). The
-database and content store must also be outside the scanned root.
+database and content store must also be outside the scanned root. For a
+single-file root (one archive) the protected root is the file's directory, so
+nothing is spooled or stored beside the source (review U1).
 
 ## Limits
 
@@ -168,7 +170,9 @@ catalogued carries a time there on this basis", not inactivity.
   nothing private reaches a provider by default), stored append-only with SHA-256;
   identical profiles are reused.
 - `explain(provider=…)` — provider adapters: `none` (default, nothing generated),
-  `fake` (deterministic test double). Other adapters must be registered in code; an
+  `fake` (deterministic test double; offered in the `/catalog` form only with
+  `EW_CATALOG_TEST_PROVIDERS=1`, review U4 — the API/CLI accept it when named and the
+  run records it). Other adapters must be registered in code; an
   adapter with `external = True` requires `allow_external=True` for that run, and
   the opt-in is recorded. **No real model is called by this increment.** The model
   may only write placeholders such as `{{totals.entries}}`; the pipeline resolves
@@ -199,7 +203,13 @@ nothing is ingested), and calls `ingest_file` with
 metadata (entry, scan, container chain). Entries without a verified hash
 (`encrypted`, `limit_exceeded`, `damaged`, `skipped`) are reported as
 `not_ingestible`. Same bytes at another locator remain a separate artifact row;
-repeated ingest adds an acquisition observation, not a new artifact.
+repeated ingest adds an acquisition observation, not a new artifact. The ingested
+path is a temporary copy, so its own mtime is never recorded: the observation
+declares the **catalogued** modification instant (`source_stat='declared'`; the
+`filesystem_stat` time of a disk file, else an archive header time with a UTC basis)
+with `source_modified_at_basis = catalog_entry_times:<id> (<source>, <tz_status>)`,
+or `NULL` when the catalog has no instant (e.g. a zone-less ZIP DOS time) — review
+finding 1.
 
 ## CLI
 
@@ -257,6 +267,7 @@ trusted/private network.
 | Document containers not expanded by default. | A user needs their embedded media catalogued (`--expand-document-containers`). |
 | Display unflagged valid UTF-8 ZIP names as UTF-8 (cp437 kept as alternative). | A corpus shows real cp437 names that happen to be valid UTF-8. |
 | HTTP scans are synchronous. | Real roots make requests time out; then move scans to the job queue. |
+| Each catalog write (entry with its times, issue, entry update) is its own short transaction on a `synchronous=NORMAL` WAL connection; no write lock is held while content is read or hashed (review finding 4; measured: 5,000 small files 1.1 s → 2.2 s). Entries of a running scan become visible as they are written; they stay immutable once the scan finishes. | Commit cost dominates on real roots; then buffer rows read-ahead and write them in short batches after reading. |
 | CSV keeps raw text (no formula guard prefix). | Users open CSV directly in spreadsheet software and need the guard; XLSX is the safe default meanwhile. |
 
 ## Not done / not verified

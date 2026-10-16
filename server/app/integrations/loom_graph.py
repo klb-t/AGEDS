@@ -340,12 +340,20 @@ def _hypothesis_payload(row) -> dict:
     return result
 
 
-def list_hypotheses(*, status: str | None = None, limit: int = 200) -> list[dict]:
+def list_hypotheses(*, status: str | None = None, limit: int = 200, origin: str | None = None) -> list[dict]:
+    """Hypotheses in id order; ``origin`` filters in SQL so LIMIT applies to that client's rows."""
     if status is not None and status not in ('quarantined', 'promoted', 'rejected'):
         raise GraphInputError('status must be quarantined, promoted or rejected')
     if type(limit) is not int or not 1 <= limit <= 10_000:
         raise GraphInputError('limit must be an integer from 1 to 10000')
-    where, params = ('', ()) if status is None else (' WHERE status=?', (status,))
+    clauses, params = [], []
+    if status is not None:
+        clauses.append('status=?')
+        params.append(status)
+    if origin is not None:
+        clauses.append('origin=?')
+        params.append(origin)
+    where = (' WHERE ' + ' AND '.join(clauses)) if clauses else ''
     with session() as db:
         return [_hypothesis_payload(row) for row in db.execute(f'SELECT * FROM relation_hypotheses{where} ORDER BY id LIMIT ?', (*params, limit))]
 

@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 
 from ..config import settings
 from ..db import session
-from ..evidence import IntegrityError
+from ..evidence import IntegrityError, temporary_copy_acquisitions
 
 router = APIRouter()
 NAV: list[tuple[str, str]] = []
@@ -108,10 +108,11 @@ def upload_import(kind: str, file: UploadFile = File(...), label: str | None = F
         path = Path(directory) / ('upload' + ''.join(Path(name).suffixes)[-20:])
         with path.open('wb') as handle:
             shutil.copyfileobj(file.file, handle)
-        return _run(kind, path, locator=f'upload:{kind}:{name}', original_name=name, label=label,
-                    collection_id=collection_id, enable_browser_history=enable_browser_history,
-                    enable_location_history=enable_location_history, coarse_decimals=coarse_decimals,
-                    profile=profile, chat_member=chat_member)
+        with temporary_copy_acquisitions():  # the private copy's mtime is the upload instant
+            return _run(kind, path, locator=f'upload:{kind}:{name}', original_name=name, label=label,
+                        collection_id=collection_id, enable_browser_history=enable_browser_history,
+                        enable_location_history=enable_location_history, coarse_decimals=coarse_decimals,
+                        profile=profile, chat_member=chat_member)
 
 
 def _resolve(root_id: int, relative_path: str) -> Path:

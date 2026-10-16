@@ -28,7 +28,7 @@ from collections import Counter
 
 from .analysis_items import read_projection, undated_reason
 from .query import iter_window, make_filters
-from .ruleset import canonical_json, display_params, load_rule, params_sha256
+from .ruleset import canonical_json, display_params, load_rule
 from .timeutil import US, parse_bound
 
 VERSION = 'timeline.report.v1'
@@ -185,8 +185,10 @@ def report_section(db: sqlite3.Connection, *, from_utc: str | None = None, to_ut
         'schema': 'ageds.timeline-report-section/v1', 'version': VERSION,
         'rule': {'id': f'{rule.rule_id}@{rule.version}', 'rule_id': rule.rule_id, 'version': rule.version,
                  'sha256': rule.sha256, 'origin': rule.origin},
+        # The stored projection identity (zone parameters; the free-text assumption label is per request).
         'projection': {'id': projection['id'], 'status': projection['status'], 'params': canonical_json(params),
-                       'params_sha256': params_sha256(params), 'build_id': build['id'], 'build_mode': build['mode'],
+                       'key_params': projection_row['params_json'], 'params_sha256': projection_row['params_sha256'],
+                       'build_id': build['id'], 'build_mode': build['mode'],
                        'build_finished_at': build['finished_at'], 'max_halfwidth_us': build['counts'].get('max_halfwidth_us')},
         'window': {'from': from_utc, 'to': to_utc, 'to_exclusive': True, 'axis': 'UTC', 'match': 'display'},
         'scope': {'events': len(events), 'artifacts': len(artifacts)},

@@ -4,6 +4,7 @@ import importlib.metadata
 import math
 from numbers import Integral, Real
 import platform
+import sqlite3
 import threading
 import time
 import traceback
@@ -298,14 +299,34 @@ def worker_kinds() -> tuple[str, ...] | None:
     kinds = tuple(kind.strip() for kind in os.getenv("EW_WORKER_KINDS", "").split(",") if kind.strip())
     return kinds or None
 
-def main():
+CLAIM_RETRY_MAX_SECONDS = 30.0
+
+
+def claim_next(kinds, failures: int, *, sleep=time.sleep) -> tuple[dict | None, int]:
+    """One claim attempt. A locked/busy (or briefly unavailable) database is retried
+    with exponential backoff instead of ending the worker loop (review finding 4)."""
+    try:
+        return claim_job(kinds=kinds), 0
+    except sqlite3.OperationalError as error:
+        delay = min(CLAIM_RETRY_MAX_SECONDS, 0.5 * 2 ** failures)
+        print(f"claim_job failed ({error}); retrying in {delay:g}s")
+        sleep(delay)
+        return None, failures + 1
+
+
+def main(*, iterations: int | None = None, sleep=time.sleep):
+    """Worker loop; ``iterations``/``sleep`` exist for tests (default: run forever)."""
     init_db()
     kinds = worker_kinds()
     print("Evidence Workbench worker started" + (f" for job kinds {', '.join(kinds)}" if kinds else ""))
-    while True:
-        job = claim_job(kinds=kinds)
+    failures = 0
+    count = 0
+    while iterations is None or count < iterations:
+        count += 1
+        job, failures = claim_next(kinds, failures, sleep=sleep)
         if not job:
-            time.sleep(2)
+            if not failures:
+                sleep(2)
             continue
         try:
             process_job(job)

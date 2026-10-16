@@ -10,8 +10,10 @@ leaves out and how to run it. Acceptance evidence: [receipt](validation/IMPORT_C
 |---|---|
 | Acquisition | Every input file goes through `evidence.ingest_file` (optional `collection_id`). Extracted children (email attachments/inline parts, WhatsApp media, a chat `.txt` inside a zip) are acquired with `parent_artifact_id`. Identical bytes share one stored copy and one SHA-256 while each provenance keeps its own artifact row and observation. |
 | Originals | Read only. Extraction writes to a private system temporary directory, never next to the source. Tests compare SHA-256 of every corpus file before and after all imports. |
+| Source times of acquisitions | `ingest_file(..., source_stat=)` says what the path is (review finding 1): `path` (default; the original, its mtime becomes `source_modified_at`), `temporary_copy` (uploads, extracted attachments/media, a chat text taken out of a zip: `source_modified_at` stays `NULL`) or `declared` (the caller supplies the instant and its basis). Upload routes wrap importers in `evidence.temporary_copy_acquisitions()`; `acquire_bytes` always acquires a temporary copy. The observation metadata names the scope (`filesystem_stat_scope`). Existing rows are not rewritten; the timeline ignores older rows with temporary markers (see [timeline](TIMELINE.md)). |
 | Raw fields | Raw headers, attributes, cells, content lines or JSON records are kept in event/observation metadata, bounded by `CommLimits` (default 4096 characters per string, 200 items per container); truncation is counted. The preserved original remains the authority. |
-| Locators | Byte range + message index (MBOX), component index + physical lines (ICS/VCF), XML element ordinal, table/row/raw record (billing), record index or HTML line (Takeout), chat line (WhatsApp), container path `zip!/member` or `mbox!/message/N/mime-part/P`. |
+| Locators | Byte range + message index (MBOX), component index + physical lines (ICS/VCF), XML element ordinal, table/row/raw record (billing), record index or HTML line (Takeout), chat line (WhatsApp), container path `zip@sha256:<zip hash>!/member` or `mbox@sha256:<mbox hash>!/message/N/mime-part/P`. Since parser version 2 of `email_rfc5322` and `whatsapp_media` (review finding 5) a child locator names the container's content identity, so two exports with the same file name (e.g. two Takeouts' `All mail Including Spam and Trash.mbox`) never share a child locator; identical child bytes get one stored copy and one artifact row per container. A container that a version-1 import already acquired keeps version 1 (`<container>!/…`) on re-import, so re-importing it stays idempotent; existing rows are never rewritten. WhatsApp folder exports keep their filesystem paths. |
+| Parents | A child acquired again at the same locator under a **different** parent is no longer refused (409): the artifact keeps its first `parent_artifact_id`, and the new observation records `parent_artifact_id`, `parent_relation: additional_parent_observed` and `artifact_parent_artifact_id` (also in the `ingest` audit row), so both provenances stay visible. |
 | Idempotence | Re-importing the same file at the same locator reuses the artifact, events (same `external_id` and payload), time candidates and observation rows; a changed interpretation under the same parser version is a visible `IntegrityError`, never an overwrite. A new acquisition observation is still appended, as for every `ingest_file`. |
 | Time | Every timestamp a source states is a `TimeCandidate` in `event_times` with kind, raw text, zone status and precision. `events.ts_start/ts_end` are filled only when the source fixes the UTC instant (offset, declared zone without DST fold, epoch); otherwise they stay empty and the candidate keeps the wall-clock value. The importing machine's zone is never used. |
 | Issues and coverage | Each result lists issue codes with exact counts (listing bounded) and `coverage.complete`. Reaching a limit (records, message bytes, attachment size, archive members, walk entries, document size) makes coverage partial. One append-only `audit_log` row (`action='import_run'`) records importer, version, options/opt-ins, counts, coverage and issue counts. |
@@ -89,10 +91,13 @@ flagged. DST gaps stay `unknown` (`dst: nonexistent_local_time`); folds keep bot
 instants (`utc_alternatives`) and leave `ts_start` empty. `RRULE`/`RDATE`/`EXDATE` are
 kept raw; **nothing is expanded on import**. `expand_recurrence(event_id, max_instances,
 until)` (CLI `expand-calendar-recurrence`, API `GET …/calendar/{id}/occurrences`) returns
-a bounded, unsaved projection labelled `ics_recurrence_projection/v1` with the dateutil
+a bounded, unsaved projection labelled `ics_recurrence_projection/v2` with the dateutil
 version; occurrences are generated in wall-clock time and mapped through the declared
-zone, EXDATEs are removed and `RECURRENCE-ID` overrides are marked, not merged. A UTC
-`UNTIL` is compared as wall-clock time (labelled simplification). Overrides are separate
+zone, EXDATEs are removed and `RECURRENCE-ID` overrides are marked, not merged. Since v2
+(review finding 11) `UNTIL`, `EXDATE` and `RECURRENCE-ID` values with `Z` or their own
+`TZID` are converted to DTSTART's wall clock before comparison (RFC 5545 instants); only
+floating values are compared as wall-clock time. The `until` query bound may carry an
+offset; an unparsable bound is a 422. Overrides are separate
 events sharing `thread_id = uid:<UID>`; missing UID → content-derived id.
 
 ### Contacts: VCF (`vcf.py`, table `contact_observations`)

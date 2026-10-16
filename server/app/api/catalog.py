@@ -270,7 +270,7 @@ def catalog_page(request: Request, collection: Id | None = None, type: str | Non
         'collisions': store.list_collisions(collection_id=collection, limit=20)['collisions'],
         'annotations': describe.list_annotations(collection, 20) if selected else [],
         'scans': store.list_scans(collection, 10) if selected else [],
-        'providers': ['none', *sorted(describe.PROVIDERS)],
+        'providers': describe.ui_providers(),
     }
     base = {'collection': collection, 'type': type, 'status': status, 'conflict': 'true' if conflict else None,
             'dup': 'true' if dup else None, 'group': group, 'q': q, 'minGap': minGap if minGap != 30 else None,

@@ -71,7 +71,7 @@ def _render(section: Section, ctx, value: dict, where: str) -> None:
     blocks.append(kv('timeline.projection', [
         ('rule', rule['id']), ('rule_sha256', rule['sha256']), ('rule_origin', rule['origin']),
         ('projection_id', projection['id']), ('projection_params', projection['params']),
-        ('params_sha256', projection['params_sha256']), ('build_id', projection['build_id']),
+        ('projection_key_params', projection['key_params']), ('params_sha256', projection['params_sha256']), ('build_id', projection['build_id']),
         ('build_mode', projection['build_mode']), ('build_finished_at', projection['build_finished_at']),
         ('snapshot_status', projection['status'])], lang, title_key='timeline_projection'))
     blocks.append(table('timeline.placement', PLACEMENT_COLUMNS, value['placement'], lang, title_key='placement'))

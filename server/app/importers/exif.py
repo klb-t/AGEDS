@@ -16,7 +16,8 @@ from pathlib import Path
 
 from ..db import session
 from .comm_common import (DEFAULT_LIMITS, CommLimits, Issues, acquire, add_event_with_times, local_candidate,
-                          offset_candidate, record_import_run, stored_path)
+                          numeric_offset_minutes, offset_candidate, out_of_range_offset_candidate,
+                          record_import_run, stored_path)
 
 PARSER_NAME = 'exif_minimal'
 PARSER_VERSION = '1'
@@ -158,7 +159,11 @@ def exif_candidates(values: dict, problems: list[str]):
         source = f'exif:{name}'
         if offset_match:
             sign, hours, minutes = offset_match.groups()
-            total = (int(hours) * 60 + int(minutes)) * (1 if sign == '+' else -1)
+            total = numeric_offset_minutes(sign, hours, minutes)
+            if total is None:  # e.g. +99:00 is not an offset: keep the wall clock, zone unknown
+                problems.append(f'exif_offset_out_of_range:{offset_name}')
+                candidates.append(out_of_range_offset_candidate('exif', raw, source, naive, precision, meta, offset))
+                continue
             meta['offset_raw'] = offset
             candidates.append(offset_candidate('exif', raw, source, naive, total, precision, meta))
         else:

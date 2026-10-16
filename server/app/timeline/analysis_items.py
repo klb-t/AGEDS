@@ -19,7 +19,7 @@ from __future__ import annotations
 import json
 import sqlite3
 
-from .projection import ensure_projection
+from .projection import ensure_projection, label_flags
 from .ruleset import Rule, display_params, load_rule
 from .timeutil import US, parse_bound
 
@@ -115,7 +115,7 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
     truncated = len(rows) > limit
     items, untimed = [], []
     for row in rows[:limit]:
-        flags = json.loads(row['flags_json'] or '{}')
+        flags = label_flags(json.loads(row['flags_json'] or '{}'), params)
         if row['basis'] == UNKNOWN and unknown_zone == 'exclude':
             untimed.append({'event_id': row['ref_id'], 'event_type': row['event_type'],
                             'reason': unknown_zone_reason(flags), 'local_as_utc': row['sort_us'] / US,

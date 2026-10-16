@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from .db import init_db, session
 from .config import settings
-from .evidence import IntegrityError, ensure_source, ingest_file
+from .evidence import IntegrityError, ensure_source, ingest_file, temporary_copy_acquisitions
 from .citations import anchor_payload, create_citation, loads_transcript_segments, milliseconds
 from .importers.sms_backup import import_sms_backup
 from .importers.whatsapp import import_whatsapp_txt
@@ -146,7 +146,8 @@ async def upload(file:UploadFile=File(...),source_label:str=Form('Manual upload'
         shutil.copyfileobj(file.file,tmp); p=Path(tmp.name)
     try:
         src=ensure_source('manual_upload',source_label)
-        aid=ingest_file(p,source_id=src,source_locator=f'upload:{file.filename}',original_name=file.filename,mime_type=file.content_type)
+        aid=ingest_file(p,source_id=src,source_locator=f'upload:{file.filename}',original_name=file.filename,mime_type=file.content_type,
+                        source_stat='temporary_copy')
         return {'ok':True,'artifact_id':aid}
     finally:p.unlink(missing_ok=True)
 
@@ -154,14 +155,18 @@ async def upload(file:UploadFile=File(...),source_label:str=Form('Manual upload'
 async def import_sms(file:UploadFile=File(...)):
     with tempfile.NamedTemporaryFile(delete=False,suffix='.xml') as tmp:
         shutil.copyfileobj(file.file,tmp); p=Path(tmp.name)
-    try:return import_sms_backup(p,source_locator=f'upload:sms-backup:{file.filename}',original_name=file.filename)
+    try:
+        with temporary_copy_acquisitions():
+            return import_sms_backup(p,source_locator=f'upload:sms-backup:{file.filename}',original_name=file.filename)
     finally:p.unlink(missing_ok=True)
 
 @app.post('/import/whatsapp')
 async def import_wa(file:UploadFile=File(...),chat_label:str=Form('')):
     with tempfile.NamedTemporaryFile(delete=False,suffix='.txt') as tmp:
         shutil.copyfileobj(file.file,tmp); p=Path(tmp.name)
-    try:return import_whatsapp_txt(p,chat_label or None,source_locator=f'upload:whatsapp:{file.filename}',original_name=file.filename)
+    try:
+        with temporary_copy_acquisitions():
+            return import_whatsapp_txt(p,chat_label or None,source_locator=f'upload:whatsapp:{file.filename}',original_name=file.filename)
     finally:p.unlink(missing_ok=True)
 
 @app.get('/artifact/{artifact_id}',response_class=HTMLResponse)
@@ -309,7 +314,8 @@ async def api_upload_artifact(file:UploadFile=File(...),source_label:str=Form('A
         src=ensure_source('client_upload',source_label)
         aid=ingest_file(p,source_id=src,source_locator=source_locator or f'client-upload:{file.filename}',original_name=file.filename,mime_type=file.content_type,
                         metadata={'client_metadata':client_metadata,'client_metadata_status':'unverified',
-                                  'acquisition_kind':'uploaded_stream','filesystem_stat_scope':'server_temporary_upload_not_original_source'})
+                                  'acquisition_kind':'uploaded_stream','filesystem_stat_scope':'server_temporary_upload_not_original_source'},
+                        source_stat='temporary_copy')
         with session() as db:
             sha=db.execute('SELECT sha256 FROM artifacts WHERE id=?',(aid,)).fetchone()['sha256']
         return {'ok':True,'artifact_id':aid,'sha256':sha}

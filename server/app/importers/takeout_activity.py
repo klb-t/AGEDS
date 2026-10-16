@@ -19,7 +19,8 @@ from pathlib import Path
 
 from ..timeinfo import TimeCandidate, from_iso
 from .comm_common import (DEFAULT_LIMITS, CommLimits, Issues, acquire, add_event_with_times, bound_json,
-                          bounded_text, content_id, legacy_instant, load_data, local_candidate, offset_candidate,
+                          bounded_text, content_id, legacy_instant, load_data, local_candidate,
+                          numeric_offset_minutes, offset_candidate, out_of_range_offset_candidate,
                           record_import_run, stored_path)
 from .email_mbox import html_to_text
 
@@ -66,7 +67,9 @@ def parse_display_time(text: str, config: dict, source: str) -> tuple[TimeCandid
         numeric = _NUMERIC_ZONE.match(zone) if zone else None
         if numeric:
             sign, hours, minutes = numeric.groups()
-            offset = 0 if sign is None else (int(hours) * 60 + int(minutes or 0)) * (1 if sign == '+' else -1)
+            offset = 0 if sign is None else numeric_offset_minutes(sign, hours, minutes)
+            if offset is None:  # e.g. GMT+25 is not an offset: keep the wall clock, zone unknown
+                return out_of_range_offset_candidate('created', text, source, naive, precision, meta, zone), meta
             meta['zone_status'] = 'numeric_zone_in_display_text'
             return offset_candidate('created', text, source, naive, offset, precision, meta), meta
         meta['zone_status'] = 'abbreviation_not_converted' if zone else 'zone_missing'

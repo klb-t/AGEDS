@@ -163,8 +163,12 @@ def acquire(path: Path, *, source_kind: str, source_label: str, locator: str | N
             parser_version: str, original_name: str | None = None, options: dict | None = None,
             collection_id: int | None = None, mime_type: str | None = None,
             source_id: int | None = None, parent_artifact_id: int | None = None,
-            is_raw: bool = True, extra_metadata: dict | None = None) -> tuple[int, int]:
-    """Acquire a file (or an extracted child) through ``evidence.ingest_file``."""
+            is_raw: bool = True, extra_metadata: dict | None = None,
+            source_stat: str | None = None) -> tuple[int, int]:
+    """Acquire a file (or an extracted child) through ``evidence.ingest_file``.
+
+    ``source_stat`` is passed through (``None`` = the caller's context default).
+    """
     locator = locator if locator is not None else str(path)
     if source_id is None:
         source_id = evidence.ensure_source(source_kind, source_label, locator)
@@ -176,8 +180,30 @@ def acquire(path: Path, *, source_kind: str, source_label: str, locator: str | N
     artifact_id = evidence.ingest_file(
         path, source_id=source_id, source_locator=locator, original_name=original_name,
         mime_type=mime_type, metadata=metadata, is_raw=is_raw, collection_id=collection_id,
-        parent_artifact_id=parent_artifact_id)
+        parent_artifact_id=parent_artifact_id, source_stat=source_stat)
     return source_id, artifact_id
+
+
+def container_scheme(artifact_id: int, locator: str, importer: str, current_version: str) -> tuple[str, str]:
+    """(parser version, child locator base) for one import of a container (review finding 5).
+
+    Since version 2 of the container importers a child locator names the
+    container's content identity: ``<locator>@sha256:<container hash>!/...``,
+    so two exports with the same file name never share a child locator. A
+    container that an earlier version-1 import already acquired keeps version
+    1 (``<locator>!/...``): re-importing it stays idempotent instead of
+    conflicting with the events and children recorded then. Existing rows are
+    never rewritten.
+    """
+    with session() as db:
+        row = db.execute('SELECT sha256 FROM artifacts WHERE id=?', (artifact_id,)).fetchone()
+        earlier = {r[0] for r in db.execute(
+            '''SELECT DISTINCT json_extract(metadata_json,'$.source_metadata.parser_version') FROM source_observations
+               WHERE artifact_id=? AND json_extract(metadata_json,'$.source_metadata.importer')=?''',
+            (artifact_id, importer))}
+    if '1' in earlier or row is None or not row['sha256']:
+        return '1', locator
+    return current_version, f"{locator}@sha256:{row['sha256']}"
 
 
 def acquire_bytes(payload: bytes, *, name: str, source_id: int, locator: str, importer: str,
@@ -188,6 +214,7 @@ def acquire_bytes(payload: bytes, *, name: str, source_id: int, locator: str, im
 
     The temporary file lives in the system temp directory, never in a source tree;
     its name carries only a sanitized suffix so the store keeps a useful extension.
+    Its filesystem times describe the extraction, so none is recorded as a source time.
     """
     with tempfile.TemporaryDirectory(prefix='ageds-extract-') as directory:
         temporary = Path(directory) / ('payload' + safe_suffix(name))
@@ -197,7 +224,7 @@ def acquire_bytes(payload: bytes, *, name: str, source_id: int, locator: str, im
             temporary, source_kind='', source_label='', locator=locator, importer=importer,
             parser_version=parser_version, original_name=name, collection_id=collection_id,
             mime_type=mime_type, source_id=source_id, parent_artifact_id=parent_artifact_id,
-            is_raw=is_raw, extra_metadata=extra_metadata)
+            is_raw=is_raw, extra_metadata=extra_metadata, source_stat='temporary_copy')
         return artifact_id
 
 
@@ -266,8 +293,42 @@ def local_candidate(kind: str, raw: str | None, source: str, naive: datetime, pr
                          precision=precision, metadata=dict(metadata or {}))
 
 
+# ``datetime.timezone`` accepts offsets strictly inside +-24 h. Civil offsets lie
+# within -12:00..+14:00; values in between are kept (callers flag them).
+MAX_OFFSET_MINUTES = 24 * 60 - 1
+
+
+def numeric_offset_minutes(sign: str | None, hours, minutes=0) -> int | None:
+    """Signed minutes of a numeric zone, or None when the text is not a valid offset.
+
+    Minutes must be 0..59 and the total strictly less than 24 hours: ``+2400``,
+    ``+99:00`` or ``GMT+25`` are not offsets and must never reach
+    ``datetime.timezone`` (which raises).
+    """
+    hours, minutes = int(hours), int(minutes or 0)
+    if minutes >= 60 or hours * 60 + minutes > MAX_OFFSET_MINUTES:
+        return None
+    total = hours * 60 + minutes
+    return -total if sign == '-' else total
+
+
+def out_of_range_offset_candidate(kind: str, raw: str | None, source: str, naive: datetime, precision: str,
+                                  metadata: dict, offset_raw: str | None) -> TimeCandidate:
+    """Wall-clock reading (zone unknown) of a value whose numeric zone is not a valid offset.
+
+    ``metadata`` is updated in place so callers that also return it report the same status.
+    """
+    metadata['zone_status'] = 'numeric_offset_out_of_range'
+    metadata['offset_raw'] = offset_raw
+    return local_candidate(kind, raw, source, naive, precision, metadata)
+
+
 def offset_candidate(kind: str, raw: str | None, source: str, naive: datetime, offset_minutes: int,
                      precision: str, metadata: dict | None = None, tz_label: str | None = None) -> TimeCandidate:
+    if isinstance(offset_minutes, bool) or not isinstance(offset_minutes, int) or abs(offset_minutes) > MAX_OFFSET_MINUTES:
+        # Defensive: callers range-check first; a parsed value must never raise here.
+        return out_of_range_offset_candidate(kind, raw, source, naive, precision, dict(metadata or {}),
+                                             str(offset_minutes))
     zone = timezone(timedelta(minutes=offset_minutes))
     sign = '+' if offset_minutes >= 0 else '-'
     hours, minutes = divmod(abs(offset_minutes), 60)

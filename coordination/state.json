@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "AGEDS",
   "state_id": "AGEDS-STATE-20261016-001",
-  "updated_at": "2026-10-16T19:06:07.754679+00:00",
+  "updated_at": "2026-10-16T19:48:46.914244+00:00",
   "based_on_remote_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
   "local_branch": "ccr-d25c3cb3-qgbhql",
   "status_summary": "Evidence Timeline & Analysis increment started on 9c1d513: Etap 0 report and F0 extension foundation; parallel tracks A-H claimed with disjoint file scopes.",
@@ -358,8 +358,8 @@
     },
     {
       "id": "AGEDS-TASK-20261016-E",
-      "owner": "analysis",
-      "status": "claimed",
+      "owner": "analysis (E1 budget, E2 hypotheses)",
+      "status": "done",
       "scope": [
         "server/app/analysis/",
         "server/app/schema/analysis.py",
@@ -376,12 +376,21 @@
       "acceptance": [
         "Interval-union budgets with bounds, unobserved band, sensitivity grid, preregistered hypotheses, permutation event study with fixed disclaimers."
       ],
-      "result_refs": []
+      "result_refs": [
+        "docs/TIME_BUDGET.md",
+        "docs/HYPOTHESES.md",
+        "docs/validation/TIME_BUDGET_2026-10-16.json",
+        "docs/validation/HYPOTHESES_2026-10-16.json"
+      ],
+      "results": {
+        "E1": "797 passed own head; analysis_budget.cjs 9/9; 20k events 7-9 s, 100k 38-43 s (11-point grid, 90 days)",
+        "E2": "835 passed own head; hypotheses.cjs 10 PASS; planted effect p<=0.02, density-burst null flagged, weekday confound removed by stratified null"
+      }
     },
     {
       "id": "AGEDS-TASK-20261016-F",
       "owner": "reports",
-      "status": "ready",
+      "status": "done",
       "scope": [
         "server/app/reports/",
         "server/app/schema/reports.py",
@@ -396,7 +405,14 @@
       "acceptance": [
         "Every number from code, method section, report manifest verifiable, outputs only to user directory."
       ],
-      "result_refs": []
+      "result_refs": [
+        "docs/REPORTS.md",
+        "docs/validation/REPORTS_2026-10-16.json"
+      ],
+      "results": {
+        "own_suite": "750 passed; reports.cjs 9 PASS"
+      },
+      "pending": "timeline/budget/dossier providers wired by X"
     },
     {
       "id": "AGEDS-TASK-20261016-G",
@@ -439,7 +455,7 @@
     {
       "id": "AGEDS-TASK-20261016-H",
       "owner": "workbench (Fable)",
-      "status": "claimed",
+      "status": "done",
       "scope": [
         "server/app/workbench/",
         "server/app/schema/workbench.py",
@@ -454,7 +470,15 @@
       "acceptance": [
         "Layer-filtered search, saved searches, bulk tags, folders, bookmarks, theme, PL/NL/EN."
       ],
-      "result_refs": []
+      "result_refs": [
+        "docs/WORKBENCH.md",
+        "docs/validation/WORKBENCH_2026-10-16.json"
+      ],
+      "results": {
+        "own_suite": "526 passed, 742 subtests; node 98; workbench.cjs 9 PASS; acceptance.cjs 24 PASS",
+        "wcag": "22 text pairs AA both themes"
+      },
+      "note": "first attempt on Fable stopped (credits exhausted) before writing; rerun on default model"
     },
     {
       "id": "AGEDS-TASK-20261016-P",
@@ -475,6 +499,75 @@
         ],
         "tests": "server/tests/test_repository_privacy.py 2 passed"
       }
+    },
+    {
+      "id": "AGEDS-TASK-20261016-I",
+      "owner": "importplan",
+      "status": "done",
+      "scope": [
+        "server/app/importplan/",
+        "server/app/schema/importplan.py (90-99)",
+        "api/commands importplan",
+        "templates/static importplan",
+        "tests"
+      ],
+      "based_on_commit": "e1ce8d2",
+      "acceptance": [
+        "plan exact, ambiguous never auto-approved, opt-ins off, idempotent rerun, tamper refused, crash resume"
+      ],
+      "result_refs": [
+        "docs/IMPORT_PLAN.md",
+        "docs/validation/IMPORT_PLAN_2026-10-16.json"
+      ],
+      "results": {
+        "own_suite": "748 passed, 2 xfailed (review #1/#5 pending R)",
+        "browser": "importplan.cjs 9 PASS, media.cjs 7 PASS"
+      }
+    },
+    {
+      "id": "AGEDS-TASK-20261016-REVIEW",
+      "owner": "reviewer",
+      "status": "accepted",
+      "scope": [
+        "read-only review of 9c1d513..b181c21"
+      ],
+      "based_on_commit": "b181c21",
+      "acceptance": [
+        "confirmed findings with reproducers"
+      ],
+      "result_refs": [
+        "13 confirmed + 6 plausible findings; fixes in task R"
+      ]
+    },
+    {
+      "id": "AGEDS-TASK-20261016-R",
+      "owner": "review_fixes",
+      "status": "claimed",
+      "scope": [
+        "files named in review findings",
+        "server/tests/test_review_fixes_*.py",
+        "docs/validation/REVIEW_FIXES_2026-10-16.*"
+      ],
+      "based_on_commit": "b181c21",
+      "acceptance": [
+        "each finding reproduced by a failing test, then fixed"
+      ],
+      "result_refs": []
+    },
+    {
+      "id": "AGEDS-TASK-20261016-X",
+      "owner": "integration",
+      "status": "claimed",
+      "scope": [
+        "post-merge failures",
+        "report providers timeline/budget/dossier",
+        "bookmarks on timeline"
+      ],
+      "based_on_commit": "cab22bc",
+      "acceptance": [
+        "full pytest, node, verify, all browser scripts green"
+      ],
+      "result_refs": []
     }
   ],
   "remaining_boundaries": [

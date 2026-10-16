@@ -75,6 +75,9 @@ EXCLUDED_EXTENSION_TABLES = {
     'timeline_items': 'derived cache: rebuilt from events/event_times by the versioned display rule',
     'timeline_projection_builds': 'derived cache build log (rule hash and watermarks of a rebuildable projection)',
     'workbench_search_docs': 'derived search index content, rebuilt by workbench-index-check --rebuild',
+    'timeline_projection_evictions': 'derived cache bookkeeping: evictions of rebuildable timeline projections',
+    'api_token_rejections': ('transient security telemetry (rejected token attempts per hour, key and reason); '
+                             'references the excluded credential table api_tokens'),
 }
 EXCLUDED_EXTENSION_COLUMNS = {
     'annotation_proposals': {'token_id': 'reference into the excluded credential table api_tokens'},

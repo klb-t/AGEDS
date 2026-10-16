@@ -71,6 +71,17 @@ EXECUTION_KEYS = {
 }
 DESCRIPTIVE_KEYS = ('description',)
 IMMUTABLE_OVERRIDE_KEYS = set(COMMON_KEYS)
+# Overrides an HTTP client may send: decoding and strategy parameters only
+# (``None`` = the whole value; a set = only those nested keys). Engine, model,
+# device, compute type, every model option, the diarization pipeline and the
+# resource limits choose code, files or network behaviour on the server and are
+# operator decisions: a recipe preset (built-in or EW_MEDIA_RECIPE_DIR) or the CLI.
+CLIENT_OVERRIDE_KEYS = {
+    'asr': {'strategy': None, 'vad': None, 'word_timestamps': None, 'language': None, 'allowed_languages': None,
+            'windows': None, 'detection': None, 'transcribe_options': None},
+    'ocr': {'languages': None, 'psm': None, 'oem': None, 'layout': None, 'pdf': {'dpi', 'max_pages'}},
+    'diarization': {'num_speakers': None, 'min_speakers': None, 'max_speakers': None},
+}
 
 
 class RecipeError(ValueError):
@@ -184,6 +195,29 @@ def _merge(base: dict, overrides: dict, path: str = '') -> dict:
         else:
             result[key] = copy.deepcopy(value)
     return result
+
+
+def check_client_overrides(kind: str, overrides) -> None:
+    """Refuse override keys an HTTP client may not choose (see ``CLIENT_OVERRIDE_KEYS``)."""
+    if overrides is None:
+        return
+    if not isinstance(overrides, dict):
+        raise RecipeError('overrides must be an object')
+    allowed = CLIENT_OVERRIDE_KEYS.get(kind)
+    if allowed is None:
+        raise RecipeError(f'unknown recipe kind {kind}')
+    refused = []
+    for key, value in overrides.items():
+        if key not in allowed:
+            refused.append(str(key))
+        elif allowed[key] is not None:
+            if not isinstance(value, dict):
+                raise RecipeError(f'override {key} must be an object')
+            refused.extend(f'{key}.{inner}' for inner in value if inner not in allowed[key])
+    if refused:
+        permitted = sorted(k if v is None else f'{k}.{{{",".join(sorted(v))}}}' for k, v in allowed.items())
+        raise RecipeError(f'override {", ".join(sorted(refused))} can be set only in a local recipe preset or through '
+                          f'the CLI (operator decision); HTTP clients may override only: {", ".join(permitted)}')
 
 
 def _finite(value, name: str, *, low=None, high=None, integer=False, allow_none=False):

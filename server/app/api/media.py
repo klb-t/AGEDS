@@ -67,18 +67,19 @@ def _recipes(kind: str | None = None) -> list[dict]:
     return items
 
 
-# Options that name local filesystem locations or switch network behaviour are
-# operator decisions (presets/CLI), not something an HTTP client may choose.
-HTTP_FORBIDDEN_MODEL_OPTIONS = frozenset({'download_root', 'local_files_only'})
-
-
 def _enqueue(artifact_id: int, body: JobIn) -> dict:
+    """HTTP enqueue: only decode/strategy overrides (``recipe.CLIENT_OVERRIDE_KEYS``).
+
+    Model, engine, device, compute type, model options, diarization pipeline and
+    limits are operator decisions (recipe presets or the CLI); review finding 3.
+    """
     from ..media.queue import enqueue_media_job
+    from ..media.recipe import RECIPE_KIND_FOR_JOB, RecipeError, check_client_overrides
     _artifact(artifact_id)
-    options = (body.overrides or {}).get('model_options') if isinstance(body.overrides, dict) else None
-    if isinstance(options, dict) and HTTP_FORBIDDEN_MODEL_OPTIONS & set(options):
-        raise HTTPException(422, 'model_options ' + ', '.join(sorted(HTTP_FORBIDDEN_MODEL_OPTIONS & set(options)))
-                            + ' can be set only in a local recipe preset or through the CLI')
+    try:
+        check_client_overrides(RECIPE_KIND_FOR_JOB[body.kind], body.overrides)
+    except RecipeError as error:
+        raise _unprocessable(error) from error
     try:
         return enqueue_media_job(body.kind, artifact_id, recipe_id=body.recipe, overrides=body.overrides,
                                  priority=body.priority, dedup=body.dedup)

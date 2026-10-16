@@ -122,6 +122,7 @@ class FakeProvider:
     """Deterministic test double: writes only placeholders, never numbers."""
     name = 'fake'
     external = False
+    test_double = True
 
     def describe(self, profile: dict, prompt: str, params: dict) -> ProviderResult:
         text = ('Kolekcja #{{collection_id}} zawiera {{totals.entries}} wpisów w {{type_count}} typach; '
@@ -135,6 +136,17 @@ class FakeProvider:
 
 
 PROVIDERS: dict[str, object] = {'fake': FakeProvider()}
+
+
+def ui_providers() -> list[str]:
+    """Provider names offered in the /catalog form (review U4).
+
+    Test doubles are listed only with ``EW_CATALOG_TEST_PROVIDERS=1``; the API
+    and CLI still accept an explicitly named provider, and every run records it.
+    """
+    show_doubles = os.environ.get('EW_CATALOG_TEST_PROVIDERS', '').strip().lower() in ('1', 'true', 'yes', 'on')
+    return ['none', *sorted(name for name, provider in PROVIDERS.items()
+                            if show_doubles or not getattr(provider, 'test_double', False))]
 
 
 def register_provider(provider) -> None:

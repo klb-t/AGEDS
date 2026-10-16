@@ -636,7 +636,10 @@ def test_whatsapp_zip_children_of_container_and_pdf_identity(env):
     children = {a['original_name']: a for a in rows('SELECT * FROM artifacts WHERE parent_artifact_id=?',
                                                     (result['container_artifact_id'],))}
     assert children['DOC-20240105-WA0003.pdf']['sha256'] == env['m']['pdf']['sha256']
-    assert children['IMG-20240105-WA0001.jpg']['source_locator'].endswith('export.zip!/IMG-20240105-WA0001.jpg')
+    container_sha = rows('SELECT sha256 FROM artifacts WHERE id=?', (result['container_artifact_id'],))[0]['sha256']
+    # Parser version 2 (review finding 5): member locators carry the zip's content identity.
+    assert children['IMG-20240105-WA0001.jpg']['source_locator'].endswith(
+        f'export.zip@sha256:{container_sha}!/IMG-20240105-WA0001.jpg')
     patterns = {json.loads(r['locator_json'])['pattern_id'] for r in rows('SELECT * FROM event_media_references')}
     assert {'android_file_attached_en_v1', 'android_file_attached_nl_v1', 'android_media_omitted_en_v1'} <= patterns
     counts = snapshot_counts()
@@ -726,8 +729,12 @@ def test_parent_artifact_validation(env, tmp_path):
     assert rows('SELECT parent_artifact_id FROM artifacts WHERE id=?', (child,))[0]['parent_artifact_id'] == parent
     assert evidence.ingest_file(child_file, source_id=source, source_locator='c') == child  # parent not stated
     other_parent = evidence.ingest_file(child_file, source_id=source, source_locator='other')
-    with pytest.raises(evidence.IntegrityError):
-        evidence.ingest_file(child_file, source_id=source, source_locator='c', parent_artifact_id=other_parent)
+    # Review finding 5: another stated parent is recorded on the observation, never re-parented or refused.
+    assert evidence.ingest_file(child_file, source_id=source, source_locator='c', parent_artifact_id=other_parent) == child
+    assert rows('SELECT parent_artifact_id FROM artifacts WHERE id=?', (child,))[0]['parent_artifact_id'] == parent
+    stated = json.loads(rows('SELECT metadata_json FROM source_observations WHERE artifact_id=? ORDER BY id DESC LIMIT 1',
+                             (child,))[0]['metadata_json'])
+    assert (stated['parent_artifact_id'], stated['parent_relation']) == (other_parent, 'additional_parent_observed')
     with dbmod.session() as db:
         case = db.execute("INSERT INTO cases(name) VALUES ('second synthetic case')").lastrowid
     foreign = evidence.ensure_source('test', 'other case', case_id=case)

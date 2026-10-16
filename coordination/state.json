@@ -2,7 +2,7 @@
   "schema_version": 1,
   "project": "AGEDS",
   "state_id": "AGEDS-STATE-20261016-001",
-  "updated_at": "2026-10-16T18:41:16.718342+00:00",
+  "updated_at": "2026-10-16T18:44:48.527456+00:00",
   "based_on_remote_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
   "local_branch": "ccr-d25c3cb3-qgbhql",
   "status_summary": "Evidence Timeline & Analysis increment started on 9c1d513: Etap 0 report and F0 extension foundation; parallel tracks A-H claimed with disjoint file scopes.",
@@ -185,7 +185,7 @@
     {
       "id": "AGEDS-TASK-20261016-B",
       "owner": "importers",
-      "status": "in_progress",
+      "status": "accepted",
       "scope": [
         "server/app/importers/ (new files)",
         "server/app/importers/data/",
@@ -223,7 +223,33 @@
           ]
         },
         "B2_comm": {
-          "status": "claimed"
+          "status": "accepted",
+          "integrated_commit": "merge of wt-B2 de29aaf",
+          "result_refs": [
+            "docs/IMPORTERS_COMM.md",
+            "docs/validation/IMPORT_COMM_2026-10-16.json"
+          ],
+          "results": {
+            "backend_after_merge": "610 passed, 1 skipped, 680 subtests",
+            "cli_runtime": "12 commands, 14 import runs exit 0, 4 refusals exit 2, 34 corpus files hashes unchanged"
+          },
+          "shared_edits": [
+            "evidence.ingest_file(parent_artifact_id=None)",
+            "records.py COMM_MIGRATIONS 25-27",
+            "imports_comm registration"
+          ],
+          "deviations": [
+            "alphabetic email zones (CET) not converted; RFC 5322 -0000 reading kept as alternative",
+            "ICS TZID stored as explicit_offset + zone_declaration",
+            "ts_start/ts_end filled only when UTC instant fixed"
+          ],
+          "not_done": [
+            "correlations (track C)",
+            "XLS billing",
+            "PNG tEXt",
+            "TNEF/uuencode",
+            "UI"
+          ]
         }
       }
     },

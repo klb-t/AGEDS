@@ -1,14 +1,20 @@
 """Scoped events for the report (shared by several sections; not a section).
 
-Time placement uses the analysis source seam (rule ``analysis_source.v1``):
-an event is on the UTC axis only when a candidate has a known offset (or the
-caller passed ``assume_zone``, recorded on the item). Untimed events are kept
-with their reason and reported as exclusions, never shifted or dropped silently.
+Time placement uses the analysis source seam, which delegates to the timeline
+projection (display rule ``display_time@N`` with its SHA-256; the interim rule
+``analysis_source.v1`` only without the timeline package). The read never
+writes: the report service refreshes the projection (a derived cache) before
+its read-only snapshot and the seam refuses a stale cache. An event is on the
+UTC axis only when a candidate has a known offset (or the caller passed
+``assume_zone`` with a named ``assumption_rule``, recorded on the item).
+Untimed events are kept with their reason and reported as exclusions, never
+shifted or dropped silently.
 
 Filters are literal: ``counterparty`` is a case-folded substring of
 contact label / address / sender / recipients; ``topic`` a case-folded
 substring of subject or body. No semantic matching, no diacritics folding.
-Hidden chat parts (``metadata.chat.hidden``) are excluded unless
+Hidden chat parts (hidden by the timeline display rule: ``chat_message_part``
+events and ``metadata.chat.hidden``) are excluded unless
 ``include_hidden_chat_parts`` is set; their count is reported.
 """
 from __future__ import annotations
@@ -59,7 +65,8 @@ def scoped_events(ctx) -> dict:
     params = ctx.params
     loaded = load_items(ctx.db, start_utc=params['from'], end_utc=params['to'],
                         event_types=params['event_types'] or None, assume_zone=params['assume_zone'],
-                        limit=params['max_events'])
+                        assumption_rule=params['assumption_rule'], include_hidden=True,
+                        limit=params['max_events'], refresh=False)
     timed_ids = [item['event_id'] for item in loaded['items']]
     untimed_ids = [item['event_id'] for item in loaded['untimed']]
     rows = _rows_by_id(ctx.db, 'events', timed_ids + untimed_ids)
@@ -70,7 +77,7 @@ def scoped_events(ctx) -> dict:
         if not _matches(row, params['counterparty'], params['topic']):
             exclusions['filtered_by_counterparty_or_topic'] += 1
             continue
-        if _hidden(row) and not params['include_hidden_chat_parts']:
+        if (item.get('hidden') or _hidden(row)) and not params['include_hidden_chat_parts']:
             exclusions['hidden_chat_parts_excluded'] += 1
             continue
         items.append(item)
@@ -79,10 +86,16 @@ def scoped_events(ctx) -> dict:
         if not _matches(row, params['counterparty'], params['topic']):
             exclusions['filtered_by_counterparty_or_topic'] += 1
             continue
-        if _hidden(row) and not params['include_hidden_chat_parts']:
+        if (item.get('hidden') or _hidden(row)) and not params['include_hidden_chat_parts']:
             exclusions['hidden_chat_parts_excluded'] += 1
             continue
         untimed.append(item)
+    for item in items:
+        # Literal grouping (docs/REPORTS.md): the source's label/address as written. The timeline
+        # lane key (separators removed from phone-like values) stays available as counterparty_key.
+        row = rows[item['event_id']]
+        item['counterparty_key'] = item.get('counterparty')
+        item['counterparty'] = row['contact_label'] or row['phone_or_address']
     reasons: dict[str, int] = {}
     for item in untimed:
         reasons[item['reason']] = reasons.get(item['reason'], 0) + 1
@@ -98,7 +111,9 @@ def scoped_events(ctx) -> dict:
                 times.setdefault(row['event_id'], []).append(dict(row))
     artifact_ids = sorted({rows[i]['artifact_id'] for i in used if rows[i]['artifact_id'] is not None})
     artifacts = _rows_by_id(ctx.db, 'artifacts', artifact_ids)
-    result = {'rule': loaded['rule'] or RULE_ID, 'assume_zone': loaded['assume_zone'], 'items': items,
+    result = {'rule': loaded['rule'] or RULE_ID, 'rule_sha256': loaded.get('rule_sha256'),
+              'seam': loaded.get('seam', 'interim_fallback'), 'projection': loaded.get('projection'),
+              'assumption_rule': loaded.get('assumption_rule'), 'assume_zone': loaded['assume_zone'], 'items': items,
               'untimed': untimed, 'rows': rows, 'times': times, 'artifacts': artifacts,
               'exclusions': exclusions, 'truncated': bool(loaded['truncated'])}
     ctx.scope['_events'] = result

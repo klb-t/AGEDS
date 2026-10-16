@@ -46,6 +46,17 @@ def provide(ctx) -> dict:
         section.exclude('requested_anchors_not_found', len(wanted) - len(anchors))
         section.exclude('scope', 'anchors requested by anchor_ids')
         total = len(anchors)
+    elif ctx.options.get('scope') == 'scope' and ctx.scope.get('anchor_ids') is not None:
+        wanted = list(dict.fromkeys(ctx.scope['anchor_ids']))
+        anchors = []
+        for anchor_id in wanted:
+            row = db.execute('SELECT * FROM evidence_anchors WHERE id=?', (anchor_id,)).fetchone()
+            if row is None:
+                section.unknown(f'evidence_anchor.{anchor_id}')
+            else:
+                anchors.append(row)
+        total = len(anchors)
+        section.exclude('scope', 'anchors pinned by an earlier section (hypothesis dossier)')
     elif ctx.options.get('scope') == 'scope' and ctx.scope.get('artifact_ids'):
         ids = sorted(ctx.scope['artifact_ids'])
         anchors = []

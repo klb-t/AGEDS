@@ -26,6 +26,33 @@ from .timeutil import US, parse_bound
 UNKNOWN = 'local_as_utc_unknown_zone'
 
 
+class ProjectionNotFresh(RuntimeError):
+    """The projection cache is stale and the caller asked for a read without refresh."""
+
+
+def read_projection(db: sqlite3.Connection, rule: Rule, params: dict) -> dict:
+    """The projection description, read without writing (``PRAGMA query_only`` for the call).
+
+    A fresh projection is returned as ``ensure_projection`` would. A stale or missing one
+    would need a cache refresh (a write): that is refused with ``ProjectionNotFresh`` so a
+    read-only snapshot (a report) never writes and never reads a stale cache silently.
+    Refresh first with ``ensure_projection`` in a write transaction, then read.
+    """
+    previous = int(db.execute('PRAGMA query_only').fetchone()[0])
+    db.execute('PRAGMA query_only=1')
+    try:
+        return ensure_projection(db, rule, params)
+    except sqlite3.OperationalError as exc:
+        if 'readonly' not in str(exc) and 'read-only' not in str(exc):
+            raise
+        raise ProjectionNotFresh(
+            f'timeline projection {rule.rule_id}@{rule.version} with params {params} is not fresh in this read-only '
+            'snapshot; refresh it in a write transaction first (timeline.projection.ensure_projection)') from exc
+    finally:
+        if not previous:
+            db.execute('PRAGMA query_only=0')
+
+
 # Projection reasons mapped to the analysis item contract (analysis/source.py).
 _ANALYSIS_REASON = {'no_candidates': 'no_time_candidate', 'no_usable_candidate': 'no_parseable_time'}
 
@@ -52,14 +79,18 @@ def undated_reason(flags: dict) -> str:
 def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc: str | None = None,
                event_types=None, assume_zone: str | None = None, assumption_rule: str | None = None,
                unknown_zone: str = 'exclude', include_hidden: bool = False, rule: Rule | str | None = None,
-               limit: int = 1_000_000) -> dict:
-    """Events overlapping ``[start_utc, end_utc)`` sorted by (t_start, event_id); see module docstring."""
+               limit: int = 1_000_000, refresh: bool = True) -> dict:
+    """Events overlapping ``[start_utc, end_utc)`` sorted by (t_start, event_id); see module docstring.
+
+    ``refresh=False`` never writes: the projection must already be fresh in this
+    connection's snapshot, otherwise ``ProjectionNotFresh`` is raised (read-only callers).
+    """
     if unknown_zone not in ('exclude', 'interval'):
         raise ValueError("unknown_zone must be 'exclude' or 'interval'")
     resolved = rule if isinstance(rule, Rule) else load_rule(rule, kind='display_rule')
     params = display_params(assume_zone, assumption_rule)
     db.row_factory = sqlite3.Row
-    projection = ensure_projection(db, resolved, params)
+    projection = ensure_projection(db, resolved, params) if refresh else read_projection(db, resolved, params)
     lo, hi = parse_bound(start_utc), parse_bound(end_utc, end=True)
     clauses, args = ["ti.projection_id=?", "ti.item_kind='event'"], [projection['id']]
     if not include_hidden:
@@ -87,7 +118,8 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
         flags = json.loads(row['flags_json'] or '{}')
         if row['basis'] == UNKNOWN and unknown_zone == 'exclude':
             untimed.append({'event_id': row['ref_id'], 'event_type': row['event_type'],
-                            'reason': unknown_zone_reason(flags), 'local_as_utc': row['sort_us'] / US})
+                            'reason': unknown_zone_reason(flags), 'local_as_utc': row['sort_us'] / US,
+                            'hidden': bool(row['hidden'])})
             continue
         t0 = row['sort_us'] / US
         t1 = row['end_us'] / US if row['end_us'] is not None and row['end_us'] >= row['sort_us'] else None
@@ -102,12 +134,12 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
                            'assumption_rule': flags.get('assumption_rule'), 'dst': flags.get('dst')},
             'text_chars': row['text_chars'], 'tags': json.loads(row['tags_json'] or '[]'),
         })
-    for row in db.execute(f'SELECT ref_id, event_type, flags_json FROM timeline_items ti WHERE {where} AND ti.sort_us IS NULL '
-                          'ORDER BY ti.ref_id LIMIT ?', (*args, limit + 1)):
+    for row in db.execute(f'SELECT ref_id, event_type, flags_json, hidden FROM timeline_items ti WHERE {where} '
+                          'AND ti.sort_us IS NULL ORDER BY ti.ref_id LIMIT ?', (*args, limit + 1)):
         untimed.append({'event_id': row['ref_id'], 'event_type': row['event_type'],
-                        'reason': undated_reason(json.loads(row['flags_json'] or '{}'))})
+                        'reason': undated_reason(json.loads(row['flags_json'] or '{}')), 'hidden': bool(row['hidden'])})
     return {'rule': f'{resolved.rule_id}@{resolved.version}', 'rule_sha256': resolved.sha256, 'params': params,
-            'projection': {'id': projection['id'], 'build_id': projection['build']['id']},
+            'projection': {'id': projection['id'], 'build_id': projection['build']['id'], 'status': projection['status']},
             'assume_zone': assume_zone, 'unknown_zone': unknown_zone, 'items': items, 'untimed': untimed,
             'truncated': truncated}
 

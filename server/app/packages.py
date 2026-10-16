@@ -53,6 +53,21 @@ EXTENSION_TABLES = (
     'timeline_correlation_runs', 'timeline_hypotheses', 'timeline_hypothesis_status',
     'workbench_saved_searches', 'workbench_saved_search_runs', 'workbench_folders', 'workbench_folder_items',
     'workbench_bookmarks',
+    # E1 (time budget): append-only interpretive runs with parameters/config hash/result hash, the
+    # labelling runs and per-event labels they reference (the private category configuration is only
+    # hashed, so labels cannot be rebuilt from a package), human label corrections, and model runs
+    # with their labelled outputs (A04: every model attempt is pinned).
+    'analysis_runs', 'analysis_label_runs', 'analysis_event_labels', 'analysis_label_annotations',
+    'analysis_model_runs', 'analysis_model_outputs',
+    # E2 (hypotheses): preregistered versions (hash chain), event-study/candidate runs, dossier
+    # pointers and human classifications, theses and disclosures; all append-only human/interpretive.
+    'hypotheses', 'hypothesis_versions', 'hypothesis_runs', 'hypothesis_dossier_items',
+    'hypothesis_dossier_decisions', 'hypothesis_theses', 'hypothesis_thesis_evidence', 'hypothesis_disclosures',
+    # I (import planner): immutable plans and items, human decisions per plan version, execution runs
+    # and attempts (provenance of what was imported with which importer/config; leases are historical
+    # metadata as for core jobs/processing_runs), and audited abandonments of catalog scans.
+    'import_plans', 'import_plan_items', 'import_plan_item_members', 'import_plan_versions',
+    'import_plan_decisions', 'import_plan_runs', 'import_plan_attempts', 'catalog_scan_abandonments',
 )
 EXCLUDED_EXTENSION_TABLES = {
     'api_tokens': 'credential table: token keys, salts and secret digests are never exported',

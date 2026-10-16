@@ -46,6 +46,12 @@ def event_row(ctx, events: dict, item: dict) -> dict:
 
 def provide(ctx, *, section_name: str = 'chronology', title_key: str = 'section_chronology') -> dict:
     section = Section(ctx, section_name, __name__, VERSION, title_key)
+    fill(section, ctx)
+    return section.result()
+
+
+def fill(section: Section, ctx) -> Section:
+    """Add the chronology blocks, inputs and exclusions to ``section`` (shared with the timeline section)."""
     events = scoped_events(ctx)
     section.data['rule'] = events['rule']
     max_rows = ctx.params['max_rows']
@@ -87,4 +93,4 @@ def provide(ctx, *, section_name: str = 'chronology', title_key: str = 'section_
                                                ('counterparty', 'text'), ('quote', 'quote'), ('body_sha256', 'hash')],
                         untimed_rows, ctx.lang, title_key='untimed', total_rows=len(untimed),
                         truncated=len(untimed) > max_rows))
-    return section.result()
+    return section

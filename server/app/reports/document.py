@@ -138,6 +138,11 @@ def _method_view(method: dict, lang: str) -> list[dict]:
         table('method.inputs', [('input_table', 'text'), ('rows', 'number'), ('rows_sha256', 'hash')],
               [{'input_table': item['table'], 'rows': item['rows'], 'rows_sha256': item['rows_sha256']}
                for item in method['inputs']['tables']], lang, title_key='inputs'),
+        table('method.derived_caches', [('cache', 'text'), ('rule_id', 'text'), ('rule_version', 'text'),
+                                        ('rule_sha256', 'hash'), ('params', 'json'), ('projection_id', 'id'),
+                                        ('build_id', 'id'), ('build_mode', 'text'), ('build_finished_at', 'time'),
+                                        ('refreshed_by_report', 'bool'), ('write_scope', 'text')],
+              method['derived_caches'], lang, title_key='derived_caches'),
         table('method.limitations', [('limitation', 'text')], [{'limitation': text} for text in method['limitations']],
               lang, title_key='limitations'),
     ]
@@ -145,7 +150,7 @@ def _method_view(method: dict, lang: str) -> list[dict]:
 
 
 def build_document(*, report_uid: str, report_type: str, definition: dict, params: dict, sections: list[dict],
-                   generated_at: str, template_files: list[dict]) -> dict:
+                   generated_at: str, template_files: list[dict], derived_caches: list[dict] | None = None) -> dict:
     lang = params['language']
     commit, dirty = git_state()
     merged = _merge_sections(sections)
@@ -165,6 +170,9 @@ def build_document(*, report_uid: str, report_type: str, definition: dict, param
                                                     'snapshot', 'rule')} for section in sections],
         'model_runs': merged['model_runs'], 'unknowns': merged['unknowns'], 'exclusions': merged['exclusions'],
         'cited': merged['cited'], 'inputs': merged['inputs'], 'limitations': list(LIMITATIONS),
+        # Derived caches read by the snapshot (and refreshed just before it, in their own write
+        # transaction, when stale): the only writes a report causes besides its register row.
+        'derived_caches': list(derived_caches or []),
     }
     used_labels = {key for key in LABELS['pl']} | {f'intro_{name}' for name in ('catalog', 'timeline', 'time_budget',
                                                                                   'hypothesis_dossier', 'lawyer_package')}

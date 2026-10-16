@@ -15,6 +15,7 @@ const rangeEl = $('[data-range-panel]');
 const undatedEl = $('[data-undated]');
 const selectionEl = $('[data-selection]');
 const form = $('[data-filters]');
+const bookmarksEl = $('[data-bookmarks]');
 
 const ROW = 46;
 const LABEL = 190;
@@ -31,7 +32,9 @@ const state = {
   view: null, extent: null, group: 'source', seq: 0, controller: null, mode: null,
   lanes: [], items: [], density: null, selection: null, undatedCount: 0,
   reportsAvailable: root.dataset.reportsAvailable === 'true', rows: new Map(),
+  bookmarks: {items: [], hasMore: false, unzoned: 0, error: null},
 };
+const BOOKMARK_LIMIT = 200;
 
 function el(tag, attrs = {}, text) {
   const node = document.createElement(tag);
@@ -105,6 +108,8 @@ async function refresh() {
   const bucket = M.chooseBucket(view.start, view.end, maxBuckets);
   const bounds = {from: M.isoBound(view.start), to: M.isoBound(view.end)};
   updateExports(params, bounds);
+  // Bookmarks (workbench, human annotations) load beside the projection; their failure never blocks the view.
+  const bookmarks = loadBookmarks(bounds, controller.signal);
   try {
     const started = performance.now();
     const density = await getJSON('/api/timeline/density?' + M.buildQuery({...params, ...bounds, bucket, group: state.group,
@@ -127,6 +132,8 @@ async function refresh() {
     state.items = items;
     state.lanes = density.lanes.map(lane => ({key: laneKey(lane.key), label: lane.label, total: lane.total, buckets: lane.buckets}));
     state.undatedCount = density.undated_count;
+    state.bookmarks = await bookmarks;
+    if (seq !== state.seq) return;
     draw();
     const elapsed = Math.round(performance.now() - started);
     root.dataset.state = 'ready';
@@ -146,9 +153,86 @@ async function refresh() {
   }
 }
 
+async function loadBookmarks(bounds, signal) {
+  try {
+    const data = await getJSON('/api/workbench/bookmarks?' + M.buildQuery({from: bounds.from, to: bounds.to,
+      limit: BOOKMARK_LIMIT}), signal);
+    return {items: data.items, hasMore: data.has_more, unzoned: data.unzoned_excluded, error: null};
+  } catch (error) {
+    if (error.name === 'AbortError') return {items: [], hasMore: false, unzoned: 0, error: 'przerwano'};
+    return {items: [], hasMore: false, unzoned: 0, error: error.message};
+  }
+}
+
+function bookmarkInstant(text) {
+  const value = text == null ? NaN : Date.parse(text);
+  return Number.isFinite(value) ? value : null;
+}
+
+// Bookmarks are a human annotation layer (a chosen position, not an event time): one strip
+// above the lanes, data rendered through textContent/attributes only.
+function drawBookmarks(width) {
+  const data = state.bookmarks;
+  const summary = data.error ? 'Zakładki: niedostępne' : `Zakładki: ${data.items.length}${data.hasMore ? '+' : ''}`;
+  const label = el('span', {class: 'tl-bookmarks-label', 'data-bookmark-count': data.error ? 'error' : data.items.length,
+    title: data.error ? `Zakładki niedostępne: ${data.error}`
+      : `Zakładki w widoku (adnotacje człowieka)${data.unzoned ? `; ${data.unzoned} bez strefy — bez chwili UTC, nie pokazano` : ''}`
+        + (data.hasMore ? `; pokazano pierwsze ${BOOKMARK_LIMIT}` : '')}, summary);
+  const marks = [];
+  for (const item of data.items) {
+    const start = bookmarkInstant(item.start?.utc);
+    if (start == null) continue;
+    const end = bookmarkInstant(item.end?.utc);
+    const x0 = M.timeToX(start, state.view, width);
+    const x1 = end == null ? x0 : M.timeToX(end, state.view, width);
+    if (x1 < 0 || x0 > width) continue;
+    const left = Math.max(0, x0);
+    const range = end != null && end > start;
+    const style = {left: `${LABEL + left - (range ? 0 : 4)}px`};
+    if (range) style.width = `${Math.max(3, Math.min(width, x1) - left)}px`;
+    const when = range ? `${item.start.utc} – ${item.end.utc}` : item.start.utc;
+    const mark = el('button', {type: 'button', class: range ? 'tl-bookmark tl-bookmark-range' : 'tl-bookmark',
+      'data-bookmark': item.id, style, title: `${item.label || 'zakładka'} · ${when} · adnotacja człowieka, nie czas zdarzenia`,
+      'aria-label': `Zakładka ${item.label || item.id}, ${when}`});
+    mark.addEventListener('click', event => {event.stopPropagation(); showBookmark(item);});
+    marks.push(mark);
+  }
+  bookmarksEl.replaceChildren(label, ...marks);
+  root.dataset.renderedBookmarks = String(marks.length);
+}
+
+function showBookmark(item) {
+  const ref = item.ref || null;
+  const parts = [el('h2', {}, 'Zakładka'), el('h3', {}, item.label || `#${item.id}`),
+    el('p', {class: 'tl-bookmark-note'}, 'Adnotacja człowieka: wybrana pozycja na osi czasu, nie zaobserwowany czas zdarzenia.')];
+  parts.push(dl([
+    ['Zakładka', `#${item.id}`], ['Początek (surowy)', item.start?.raw], ['Początek UTC', item.start?.utc],
+    ['Koniec (surowy)', item.end?.raw], ['Koniec UTC', item.end?.utc], ['Strefa', item.tz_status], ['Notatka', item.note],
+    ['Powiązanie', ref ? `${ref.kind} #${ref.id}${ref.version_id != null ? ` · wersja ${ref.version_id}` : ''}`
+      + `${ref.segment_index != null ? ` · segment ${ref.segment_index}` : ''}${ref.exists === false ? ' (nie istnieje)' : ''}` : null],
+    ['Zmieniono', item.updated_at],
+  ]));
+  const links = el('p', {class: 'tl-links'});
+  if (ref && ref.exists !== false) {
+    const key = ref.kind === 'event' ? `event:${ref.id}`
+      : ref.kind === 'transcript_segment' && ref.version_id != null && ref.segment_index != null ? `segment:${ref.version_id}:${ref.segment_index}` : null;
+    if (key) {
+      const open = el('button', {type: 'button', class: 'tl-linkish', 'data-bookmark-ref': key}, 'Pokaż powiązany element');
+      open.addEventListener('click', () => showDetail(key));
+      links.append(open, ' · ');
+    }
+    if (ref.kind === 'artifact' || ref.kind === 'transcript_segment') links.append(el('a', {href: `/artifact/${encodeURIComponent(ref.id)}`}, 'Artefakt'), ' · ');
+  }
+  links.append(el('a', {href: '/workbench/bookmarks'}, 'Wszystkie zakładki'));
+  parts.push(links);
+  detailEl.replaceChildren(...parts);
+  root.dataset.detailKey = `bookmark:${item.id}`;
+}
+
 function draw() {
   const width = trackWidth();
   drawRuler(width);
+  drawBookmarks(width);
   spacer.style.height = `${Math.max(1, state.lanes.length) * ROW}px`;
   for (const row of state.rows.values()) row.remove();
   state.rows.clear();

@@ -232,6 +232,39 @@ const bulk = Number(process.env.AGEDS_TIMELINE_BULK || 5000);
       await shot('segment-detail');
     });
 
+    await test('workbench bookmarks render on the swimlanes as a human annotation strip', async () => {
+      const previous = await seq();
+      await page.evaluate(() => {
+        const form = document.querySelector('[data-filters]');
+        form.querySelector('[name=kind]').value = '';
+        form.querySelector('[name=q]').value = 'wiadomość';
+        form.requestSubmit();
+      });
+      await ready(previous);
+      const p2 = await seq();
+      await page.locator('[data-action="fit"]').click();
+      await ready(p2);
+      // Point + range in the fitted chatbot window; the 2023 one is outside, the zone-less one has no instant.
+      assert.equal(await root.getAttribute('data-rendered-bookmarks'), '2');
+      assert.deepEqual((await page.locator('[data-bookmark]').evaluateAll(n => n.map(e => Number(e.dataset.bookmark)))).sort(),
+                       [fixture.bookmarks.point, fixture.bookmarks.range].sort());
+      assert.equal(await page.locator('.tl-bookmark-range').count(), 1);
+      const label = page.locator('.tl-bookmarks-label');
+      assert.equal(await label.textContent(), 'Zakładki: 2');
+      assert.match(await label.getAttribute('title'), /1 bez strefy/);
+      await page.locator(`[data-bookmark="${fixture.bookmarks.point}"]`).click();
+      await page.waitForFunction(id => document.querySelector('[data-timeline]').dataset.detailKey === `bookmark:${id}`,
+                                 fixture.bookmarks.point);
+      const detail = await page.locator('[data-detail]').textContent();
+      assert.ok(detail.includes('Zakładka ' + fixture.literal) && detail.includes('nie zaobserwowany czas zdarzenia'));
+      assert.equal(await page.locator('img').count(), 0);
+      assert.equal(await page.evaluate(() => window.__timelineSourceExecuted), undefined);
+      await page.locator('[data-bookmark-ref]').click();
+      await page.waitForFunction(id => document.querySelector('[data-timeline]').dataset.detailKey === `event:${id}`,
+                                 fixture.ids.chatgpt[0]);
+      await shot('bookmarks-strip');
+    });
+
     assert.deepEqual(pageErrors, []);
     receipt.page_errors = pageErrors;
     receipt.console_errors = consoleErrors;

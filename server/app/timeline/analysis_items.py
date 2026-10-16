@@ -139,7 +139,7 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
         untimed.append({'event_id': row['ref_id'], 'event_type': row['event_type'],
                         'reason': undated_reason(json.loads(row['flags_json'] or '{}')), 'hidden': bool(row['hidden'])})
     return {'rule': f'{resolved.rule_id}@{resolved.version}', 'rule_sha256': resolved.sha256, 'params': params,
-            'projection': {'id': projection['id'], 'build_id': projection['build']['id'], 'status': projection['status']},
+            'projection': {'id': projection['id'], 'build_id': projection['build']['id']},
             'assume_zone': assume_zone, 'unknown_zone': unknown_zone, 'items': items, 'untimed': untimed,
             'truncated': truncated}
 

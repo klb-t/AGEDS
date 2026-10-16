@@ -88,7 +88,18 @@ def build_small(root: Path) -> dict:
     with db.session() as connection:
         tag = connection.execute("INSERT INTO tags(name) VALUES('syntetyczny-tag')").lastrowid
         connection.execute('INSERT INTO event_tags(event_id,tag_id) VALUES(?,?)', (ids['sms'], tag))
-    return {'ids': ids, 'recording': recording, 'transcript': transcript, 'collection': collection, 'literal': LITERAL}
+    # Workbench bookmarks (human annotations) over the chatbot day: a point linked to an event, a range,
+    # one far outside any window and one without a zone (no UTC instant, never placed).
+    from server.app.workbench import bookmarks
+    marks = {
+        'point': bookmarks.create_bookmark('2025-10-26T10:45:00Z', label='Zakładka ' + LITERAL, note='notatka ' + LITERAL,
+                                           ref={'kind': 'event', 'id': ids['chatgpt'][0]})['id'],
+        'range': bookmarks.create_bookmark('2025-10-26T11:46:00+01:00', '2025-10-26T11:48:00+01:00', label='Zakres')['id'],
+        'outside': bookmarks.create_bookmark('2023-01-01T00:00:00Z', label='Poza oknem')['id'],
+        'unzoned': bookmarks.create_bookmark('2025-10-26T10:47:00', label='Bez strefy')['id'],
+    }
+    return {'ids': ids, 'recording': recording, 'transcript': transcript, 'collection': collection, 'literal': LITERAL,
+            'bookmarks': marks}
 
 
 EVENT_MIX = ('sms', 'whatsapp_message', 'chat_message', 'call', 'email')

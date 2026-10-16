@@ -16,6 +16,14 @@ from server.tests.test_media_support import MediaCase
 
 
 class StrategyHelperTests(MediaCase):
+    def test_corpus_part_is_labelled_synthetic_tones_not_speech(self):
+        from server.tests.corpus import build_corpus
+        manifest = build_corpus(self.root / 'registry', ('audio',))['audio']['manifest']
+        self.assertIn('NOT speech', manifest['label'])
+        planted = manifest['files']['codeswitch.wav']['planted_cases']
+        self.assertEqual(['pl', 'nl', 'en'], planted['three_languages'])
+        self.assertEqual(6.0, planted['window_straddles_switch']['switch_at'])
+
     def test_regions_are_clipped_sorted_and_merged_without_inventing_speech(self):
         raw = [{'start': 900, 'end': 2000}, {'start': -5, 'end': 100}, {'start': 50, 'end': 300},
                {'start': 5000, 'end': 5000}, {'start': 1900, 'end': 99999}]
@@ -172,3 +180,29 @@ class CodeSwitchWorkerTests(MediaCase):
         refs = [{'segment_index': 1, 'word_index': len(segments[1]['words']) - 1}, {'segment_index': 2, 'word_index': 0}]
         anchor = citations.create_citation(self.aid, did, word_refs=refs)
         self.assertTrue(math.isclose(anchor['end_ms'], round(segments[2]['words'][0]['end'] * 1000)))
+
+    def test_late_code_switching_worker_cannot_publish_and_replacement_uses_the_same_pin(self):
+        import time
+        from server.app import db
+        from server.app.jobs import LeaseLost
+        queued = enqueue_transcription(self.aid, recipe='per-segment-pl-nl-en')
+        replacement = []
+        record = recipes.recipe_from_job(self.rows('jobs')[0] | {'kind': 'transcribe'})
+
+        class Reclaimed(CodeSwitchingAdapter):
+            def transcribe(self, audio):
+                with db.session() as conn:
+                    conn.execute("UPDATE jobs SET lease_expires_at=? WHERE status='running'", (time.time() - 1,))
+                replacement.append(jobs.claim_job(worker_id='replacement'))
+                return super().transcribe(audio)
+        with self.assertRaises(LeaseLost):
+            worker.process_job(jobs.claim_job(), Reclaimed(record))
+        self.assertEqual([], self.rows('derived_text'))
+        worker.process_job(replacement[0])
+        runs = self.rows('processing_runs')
+        self.assertEqual(['abandoned', 'done'], [r['status'] for r in runs])
+        self.assertEqual({queued['recipe']['sha256']},
+                         {json.loads(r['provenance_json'])['recipe']['sha256'] for r in runs})
+        self.assertEqual('injected_adapter_bound_to_same_recipe',
+                         json.loads(runs[0]['provenance_json'])['recipe']['application'])
+        self.assertEqual(1, len(self.rows('derived_text')))

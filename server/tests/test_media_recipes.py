@@ -220,3 +220,33 @@ class RecipePinningTests(MediaCase):
         self.assertEqual('injected_adapter_not_bound_to_recipe', recipe['application'])
         work = json.loads(run['metadata_json'])['work']
         self.assertEqual(('wav_header_declared_duration', 4.0), (work['basis'], work['amount']))
+
+
+class RecipeExportTests(MediaCase):
+    def test_metadata_export_carries_job_pin_and_run_recipe_hash(self):
+        from server.app.packages import export_metadata_package, validate_metadata_package
+        self.fake_whisper()
+        aid = self.add_audio('audio_single_en')
+        queued = enqueue_transcription(aid, recipe='per-segment-pl-nl-en')
+        worker.process_job(jobs.claim_job())
+        package = export_metadata_package()
+        job = package['tables']['jobs'][0]
+        run = package['tables']['processing_runs'][0]
+        self.assertEqual(queued['recipe']['sha256'], json.loads(job['payload_json'])['recipe']['sha256'])
+        provenance = json.loads(run['provenance_json'])
+        self.assertEqual('hash_matches', recipes.verify_run_recipe(provenance)['status'])
+        version = json.loads(package['tables']['derived_text'][0]['metadata_json'])
+        self.assertEqual((queued['recipe']['sha256'], True), (version['recipe']['sha256'],
+                                                              version['recipe']['word_timestamps_requested']))
+        self.assertTrue(validate_metadata_package(package)['valid'])
+
+    def test_recipe_without_word_timestamps_limits_citations_explicitly(self):
+        fake = self.fake_whisper()
+        aid = self.add_audio('audio_single_en')
+        enqueue_transcription(aid, overrides={'word_timestamps': False})
+        worker.process_job(jobs.claim_job())
+        self.assertEqual(False, fake.named('transcribe')[0]['word_timestamps'])
+        metadata = json.loads(self.rows('derived_text')[0]['metadata_json'])
+        self.assertEqual('unavailable', metadata['word_timing']['status'])
+        self.assertIn('limited to segment selectors', metadata['word_timing']['recipe_word_timestamps'])
+        self.assertFalse(metadata['recipe']['word_timestamps_requested'])

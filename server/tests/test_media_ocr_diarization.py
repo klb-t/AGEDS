@@ -323,3 +323,9 @@ class NewKindFencingTests(MediaCase):
             jobs.finish_job(job['id'], job['lease_token'], 'done')
         with self.assertRaises(ValueError):
             claim_job(kinds=())
+
+    def test_worker_kind_filter_comes_from_environment(self):
+        with patch.dict('os.environ', {'EW_WORKER_KINDS': ' ocr, transcribe ,'}):
+            self.assertEqual(('ocr', 'transcribe'), worker.worker_kinds())
+        with patch.dict('os.environ', {'EW_WORKER_KINDS': ''}):
+            self.assertIsNone(worker.worker_kinds())

@@ -229,6 +229,9 @@ class FakeFasterWhisper:
                     speech = [v for s, e in regions for v in samples[s:e]][:30 * SAMPLE_RATE]
                     language, probability, _ = fake_language_report(speech)
                 segments = fake_segments(samples, regions, language)
+                if not kwargs.get('word_timestamps'):
+                    for segment in segments:           # faster-whisper returns words=None then
+                        segment.words = None
                 info = SimpleNamespace(language=language, language_probability=probability,
                                        duration=len(samples) / SAMPLE_RATE, all_language_probs=None,
                                        transcription_options={'synthetic_fake': True, 'word_timestamps':

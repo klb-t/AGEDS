@@ -256,6 +256,14 @@ def run_transcribe(job: dict, adapter=None) -> int:
         result_metadata["input_mode"] = "verified_seekable_filelike"
         result_metadata["input_verification"] = verification
         result_metadata["word_timing"] = word_timing_capabilities(result.segments)
+        requested = record["effective"].get("word_timestamps")
+        result_metadata["recipe"] = {"id": record["id"], "sha256": record["sha256"],
+                                     "pin_status": record.get("pin_status", "unknown"),
+                                     "application": provenance["recipe"]["application"],
+                                     "word_timestamps_requested": requested}
+        if requested is False:
+            result_metadata["word_timing"]["recipe_word_timestamps"] = (
+                "disabled by recipe; citations of this version are limited to segment selectors")
         return publish_transcript(job, text=result.text, model=metadata.get("model") or "unknown", language=result.language,
                                   segments=result.segments, metadata=result_metadata)
 
@@ -281,11 +289,18 @@ def process_job(job: dict, adapter=None, *, lease_seconds: float = DEFAULT_LEASE
         finish(job["id"], "failed", f"{error}\n{traceback.format_exc()}", lease_token=job["lease_token"])
         raise
 
+def worker_kinds() -> tuple[str, ...] | None:
+    """EW_WORKER_KINDS (comma-separated, e.g. "transcribe,ocr") limits what this worker claims."""
+    import os
+    kinds = tuple(kind.strip() for kind in os.getenv("EW_WORKER_KINDS", "").split(",") if kind.strip())
+    return kinds or None
+
 def main():
     init_db()
-    print("Evidence Workbench worker started")
+    kinds = worker_kinds()
+    print("Evidence Workbench worker started" + (f" for job kinds {', '.join(kinds)}" if kinds else ""))
     while True:
-        job = claim_job()
+        job = claim_job(kinds=kinds)
         if not job:
             time.sleep(2)
             continue

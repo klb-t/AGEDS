@@ -41,7 +41,7 @@ import threading
 import time
 import uuid
 from contextlib import closing, contextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -57,21 +57,7 @@ REQUIRED_ROLES = {'file', 'archive', 'conversations', 'chat_text'}
 RESULT_MAX_BYTES = 64 * 1024
 
 
-@dataclass(frozen=True)
-class RunLimits:
-    """Execution bounds (presets). A hit refuses the item before anything is read."""
-    max_item_bytes: int = 64 * 1024 ** 3
-    max_item_members: int = 200_000
-    min_free_temp_bytes: int = 256 * 1024 ** 2
-    lease_seconds: int = 6 * 3600
-
-    def __post_init__(self):
-        for name, value in asdict(self).items():
-            if not isinstance(value, int) or isinstance(value, bool) or value < 1:
-                raise ValueError(f'run limit {name} must be a positive integer')
-
-
-LIMIT_NAMES = tuple(RunLimits.__dataclass_fields__)
+from .limits import RUN_LIMIT_NAMES as LIMIT_NAMES, RunLimits  # noqa: E402,F401  (re-exported)
 
 
 class Refused(Exception):
@@ -288,6 +274,10 @@ def _materialize(item: dict, members: list[dict], workdir: Path, materialize: st
             if unit not in target.resolve(strict=False).parents:
                 raise Refused('unsafe_member_path', 'member path escapes the temporary directory', path=relative)
             target.parent.mkdir(parents=True, exist_ok=True)
+            # TODO(importplan, review finding #1): the importers acquire this temporary copy, so
+            # ingest_file records the copy's mtime as source_modified_at. When ingest_file gains an
+            # explicit stat scope / declared mtime (track R), pass the catalogued source time here
+            # (catalog_entry_times) through the adapters. Test: test_acquisition_keeps_the_catalogued_source_time.
             reader.copy_to(member['entry_id'], target)
             files.append(MaterializedFile(member['entry_id'], target, member['locator'],
                                           catalog_source_locator(item['collection_id'], member['locator']),
@@ -485,10 +475,15 @@ def _finish_run(run_id: int, actor: str) -> dict:
                 return {'run_id': run_id, 'status': run['status'], 'attempts': by_status}
             options = json.loads(run['options_json'])
             selected = options.get('selected_items', 0)
-            done = by_status.get('done', 0)
-            status = 'completed' if done == selected and not (set(by_status) - {'done'}) else \
-                'failed' if not done and selected else 'partial'
-            summary = {'attempts': by_status, 'selected_items': selected}
+            latest = {}
+            for row in db.execute('SELECT item_id, status FROM import_plan_attempts WHERE run_id=? ORDER BY id', (run_id,)):
+                latest[row['item_id']] = row['status']
+            outcomes: dict[str, int] = {}
+            for value in latest.values():
+                outcomes[value] = outcomes.get(value, 0) + 1
+            done = outcomes.get('done', 0)
+            status = 'completed' if done == selected else 'failed' if not done and selected else 'partial'
+            summary = {'attempts': by_status, 'item_outcomes': outcomes, 'selected_items': selected}
             db.execute('UPDATE import_plan_runs SET status=?, finished_at=?, summary_json=? WHERE id=?',
                        (status, _now_iso(), _json(summary), run_id))
             _audit(db, actor, 'import_plan_run_finished', 'import_plan_run', run_id, {'status': status, **summary})

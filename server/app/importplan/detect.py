@@ -32,7 +32,7 @@ import json
 import re
 from collections import Counter, defaultdict
 from contextlib import closing
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from .. import db as dbmod
@@ -49,24 +49,7 @@ ENTRY_COLUMNS = ('id', 'scan_id', 'collection_id', 'parent_entry_id', 'locator',
                  'is_container', 'status')
 
 
-@dataclass(frozen=True)
-class PlanLimits:
-    """Planner bounds (presets; every hit is reported as incomplete coverage)."""
-    max_entries: int = 1_000_000
-    max_probe_bytes: int = 4 * 1024 ** 3
-    max_unit_members: int = 200_000
-    max_conversation_id_scan_bytes: int = 64 * 1024 ** 2
-    max_conversation_ids_listed: int = 500
-    max_spreadsheet_probe_bytes: int = 32 * 1024 ** 2
-    max_whatsapp_txt_probes_per_zip: int = 8
-
-    def __post_init__(self):
-        for name, value in asdict(self).items():
-            if not isinstance(value, int) or isinstance(value, bool) or value < 1:
-                raise ValueError(f'plan limit {name} must be a positive integer')
-
-
-LIMIT_NAMES = tuple(PlanLimits.__dataclass_fields__)
+from .limits import LIMIT_NAMES, PlanLimits  # noqa: E402,F401  (re-exported)
 
 
 def load_detectors(path: Path | str | None = None) -> dict:

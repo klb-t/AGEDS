@@ -23,6 +23,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
 import zipfile
 from pathlib import Path
 
@@ -34,6 +35,7 @@ DAT_CONV = '6b1f0c2e-0000-4000-8000-00000000c0d1'
 PDF_DAT = (b'%PDF-1.7\n% AGEDS synthetic ChatGPT export attachment in a .dat file\n'
            b'1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF\n')
 DOS = (2024, 10, 1, 12, 0, 0)
+SOURCE_MTIME = 1704628800  # 2024-01-07T12:00:00Z, set on every source file (filesystem time is not an event time)
 
 
 def _zip(members: list[tuple[str, bytes]]) -> bytes:
@@ -88,16 +90,25 @@ def chatgpt_export_zip() -> bytes:
     ])
 
 
-def tampered_takeout(parts: Path) -> bytes:
-    """The Takeout zip with one byte changed in the nested MBOX member (same names, same order)."""
-    return _takeout(parts, mbox_suffix=b'X')
+def tampered_takeout(parts: Path, *, grow: bool = False) -> bytes:
+    """The Takeout zip with the nested MBOX member changed after the scan (same names, same order).
+
+    By default one byte is replaced (same size, different SHA-256); ``grow`` appends a byte instead.
+    """
+    return _takeout(parts, tamper='grow' if grow else 'replace')
 
 
-def _takeout(parts: Path, *, mbox_suffix: bytes = b'') -> bytes:
+def _takeout(parts: Path, *, tamper: str | None = None) -> bytes:
     comm = parts / 'communications'
     activity = comm / 'takeout' / 'My Activity'
+    mbox = (comm / 'mail' / 'takeout.mbox').read_bytes()
+    if tamper == 'replace':
+        middle = len(mbox) // 2
+        mbox = mbox[:middle] + (b'Y' if mbox[middle:middle + 1] != b'Y' else b'Z') + mbox[middle + 1:]
+    elif tamper == 'grow':
+        mbox += b'X'
     inner = _zip([
-        ('Mail/All mail Including Spam and Trash.mbox', (comm / 'mail' / 'takeout.mbox').read_bytes() + mbox_suffix),
+        ('Mail/All mail Including Spam and Trash.mbox', mbox),
         ('Calendar/Example.ics', (comm / 'calendar' / 'calendar.ics').read_bytes()),
         ('Contacts/All Contacts/All Contacts.vcf', (comm / 'contacts' / 'contacts.vcf').read_bytes()),
         ('My Activity/Gemini Apps/MyActivity.json', (activity / 'Gemini Apps' / 'MyActivity.json').read_bytes()),
@@ -162,6 +173,11 @@ def build(root: Path) -> dict:
     _write(drive_c / 'copy' / 'chatgpt-export-2025-03.zip', export)
     _write(drive_c / 'later-export' / 'conversations.json', _json([_conversation_c(3)]))
 
+    for source_root in (phone, drive_b, drive_c):
+        for path in source_root.rglob('*'):
+            if path.is_file():
+                os.utime(path, (SOURCE_MTIME, SOURCE_MTIME))
+
     takeout_inner = 'takeout-20241001.zip!/Takeout/takeout-inner.zip'
     expected_items = {
         'phone_a': [
@@ -218,4 +234,5 @@ def build(root: Path) -> dict:
         'shared_conversations': {'chatgpt': {C_ID: 3, S_ID: 2, DAT_CONV: 2}},
         'whatsapp': comm_manifest['whatsapp'],
         'chat_manifest_keys': sorted(chat_manifest),
+        'source_mtime_utc': '2024-01-07T12:00:00+00:00',
     }

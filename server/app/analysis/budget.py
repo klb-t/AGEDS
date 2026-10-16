@@ -628,8 +628,11 @@ def method_record(params: dict) -> dict:
 
 def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_to: str, zone: str,
                    params: dict | None = None, assume_zone: str | None = None, assumption_rule: str | None = None,
-                   persist: bool = True) -> dict:
-    """Validate, load items (window plus margin), filter, label and (optionally) store the labelling run."""
+                   persist: bool = True, need_fields: bool = False) -> dict:
+    """Validate, load items (window plus margin), filter, label and (optionally) store the labelling run.
+
+    Call it before writing in the same connection: the timeline projection refreshes in its own transaction.
+    """
     from . import model_runs
     p = effective_params(params)
     z = cal.zone_info(zone)
@@ -643,7 +646,7 @@ def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_t
     margin = horizon_margin(p, points)
     loaded = load_items(db, start_utc=cal.iso_utc(lo - margin), end_utc=cal.iso_utc(hi + margin),
                         assume_zone=assume_zone, assumption_rule=assumption_rule, include_hidden=True,
-                        limit=p['max_items'], fields=cat.needs_fields(config),
+                        limit=p['max_items'], fields=need_fields or cat.needs_fields(config),
                         media_durations=p['wav_header_durations'], timeline_rule=p['timeline_rule'])
     kept, filtered = [], Counter()
     for it in loaded['items']:

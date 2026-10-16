@@ -308,9 +308,15 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
         return load_items_interim(db, start_utc=start_utc, end_utc=end_utc, event_types=event_types,
                                   assume_zone=assume_zone, limit=limit, fields=fields, media_durations=media_durations)
     db.row_factory = sqlite3.Row
-    loaded = timeline_load_items(db, start_utc=start_utc, end_utc=end_utc, event_types=event_types,
-                                 assume_zone=assume_zone, assumption_rule=assumption_rule, include_hidden=True,
-                                 rule=timeline_rule, limit=limit)
+    try:
+        loaded = timeline_load_items(db, start_utc=start_utc, end_utc=end_utc, event_types=event_types,
+                                     assume_zone=assume_zone, assumption_rule=assumption_rule, include_hidden=True,
+                                     rule=timeline_rule, limit=limit)
+    except sqlite3.OperationalError as exc:
+        if 'within a transaction' not in str(exc):
+            raise
+        raise ValueError('the timeline projection needs its own refresh transaction: load analysis items before '
+                         'writing in this connection (or commit first)') from exc
     items, hidden = [], []
     for item in loaded['items']:
         if item['hidden'] and not include_hidden:

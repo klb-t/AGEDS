@@ -174,7 +174,7 @@ export function mount(root) {
     const run = await getJSON(`/api/analysis/budget/runs/${id}`);
     state.run = run;
     state.palette = new Map(run.result.categories.map(c => [c.id, c]));
-    const grans = Object.keys(run.result.candles);
+    const grans = ['day', 'week', 'month'].filter(g => run.result.candles[g]);
     const gsel = $('[data-granularity]');
     gsel.replaceChildren(...grans.map(g => el('option', {value: g, text: {day: 'dzień', week: 'tydzień', month: 'miesiąc'}[g] || g})));
     if (!grans.includes(state.granularity)) state.granularity = grans[0];

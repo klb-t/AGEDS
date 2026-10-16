@@ -102,18 +102,13 @@ def run_features(db, config: cat.CategoryConfig, *, window_from: str, window_to:
     p = effective_params(params)
     bp = p['budget_params']
     prepared = bud.prepare_inputs(db, config, window_from=window_from, window_to=window_to, zone=zone, params=bp,
-                                  assume_zone=assume_zone, assumption_rule=assumption_rule, persist=persist)
+                                  assume_zone=assume_zone, assumption_rule=assumption_rule, persist=persist,
+                                  need_fields=True)
     lo, hi = prepared['lo'], prepared['hi']
     z = cal.zone_info(zone)
     day_list = cal.days(lo, hi, z)
     starts = [d['start'] for d in day_list]
     items = [it for it in prepared['items'] if lo <= it['t_start'] < hi]
-    if any('fields' not in it for it in items):
-        reloaded = {it['event_id']: it for it in bud.load_items(db, start_utc=cal.iso_utc(lo), end_utc=cal.iso_utc(hi),
-                                                                assume_zone=assume_zone, assumption_rule=assumption_rule,
-                                                                include_hidden=True, limit=bp['max_items'], fields=True,
-                                                                timeline_rule=bp['timeline_rule'])['items']}
-        items = [reloaded.get(it['event_id'], it) for it in items]
     labels = prepared['labels']
     night_start, night_end = _minutes(p['night_start']), _minutes(p['night_end'])
     per_day = [{'messages': 0, 'out': 0, 'in': 0, 'all': 0, 'night': 0, 'official': set(), 'resp': []} for _ in day_list]

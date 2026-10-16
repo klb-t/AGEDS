@@ -1,4 +1,4 @@
-.ab-main{display:grid;gap:1rem}
+.ab-main{display:grid;grid-template-columns:minmax(0,1fr);gap:1rem}.ab-main>section{min-width:0}
 .ab-controls{display:flex;flex-wrap:wrap;gap:1rem}.ab-controls label{flex:1 1 260px}
 .ab-status{color:#8b949e;margin:.4rem 0}
 .ab-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.6rem;margin-top:.6rem}

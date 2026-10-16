@@ -228,8 +228,10 @@ def serve() -> None:
         config = categories.load_config(manifest['config_path'])
         with db.session() as connection:
             categories.add_annotation(connection, ids['sms-override'], {'odpoczynek': 1}, note='synthetic correction')
+        with db.session() as connection:
             first = budget.run_budget(connection, config, window_from=manifest['window']['from'],
                                       window_to=manifest['window']['to'], zone=ZONE)
+        with db.session() as connection:
             second = budget.run_budget(connection, config, window_from=manifest['window']['from'],
                                        window_to=manifest['window']['to'], zone=ZONE,
                                        params={'overlap_rule': 'count_both', 'granularities': ['day', 'week']})

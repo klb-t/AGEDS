@@ -90,7 +90,14 @@ version, parameters and the per-run opt-in. Providers: `none` (default; records 
 ran) and `fake` (deterministic hash of the event id, for tests; explicitly not a model).
 Any other provider is refused as unavailable — no network adapter exists.
 
-## 4. The budget model (rule `time_budget.v1`)
+## 4. The budget model (rule `time_budget.v2`)
+
+`time_budget.v2` (2026-10-16, end-to-end acceptance task Z) changes only the method record: `method.seam`,
+`method.source_rule` and `method.source_rule_sha256` now name the rule that actually placed the items (e.g.
+`display_time@1` and its SHA-256, the same values as `result.input`); `method.interim_fallback_rule` names
+`analysis_source.v1`. Runs stored as `time_budget.v1` said `source_rule: analysis_source.v1` even when the
+timeline seam was used; they stay stored unchanged with their result hash and are read as historical
+(`method.rule_history` explains the difference). The computation is identical.
 
 **Time source.** Items come from the timeline projection (`display_time@N`, its SHA-256 and
 the projection parameters are recorded in `result.input`), see [TIMELINE.md](TIMELINE.md).

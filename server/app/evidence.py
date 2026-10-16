@@ -134,38 +134,46 @@ def ingest_file(path: Path, *, source_id: int, source_locator: str | None = None
         db.execute("INSERT INTO audit_log(action,object_kind,object_id,details_json) VALUES ('ingest','artifact',?,?)", (aid,json.dumps({'sha256':digest,'source_locator':source_locator,'source_id':source_id,'observation_id':observation.lastrowid,'collection_id':collection_id,'deduplicated':row is not None},ensure_ascii=False)))
         return aid
 
-def add_event(*, source_id: int, artifact_id: int | None, event_type: str, ts_start: str | None = None, ts_end: str | None = None, direction: str | None = None, sender: str | None = None, recipients: str | None = None, contact_label: str | None = None, phone_or_address: str | None = None, subject: str | None = None, body: str | None = None, external_id: str | None = None, thread_id: str | None = None, confidence: float | None = None, metadata: dict | None = None) -> int:
+def add_event(*, source_id: int, artifact_id: int | None, event_type: str, ts_start: str | None = None, ts_end: str | None = None, direction: str | None = None, sender: str | None = None, recipients: str | None = None, contact_label: str | None = None, phone_or_address: str | None = None, subject: str | None = None, body: str | None = None, external_id: str | None = None, thread_id: str | None = None, confidence: float | None = None, metadata: dict | None = None, db: sqlite3.Connection | None = None) -> int:
+    """Insert or re-observe one event; an optional caller transaction batches writes.
+
+    The caller owns BEGIN/commit/rollback when it supplies ``db``.
+    """
     values = (artifact_id,source_id,event_type,ts_start,ts_end,direction,sender,recipients,contact_label,phone_or_address,subject,body,external_id,thread_id,confidence,json.dumps(metadata or {},ensure_ascii=False,sort_keys=True))
     columns = ('artifact_id','source_id','event_type','ts_start','ts_end','direction','sender','recipients','contact_label','phone_or_address','subject','body','external_id','thread_id','confidence','metadata_json')
-    with session() as db:
-        db.execute('BEGIN IMMEDIATE')
-        source = db.execute('SELECT case_id FROM sources WHERE id=?', (source_id,)).fetchone()
+    def insert(connection: sqlite3.Connection) -> int:
+        source = connection.execute('SELECT case_id FROM sources WHERE id=?', (source_id,)).fetchone()
         if source is None:
             raise ValueError('source does not exist')
         if artifact_id is not None:
-            provenance_cases = {r['case_id'] for r in db.execute('''
+            provenance_cases = {r['case_id'] for r in connection.execute('''
                 SELECT s.case_id FROM artifacts a JOIN sources s ON s.id=a.source_id WHERE a.id=?
                 UNION SELECT s.case_id FROM source_observations o JOIN sources s ON s.id=o.source_id WHERE o.artifact_id=?
                 ''', (artifact_id, artifact_id))}
             if provenance_cases != {source['case_id']}:
                 raise IntegrityError('event source and artifact must belong to the same known case')
         if external_id is not None:
-            existing = db.execute('SELECT * FROM events WHERE artifact_id IS ? AND source_id=? AND event_type=? AND external_id=? ORDER BY id LIMIT 1', (artifact_id,source_id,event_type,external_id)).fetchone()
+            existing = connection.execute('SELECT * FROM events WHERE artifact_id IS ? AND source_id=? AND event_type=? AND external_id=? ORDER BY id LIMIT 1', (artifact_id,source_id,event_type,external_id)).fetchone()
             if existing:
                 # Equality of parsed values avoids silently accepting parser-ID
                 # collisions or a later reinterpretation under the same version.
                 if any(existing[column] != value for column, value in zip(columns, values)):
                     raise IntegrityError('event external_id conflicts with existing payload; retain a separate parser version')
                 eid = int(existing['id'])
-                db.execute("INSERT INTO audit_log(action,object_kind,object_id,details_json) VALUES ('event_reobserved','event',?,?)", (eid,json.dumps({'artifact_id':artifact_id,'source_id':source_id,'external_id':external_id},ensure_ascii=False)))
+                connection.execute("INSERT INTO audit_log(action,object_kind,object_id,details_json) VALUES ('event_reobserved','event',?,?)", (eid,json.dumps({'artifact_id':artifact_id,'source_id':source_id,'external_id':external_id},ensure_ascii=False)))
                 return eid
-        cur = db.execute("""INSERT INTO events(artifact_id,source_id,event_type,ts_start,ts_end,direction,sender,recipients,contact_label,phone_or_address,subject,body,external_id,thread_id,confidence,metadata_json)
+        cur = connection.execute("""INSERT INTO events(artifact_id,source_id,event_type,ts_start,ts_end,direction,sender,recipients,contact_label,phone_or_address,subject,body,external_id,thread_id,confidence,metadata_json)
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""", values)
         eid = int(cur.lastrowid)
         title = ' | '.join(x for x in [event_type, contact_label, phone_or_address, subject] if x)
-        db.execute("INSERT INTO search_fts(object_kind,object_id,title,content) VALUES ('event',?,?,?)", (eid,title,body or ''))
-        db.execute("INSERT INTO audit_log(action,object_kind,object_id,details_json) VALUES ('event_imported','event',?,?)", (eid,json.dumps({'artifact_id':artifact_id,'source_id':source_id,'external_id':external_id},ensure_ascii=False)))
+        connection.execute("INSERT INTO search_fts(object_kind,object_id,title,content) VALUES ('event',?,?,?)", (eid,title,body or ''))
+        connection.execute("INSERT INTO audit_log(action,object_kind,object_id,details_json) VALUES ('event_imported','event',?,?)", (eid,json.dumps({'artifact_id':artifact_id,'source_id':source_id,'external_id':external_id},ensure_ascii=False)))
         return eid
+    if db is not None:
+        return insert(db)
+    with session() as connection:
+        connection.execute('BEGIN IMMEDIATE')
+        return insert(connection)
 
 def add_derived_text(artifact_id: int, kind: str, text: str, *, model: str | None = None, language: str | None = None, segments: list | None = None, confidence: float | None = None, run_id: int | None = None, metadata: dict | None = None, db: sqlite3.Connection | None = None) -> int:
     """Append a text version; an optional caller transaction supports lease fencing.

@@ -38,7 +38,8 @@ CONTROL_BODY = 'linia\x01z kontrolnym znakiem'
 
 
 class ReportEnv:
-    def __init__(self, *, chat: bool = True, comm: bool = True, catalog: bool = True, root: Path | None = None):
+    def __init__(self, *, chat: bool = True, comm: bool = True, catalog: bool = True, analysis: bool = True,
+                 root: Path | None = None):
         self.tmp = tempfile.TemporaryDirectory(prefix='ageds-reports-') if root is None else None
         self.root = Path(self.tmp.name) if root is None else Path(root)
         (self.root / 'data' / 'store').mkdir(parents=True, exist_ok=True)
@@ -46,7 +47,9 @@ class ReportEnv:
                                 store_dir=self.root / 'data' / 'store', scan_roots=(self.root / 'scan',))
         (self.root / 'scan').mkdir(exist_ok=True)
         self.output = self.root / 'private-reports'
-        self.chat, self.comm, self.catalog = chat, comm, catalog
+        self.chat, self.comm, self.catalog, self.analysis = chat, comm, catalog, analysis
+        self.budget_run = self.hypothesis = None
+        self.correlations: list[int] = []
 
     def start(self, monkeypatch) -> 'ReportEnv':
         from server.app import main
@@ -124,6 +127,57 @@ class ReportEnv:
                          (self.artifact_audio, 'propozycja <i>adnotacji</i>'))
         from server.app.integrations import tokens
         self.token = tokens.create_token('reports-test', ('read',), client_id='reports-test')
+        if self.analysis:
+            self.plant_analysis()
+
+    def plant_analysis(self):
+        """A stored time-budget run (E1) and a hypothesis with versions, an event study, dossier items,
+        theses and a disclosure (E2) over the planted events, so the analysis report sections render
+        real stored results (every number then traceable to report.json and the stored run)."""
+        from server.app.analysis import budget, categories, dossier, eventstudy, preregistration, theses
+        config = categories.parse_config({
+            'schema': categories.CONFIG_SCHEMA, 'version': 'reports-synthetic-1',
+            'categories': [{'id': 'sprawy_urzedowe', 'label': 'Sprawy urzędowe'}, {'id': 'kancelaria', 'label': 'Kancelaria'}],
+            'default_category': None, 'combine': 'max', 'official_categories': ['sprawy_urzedowe'],
+            'rules': [{'id': 'urzad', 'version': 1, 'kind': 'counterparty', 'values': ['+48 000 000 001'],
+                       'weights': {'sprawy_urzedowe': 1}},
+                      {'id': 'kancelaria', 'version': 1, 'kind': 'counterparty', 'values': ['kontakt@example.org'],
+                       'weights': {'kancelaria': 1}}]})
+        conn = db.connect()
+        try:
+            stored = budget.run_budget(conn, config, window_from='2026-03-01', window_to='2026-03-08', zone='Europe/Warsaw',
+                                       params={'grid_mode': 'one_at_a_time'})
+            conn.commit()
+            self.budget_run = stored['run']['run_id']
+            definition = {
+                'title': 'Synthetic: incoming SMS → outgoing SMS', 'text': 'After an incoming SMS an outgoing SMS follows.',
+                'stimulus': {'event_types': ['sms'], 'directions': ['in']},
+                'outcome': {'event_types': ['sms'], 'directions': ['out']},
+                'windows': [{'label': 'after_6h', 'start_s': 0, 'end_s': 6 * 3600}],
+                'lags': {'min_s': -6 * 3600, 'max_s': 6 * 3600, 'bin_s': 3600},
+                'analysis': {'permutations': 19, 'seed': 7},
+            }
+            version = preregistration.register_hypothesis(conn, definition, actor='reports-test')
+            self.hypothesis = version['hypothesis_id']
+            self.event_study = eventstudy.run_event_study(conn, version['version_id'], actor='reports-test')
+            supporting = dossier.add_item(conn, self.hypothesis, 'event', self.events[1], classification='supporting',
+                                          rationale='odpowiedź po piśmie', actor='reports-test')
+            anchor = dossier.add_item(conn, self.hypothesis, 'anchor', self.anchor_segment['id'], actor='reports-test')
+            self.dossier_items = (supporting['item_id'], anchor['item_id'])
+            self.thesis_supported = theses.add_thesis(conn, self.hypothesis, 'Odpowiedź wysłano tego samego dnia.',
+                                                      'paraphrase', [supporting['item_id']], actor='reports-test')
+            self.thesis_unsupported = theses.add_thesis(conn, self.hypothesis, 'Urząd odpowiada zawsze w 2 godziny.',
+                                                        'speculation', [], actor='reports-test')
+            theses.add_disclosure(conn, self.hypothesis, 'known_unknowns', 'Brak billingu za marzec.', actor='reports-test')
+            if self.chat:  # one conversation in several exports: correlation hypotheses, one of them reviewed
+                from server.app.timeline import correlation
+                run = correlation.run_rule(conn, 'same_conversation', actor='reports-test')
+                listed = correlation.list_hypotheses(conn, run_id=run['id'])['hypotheses']
+                self.correlations = [h['id'] for h in listed]
+                if listed:
+                    correlation.review(conn, listed[0]['id'], 'accept', reason='sprawdzone ręcznie', actor='reports-test')
+        finally:
+            conn.close()
 
     def report(self, report_type: str, params: dict | None = None, output: Path | None = None) -> dict:
         from server.app.reports.service import create_report

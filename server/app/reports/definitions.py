@@ -37,7 +37,7 @@ TYPES: dict[str, dict] = {
 }
 
 DEFAULTS: dict[str, Any] = {
-    'from': None, 'to': None, 'language': 'pl', 'assume_zone': None, 'event_types': [],
+    'from': None, 'to': None, 'language': 'pl', 'assume_zone': None, 'assumption_rule': None, 'event_types': [],
     'counterparty': None, 'topic': None, 'include_hidden_chat_parts': False,
     'max_rows': 2000, 'max_events': 200_000, 'quote_chars': 1000, 'per_group_rows': 200,
     'formats': ['html', 'json', 'csv', 'xlsx'], 'include_citation_bundle': True,
@@ -99,6 +99,14 @@ def normalize_params(report_type: str, raw: dict | None) -> dict:
         except (ZoneInfoNotFoundError, ValueError) as exc:
             raise ReportInputError(f'assume_zone is not an IANA zone: {zone!r}') from exc
     out['assume_zone'] = zone
+    # An operator zone is never applied without a named assumption (timeline display rule, time budget).
+    assumption = _text('assumption_rule', params['assumption_rule'], 200)
+    if zone is not None and assumption is None:
+        raise ReportInputError('assume_zone requires assumption_rule: a non-empty id naming the assumption '
+                               '(at most 200 characters), recorded on every affected item')
+    if zone is None and assumption is not None:
+        raise ReportInputError('assumption_rule given without assume_zone')
+    out['assumption_rule'] = assumption
     types = _list('event_types', params['event_types'] or [], 100)
     if any(not isinstance(item, str) or not item or len(item) > 100 for item in types):
         raise ReportInputError('event_types must be non-empty strings')

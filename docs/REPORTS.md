@@ -60,9 +60,9 @@ type with its reading note. No case data lives in the repository.
 | Type | Sections (default order; `params.sections` can choose others) |
 |---|---|
 | `catalog` | `catalog` (area A: collections, types, ranges and gaps per time basis, content groups, name collisions, issue codes), `sources` (artifacts, acquisitions, content groups by SHA-256; this is also the fallback without A), `chat_records` (exports and the cross-export dedup report), `media` (runs with recipes, text versions, jobs), `integrations` (proposals, quarantined hypotheses). |
-| `timeline` | `timeline` (area C's projection when wired; until then the chronology over the analysis source seam, rule `analysis_source.v1` shown), `communications` (counts by type, direction, counterparty, chatbot; untimed by reason), `citations` (anchors on the selected material or `anchor_ids`), `annotations`. |
-| `time_budget` | `time_budget` (area E1; until wired, explicitly `unavailable`). Prints the hashed interpretive disclaimer and the label "unobserved is not inactivity". |
-| `hypothesis_dossier` | `hypothesis_dossier` (area E2; until wired, `unavailable`). Prints the hashed disclaimer label, the label "co-occurrence is not causation", and `citations`. |
+| `timeline` | `timeline` (area C's projection: display rule id/version/SHA-256, projection build, placement by basis and precision, flags, transcript segments in the range, correlation hypotheses with their review status — hypotheses, never facts, no probability — and the chronology with quotes), `communications` (counts by type, direction, counterparty, chatbot; untimed by reason), `citations` (anchors on the selected material or `anchor_ids`), `annotations`. |
+| `time_budget` | `time_budget` (area E1: a stored budget run given by `budget_run_id` — run identity and result-hash check, window, time source, category totals and candles with lower/probable/upper, wick and body, the `nieobserwowane` band, sensitivity ranges and flips, category definitions with rule provenance but no rule values, exclusions, parameters; without an id or for a missing run `unavailable`). Prints the hashed interpretive disclaimer and the label "unobserved is not inactivity". |
+| `hypothesis_dossier` | `hypothesis_dossier` (area E2, `hypothesis_id`: registered versions with the hash chain and integrity check, operationalization, dossier items with human classification and source check, theses with typology and computed flags such as `unsupported`, event-study runs, windows and warnings, exclusions, disclosure quadrants; without an id `unavailable`). Prints the hashed disclaimer label (E2's own, re-hashed), the label "co-occurrence is not causation", and `citations` (exactly the anchors pinned in the dossier, also bundled). |
 | `lawyer_package` | `counterparties` (grouped by counterparty, e-mail domain or collection, with a chronology per group), `citations` (key quotes: `anchor_ids` or all), `documents` (artifacts in scope with SHA-256, size, source, acquisitions), `annotations`, `open_questions` (typed by a person + gaps counted by code). |
 
 Grouping is literal. Two spellings of one institution stay two groups; merging
@@ -73,7 +73,8 @@ substrings, not semantic matching.
 
 `from`, `to` (ISO with an offset or `Z`; a bare date means 00:00 UTC; a time
 without an offset is refused), `language` (`pl`/`en` labels), `assume_zone`
-(IANA; recorded on every affected item), `event_types`, `counterparty`, `topic`,
+(IANA; recorded on every affected item) with the mandatory `assumption_rule`
+(a named assumption, as on the timeline; one without the other is refused), `event_types`, `counterparty`, `topic`,
 `include_hidden_chat_parts` (false), `max_rows` (2000 rows per table),
 `max_events` (200000 scanned), `quote_chars` (1000), `per_group_rows` (200),
 `formats` (`html`, `json`, `csv`, `xlsx`; add `pdf`), `include_citation_bundle`
@@ -126,7 +127,16 @@ It is shown in the header and the method section. A file cannot contain its
 own hash, so file hashes are in the manifest.
 
 Sections fed by one read-only transaction say `snapshot:
-report_read_transaction`. Upstream functions that open their own connection
+report_read_transaction`. The timeline projection (`timeline_items`) is a
+rebuildable **derived cache**. Before the snapshot, the service refreshes it in
+its own short write transaction and then requires it to be fresh inside the
+snapshot. If new data arrived in between, the snapshot is retried up to three
+times and then refused (`ProjectionNotFresh`). `method.derived_caches` (and the
+method table) records the rule id, version and SHA-256, the projection parameters,
+the projection and build id, the build mode and time, and whether this report
+triggered the build. That refresh and the register/audit rows are the only
+writes a report causes. Evidence and analysis tables are not written (tested by
+digesting every other table before and after). Upstream functions that open their own connection
 (the catalog coverage, the chat dedup report) say
 `separate_read_transaction`. Citation packets are each read in their own
 transaction, as the single-packet export does.
@@ -198,9 +208,9 @@ Upstream functions are looked up lazily:
 | Section | Upstream (first importable wins) | Expected call |
 |---|---|---|
 | `catalog` | `server.app.catalog.coverage.coverage_report`, `server.app.catalog.store.list_groups`/`list_collisions` (wired) | `coverage_report(collection_id, min_gap_days=)` |
-| `timeline` | `server.app.timeline.report.report_section` | `(db, *, from_utc, to_utc, counterparty, topic, event_types, limit) -> dict` with `rule` and `items` |
-| `time_budget` | `server.app.analysis.budget.report_payload`, `…get_budget_run` | `(db, budget_run_id) -> dict` (stored run with candles/bounds, unobserved band, sensitivity, category definitions) |
-| `hypothesis_dossier` | `server.app.analysis.dossier.report_payload`, `…list_dossier` | `(db, hypothesis_id) -> dict` |
+| `timeline` | `server.app.timeline.report.report_section` (wired) | `(db, *, from_utc, to_utc, event_ids, artifact_ids, assume_zone, assumption_rule, include_segments, topic, limit, max_scan) -> dict`: rule, projection, placement, flags, segments, correlations, inputs; reads the cache without refreshing it |
+| `time_budget` | `server.app.analysis.budget_report.report_payload` (wired) | `(db, budget_run_id) -> dict`: the stored `analysis_runs` row flattened into rows, result hash rechecked; `LookupError` for a missing run → `unavailable` |
+| `hypothesis_dossier` | `server.app.analysis.dossier_report.report_payload` (wired) | `(db, hypothesis_id) -> dict`: versions, dossier, theses, runs, windows, warnings, exclusions, disclosure, anchors, inputs |
 
 The disclaimer is taken from `server.app.analysis.hypotheses.disclaimer()` when
 present, after checking its declared SHA-256 against the text. Otherwise the
@@ -248,11 +258,13 @@ appear in the package.
 | A new `report-verify` command in the `metadata-verify` style. | The prompt says "the existing CLI"; no existing command understands report files. |
 | CSV text is guarded and the original value is kept elsewhere. | Coordinator rule shared with the catalog area; XLSX/JSON/HTML stay exact. |
 | HTTP creation only below `EW_REPORTS_DIR`. | Same pattern as `EW_SCAN_ROOTS`: the browser never chooses arbitrary server paths. |
-| The interim chronology uses the analysis source seam. | Replace it by wiring C's `report_section`; the rule id is in every report. |
+| The chronology uses the analysis source seam, which delegates to C's projection. | Integration 2026-10-16: the same projection and snapshot feed C's `report_section`; the interim rule remains only for a checkout without the timeline package. |
+| A report refreshes the derived timeline cache before its read-only snapshot. | A stale cache must neither be written from a read-only connection nor read silently; reconsider if the cache becomes independently versioned per snapshot. |
 | `formats` must contain `html` and `json`. | HTML is primary and JSON is the machine record that HTML values point into. |
 
-Not done or not verified: C, E1 and E2 sections are not wired (explicitly
-`unavailable` or the seam fallback); this revision has no model-written prose
+Not done or not verified: the C, E1 and E2 sections are wired (integration
+receipt [INTEGRATION_2026-10-16](validation/INTEGRATION_2026-10-16.md)), but a
+time-budget report renders one stored run and does not start a run; this revision has no model-written prose
 and no LLM call; English labels fall back to keys where untranslated; the PDF
 layout of very wide tables is not tuned; the report directory is not
 re-verified automatically after creation, so verification runs on request.

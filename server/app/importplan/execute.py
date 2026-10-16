@@ -45,7 +45,7 @@ from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-from .. import db as dbmod
+from .. import db as dbmod, evidence
 from ..evidence import IntegrityError
 from .adapters import IMPORTERS, MaterializedFile, RunContext, catalog_source_locator
 from .plan import Conflict, NotFound, _attempts, _items, _plan_row, _states, blockers, config_sha256, state_of, work_parent
@@ -270,10 +270,8 @@ def _materialize(item: dict, members: list[dict], workdir: Path, materialize: st
             if unit not in target.resolve(strict=False).parents:
                 raise Refused('unsafe_member_path', 'member path escapes the temporary directory', path=relative)
             target.parent.mkdir(parents=True, exist_ok=True)
-            # TODO(importplan, review finding #1): the importers acquire this temporary copy, so
-            # ingest_file records the copy's mtime as source_modified_at. When ingest_file gains an
-            # explicit stat scope / declared mtime (track R), pass the catalogued source time here
-            # (catalog_entry_times) through the adapters. Test: test_acquisition_keeps_the_catalogued_source_time.
+            # The importers acquire this temporary copy: _run_importer declares the catalogued
+            # source time for it (review finding 1); test_acquisition_keeps_the_catalogued_source_time.
             reader.copy_to(member['entry_id'], target)
             files.append(MaterializedFile(member['entry_id'], target, member['locator'],
                                           catalog_source_locator(item['collection_id'], member['locator']),
@@ -281,6 +279,21 @@ def _materialize(item: dict, members: list[dict], workdir: Path, materialize: st
     shutil.rmtree(spool, ignore_errors=True)
     root = files[0].path if materialize == 'self' else unit
     return root, files
+
+
+def _run_importer(importer, ctx: RunContext) -> dict:
+    """Run the importer on the materialized copies (review finding 1).
+
+    Every ingest of a materialized member declares the catalogued mtime of its entry
+    (``catalog.ingest.declared_mtime``; None with the reason when the catalogue has no
+    instant); any other file an importer acquires (extracted attachments, its own temporary
+    files) is a server-side temporary copy and records no source time.
+    """
+    from ..catalog.ingest import declared_mtime
+    with closing(dbmod.connect()) as db:
+        times = {f.path: declared_mtime(db, f.entry_id) for f in ctx.files}
+    with evidence.temporary_copy_acquisitions(), evidence.declared_source_times(times):
+        return importer.run(ctx)
 
 
 def _marks(db) -> dict:
@@ -407,7 +420,7 @@ def run_item(item: dict, state: dict, run: dict, plan: dict, *, limits: RunLimit
                              export_label=catalog_source_locator(item['collection_id'], item['locator']), actor=actor)
             with closing(dbmod.connect()) as db:
                 before = _marks(db)
-            importer_result = importer.run(ctx)
+            importer_result = _run_importer(importer, ctx)
             if hooks and hooks.get('after_import'):
                 hooks['after_import'](item, importer_result)
             with closing(dbmod.connect()) as db:

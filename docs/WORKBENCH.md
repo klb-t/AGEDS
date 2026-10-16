@@ -146,8 +146,9 @@ human annotation), not an event time. Item:
 (≤ 16 KiB JSON, no NaN). Raw text is kept; `+01:00`/`Z` give a UTC instant;
 a zone-less value keeps `tz_status: "unknown"`, has no instant, is never
 guessed and cannot be placed in an instant window (asking for both is 422).
-The visual rendering on the swimlanes is left to the coordinator's C/H
-integration; `/workbench/bookmarks` is a plain list/create page.
+Integration 2026-10-16: `/timeline` draws the bookmarks of its window in a strip
+above the lanes (see [TIMELINE.md](TIMELINE.md) §6); `/workbench/bookmarks`
+remains the plain list/create page.
 
 ## 6. Knowledge summary, quick jump, citation text
 
@@ -313,8 +314,8 @@ check: originals read-only (R), layers separate (L), no fabricated certainty
   `/api/search` keeps its contract (no annotations there).
 - Prompt lists "notatki": notes already exist as `annotations`; folder item,
   folder and bookmark notes are workbench working notes (human annotation
-  layer) in workbench tables. The metadata package (`packages.TABLES`) does
-  not include workbench tables until area F declares extension tables.
+  layer) in workbench tables. The metadata package carries them as declared
+  extension tables (`packages.EXTENSION_TABLES`); the search index stays excluded.
 - ł/Ł folding exists only in the index; a column filter keeps exact
   semantics. No other normalisation is applied.
 - The theme change touches the dark look once (button contrast, above).

@@ -128,6 +128,29 @@ const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
       assert.deepEqual(ids.map(Number).sort(), [timelineId, lawyerId].sort());
     });
 
+    await test('analysis reports from the forms render stored E1/E2 results under the hashed disclaimer', async () => {
+      for (const [type, field, value, expected] of [
+        ['time_budget', 'budget_run_id', fixture.budgetRun, /nieobserwowane/],
+        ['hypothesis_dossier', 'hypothesis_id', fixture.hypothesis, /Urząd odpowiada zawsze w 2 godziny\./]]) {
+        await page.goto(base + '/reports');
+        const details = page.locator(`[data-type-form="${type}"]`);
+        await details.locator('summary').click();
+        const form = details.locator('form');
+        await form.locator(`input[name="${field}"]`).fill(String(value));
+        await Promise.all([page.waitForURL(/\/reports\/\d+$/), form.locator('button[data-create]').click()]);
+        assert.equal(await page.locator('[data-verification]').getAttribute('data-verification'), 'valid');
+        const frame = page.frameLocator('iframe[data-report-preview]');
+        await frame.locator('h1').waitFor();
+        const text = await frame.locator('body').textContent();
+        assert.match(text, /Wynik analizatora jest materiałem pomocniczym dla człowieka\/biegłego, nie wnioskiem przyczynowym\./);
+        assert.match(text, expected);
+        assert.doesNotMatch(text, /niedostępna/);
+        const handle = await page.locator('iframe[data-report-preview]').elementHandle(); const content = await handle.contentFrame();
+        assert.equal(await content.evaluate(() => document.querySelectorAll('[data-k]').length > 100), true);
+        assert.equal(await frame.locator('script').count(), 0);
+      }
+    });
+
     await test('tampering with a file blocks the preview and shows the mismatch', async () => {
       const dirs = fs.readdirSync(fixture.reportsDir).filter(name => name.startsWith('ageds-report-timeline-'));
       assert.equal(dirs.length, 1);

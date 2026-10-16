@@ -26,6 +26,7 @@ def main():
         env.plant()
         print(json.dumps({'reportsDir': os.environ['EW_REPORTS_DIR'], 'artifactAudio': env.artifact_audio,
                           'anchorSegment': env.anchor_segment['id'], 'events': env.events,
+                          'budgetRun': env.budget_run, 'hypothesis': env.hypothesis,
                           'pdf': bool(os.environ.get('EW_PDF_CHROMIUM'))}), flush=True)
         uvicorn.run('server.app.main:app', host='127.0.0.1', port=int(os.environ['AGEDS_BROWSER_PORT']), log_level='warning')
 

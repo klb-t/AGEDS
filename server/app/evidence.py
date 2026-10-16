@@ -86,6 +86,24 @@ STAT_SCOPES = {
     'declared': 'declared_by_caller',
 }
 _DEFAULT_STAT_SCOPE: ContextVar[str | None] = ContextVar('ageds_ingest_stat_scope', default=None)
+_DECLARED_PATH_TIMES: ContextVar[dict | None] = ContextVar('ageds_declared_path_times', default=None)
+
+
+@contextmanager
+def declared_source_times(times: dict):
+    """Inside this block ``ingest_file`` declares a caller-known source time for exactly these paths.
+
+    ``times`` maps a path to ``(utc_or_None, basis)`` — e.g. catalogued files the import
+    planner materialized as temporary copies (the importer acquires the copy; the catalogue
+    knows the original's mtime). Any other path keeps the surrounding default scope (wrap in
+    :func:`temporary_copy_acquisitions` too); an explicit ``source_stat`` argument still wins.
+    """
+    resolved = {str(Path(path).resolve()): value for path, value in times.items()}
+    token = _DECLARED_PATH_TIMES.set({**(_DECLARED_PATH_TIMES.get() or {}), **resolved})
+    try:
+        yield
+    finally:
+        _DECLARED_PATH_TIMES.reset(token)
 
 
 @contextmanager
@@ -133,6 +151,11 @@ def ingest_file(path: Path, *, source_id: int, source_locator: str | None = None
     ``'declared'`` records ``declared_source_modified_at`` (an instant or None)
     with the caller's ``declared_time_basis`` (e.g. a catalogued mtime).
     """
+    declared_paths = _DECLARED_PATH_TIMES.get()
+    if declared_paths and source_stat is None and declared_source_modified_at is None and declared_time_basis is None:
+        hit = declared_paths.get(str(Path(path).resolve()))
+        if hit is not None:
+            source_stat, (declared_source_modified_at, declared_time_basis) = 'declared', hit
     scope = source_stat or _DEFAULT_STAT_SCOPE.get() or 'path'
     if scope not in STAT_SCOPES:
         raise ValueError(f'source_stat must be one of {", ".join(STAT_SCOPES)}')

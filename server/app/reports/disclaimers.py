@@ -27,6 +27,14 @@ CORRELATION = {
     'en': 'Co-occurrence in time is not causation; documentation density can produce apparent dependencies.',
 }
 
+CORRELATION_HYPOTHESIS_ID = 'ageds.reports.correlation-hypothesis-label/v1'
+CORRELATION_HYPOTHESIS = {
+    'pl': 'Hipotezy korelacji to propozycje reguł z dowodami dla każdego kryterium i decyzją człowieka; '
+          'nie są faktami i nie mają prawdopodobieństwa.',
+    'en': 'Correlation hypotheses are rule proposals with per-criterion evidence and a human decision; '
+          'they are not facts and carry no probability.',
+}
+
 
 def interpretive(lang: str) -> dict:
     try:

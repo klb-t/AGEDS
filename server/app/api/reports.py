@@ -198,7 +198,7 @@ def _form_params(form) -> tuple[str, dict, str | None]:
         raise ReportInputError(f'additional parameters are not valid JSON: {exc}') from exc
     if not isinstance(params, dict):
         raise ReportInputError('additional parameters must be a JSON object')
-    for name in ('from', 'to', 'counterparty', 'topic', 'assume_zone', 'title', 'language', 'group_by'):
+    for name in ('from', 'to', 'counterparty', 'topic', 'assume_zone', 'assumption_rule', 'title', 'language', 'group_by'):
         value = str(form.get(name) or '').strip()
         if value:
             params[name] = value

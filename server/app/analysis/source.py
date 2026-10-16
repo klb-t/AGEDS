@@ -312,7 +312,8 @@ def _enrich(db: sqlite3.Connection, items: list[dict], fields: bool, media_durat
 def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc: str | None = None,
                event_types: tuple[str, ...] | list[str] | None = None, assume_zone: str | None = None,
                assumption_rule: str | None = None, include_hidden: bool = False, limit: int = 1_000_000,
-               fields: bool = False, media_durations: bool = False, timeline_rule: str | None = None) -> dict:
+               fields: bool = False, media_durations: bool = False, timeline_rule: str | None = None,
+               refresh: bool = True) -> dict:
     """Return ``{'seam', 'rule', 'rule_sha256', 'items', 'untimed', 'hidden_excluded', 'truncated', ...}``.
 
     Items are sorted by (t_start, event_id) and keep the interim contract: event_id,
@@ -322,6 +323,10 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
     end_basis, declared_duration_s, duration_basis and, with ``fields=True``,
     ``fields`` (sender, recipients, subject, contact_label, phone_or_address and the
     first ``FIELD_BODY_CHARS`` characters of body with ``body_truncated``).
+
+    ``refresh=False`` is for read-only snapshots (reports): the timeline projection is
+    not refreshed (no write); a stale projection raises
+    ``timeline.analysis_items.ProjectionNotFresh`` instead of being read silently.
     """
     try:
         from ..timeline.analysis_items import load_items as timeline_load_items
@@ -332,7 +337,7 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
     try:
         loaded = timeline_load_items(db, start_utc=start_utc, end_utc=end_utc, event_types=event_types,
                                      assume_zone=assume_zone, assumption_rule=assumption_rule, include_hidden=True,
-                                     rule=timeline_rule, limit=limit)
+                                     rule=timeline_rule, limit=limit, refresh=refresh)
     except sqlite3.OperationalError as exc:
         if 'within a transaction' not in str(exc):
             raise
@@ -354,13 +359,15 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
         # read as UTC does.
         lo_us, hi_us = int(_epoch(start_utc) * 1_000_000), int(_epoch(end_utc) * 1_000_000)
         seen = {u['event_id'] for u in loaded['untimed']}
+        from ..timeline.analysis_items import unknown_zone_reason
         for row in db.execute(
-                "SELECT ref_id, event_type, sort_us FROM timeline_items WHERE projection_id=? AND item_kind='event' "
-                "AND basis='local_as_utc_unknown_zone' AND lo_us<? AND hi_us>=? ORDER BY ref_id",
+                "SELECT ref_id, event_type, sort_us, flags_json, hidden FROM timeline_items WHERE projection_id=? "
+                "AND item_kind='event' AND basis='local_as_utc_unknown_zone' AND lo_us<? AND hi_us>=? ORDER BY ref_id",
                 (loaded['projection']['id'], hi_us, lo_us)):
             if row[0] not in seen and (not event_types or row[1] in event_types):
-                loaded['untimed'].append({'event_id': row[0], 'event_type': row[1], 'reason': 'unknown_zone',
-                                          'local_as_utc': row[2] / 1_000_000})
+                loaded['untimed'].append({'event_id': row[0], 'event_type': row[1],
+                                          'reason': unknown_zone_reason(json.loads(row[3] or '{}')),
+                                          'local_as_utc': row[2] / 1_000_000, 'hidden': bool(row[4])})
         loaded['untimed'].sort(key=lambda u: u['event_id'])
     items, hidden = [], []
     for item in loaded['items']:

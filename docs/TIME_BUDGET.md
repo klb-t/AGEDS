@@ -210,7 +210,11 @@ are refused.
   points ≈ 7 s; 100 000 events ≈ 38 s. `max_items` (default 250 000) bounds a run; a cut
   input is reported as `source_truncated`.
 * Not done: real model providers (none exist by design), per-event roles in the candle event
-  list (role counts are per candle), a light theme of the page, report export (track F).
+  list (role counts are per candle), a light theme of the page. Report export is wired
+  (integration 2026-10-16): `analysis.budget_report.report_payload(db, run_id)` flattens a
+  stored run for the `time_budget` report section without recomputing it.
+* An operator zone that cannot place a wall clock (DST gap) is excluded as
+  `nonexistent_local_time` (integration 2026-10-16; previously reported as `unknown_zone`).
 
 ## 11. Python API shared with the hypothesis track
 
@@ -222,3 +226,4 @@ are refused.
 `analysis.source`: `load_items` (timeline seam), `event_item`.
 `analysis.budget`: `prepare_inputs`, `compute_budget`, `run_budget`, `effective_params`.
 `analysis.runs`: `store_run`, `get_run`, `list_runs`.
+`analysis.budget_report`: `report_payload` (stored run → report rows, read-only).

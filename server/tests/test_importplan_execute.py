@@ -339,10 +339,7 @@ def test_changing_the_importer_reruns_a_done_item(world):
     assert len(parsers) == 2
 
 
-@pytest.mark.xfail(strict=True, reason='review finding #5 (REVIEW_FINDINGS_b181c21.md): email/WhatsApp child locators are '
-                   'derived from the container locator only, so a later export at the same virtual locator with the same '
-                   'first attachment raises IntegrityError (different parent). Track R puts container identity into child '
-                   'locators; this assertion flips then.')
+# Review finding #5 (fixed by track R): child locators carry the container SHA-256.
 def test_later_export_at_the_same_locator_imports_with_shared_attachments(world):
     plan_id = new_plan(world)['plan']['id']
     found = by_locator(world, all_items(plan_id))
@@ -361,9 +358,7 @@ def test_later_export_at_the_same_locator_imports_with_shared_attachments(world)
     assert result['items'][0]['status'] == 'done', result['items'][0]['error']
 
 
-@pytest.mark.xfail(strict=False, reason='review finding #1 (REVIEW_FINDINGS_b181c21.md): ingest_file stores the temporary '
-                   "copy's mtime as source_modified_at. TODO(importplan): once track R adds the explicit stat scope / declared "
-                   'mtime to ingest_file, pass the catalogued source time for materialized entries (execute._materialize).')
+# Review finding #1: materialized members declare the catalogued mtime (execute._run_importer).
 def test_acquisition_keeps_the_catalogued_source_time(world):
     plan_id = new_plan(world)['plan']['id']
     calls = by_locator(world, all_items(plan_id))[('phone_a', 'backup/calls-20240107.xml')]

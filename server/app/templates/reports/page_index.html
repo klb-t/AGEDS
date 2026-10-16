@@ -22,6 +22,7 @@
 <label>Temat (podciąg treści)<input name="topic" value="{{ prefill.get('topic', '') if prefill.get('type') == name else '' }}"></label>
 <label>Typy zdarzeń (przecinki)<input name="event_types"></label>
 <label>Przyjęta strefa (IANA, opcjonalnie)<input name="assume_zone" placeholder="np. Europe/Warsaw"></label>
+<label>Nazwa założenia strefy (wymagana ze strefą)<input name="assumption_rule" placeholder="np. operator: zegar telefonu"></label>
 <label>ID kotwic cytatów (przecinki)<input name="anchor_ids"></label>
 <label class="check"><input type="checkbox" name="include_hidden_chat_parts" value="1"> Uwzględnij ukryte części czatów</label>
 {% endif %}

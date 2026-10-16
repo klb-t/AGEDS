@@ -499,7 +499,8 @@ def test_analysis_items_keep_the_interim_contract_without_silent_zones(tl):
                           'chatbot', 'direction', 't_start', 't_end', 'time_basis', 'text_chars', 'tags', 't_lo', 't_hi'}
     assert first['t_end'] - first['t_start'] == 1800
     reasons = {u['event_id']: u['reason'] for u in result['untimed']}
-    assert reasons[local] == 'unknown_zone' and reasons[undated] == 'no_candidates'
+    # Projection reason ``no_candidates`` is mapped to the analysis item contract (analysis/source.py).
+    assert reasons[local] == 'unknown_zone' and reasons[undated] == 'no_time_candidate'
     included = {i['event_id']: i for i in interval['items']}
     assert included[local]['t_hi'] - included[local]['t_lo'] == pytest.approx(26 * 3600 + 60, abs=1e-5)
     assert part in included and included[part]['hidden']

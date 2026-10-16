@@ -24,24 +24,91 @@ def _check_references(db, params: dict) -> None:
             raise ReportInputError(f'collection {params["collection_id"]} does not exist')
 
 
-def compute_sections(report_type: str, params: dict) -> list[dict]:
-    """Run every planned section in ONE read-only transaction (no writes)."""
+SNAPSHOT_ATTEMPTS = 3
+
+
+def _timeline_projection(params: dict):
+    """(rule, display params) of the report's timeline projection, or None without the timeline package."""
+    try:
+        from ..timeline.ruleset import RuleError, display_params, load_rule
+    except ImportError:
+        return None
+    try:
+        return load_rule(None, kind='display_rule'), display_params(params['assume_zone'], params['assumption_rule'])
+    except RuleError as exc:
+        raise ReportInputError(str(exc)) from exc
+
+
+def refresh_timeline_projection(params: dict) -> dict | None:
+    """Refresh the derived timeline cache in its own short write transaction.
+
+    Reports read evidence through one read-only snapshot and never write. The
+    timeline projection (``timeline_items``) is a rebuildable derived cache; its
+    refresh is made explicit here, before the snapshot, and recorded in the
+    method section (rule id/version/SHA-256, parameters, projection and build id,
+    whether this report triggered the build). Evidence tables are not written.
+    """
+    spec = _timeline_projection(params)
+    if spec is None:
+        return None
     from ..db import connect
-    with closing(connect(read_only=True)) as db:
-        db.execute('BEGIN')
-        try:
-            _check_references(db, params)
-            scope: dict = {'_sections': []}
-            results = []
-            for name, options in definitions.section_plan(report_type, params):
-                ctx = SectionContext(db=db, params=params, lang=params['language'], options=options, scope=scope,
-                                     bundle_enabled=params['include_citation_bundle'])
-                result = run_section(name, ctx)
-                results.append(result)
-                scope['_sections'].append(result)
-            return results
-        finally:
-            db.rollback()
+    from ..timeline.projection import ensure_projection
+    rule, display = spec
+    with closing(connect()) as db:
+        projection = ensure_projection(db, rule, display)
+    return projection
+
+
+def _projection_record(refreshed: dict, current: dict) -> dict:
+    build = current['build']
+    rule = current['rule']
+    return {'kind': 'derived_cache', 'cache': 'timeline_projection', 'rule_id': rule.get('rule_id', rule.get('id')),
+            'rule_version': rule.get('version'), 'rule_sha256': rule.get('sha256'), 'params': current['params'],
+            'projection_id': current['id'], 'build_id': build['id'], 'build_mode': build['mode'],
+            'build_finished_at': build['finished_at'],
+            'refreshed_by_report': refreshed['status'] == 'refreshed' and refreshed['build']['id'] == build['id'],
+            'write_scope': 'timeline_projections, timeline_items, timeline_projection_builds (derived cache only)',
+            'snapshot_status': current['status']}
+
+
+def compute_sections(report_type: str, params: dict) -> tuple[list[dict], list[dict]]:
+    """Run every planned section in ONE read-only transaction (no writes).
+
+    Returns ``(sections, derived_caches)``. The timeline projection is refreshed
+    first in its own write transaction (derived cache only); inside the snapshot
+    it must then be fresh, otherwise the snapshot is retried (data arrived in
+    between) up to ``SNAPSHOT_ATTEMPTS`` times and then refused.
+    """
+    from ..db import connect
+    spec = _timeline_projection(params)
+    for attempt in range(1, SNAPSHOT_ATTEMPTS + 1):
+        refreshed = refresh_timeline_projection(params) if spec is not None else None
+        with closing(connect(read_only=True)) as db:
+            db.execute('BEGIN')
+            try:
+                caches = []
+                if spec is not None:
+                    from ..timeline.analysis_items import ProjectionNotFresh, read_projection
+                    try:
+                        current = read_projection(db, *spec)  # first read: fixes the snapshot
+                    except ProjectionNotFresh:
+                        if attempt == SNAPSHOT_ATTEMPTS:
+                            raise
+                        continue
+                    caches.append(_projection_record(refreshed, current))
+                _check_references(db, params)
+                scope: dict = {'_sections': [], '_derived_caches': caches}
+                results = []
+                for name, options in definitions.section_plan(report_type, params):
+                    ctx = SectionContext(db=db, params=params, lang=params['language'], options=options, scope=scope,
+                                         bundle_enabled=params['include_citation_bundle'])
+                    result = run_section(name, ctx)
+                    results.append(result)
+                    scope['_sections'].append(result)
+                return results, caches
+            finally:
+                db.rollback()
+    raise RuntimeError('unreachable')  # pragma: no cover
 
 
 def _citation_pairs(sections: list[dict]) -> list[tuple[int, int]]:
@@ -74,7 +141,7 @@ def create_report(report_type: str, params: dict | None, output_dir, *, actor: s
     params = definitions.normalize_params(report_type, params)
     definition = definitions.TYPES[report_type]
     check_output_dir(output_dir)  # refuse early, before any work
-    sections = compute_sections(report_type, params)
+    sections, derived_caches = compute_sections(report_type, params)
     report_uid = uuid.uuid4().hex
     generated_at = utc_now()
     stamp = generated_at.replace('-', '').replace(':', '')
@@ -88,7 +155,7 @@ def create_report(report_type: str, params: dict | None, output_dir, *, actor: s
         _apply_bundle_result(sections, bundle_manifest)
         document = build_document(report_uid=report_uid, report_type=report_type, definition=definition,
                                   params=params, sections=sections, generated_at=generated_at,
-                                  template_files=template_files(definition['template']))
+                                  template_files=template_files(definition['template']), derived_caches=derived_caches)
         outputs.write_new(staging / 'report.json', (_pretty(document)))
         outputs.write_new(staging / 'report.html', render_html(document, definition['template']))
         formats: dict = {'html': {'status': 'written', 'files': [{'path': 'report.html'}]},

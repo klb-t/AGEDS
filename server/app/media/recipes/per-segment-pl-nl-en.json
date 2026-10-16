@@ -1,0 +1,22 @@
+{
+  "schema": "ageds.media_recipe",
+  "schema_version": 1,
+  "id": "per-segment-pl-nl-en",
+  "kind": "asr",
+  "revision": 1,
+  "description": "Code-switching strategy: Silero VAD speech regions split into bounded windows; language identified per window and restricted to pl/nl/en; each window transcribed with the forced language and word timestamps. Language probabilities identify language only; they are not transcript correctness. Switches shorter than a window are not resolved.",
+  "strategy": "per_segment_language",
+  "engine": "faster-whisper",
+  "model": {"$setting": "whisper_model"},
+  "device": {"$setting": "whisper_device"},
+  "compute_type": {"$setting": "whisper_compute_type"},
+  "model_options": {},
+  "vad": {"enabled": true, "parameters": {"min_silence_duration_ms": 500, "speech_pad_ms": 200}},
+  "word_timestamps": true,
+  "language": null,
+  "allowed_languages": ["pl", "nl", "en"],
+  "windows": {"max_window_s": 6.0, "min_window_s": 1.0},
+  "detection": {"language_detection_segments": 1, "language_detection_threshold": 0.5, "top_k_reported": 5},
+  "transcribe_options": {"condition_on_previous_text": false},
+  "limits": {"max_windows": 2000, "max_regions_recorded": 5000}
+}

@@ -1,0 +1,14 @@
+{
+  "schema": "ageds.media_recipe",
+  "schema_version": 1,
+  "id": "diarization-pyannote",
+  "kind": "diarization",
+  "revision": 1,
+  "description": "Optional speaker diarization post-pass with a locally available pyannote.audio pipeline. Speaker labels are hypotheses linked to their run and never merged into transcript text.",
+  "engine": "pyannote.audio",
+  "pipeline": "pyannote/speaker-diarization-3.1",
+  "num_speakers": null,
+  "min_speakers": null,
+  "max_speakers": null,
+  "limits": {"max_turns": 100000}
+}

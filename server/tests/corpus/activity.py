@@ -26,7 +26,8 @@ Planted cases (local dates):
 * 2025-04-03 ten outgoing SMS (400 chars, hourly, ``praca_projekty``) versus five
   incoming Gemini answers (3333 chars, every 2 h, ``zdrowie``): the top category
   flips under the typing/reading grid;
-* 2025-10-26 DST fall-back day (25 h) with one call 01:30 UTC+1 lasting 600 s.
+* 2025-10-26 DST fall-back day (25 h) with one call 01:30 UTC+1 lasting 600 s and an
+  unknown-zone wall clock 02:30 that is an ambiguous fold under the zone.
 """
 from __future__ import annotations
 
@@ -141,6 +142,7 @@ def build(root: Path) -> dict:
          'body': 'y' * 100, 'id': 'sms-dst'},
         {'kind': 'unknown_zone', 'local': '2025-03-30 02:30', 'id': 'wa-nonexistent'},
         {'kind': 'unknown_zone', 'local': '2025-03-30 18:00', 'id': 'wa-unknown'},
+        {'kind': 'unknown_zone', 'local': '2025-10-26 02:30', 'id': 'wa-fold'},  # repeated hour under the zone
         {'kind': 'call', 'direction': 'incoming', 'at': datetime(2025, 10, 26, 0, 30, tzinfo=timezone.utc),
          'duration': 600, 'number': OTHER_NUMBER, 'id': 'call-fallback'},
     ]
@@ -154,7 +156,7 @@ def build(root: Path) -> dict:
             'dst_short_day': '2025-03-30', 'empty_days': ['2025-03-31', '2025-04-01', '2025-04-02'],
             'flip_day': '2025-04-03', 'dst_long_day': '2025-10-26',
             'official_call_s': 1200, 'recording_s': 2.0, 'calendar_split': {'praca_projekty': 1800, 'zdrowie': 1800},
-            'untimed_reasons': {'unknown_zone': 2},
+            'untimed_reasons': {'unknown_zone': 2},  # within the main window (the October fold is outside)
             'untimed_reasons_assumed_zone': {'unknown_zone': 1},  # 02:30 does not exist on the DST day
             'filtered': {'chat_content_kind:reasoning': 1, 'hidden_by_projection': 1},
         },

@@ -84,6 +84,20 @@ def _choose_time(rows: list[sqlite3.Row], legacy_start: str | None, legacy_end: 
 FIELD_BODY_CHARS = 65_536
 
 
+def _fold_alternatives(candidate: TimeCandidate) -> list[float]:
+    """Both instants of a DST fold (never silently resolved: they stay in time_basis and t_lo/t_hi)."""
+    values = candidate.metadata.get('utc_alternatives')
+    if not isinstance(values, list):
+        return []
+    out = []
+    for value in values:
+        try:
+            out.append(_epoch(value))
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
 def _confirmed_duration(metadata: dict) -> float | None:
     """Source-declared duration in seconds (call logs ``metadata.duration``), else None."""
     duration = metadata.get('duration')
@@ -168,7 +182,10 @@ def event_item(db: sqlite3.Connection, event_id: int) -> dict:
         start, end = chosen['start'], chosen['end']
         t0 = _epoch(start.utc) if start else None
         t1 = _epoch(end.utc) if start and end else None
-        item.update({'t_start': t0, 't_end': t1 if t1 is not None and t1 >= t0 else None, 't_lo': t0, 't_hi': t0,
+        alternatives = _fold_alternatives(start) if start else []
+        item.update({'t_start': t0, 't_end': t1 if t1 is not None and t1 >= t0 else None,
+                     't_lo': min([t0, *alternatives]) if start else None, 't_hi': max([t0, *alternatives]) if start else None,
+                     'dst': start.metadata.get('dst') if start else None,
                      'basis': start.tz_status if start else 'none', 'untimed_reason': chosen['reason'],
                      'rule': RULE_ID, 'seam': 'interim_fallback'})
         return item
@@ -237,10 +254,14 @@ def load_items_interim(db: sqlite3.Connection, *, start_utc: str | None = None, 
             continue
         end = chosen['end'] if t1 is not None else None
         item = _describe(db, e, fields)
+        alternatives = _fold_alternatives(start)
         item.update({
             't_start': t0, 't_end': t1,
+            't_lo': min([t0, *alternatives]), 't_hi': max([t0, *alternatives]),
             'time_basis': {'kind': start.kind, 'tz_status': start.tz_status, 'source': start.source,
-                           'precision': start.precision, 'assumed_zone': start.metadata.get('assumed_zone')},
+                           'precision': start.precision, 'assumed_zone': start.metadata.get('assumed_zone'),
+                           'dst': start.metadata.get('dst'),
+                           'utc_alternatives': start.metadata.get('utc_alternatives')},
             'end_basis': {'kind': end.kind, 'source': end.source, 'tz_status': end.tz_status} if end else None,
         })
         if item['declared_duration_s'] is None and t1 is None and media_durations and e['artifact_id']:
@@ -317,6 +338,30 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
             raise
         raise ValueError('the timeline projection needs its own refresh transaction: load analysis items before '
                          'writing in this connection (or commit first)') from exc
+    folds = [it['event_id'] for it in loaded['items'] if it['time_basis'].get('dst') == 'ambiguous_fold']
+    if folds:
+        for offset in range(0, len(folds), 500):
+            chunk = folds[offset:offset + 500]
+            flags = {r[0]: json.loads(r[1] or '{}') for r in db.execute(
+                "SELECT ref_id, flags_json FROM timeline_items WHERE projection_id=? AND item_kind='event' "
+                'AND ref_id IN (%s)' % ','.join('?' * len(chunk)), (loaded['projection']['id'], *chunk))}
+            for it in loaded['items']:
+                if it['event_id'] in flags:
+                    it['time_basis']['utc_alternatives'] = flags[it['event_id']].get('utc_alternatives')
+    if start_utc and end_utc:
+        # An unknown-zone wall clock may fall in the window under any real offset: report every such
+        # item whose offset interval [t_lo, t_hi] overlaps the window, not only those whose wall clock
+        # read as UTC does.
+        lo_us, hi_us = int(_epoch(start_utc) * 1_000_000), int(_epoch(end_utc) * 1_000_000)
+        seen = {u['event_id'] for u in loaded['untimed']}
+        for row in db.execute(
+                "SELECT ref_id, event_type, sort_us FROM timeline_items WHERE projection_id=? AND item_kind='event' "
+                "AND basis='local_as_utc_unknown_zone' AND lo_us<? AND hi_us>=? ORDER BY ref_id",
+                (loaded['projection']['id'], hi_us, lo_us)):
+            if row[0] not in seen and (not event_types or row[1] in event_types):
+                loaded['untimed'].append({'event_id': row[0], 'event_type': row[1], 'reason': 'unknown_zone',
+                                          'local_as_utc': row[2] / 1_000_000})
+        loaded['untimed'].sort(key=lambda u: u['event_id'])
     items, hidden = [], []
     for item in loaded['items']:
         if item['hidden'] and not include_hidden:

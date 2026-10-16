@@ -79,3 +79,28 @@ def test_event_item_uses_projection(tmp_path, monkeypatch):
             source.event_item(db, 999)
     assert placed['seam'] == 'timeline' and placed['t_start'] == 1735725600 and placed['untimed_reason'] is None
     assert unknown['t_start'] is None and unknown['untimed_reason'] == 'unknown_zone'
+
+
+def test_dst_fold_keeps_both_instants_in_both_seams(tmp_path, monkeypatch):
+    """Regression (review U3): an ambiguous fold is carried with a flag and both instants, never resolved."""
+    dbmod, evidence = _db(tmp_path, monkeypatch)
+    src = evidence.ensure_source('test', 'synthetic')
+    stored = evidence.add_event(source_id=src, artifact_id=None, event_type='sms', body='importer-assumed fold')
+    local = evidence.add_event(source_id=src, artifact_id=None, event_type='whatsapp_message', ts_start='2025-10-26 02:30',
+                               body='wall clock in the repeated hour')
+    folded = timeinfo.assume_zone(timeinfo.from_iso('received', '2025-10-26 02:15', 'test'), 'Europe/Warsaw', rule='importer-test')
+    assert folded.metadata['dst'] == 'ambiguous_fold'
+    with dbmod.session() as db:
+        timeinfo.record_event_times(db, stored, [folded])
+    first, second = 1761437700.0, 1761441300.0  # 00:15Z and 01:15Z
+    with dbmod.session() as db:
+        interim = {i['event_id']: i for i in load_items_interim(db, assume_zone='Europe/Warsaw')['items']}
+        timeline = {i['event_id']: i for i in load_items(db, assume_zone='Europe/Warsaw', assumption_rule='op-test')['items']}
+    for seam in (interim, timeline):
+        item = seam[stored]
+        assert item['time_basis']['dst'] == 'ambiguous_fold'
+        assert len(item['time_basis']['utc_alternatives']) == 2
+        assert item['t_lo'] == first and second <= item['t_hi'] < second + 60  # timeline adds minute precision
+        operator = seam[local]
+        assert operator['time_basis']['dst'] == 'ambiguous_fold' and len(operator['time_basis']['utc_alternatives']) == 2
+        assert 3600 <= operator['t_hi'] - operator['t_lo'] < 3660

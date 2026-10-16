@@ -302,3 +302,24 @@ def test_interval_union_matches_independent_computation(corpus):
         times = sorted(r['at'].timestamp() for r in rows if r['conv'] == conv)
         spans.append((times[0] - 6, times[-1] + 30))
     assert _day(result, '2025-03-27')['categories']['praca_projekty']['probable'] == pytest.approx(intervals.total(spans))
+
+
+def test_ambiguous_dst_fold_is_never_silently_resolved(corpus):
+    dbmod, manifest, ids, config = corpus
+    zone = {'assume_zone': activity.ZONE, 'assumption_rule': 'synthetic-operator-zone'}
+    plain = _run(dbmod, manifest, config, window='fallback_window')['result']
+    assert plain['exclusions']['untimed']['event_ids'] == [ids['wa-fold']]
+    default = _run(dbmod, manifest, config, window='fallback_window', **zone)['result']
+    assert default['exclusions']['filtered']['by_reason'].get('ambiguous_fold') == 1
+    assert default['exclusions']['ambiguous_fold_items_carried'] == 0
+    assert all(ids['wa-fold'] not in v['event_ids'] for c in default['candles']['day'] for v in c['categories'].values())
+    carried = _run(dbmod, manifest, config, window='fallback_window', params={'ambiguous_fold': 'carry'}, **zone)['result']
+    assert 'ambiguous_fold' not in carried['exclusions']['filtered']['by_reason']
+    assert carried['exclusions']['ambiguous_fold_items_carried'] == 1
+    assert carried['input']['time_uncertainty']['max_width_s'] == 3600 + 60  # both instants + minute precision
+    day = _day(carried, manifest['expect']['dst_long_day'])
+    assert ids['wa-fold'] in day['categories']['inne']['event_ids']
+    assert 'time_uncertainty' in day['categories']['inne']['roles']
+    assert day['categories']['inne']['lower'] == _day(default, manifest['expect']['dst_long_day'])['categories']['inne']['lower']
+    with pytest.raises(ValueError, match='ambiguous_fold'):
+        budget.effective_params({'ambiguous_fold': 'earlier'})

@@ -16,6 +16,7 @@
     "include_hidden": false,
     "max_time_uncertainty_s": 21600,
     "uncertainty_mode": "widen_upper",
+    "ambiguous_fold": "exclude",
     "timeline_rule": null,
     "typing_directions": ["outgoing"],
     "typing_event_types": null,

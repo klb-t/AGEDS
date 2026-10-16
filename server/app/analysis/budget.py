@@ -71,6 +71,7 @@ _STR_LISTS = ('excluded_event_types', 'chat_content_kinds', 'typing_directions',
 _OPT_STR_LISTS = ('typing_event_types', 'reading_event_types')
 _BOOLS = ('include_hidden', 'wav_header_durations')
 UNCERTAINTY_MODES = ('widen_upper', 'ignore')
+FOLD_POLICIES = ('exclude', 'carry')
 
 
 def _number(name, value):
@@ -95,6 +96,10 @@ def _check(name, value):
     if name == 'uncertainty_mode':
         if value not in UNCERTAINTY_MODES:
             raise ValueError(f'uncertainty_mode must be one of {UNCERTAINTY_MODES}')
+        return value
+    if name == 'ambiguous_fold':
+        if value not in FOLD_POLICIES:
+            raise ValueError(f'ambiguous_fold must be one of {FOLD_POLICIES}')
         return value
     if name == 'timeline_rule':
         if value is not None and (not isinstance(value, str) or not value or len(value) > 200):
@@ -178,6 +183,8 @@ def _filter_reason(item: dict, params: dict) -> str | None:
         return f'excluded_event_type:{item["event_type"]}'
     if (item.get('hidden') or (item.get('chat') or {}).get('hidden')) and not params['include_hidden']:
         return 'hidden_by_projection'
+    if (item.get('time_basis') or {}).get('dst') == 'ambiguous_fold' and params['ambiguous_fold'] == 'exclude':
+        return 'ambiguous_fold'
     width = item.get('t_hi', item['t_start']) - item.get('t_lo', item['t_start'])
     if width > params['max_time_uncertainty_s']:
         return 'time_uncertainty_over_limit'
@@ -623,6 +630,9 @@ def method_record(params: dict) -> dict:
                         'interval [t_lo, t_hi] is wider than max_time_uncertainty_s are excluded; with uncertainty_mode '
                         'widen_upper the upper variant also covers [t_lo, t_hi + confirmed duration]'),
         'hidden': 'items hidden by the timeline projection (chat parts, hidden chat messages) are excluded unless include_hidden',
+        'ambiguous_fold': ('a wall clock in a repeated DST hour has two instants; ambiguous_fold=exclude (default) '
+                           'excludes it with that reason; carry keeps the display (earlier) instant for lower/probable, '
+                           'flags it and lets the upper variant cover both instants (t_lo..t_hi)'),
     }
 
 
@@ -696,10 +706,12 @@ def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_t
             'untimed': {'count': len(untimed), 'by_reason': dict(sorted(Counter(u['reason'] for u in untimed).items())),
                         'event_ids': [u['event_id'] for u in untimed[:1000]],
                         'event_ids_truncated': len(untimed) > 1000,
-                        'scope': 'all events whose time could not be placed on the UTC axis (window unknown)'},
+                        'scope': ('unknown-zone wall clocks that could fall in the loaded window under any real UTC '
+                                  'offset, and every event without a usable time (undated)')},
             'filtered': {'count': sum(filtered.values()), 'by_reason': dict(sorted(filtered.items()))},
             'assumed_zone_items': sum(1 for it in kept if it['time_basis'].get('assumed_zone')),
             'hidden_excluded_by_seam': len(loaded.get('hidden_excluded', [])),
+            'ambiguous_fold_items_carried': sum(1 for it in kept if (it.get('time_basis') or {}).get('dst') == 'ambiguous_fold'),
             'source_truncated': loaded['truncated'],
         },
     }

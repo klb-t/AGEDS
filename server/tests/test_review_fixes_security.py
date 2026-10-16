@@ -82,6 +82,7 @@ def test_finding8_rejected_tokens_are_aggregated_not_one_row_each(env, monkeypat
             assert http.get('/api/timeline', headers={'Authorization': f'Bearer ageds_{i:012x}.junk'}).status_code == 401
         for _ in range(30):
             assert http.get('/api/timeline', headers={'Authorization': 'Bearer ageds_aaaaaaaaaaaa.junk'}).status_code == 401
+    tokens.flush_rejection_counts()  # review 2 P2: repeats of a known key/reason are added lazily
     audit_rows = env.one("SELECT COUNT(*) FROM audit_log WHERE action='token_rejected'")
     assert audit_rows <= tokens.MAX_REJECTION_KEYS_PER_BUCKET + 1
     counters = env.rows('SELECT token_key, reason, count FROM api_token_rejections')
@@ -137,7 +138,8 @@ def test_finding6_require_token_covers_exports_and_every_state_change(env, monke
         assert http.post(f"/integrations/tokens/{client_token['id']}/revoke", follow_redirects=False).status_code == 401
         assert env.one('SELECT COUNT(*) FROM annotations') == 0
         assert env.one('SELECT revoked_at FROM api_tokens WHERE id=?', (client_token['id'],)) is None
-        assert http.get('/integrations').status_code == 200  # read-only pages stay open (documented)
+        page = http.get('/integrations')  # review 2 finding 6: pages need the token too; the login form answers
+        assert page.status_code == 401 and 'action="/integrations/session"' in page.text and 'proposal' not in page.text
         bearer = {'Authorization': f'Bearer {operator}'}
         assert http.get('/export/events.csv', headers=bearer).status_code == 200
         assert http.post('/upload', files={'file': ('a.txt', b'abc', 'text/plain')}, headers=bearer).status_code == 200
@@ -152,6 +154,7 @@ def test_finding6_require_token_covers_exports_and_every_state_change(env, monke
                          follow_redirects=False).status_code == 303
         assert env.one('SELECT COUNT(*) FROM annotations') == 1
         assert http.get('/export/events.csv').status_code == 200
+        assert http.get('/integrations').status_code == 200  # the session cookie opens the pages
         assert http.get('/api/read/v1/contract').status_code == 401  # scoped routes still need a bearer header
         assert http.post('/integrations/session/logout', follow_redirects=False).status_code == 303
         assert http.get('/export/events.csv').status_code == 401

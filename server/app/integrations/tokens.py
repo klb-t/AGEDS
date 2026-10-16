@@ -20,6 +20,7 @@ import os
 import secrets
 import sqlite3
 import threading
+import time
 from contextlib import closing
 from datetime import datetime, timedelta, timezone
 
@@ -41,8 +42,14 @@ TOUCH_INTERVAL_SECONDS = 60
 # each writes an audit row. Past this many keys in one hour further keys are
 # pooled under ``*`` so unauthenticated clients cannot grow the tables per request.
 MAX_REJECTION_KEYS_PER_BUCKET = 25
+# Review 2 P2: only the first rejection per hour, key and reason takes the write lock
+# (row + audit); repeats are counted in memory and added at most once per interval by a
+# flush with a short busy timeout, so a flood of rejected tokens does not queue on the lock.
+REJECTION_FLUSH_SECONDS = 10
 _PENDING_USES: dict[tuple[str, int], int] = {}
 _PENDING_LOCK = threading.Lock()
+_REJECTIONS: dict[tuple[str, str, str, str], dict] = {}  # (db path, hour bucket, key, reason) -> pending
+_FULL_BUCKETS: set[tuple[str, str]] = set()  # (db path, hour bucket) whose further keys are pooled under '*'
 log = logging.getLogger(__name__)
 
 
@@ -168,8 +175,60 @@ def parse_bearer(header_value: str | None) -> str | None:
 
 
 def _record_rejection(key: str, reason: str, token_id: int | None, now: str, details: dict | None = None) -> None:
-    """Count one rejection; only the first per hour, key and reason writes an audit row."""
+    """Count one rejection; only the first per hour, key and reason writes (row + audit), repeats are lazy."""
     bucket = now[:13]
+    path = str(dbmod.settings.db_path)
+    with _PENDING_LOCK:
+        entry = _REJECTIONS.get((path, bucket, key, reason))
+        if entry is None and (path, bucket) in _FULL_BUCKETS:
+            entry = _REJECTIONS.get((path, bucket, '*', reason))
+        if entry is not None:
+            entry['pending'] += 1
+            entry['last_seen'] = now
+            due = time.monotonic() - entry['flushed'] >= REJECTION_FLUSH_SECONDS
+    if entry is not None:
+        if due:
+            flush_rejection_counts()
+        return
+    stored = _store_rejection(key, reason, token_id, now, bucket, details)
+    with _PENDING_LOCK:
+        _REJECTIONS.setdefault((path, bucket, stored, reason), {'pending': 0, 'flushed': time.monotonic(), 'last_seen': now})
+        if stored == '*':
+            _FULL_BUCKETS.add((path, bucket))
+
+
+def flush_rejection_counts(*, busy_timeout_ms: int = 200) -> int:
+    """Add the in-memory repeat counts to ``api_token_rejections``; a busy database keeps them pending."""
+    path = str(dbmod.settings.db_path)
+    with _PENDING_LOCK:
+        work = [(k, e['pending'], e['last_seen']) for k, e in _REJECTIONS.items() if k[0] == path and e['pending'] > 0]
+    if work:
+        try:
+            with closing(dbmod.connect()) as db:
+                db.execute(f'PRAGMA busy_timeout={int(busy_timeout_ms)}')
+                db.execute('BEGIN IMMEDIATE')
+                for (_, bucket, key, reason), count, last_seen in work:
+                    db.execute('UPDATE api_token_rejections SET count=count+?, last_seen_at=MAX(last_seen_at, ?) '
+                               'WHERE bucket=? AND token_key=? AND reason=?', (count, last_seen, bucket, key, reason))
+                db.commit()
+        except sqlite3.OperationalError as exc:  # busy: keep the counts for the next flush
+            log.debug('token rejection counts deferred: %s', exc)
+            return 0
+    current = utc_now()[:13]
+    with _PENDING_LOCK:
+        for k, count, _ in work:
+            entry = _REJECTIONS.get(k)
+            if entry is not None:
+                entry['pending'] -= count
+                entry['flushed'] = time.monotonic()
+        for k in [k for k, e in _REJECTIONS.items() if k[0] == path and k[1] != current and e['pending'] == 0]:
+            del _REJECTIONS[k]
+        _FULL_BUCKETS.difference_update({b for b in _FULL_BUCKETS if b[0] == path and b[1] != current})
+    return sum(count for _, count, _ in work)
+
+
+def _store_rejection(key: str, reason: str, token_id: int | None, now: str, bucket: str, details: dict | None) -> str:
+    """The synchronous write for a (bucket, key, reason) not yet seen by this process; returns the key used."""
     with session() as db:
         db.execute('BEGIN IMMEDIATE')
         found = db.execute('SELECT id FROM api_token_rejections WHERE bucket=? AND token_key=? AND reason=?',
@@ -181,11 +240,12 @@ def _record_rejection(key: str, reason: str, token_id: int | None, now: str, det
                                (bucket, key, reason)).fetchone()
         if found is not None:
             db.execute('UPDATE api_token_rejections SET count=count+1, last_seen_at=? WHERE id=?', (now, found['id']))
-            return
+            return key
         db.execute('INSERT INTO api_token_rejections(bucket,token_key,reason,token_id,count,first_seen_at,last_seen_at) '
                    'VALUES(?,?,?,?,1,?,?)', (bucket, key, reason, token_id, now, now))
         _audit(db, 'token_rejected', token_id, {'token_key': key, 'reason': reason, **(details or {}),
                                                 'counted_in': f'api_token_rejections bucket {bucket}'})
+        return key
 
 
 def _touch(row, now: str):

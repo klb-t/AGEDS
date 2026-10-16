@@ -256,7 +256,9 @@ def observation_mtime_scope(locator: str | None, meta: dict) -> tuple[str, str |
     only ``source_path`` (a stat of the original location) and ``declared_by_caller``
     (with its own basis) are usable. A temporary-upload marker in the caller's
     metadata (``acquisition_kind: uploaded_stream`` or a ``…temporary…`` scope)
-    makes any row unusable: conflicting signals resolve to "not the source".
+    or extraction/catalog-materialization metadata (``extracted_from``,
+    ``catalog_entry_id``) makes any row except a declared one unusable:
+    conflicting signals resolve to "not the source".
     Older rows are judged by the markers they have: those, an
     ``upload:``/``client-upload:`` locator (server upload routes), a
     container-member locator (``…!/…``), extraction or catalog-ingest metadata.
@@ -264,18 +266,21 @@ def observation_mtime_scope(locator: str | None, meta: dict) -> tuple[str, str |
     ``legacy_unmarked_assumed_source_path`` (residual ambiguity).
     """
     scope = meta.get('filesystem_stat_scope')
+    if scope == 'declared_by_caller':
+        return scope, None
     source_meta = meta.get('source_metadata') if isinstance(meta.get('source_metadata'), dict) else {}
     declared = str(source_meta.get('filesystem_stat_scope') or '')
     if 'temporary' in declared or source_meta.get('acquisition_kind') == 'uploaded_stream':
         return declared or 'uploaded_stream', 'file_mtime_of_temporary_upload'
+    if any(key in source_meta for key in _TEMPORARY_SOURCE_KEYS):
+        # Extracted or catalog-materialized copies, whatever scope the caller passed.
+        return scope if isinstance(scope, str) else 'legacy_temporary_copy', 'file_mtime_of_temporary_copy'
     if isinstance(scope, str):
-        if scope in ('source_path', 'declared_by_caller'):
-            return scope, None
-        return scope, 'file_mtime_of_temporary_copy'
+        return (scope, None) if scope == 'source_path' else (scope, 'file_mtime_of_temporary_copy')
     locator = locator or ''
     if locator.startswith(('upload:', 'client-upload:')):
         return 'legacy_server_upload', 'file_mtime_of_temporary_upload'
-    if '!/' in locator or any(key in source_meta for key in _TEMPORARY_SOURCE_KEYS):
+    if '!/' in locator:
         return 'legacy_temporary_copy', 'file_mtime_of_temporary_copy'
     return 'legacy_unmarked_assumed_source_path', None
 

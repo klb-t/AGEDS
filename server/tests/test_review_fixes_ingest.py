@@ -132,6 +132,17 @@ def test_finding1_catalog_ingest_declares_the_catalogued_mtime(env):
     assert candidates[0].metadata['source_modified_at_basis'].startswith('catalog_entry_times:')
 
 
+def test_finding1_materialized_catalog_copies_are_never_source_times(env):
+    """A caller that forgets the stat scope (e.g. an import planner acquiring a catalog copy) is caught by its marker."""
+    path = env.root / 'copy.wav'
+    path.write_bytes(wav_bytes())
+    artifact = evidence.ingest_file(path, source_id=evidence.ensure_source('synthetic', 'planner'),
+                                    source_locator='catalog:collection/1/rec.wav', metadata={'catalog_entry_id': 7})
+    assert _observations(env)[-1]['meta']['filesystem_stat_scope'] == 'source_path'
+    [candidate] = _file_mtime_candidates(artifact)
+    assert not candidate.usable and candidate.unusable_reason == 'file_mtime_of_temporary_copy'
+
+
 def test_finding1_declared_scope_validation(env):
     path = env.root / 'x.bin'
     path.write_bytes(b'x')

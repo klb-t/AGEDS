@@ -908,7 +908,9 @@ class Pipeline:
                        first['result_sha256'] == second['result_sha256'] and second['identical_result_runs'] == [first['run_id']]
                        and first['integrity'] == 'hash_matches',
                        {k: first[k] for k in ('definition_sha256', 'seed', 'input_sha256', 'result_sha256')} | {
-                           'second_run': second['run_id'], 'windows': first['windows']})
+                           'second_run': second['run_id'],
+                           # p-values are deliberately not recorded or asserted: the null models are under review.
+                           'observed_pairs': {w['label']: w['observed'] for w in first['windows']}})
             self.check('hypothesis.causation_warning', ['N2'], 'the causation warning is always flagged and the hashed '
                        'disclaimer says the result is auxiliary material, not a causal conclusion',
                        'causation' in first['flagged_warnings'] and 'nie wnioskiem przyczynowym' in first['disclaimer']['pl'],

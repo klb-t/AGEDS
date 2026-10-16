@@ -777,9 +777,10 @@ def test_mbox_long_lines_split_by_read_bound_never_create_separators(env, tmp_pa
 
 
 def test_my_activity_refuses_other_takeout_layouts(env, tmp_path):
+    before = snapshot_counts()
     with pytest.raises(ValueError, match='list of records'):
         takeout_activity.import_my_activity(Path(env['m']['location']['timeline']))
-    assert events(event_type='activity') == []
+    assert snapshot_counts() == before  # refused before acquisition
     odd = tmp_path / 'odd.json'
     odd.write_text(json.dumps([{'latitudeE7': 1, 'longitudeE7': 2, 'timestamp': '2024-01-01T00:00:00Z'},
                                {'header': 'Search', 'title': 'ok', 'time': '2024-01-01T00:00:00Z'}]), encoding='utf-8')

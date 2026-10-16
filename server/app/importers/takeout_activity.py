@@ -192,6 +192,11 @@ def import_my_activity(path: Path, *, enable_browser_history: bool = False, sour
                        label: str | None = None, limits: CommLimits = DEFAULT_LIMITS) -> dict:
     config = settings()
     opt_in = {'enable_browser_history': bool(enable_browser_history)}
+    with path.open('rb') as handle:
+        if handle.read(4096).lstrip(b'\xef\xbb\xbf \t\r\n')[:1] == b'{':
+            # Refuse before acquisition: a JSON object is another Takeout layout
+            # (e.g. location Timeline.json) that has its own importer and opt-in.
+            raise ValueError('My Activity JSON must be a list of records')
     locator = source_locator if source_locator is not None else str(path)
     source_id, artifact_id = acquire(
         path, source_kind='google_takeout', source_label=label or 'Takeout My Activity', locator=locator,

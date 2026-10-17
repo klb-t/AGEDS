@@ -137,15 +137,21 @@ class TextLayers:
     def text(self, field: str, value):
         if not isinstance(value, str):
             return None
+        entry = None
         if self.rule is None:
-            return clean_text(value)
-        decoded, status = decode_latin1_utf8(value)
-        if status == 'decoded':
-            raw, cut = bounded(value, self.limits)
-            self.fields[field] = {'raw': raw, 'raw_truncated': bool(cut), 'raw_sha256': text_sha256(value),
-                                  'status': status}
-        elif status.startswith('not_applicable'):
-            self.fields[field] = {'status': status}
+            decoded, status = value, 'as_exported'
+        else:
+            decoded, status = decode_latin1_utf8(value)
+            if status == 'decoded':
+                raw, cut = bounded(value, self.limits)
+                entry = {'raw': raw, 'raw_truncated': bool(cut), 'raw_sha256': text_sha256(value), 'status': status}
+            elif status.startswith('not_applicable'):
+                entry = {'status': status}
+        if _SURROGATE.search(decoded):
+            entry = entry or {'status': status}
+            entry.update(lone_surrogates_replaced=True, raw_sha256=text_sha256(value))
+        if entry is not None:
+            self.fields[field] = entry
         return clean_text(decoded)
 
     def as_dict(self) -> dict:

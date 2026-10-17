@@ -1,12 +1,285 @@
 {
-  "schema": "ageds.importplan-detectors",
-  "version": "1",
-  "notice": "Traces area (personal-data exports, photo and document metadata). Key and name markers follow publicly observed export layouts; they propose an importer, nothing is imported before approval. Location and browser history importers keep their opt-ins off by default.",
-  "files": [
-    {"id": "traces_google_photos_sidecar", "types": ["json"],
-     "probe": {"kind": "json_keys", "top": "object", "any": ["photoTakenTime", "creationTime", "geoDataExif", "photoLastModifiedTime"]},
-     "candidates": [{"importer": "google_photos_sidecar", "reason": "JSON object with Google Photos sidecar keys (photoTakenTime/creationTime/geoDataExif)"}]},
-    {"id": "traces_photo_geotags", "types": ["jpg", "tiff", "png"], "probe": {"kind": "exif_marker"},
-     "candidates": [{"importer": "photo_geotags", "preference": "alternative", "reason": "EXIF block present: the traces importer also reads the GPS IFD (coordinates only with enable_location)"}]}
-  ]
+ "schema": "ageds.importplan-detectors",
+ "version": "1",
+ "notice": "Traces area (personal-data exports, photo and document metadata). Key and name markers follow publicly observed export layouts; they propose an importer, nothing is imported before approval. Location and browser history importers keep their opt-ins off by default.",
+ "files": [
+  {
+   "id": "traces_google_photos_sidecar",
+   "types": [
+    "json"
+   ],
+   "probe": {
+    "kind": "json_keys",
+    "top": "object",
+    "any": [
+     "photoTakenTime",
+     "creationTime",
+     "geoDataExif",
+     "photoLastModifiedTime"
+    ]
+   },
+   "candidates": [
+    {
+     "importer": "google_photos_sidecar",
+     "reason": "JSON object with Google Photos sidecar keys (photoTakenTime/creationTime/geoDataExif)"
+    }
+   ]
+  },
+  {
+   "id": "traces_photo_geotags",
+   "types": [
+    "jpg",
+    "tiff",
+    "png"
+   ],
+   "probe": {
+    "kind": "exif_marker"
+   },
+   "candidates": [
+    {
+     "importer": "photo_geotags",
+     "preference": "alternative",
+     "reason": "EXIF block present: the traces importer also reads the GPS IFD (coordinates only with enable_location)"
+    }
+   ]
+  },
+  {
+   "id": "traces_facebook_messages",
+   "types": [
+    "json"
+   ],
+   "locator_not_regex": "(?i)(?:^|/)(?:your_instagram_activity|instagram[^/]*)/",
+   "probe": {
+    "kind": "json_keys",
+    "top": "object",
+    "all": [
+     "participants",
+     "messages"
+    ],
+    "any": [
+     "sender_name",
+     "senderName"
+    ]
+   },
+   "candidates": [
+    {
+     "importer": "facebook_messages",
+     "reason": "JSON object with participants/messages and sender_name or senderName (Facebook/Messenger download)"
+    }
+   ]
+  },
+  {
+   "id": "traces_instagram_messages",
+   "types": [
+    "json"
+   ],
+   "locator_regex": "(?i)(?:^|/)(?:your_instagram_activity|instagram[^/]*)/",
+   "probe": {
+    "kind": "json_keys",
+    "top": "object",
+    "all": [
+     "participants",
+     "messages",
+     "sender_name"
+    ]
+   },
+   "candidates": [
+    {
+     "importer": "instagram_messages",
+     "reason": "Facebook-layout message file inside an Instagram download folder"
+    }
+   ]
+  },
+  {
+   "id": "traces_telegram_full",
+   "types": [
+    "json"
+   ],
+   "name_regex": "result.*\\.json",
+   "probe": {
+    "kind": "json_keys",
+    "top": "object",
+    "any": [
+     "personal_information",
+     "chats",
+     "left_chats"
+    ]
+   },
+   "candidates": [
+    {
+     "importer": "telegram_desktop",
+     "reason": "Telegram Desktop full export (personal_information/chats)"
+    }
+   ]
+  },
+  {
+   "id": "traces_telegram_chat",
+   "types": [
+    "json"
+   ],
+   "name_regex": "result.*\\.json",
+   "probe": {
+    "kind": "json_keys",
+    "top": "object",
+    "all": [
+     "name",
+     "type",
+     "id",
+     "messages"
+    ],
+    "all_text": [
+     "\"from_id\""
+    ]
+   },
+   "candidates": [
+    {
+     "importer": "telegram_desktop",
+     "reason": "Telegram Desktop single-chat export (name/type/id/messages with from_id)"
+    }
+   ]
+  },
+  {
+   "id": "traces_google_chat",
+   "types": [
+    "json"
+   ],
+   "name_regex": "messages\\.json",
+   "probe": {
+    "kind": "json_keys",
+    "top": "object",
+    "all": [
+     "messages",
+     "creator",
+     "created_date"
+    ]
+   },
+   "candidates": [
+    {
+     "importer": "google_chat",
+     "reason": "Takeout Google Chat messages.json (creator/created_date)"
+    }
+   ]
+  },
+  {
+   "id": "traces_x_archive",
+   "types": [
+    "txt",
+    "json"
+   ],
+   "name_regex": "(?:tweets?|direct-messages(?:-group)?)(?:-part\\d+)?\\.js",
+   "candidates": [
+    {
+     "importer": "twitter_x_archive",
+     "reason": "X/Twitter archive data file name (window.YTD.* assignment)"
+    }
+   ]
+  },
+  {
+   "id": "traces_linkedin_messages",
+   "types": [
+    "csv"
+   ],
+   "name_regex": "messages\\.csv",
+   "probe": {
+    "kind": "text_markers",
+    "all": [
+     "CONVERSATION ID",
+     "SENDER PROFILE URL"
+    ]
+   },
+   "candidates": [
+    {
+     "importer": "linkedin_messages",
+     "reason": "LinkedIn messages.csv header"
+    }
+   ]
+  },
+  {
+   "id": "traces_account_activity_json",
+   "types": [
+    "json"
+   ],
+   "probe": {
+    "kind": "json_keys",
+    "top": "object",
+    "any": [
+     "account_accesses_v2",
+     "account_activity",
+     "account_activity_v2",
+     "account_history_login_history",
+     "account_history_logout_history",
+     "account_history_password_change_history",
+     "active_sessions_v2",
+     "login_history",
+     "recognized_devices_v2",
+     "used_ip_address_v2"
+    ]
+   },
+   "candidates": [
+    {
+     "importer": "account_activity",
+     "reason": "JSON object with a Facebook/Instagram login or account activity root key"
+    }
+   ]
+  },
+  {
+   "id": "traces_account_activity_label_values",
+   "types": [
+    "json"
+   ],
+   "name_regex": "(?:account_activity\\.json|authorized_logins\\.json|ip_address_activity\\.json|logins_and_logouts\\.json|where_you're_logged_in\\.json)",
+   "probe": {
+    "kind": "json_keys",
+    "top": "array",
+    "all": [
+     "label_values"
+    ]
+   },
+   "candidates": [
+    {
+     "importer": "account_activity",
+     "reason": "Facebook security file name with label_values records"
+    }
+   ]
+  },
+  {
+   "id": "traces_google_access_log",
+   "types": [
+    "csv"
+   ],
+   "name_regex": "(?i)activities.*\\.csv",
+   "probe": {
+    "kind": "text_markers",
+    "all": [
+     "Activity Timestamp",
+     "IP Address"
+    ]
+   },
+   "candidates": [
+    {
+     "importer": "account_activity",
+     "reason": "Google Takeout Access Log Activity CSV header"
+    }
+   ]
+  },
+  {
+   "id": "traces_google_devices",
+   "types": [
+    "csv"
+   ],
+   "name_regex": "(?i)devices.*\\.csv",
+   "probe": {
+    "kind": "text_markers",
+    "all": [
+     "Device Type"
+    ]
+   },
+   "candidates": [
+    {
+     "importer": "account_activity",
+     "reason": "Google Takeout Access Log Activity devices CSV header"
+    }
+   ]
+  }
+ ]
 }

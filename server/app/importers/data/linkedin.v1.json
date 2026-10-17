@@ -1,0 +1,22 @@
+{
+  "schema": "ageds.messaging_mapping",
+  "version": "1",
+  "notice": "LinkedIn 'Get a copy of your data' messages.csv as publicly observed. Column names are matched case-insensitively after trimming; examples, not a vendor specification.",
+  "columns": {
+    "conversation_id": ["CONVERSATION ID"],
+    "conversation_title": ["CONVERSATION TITLE"],
+    "from": ["FROM"],
+    "sender_profile": ["SENDER PROFILE URL"],
+    "to": ["TO"],
+    "recipient_profiles": ["RECIPIENT PROFILE URLS"],
+    "date": ["DATE"],
+    "subject": ["SUBJECT"],
+    "content": ["CONTENT"],
+    "folder": ["FOLDER"],
+    "attachments": ["ATTACHMENTS"],
+    "draft": ["IS MESSAGE DRAFT"]
+  },
+  "required": ["conversation_id", "from", "date", "content"],
+  "date_regex": "^(?P<y>\\d{4})-(?P<mo>\\d{2})-(?P<d>\\d{2})[ T](?P<h>\\d{2}):(?P<mi>\\d{2})(?::(?P<s>\\d{2}))?\\s*(?P<zone>UTC|GMT|Z|[+-]\\d{2}:?\\d{2})?$",
+  "service_start_year": 2003
+}

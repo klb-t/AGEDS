@@ -73,7 +73,7 @@ EXTENSION_TABLES = (
     # and browser-visit rows exist only as far as the per-run opt-ins (enable_location /
     # enable_browser_history) allowed; sidecar-to-media matches are rule-id hypotheses.
     'trace_photo_sidecars', 'trace_photo_matches', 'trace_geotags', 'trace_document_metadata',
-    'trace_browser_visits',
+    'trace_browser_visits', 'trace_provider_locations',
 )
 EXCLUDED_EXTENSION_TABLES = {
     'api_tokens': 'credential table: token keys, salts and secret digests are never exported',

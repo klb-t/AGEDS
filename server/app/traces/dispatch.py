@@ -24,12 +24,24 @@ class Kind:
 _COMMON = frozenset({'label', 'collection_id', 'source_locator', 'limits'})
 _FILE = _COMMON | {'original_name'}
 _LOCATION = frozenset({'enable_location', 'coordinate_decimals'})
+_MESSAGES = _FILE | {'owner_name', 'export_label'}
+_MESSAGES_ID = _FILE | {'owner_id', 'export_label'}
 
 KINDS: dict[str, Kind] = {
     'photos-takeout': Kind('photos_takeout', 'import_photos_takeout', _COMMON | _LOCATION, True,
                            label='Google Photos Takeout (sidecars, EXIF GPS)'),
     'photo-sidecar': Kind('photos_takeout', 'import_sidecar', _FILE | _LOCATION, False, label='Google Photos sidecar JSON'),
     'photo': Kind('photos_takeout', 'import_photo', _FILE | _LOCATION, False, label='Image EXIF + GPS'),
+    'facebook': Kind('facebook', 'import_messages', _MESSAGES, True,
+                     label='Facebook/Messenger messages (download JSON, E2EE secure storage)'),
+    'instagram': Kind('instagram', 'import_instagram_messages', _MESSAGES, True, label='Instagram messages (JSON)'),
+    'telegram': Kind('telegram', 'import_result', _MESSAGES_ID, True, label='Telegram Desktop result.json'),
+    'google-chat': Kind('google_chat', 'import_chat', _MESSAGES_ID, True, label='Google Chat (Takeout messages.json)'),
+    'x-archive': Kind('twitter_x', 'import_archive', _MESSAGES_ID, True,
+                      label='X/Twitter archive (tweets.js, direct-messages*.js)'),
+    'linkedin': Kind('linkedin', 'import_messages_csv', _MESSAGES, True, label='LinkedIn messages.csv'),
+    'account-activity': Kind('account_activity', 'import_account_activity', _FILE | {'enable_location'}, False,
+                             label='Login/security activity (Facebook, Instagram, Google access log CSV)'),
 }
 
 

@@ -163,3 +163,61 @@ def test_http_upload_path_and_page(world):
     page = client.get('/traces')
     assert page.status_code == 200 and 'Ślady cyfrowe' in page.text and 'photo_metadata' in page.text
     assert '/traces' in client.get('/').text
+
+
+EXPECTED_MESSAGING = {
+    'message_1.json': {'facebook_messages', 'instagram_messages'},
+    'message_2.json': {'facebook_messages'},
+    'ala_przykladowa_1.json': {'facebook_messages'},
+    'result.json': {'telegram_desktop'},
+    'messages.json': {'google_chat'},
+    'tweets.js': {'twitter_x_archive'},
+    'tweets-part1.js': {'twitter_x_archive'},
+    'direct-messages.js': {'twitter_x_archive'},
+    'direct-messages-group.js': {'twitter_x_archive'},
+    'messages.csv': {'linkedin_messages'},
+}
+
+
+def test_plan_detects_messaging_downloads_and_runs_them(world):
+    collection, plan_id = scan_and_plan(world, world['corpus'])
+    items = items_of(plan_id)
+    chosen = {}
+    for item in items:
+        if item['name'] in EXPECTED_MESSAGING:
+            chosen.setdefault(item['name'], set()).add(item['state']['importer'])
+            assert not item['ambiguous'], item['locator']
+    assert chosen == EXPECTED_MESSAGING
+    insta = [i for i in items if i['name'] == 'message_1.json' and 'instagram' in i['locator']]
+    assert len(insta) == 1 and insta[0]['state']['importer'] == 'instagram_messages'
+    approve(plan_id, lambda i: i['state']['importer'] in {k for v in EXPECTED_MESSAGING.values() for k in v})
+    result = execute.execute_plan(plan_id, actor='tester', temp_dir=world['tmp'] / 'work')
+    assert result['status'] == 'completed' and {o['status'] for o in result['items']} == {'done'}, result['items']
+    platforms = {r['contact_label'] for r in rows("SELECT DISTINCT contact_label FROM events WHERE event_type IN "
+                                                 "('chat_message','social_post')")}
+    assert platforms == {'facebook_messenger', 'instagram', 'telegram', 'google_chat', 'twitter_x', 'linkedin'}
+    refs = rows("""SELECT r.status, r.reference_key, r.metadata_json FROM event_media_references r
+                   JOIN events e ON e.id=r.event_id WHERE e.contact_label='facebook_messenger' ORDER BY r.id""")
+    by_key = {r['reference_key'].rsplit('/', 1)[-1]: r for r in refs}
+    assert by_key['p_1.jpg']['status'] == 'not_extracted'
+    assert json.loads(by_key['p_1.jpg']['metadata_json'])['reason'] == 'catalogued_import_as_its_own_plan_item'
+    assert by_key['gone.jpg']['status'] == 'missing_from_export'
+    sources = rows("""SELECT DISTINCT o.collection_id, o.source_locator FROM source_observations o
+                      JOIN events e ON e.artifact_id=o.artifact_id WHERE e.event_type='chat_message'""")
+    assert sources and all(s['collection_id'] == collection and s['source_locator'].startswith('catalog:') for s in sources)
+
+
+def test_plan_detects_account_activity_files(world):
+    root = world['corpus'] / 'account_activity'
+    _, plan_id = scan_and_plan(world, root)
+    items = {i['name']: i for i in items_of(plan_id)}
+    expected = {'account_activity.json', 'logins_and_logouts.json', "where_you're_logged_in.json", 'authorized_logins.json',
+                'login_activity.json', 'logout_activity.json', 'login_history.json',
+                'Activities - A list of Google services accessed by.csv',
+                'Devices - A list of devices (i.e. Nest, Pixel, iPh.csv'}
+    assert {n for n, i in items.items() if i['state']['importer'] == 'account_activity'} == expected
+    assert 'other.json' not in items  # unknown JSON layout: not proposed
+    approve(plan_id, lambda i: i['state']['importer'] == 'account_activity', opt_ins={'enable_location': True})
+    result = execute.execute_plan(plan_id, actor='tester', temp_dir=world['tmp'] / 'work')
+    assert {o['status'] for o in result['items']} == {'done'}, result['items']
+    assert rows('SELECT COUNT(*) AS n FROM trace_provider_locations')[0]['n'] >= 3

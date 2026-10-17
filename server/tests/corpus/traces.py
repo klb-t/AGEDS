@@ -352,5 +352,331 @@ def build_facebook(root: Path) -> dict:
             'owner': owner, 'friend': friend, 'first_text': 'Cześć! Zażółć gęślą jaźń 😀'}
 
 
+def build_telegram(root: Path) -> dict:
+    full = root / 'DataExport_2024-01-01'
+    _write(full / 'photos' / 'photo_1@01-03-2021_11-02-00.jpg', exif_photo(None, payload=b'tg-photo'))
+    owner, friend = 'Owner Testowy', 'Ala Przykładowa'
+
+    def msg(mid, unix, text='', **extra):
+        local = None
+        if unix is not None:
+            from datetime import datetime, timedelta, timezone
+            local = (datetime(1970, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=unix) + timedelta(hours=1)).strftime(
+                '%Y-%m-%dT%H:%M:%S')
+        item = {'id': mid, 'type': 'message', 'date': local, 'date_unixtime': str(unix), 'from': friend,
+                'from_id': 'user6000001', 'text': text, 'text_entities': []}
+        if unix is None:
+            item.pop('date_unixtime')
+        item.update(extra)
+        return item
+    t0 = 1614592800  # 2021-03-01T10:00:00Z; the exporting computer wrote local UTC+1
+    personal = [
+        msg(10, t0, 'Cześć 😀 שלום'),
+        msg(11, t0 + 60, ['See ', {'type': 'link', 'text': 'https://example.org'}, ' and ', {'type': 'bold', 'text': 'bold'}],
+            **{'from': owner, 'from_id': 'user5000001', 'reply_to_message_id': 10, 'edited': '2021-03-01T11:05:00',
+               'edited_unixtime': str(t0 + 300)}),
+        msg(12, t0 + 120, '', photo='photos/photo_1@01-03-2021_11-02-00.jpg', width=1, height=1),
+        msg(13, t0 + 180, '', file='(File not included. Change data exporting settings to download.)',
+            media_type='voice_message', mime_type='audio/ogg', duration_seconds=3),
+        msg(14, t0 + 240, '', location_information={'latitude': SEA_A[0], 'longitude': SEA_A[1]}),
+        {'id': 15, 'type': 'service', 'date': '2021-03-01T11:05:00', 'date_unixtime': str(t0 + 300), 'actor': owner,
+         'actor_id': 'user5000001', 'action': 'phone_call', 'duration_seconds': 61, 'discard_reason': 'hangup',
+         'text': '', 'text_entities': []},
+        {'id': 16, 'type': 'message', 'date': '2021-03-28T02:30:00', 'from': friend, 'from_id': 'user6000001',
+         'forwarded_from': 'Kanał Przykładowy', 'text': 'forwarded, older export without date_unixtime'},
+        {'id': 17, 'type': 'message', 'date': 'not a date', 'from': friend, 'from_id': 'user6000001', 'text': 'bad date'},
+        {**msg(18, t0, 'milliseconds where seconds are declared'), 'date_unixtime': str(t0 * 1000)},
+        'not an object',
+        {'id': 19, 'type': 'message', 'date': '2021-03-01T12:00:00', 'date_unixtime': str(t0 + 3600), 'from': friend,
+         'from_id': 'user6000001', 'text': 'reacted', 'reactions': [{'type': 'emoji', 'count': 1, 'emoji': '👍',
+                                                                    'recent': [{'from': owner, 'from_id': 'user5000001'}]}]},
+    ]
+    data = {'about': 'Synthetic export.',
+            'personal_information': {'user_id': 5000001, 'first_name': 'Owner', 'last_name': 'Testowy',
+                                     'phone_number': '+48 000 000 101', 'username': '@owner_example', 'bio': ''},
+            'chats': {'about': 'chats', 'list': [
+                {'name': friend, 'type': 'personal_chat', 'id': 6000001, 'messages': personal},
+                {'name': 'Grupa testowa', 'type': 'private_supergroup', 'id': 7000001,
+                 'messages': [msg(1, t0 + 7200, 'group hello', **{'from': 'Group Member A', 'from_id': 'user7000002'})]}]},
+            'left_chats': {'about': 'left', 'list': [
+                {'name': 'Stara grupa', 'type': 'private_group', 'id': 8000001,
+                 'messages': [msg(1, t0 - 86400, 'left chat message')]}]}}
+    result = _json(full / 'result.json', data, ascii_escapes=False)
+    single = _json(root / 'ChatExport_2021-03-02' / 'result.json',
+                   {'name': friend, 'type': 'personal_chat', 'id': 6000001, 'messages': personal[:2]}, ascii_escapes=False)
+    html = _write(root / 'HtmlExport' / 'messages.html', '<html><body><div class="message">x</div></body></html>')
+    return {'root': str(full), 'result': str(result), 'single': str(single), 'html_dir': str(html.parent),
+            'owner': owner, 'friend': friend}
+
+
+def build_google_chat(root: Path) -> dict:
+    groups = root / 'Takeout' / 'Google Chat' / 'Groups'
+    dm = groups / 'DM abc123'
+    _json(dm / 'group_info.json', {'members': [{'name': 'Ala Przykładowa', 'email': 'ala@example.org', 'user_type': 'Human'},
+                                               {'name': 'Owner Testowy', 'email': 'owner@example.com', 'user_type': 'Human'}]})
+    _write(dm / 'File-photo.jpg', exif_photo(None, payload=b'gchat'))
+    messages = [
+        {'creator': {'name': 'Ala Przykładowa', 'email': 'ala@example.org', 'user_type': 'Human'},
+         'created_date': 'Tuesday, March 2, 2021 at 10:00:00 AM UTC', 'text': 'Cześć z Google Chat',
+         'topic_id': 'TOPIC1', 'message_id': 'abc123/TOPIC1',
+         'reactions': [{'emoji': {'unicode': '👍'}, 'reactor_emails': ['owner@example.com']}]},
+        {'creator': {'name': 'Owner Testowy', 'email': 'owner@example.com', 'user_type': 'Human'},
+         'created_date': 'Tuesday, March 2, 2021 at 10:05:00 AM CET', 'updated_date': 'Tuesday, 2 March 2021 at 10:06:00 UTC',
+         'text': 'abbreviated zone, edited', 'topic_id': 'TOPIC1', 'message_id': 'abc123/MSG2',
+         'attached_files': [{'original_name': 'photo.jpg', 'export_name': 'File-photo.jpg'},
+                            {'original_name': 'gone.pdf', 'export_name': 'File-gone.pdf'}]},
+        {'creator': {'name': 'Ala Przykładowa', 'email': 'ala@example.org', 'user_type': 'Human'},
+         'created_date': 'wtorek, 2 marca 2021 o 10:10:00 UTC', 'text': 'localized date not in the month table',
+         'message_id': 'abc123/MSG3'},
+        {'creator': {'name': 'Ala Przykładowa', 'email': 'ala@example.org', 'user_type': 'Human'},
+         'created_date': 'Tuesday, March 2, 2021 at 10:15:00 PM GMT+02:00', 'text': 'no message id here'},
+    ]
+    _json(dm / 'messages.json', {'messages': messages}, ascii_escapes=False)
+    space = groups / 'Space AAAA'
+    _json(space / 'group_info.json', {'name': 'Projekt testowy', 'members': []})
+    _json(space / 'messages.json', {'messages': [
+        {'creator': {'name': 'Bot', 'email': None, 'user_type': 'Bot'}, 'created_date': 'March 3, 2021, 9:00:00 AM UTC',
+         'text': 'space message', 'message_id': 'AAAA/T1'}]})
+    return {'root': str(root / 'Takeout' / 'Google Chat'), 'dm': str(dm / 'messages.json'), 'owner': 'owner@example.com'}
+
+
+def _ytd(path: Path, name: str, records, *, prefix: bool = True) -> Path:
+    body = json.dumps(records, ensure_ascii=False, indent=1)
+    return _write(path, (f'window.YTD.{name}.part0 = ' if prefix else '') + body)
+
+
+def build_x(root: Path) -> dict:
+    data = root / 'twitter-2024' / 'data'
+    _ytd(data / 'account.js', 'account', [{'account': {'email': 'owner@example.com', 'username': 'owner_example',
+                                                        'accountId': '111', 'createdAt': '2010-01-01T00:00:00.000Z'}}])
+    tweets = [
+        {'tweet': {'id_str': '1300000000000000001', 'created_at': 'Wed Sep 02 10:00:00 +0000 2020',
+                   'full_text': 'Hello 👋 #test', 'lang': 'en', 'favorite_count': '1', 'retweet_count': '0',
+                   'source': '<a href="https://example.org">Example client</a>'}},
+        {'tweet': {'id_str': '1300000000000000002', 'created_at': 'Thu Sep 03 23:59:59 +0530 2020',
+                   'full_text': 'RT @someone: retweeted text'}},
+        {'tweet': {'id_str': '1300000000000000003', 'created_at': 'not a date', 'full_text': 'a reply with a photo',
+                   'in_reply_to_status_id_str': '1200000000000000000',
+                   'extended_entities': {'media': [{'media_url_https': 'https://pbs.example.org/media/AbC.jpg',
+                                                    'type': 'photo'}]}}},
+    ]
+    _ytd(data / 'tweets.js', 'tweets', tweets)
+    _write(data / 'tweets_media' / '1300000000000000003-AbC.jpg', exif_photo(None, payload=b'tweet-media'))
+    _ytd(data / 'tweets-part1.js', 'tweets', [{'id_str': '1300000000000000004', 'created_at': 'Fri Sep 04 08:00:00 -0700 2020',
+                                                'full_text': 'old layout without the tweet wrapper and no prefix'}],
+         prefix=False)
+    dms = [{'dmConversation': {'conversationId': '111-222', 'messages': [
+        {'messageCreate': {'recipientId': '222', 'reactions': [{'senderId': '222', 'reactionKey': 'like'}], 'urls': [],
+                           'text': 'hi from the owner', 'mediaUrls': [], 'senderId': '111', 'id': '5001',
+                           'createdAt': '2020-09-02T10:00:00.000Z', 'editHistory': []}},
+        {'messageCreate': {'recipientId': '111', 'text': 'reply with media',
+                           'mediaUrls': ['https://ton.example.org/dm/5002/1/xyz.jpg'], 'senderId': '222', 'id': '5002',
+                           'createdAt': '2020-09-02T10:01:00.000Z'}},
+        {'messageCreate': {'recipientId': '111', 'text': 'no time', 'senderId': '222', 'id': '5003'}}]}}]
+    _ytd(data / 'direct-messages.js', 'direct_messages', dms)
+    group = [{'dmConversation': {'conversationId': '9001', 'messages': [
+        {'joinConversation': {'initiatingUserId': '333', 'participantsSnapshot': ['111', '333'],
+                              'createdAt': '2020-09-05T10:00:00.000Z'}},
+        {'conversationNameUpdate': {'initiatingUserId': '333', 'name': 'Grupa X', 'createdAt': '2020-09-05T10:01:00.000Z'}},
+        {'messageCreate': {'text': 'group message', 'senderId': '111', 'id': '6001', 'createdAt': '2020-09-05T10:02:00.000Z'}},
+        {'mysteryEvent': {'createdAt': '2020-09-05T10:03:00.000Z'}}]}}]
+    _ytd(data / 'direct-messages-group.js', 'direct_messages_group', group)
+    return {'root': str(root / 'twitter-2024'), 'tweets': str(data / 'tweets.js'), 'dms': str(data / 'direct-messages.js'),
+            'owner_id': '111'}
+
+
+def build_linkedin(root: Path) -> dict:
+    header = 'CONVERSATION ID,CONVERSATION TITLE,FROM,SENDER PROFILE URL,TO,RECIPIENT PROFILE URLS,DATE,SUBJECT,CONTENT,FOLDER'
+    rows = [
+        '2-abc,,Ala Przykładowa,https://www.linkedin.com/in/ala-example,Owner Testowy,https://www.linkedin.com/in/owner-example,'
+        '2023-03-01 10:00:00 UTC,,Dzień dobry,INBOX',
+        '2-abc,,Owner Testowy,https://www.linkedin.com/in/owner-example,Ala Przykładowa,https://www.linkedin.com/in/ala-example,'
+        '2023-03-01 10:05:00 UTC,,"<p>Multi<br>line, with ""quotes""</p>\nsecond physical line",SENT',
+        '2-def,Oferta,Recruiter Example,,Owner Testowy,,2023-03-02 11:00,Oferta pracy,Plain text without zone,INBOX',
+        '2-def,Oferta,Recruiter Example,,Owner Testowy,,yesterday,,bad date,INBOX',
+        '2-def,Oferta,Recruiter Example',
+        '2-ghi,,Ala Przykładowa,,Owner Testowy,,2023-03-03 09:00:00 +02:00,,with offset,INBOX',
+    ]
+    path = _write(root / 'Basic_LinkedInDataExport_03-2023' / 'messages.csv', '\ufeff' + header + '\r\n' + '\r\n'.join(rows) + '\r\n')
+    return {'root': str(path.parent), 'messages': str(path), 'owner': 'Owner Testowy'}
+
+
+def build_account_activity(root: Path) -> dict:
+    fb = root / 'facebook-ala-2024' / 'security_and_login_information'
+    files = {}
+    files['fb_activity'] = _json(fb / 'account_activity.json', {'account_activity_v2': [
+        {'action': 'Login', 'timestamp': 1600000000, 'ip_address': '192.0.2.10', 'user_agent': 'Mozilla/5.0 (X11; Linux x86_64)',
+         'datr_cookie': 'SYNTHETICcookieVALUE', 'city': mojibake('Łódź'), 'region': mojibake('Łódzkie'), 'country': 'PL',
+         'site_name': 'www.facebook.com'},
+        {'action': 'Session updated', 'timestamp': 0, 'ip_address': '2001:db8::1', 'user_agent': 'App/1.0',
+         'site_name': 'm.facebook.com'},
+        {'action': 'Login', 'timestamp': '1600000500', 'ip_address': 'not-an-ip'},
+        'not a record']})
+    files['fb_logins'] = _json(fb / 'logins_and_logouts.json', {'account_accesses_v2': [
+        {'action': 'Log in', 'timestamp': 1600001000, 'site': 'www.facebook.com', 'ip_address': '198.51.100.20'},
+        {'action': 'Log out', 'timestamp': 1600004600, 'site': 'www.facebook.com', 'ip_address': '198.51.100.20'}]})
+    files['fb_sessions'] = _json(fb / "where_you're_logged_in.json", {'active_sessions_v2': [
+        {'created_timestamp': 1599000000, 'updated_timestamp': 1600009000, 'ip_address': '203.0.113.9',
+         'user_agent': 'Mozilla/5.0', 'datr_cookie': 'OTHERcookie', 'device': 'Synthetic Phone', 'location': 'Warszawa, Polska',
+         'app': 'Messenger', 'session_type': 'mobile'}]})
+    files['fb_label_values'] = _json(fb / 'authorized_logins.json', [
+        {'timestamp': 1700000000, 'media': [], 'fbid': '100000000000001',
+         'label_values': [{'label': 'Name', 'value': 'Firefox on Linux'}, {'label': 'IP address', 'value': '198.51.100.7'},
+                          {'label': 'Estimated location', 'value': 'Kraków, PL'}, {'label': 'datr cookie', 'value': 'abc'},
+                          {'label': 'Created', 'timestamp_value': 1699990000}]}])
+    ig = root / 'instagram-ala-2024' / 'security_and_login_information' / 'login_and_profile_creation'
+    files['ig_login'] = _json(ig / 'login_activity.json', {'account_history_login_history': [
+        {'title': '2023-01-01T10:00:00+00:00', 'media_map_data': {}, 'string_map_data': {
+            'Cookie Name': {'href': '', 'value': 'SYNTHETICIGCOOKIE', 'timestamp': 0},
+            'IP Address': {'href': '', 'value': '203.0.113.5', 'timestamp': 0},
+            'Language Code': {'href': '', 'value': 'pl', 'timestamp': 0},
+            'Time': {'href': '', 'value': '', 'timestamp': 1672567200},
+            'User Agent': {'href': '', 'value': 'Instagram 300.0 Android', 'timestamp': 0}}}]})
+    files['ig_logout'] = _json(ig / 'logout_activity.json', {'account_history_logout_history': [
+        {'title': '2023-01-01T12:00:00+00:00', 'string_map_data': {
+            'IP Address': {'value': '203.0.113.5'}, 'Time': {'value': '', 'timestamp': 1672574400}}}]})
+    files['ig_old'] = _json(root / 'instagram-2019' / 'login_history.json', {'login_history': [
+        {'cookie_name': 'OLDCOOKIE', 'ip_address': '192.0.2.200', 'language_code': 'en', 'timestamp': '2019-05-01T08:00:00+02:00',
+         'user_agent': 'Mozilla/5.0'}]})
+    access = root / 'Takeout' / 'Access Log Activity'
+    files['google_activities'] = _write(access / 'Activities - A list of Google services accessed by.csv', '\r\n'.join([
+        'Gaia ID,Activity Timestamp,IP Address,Activity Country,Activity Region,Activity City,User Agent String,'
+        'Product Name,Sub-Product Name,Activity Type',
+        '100000000000000000001,2023-01-01 10:00:00 UTC,192.0.2.33,PL,Mazowieckie,Warszawa,Mozilla/5.0,Gmail,Inbox,Read',
+        '100000000000000000001,2023-01-01 10:05:00,192.0.2.33,PL,,,Mozilla/5.0,Drive,,Open',
+        '100000000000000000001,yesterday,2001:db8::42,NL,,,,Search,,Query']) + '\r\n')
+    files['google_devices'] = _write(access / 'Devices - A list of devices (i.e. Nest, Pixel, iPh.csv', '\r\n'.join([
+        'Device Type,Device Model,Device Brand,OS,OS Version,Device First Activity Timestamp,Device Last Activity Timestamp,'
+        'Device Last Location',
+        'Phone,Synthetic Model 1,Example,Android,14,2022-06-01 08:00:00 UTC,2023-01-01 09:00:00 UTC,"Warszawa, PL"']) + '\r\n')
+    files['not_activity'] = _json(root / 'misc' / 'other.json', {'something_else': []})
+    return {k: str(v) for k, v in files.items()}
+
+
+CORE_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<dc:title>{title}</dc:title><dc:creator>{creator}</dc:creator><cp:lastModifiedBy>{modifier}</cp:lastModifiedBy><cp:revision>{revision}</cp:revision>
+{times}</cp:coreProperties>"""
+APP_XML = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Template>Normal.dotm</Template><TotalTime>{total}</TotalTime><Pages>1</Pages><Words>3</Words><Application>{app}</Application><Company>Example Sp. z o.o.</Company><AppVersion>16.0000</AppVersion></Properties>"""
+CONTENT_TYPES = '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"></Types>'
+
+
+def _zip(path: Path, members: dict, *, compression=None) -> Path:
+    import zipfile
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(path, 'w', compression=compression or zipfile.ZIP_DEFLATED) as archive:
+        for name, data in members.items():
+            archive.writestr(name, data)
+    return path
+
+
+def _times_xml(created=None, modified=None, printed=None) -> str:
+    out = ''
+    if created:
+        out += f'<dcterms:created xsi:type="dcterms:W3CDTF">{created}</dcterms:created>'
+    if modified:
+        out += f'<dcterms:modified xsi:type="dcterms:W3CDTF">{modified}</dcterms:modified>'
+    if printed:
+        out += f'<cp:lastPrinted>{printed}</cp:lastPrinted>'
+    return out
+
+
+def _ooxml(path: Path, *, word: str, created=None, modified=None, printed=None, creator='Ala Przykładowa',
+           modifier='Jan Testowy', app='Microsoft Office Word', total='42', core=None) -> Path:
+    members = {'[Content_Types].xml': CONTENT_TYPES, f'{word}/document.xml': '<document/>',
+               'docProps/core.xml': core if core is not None else CORE_XML.format(
+                   title='Umowa — wersja 2 ✓', creator=creator, modifier=modifier, revision='7',
+                   times=_times_xml(created, modified, printed)),
+               'docProps/app.xml': APP_XML.format(total=total, app=app)}
+    return _zip(path, members)
+
+
+def _pdf(objects: list[bytes], trailer: bytes | None, *, version=b'1.4', tail: bytes = b'') -> bytes:
+    out = b'%PDF-' + version + b'\n%\xe2\xe3\xcf\xd3\n'
+    for item in objects:
+        out += item + b'\n'
+    if trailer is not None:
+        out += b'xref\n0 1\n0000000000 65535 f \ntrailer\n' + trailer + b'\nstartxref\n0\n%%EOF\n'
+    return out + tail
+
+
+def _utf16_hex(text: str) -> bytes:
+    return b'<' + (b'\xfe\xff' + text.encode('utf-16-be')).hex().upper().encode() + b'>'
+
+
+def build_documents(root: Path) -> dict:
+    import zlib
+    files = {}
+    files['docx'] = _ooxml(root / 'Umowa.docx', word='word', created='2020-01-01T10:00:00Z', modified='2021',
+                           printed='2020-06')
+    files['xlsx'] = _ooxml(root / 'Budzet.xlsx', word='xl', created='2020-02-02T08:00:00.123+02:00',
+                           modified='2020-02-03T25:00:00Z', app='Microsoft Excel', total='0')
+    files['pptx'] = _ooxml(root / 'Slajdy.pptx', word='ppt', created='2019-12-31T23:59:59+14:00', modified=None,
+                           app='LibreOffice/7.6', creator='', modifier='')
+    files['docx_entity'] = _ooxml(root / 'Entity.docx', word='word', core='<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a "aaaa">]>'
+                                  '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/'
+                                  'core-properties"><cp:revision>&a;</cp:revision></cp:coreProperties>')
+    big_core = CORE_XML.format(title='x' * (5 * 1024 * 1024), creator='a', modifier='b', revision='1', times='')
+    files['docx_bomb'] = _ooxml(root / 'Bomba.docx', word='word', core=big_core)
+    good = files['docx'].read_bytes()
+    files['docx_corrupt'] = _write(root / 'Uszkodzony.docx', good[:len(good) // 2])
+    files['odt'] = _zip(root / 'Notatka.odt', {
+        'mimetype': 'application/vnd.oasis.opendocument.text',
+        'meta.xml': '<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+                    'xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" office:version="1.3">'
+                    '<office:meta><meta:creation-date>2021-05-04T10:20:30.123456789</meta:creation-date><dc:date>2021-05-05T11:00:00</dc:date>'
+                    '<meta:editing-duration>PT1H2M3S</meta:editing-duration><meta:editing-cycles>4</meta:editing-cycles>'
+                    '<meta:generator>LibreOffice/7.6.4.1$Linux_X86_64</meta:generator><meta:initial-creator>Ala Przykładowa</meta:initial-creator>'
+                    '<dc:creator>Jan Testowy</dc:creator><meta:document-statistic meta:page-count="1" meta:word-count="12"/></office:meta>'
+                    '</office:document-meta>',
+        'content.xml': '<office:document-content/>'})
+    info = (b'3 0 obj\n<< /Producer (Synthetic PDF \\(test\\) \\351crit) /Creator (Writer) /Author ' + _utf16_hex('Ala Przykładowa')
+            + b' /CreationDate (D:20200101120000+01\'00\') /ModDate (D:2020) /Title (A \\\\ backslash) >>\nendobj')
+    files['pdf_simple'] = _write(root / 'prosty.pdf', _pdf([b'1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
+                                                           b'2 0 obj << /Type /Pages /Kids [] /Count 0 >> endobj', info],
+                                                          b'<< /Size 4 /Root 1 0 R /Info 3 0 R >>'))
+    update = (b'3 0 obj\n<< /Producer (Synthetic PDF) /CreationDate (D:20200101120000+01\'00\') '
+              b'/ModDate (D:20220202020202Z00\'00\') >>\nendobj\nxref\n0 1\n0000000000 65535 f \n'
+              b'trailer\n<< /Size 4 /Root 1 0 R /Info 3 0 R /Prev 0 >>\nstartxref\n0\n%%EOF\n')
+    files['pdf_incremental'] = _write(root / 'aktualizowany.pdf', files['pdf_simple'].read_bytes() + update)
+    objstm_body = b'3 0 << /Producer (Synthetic ObjStm) /CreationDate (D:20210203040506Z) /Author (Ala) >>'
+    packed = zlib.compress(objstm_body)
+    objstm = (b'5 0 obj\n<< /Type /ObjStm /N 1 /First 4 /Filter /FlateDecode /Length ' + str(len(packed)).encode()
+              + b' >>\nstream\n' + packed + b'\nendstream\nendobj')
+    xref = b'6 0 obj\n<< /Type /XRef /Size 7 /Root 1 0 R /Info 3 0 R /W [1 2 1] /Length 0 >>\nstream\n\nendstream\nendobj'
+    files['pdf_objstm'] = _write(root / 'strumien.pdf', _pdf([b'1 0 obj << /Type /Catalog >> endobj', objstm, xref], None,
+                                                            version=b'1.5', tail=b'startxref\n0\n%%EOF\n'))
+    xmp = ('<?xpacket begin="\ufeff" id="W5M0MpCehiHzreSzNTczkc9d"?><x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF '
+           'xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description rdf:about="" '
+           'xmlns:xmp="http://ns.adobe.com/xap/1.0/" xmlns:pdf="http://ns.adobe.com/pdf/1.3/" '
+           'xmlns:dc="http://purl.org/dc/elements/1.1/" xmp:CreateDate="2020-01-01T09:00:00Z" '
+           'xmp:CreatorTool="Example Writer 1.0"><xmp:ModifyDate>2023-03-03T03:03:03+01:00</xmp:ModifyDate>'
+           '<pdf:Producer>Example XMP Producer</pdf:Producer><dc:creator><rdf:Seq><rdf:li>Ala Przykładowa</rdf:li>'
+           '<rdf:li>Jan Testowy</rdf:li></rdf:Seq></dc:creator></rdf:Description></rdf:RDF></x:xmpmeta>'
+           '<?xpacket end="w"?>').encode('utf-8')
+    meta_obj = b'4 0 obj\n<< /Type /Metadata /Subtype /XML /Length ' + str(len(xmp)).encode() + b' >>\nstream\n' + xmp + b'\nendstream\nendobj'
+    info_x = b'3 0 obj\n<< /Producer (Info Producer) /CreationDate (D:20200101120000+01\'00\') /ModDate (D:20230303) >>\nendobj'
+    files['pdf_xmp'] = _write(root / 'xmp.pdf', _pdf([b'1 0 obj << /Type /Catalog /Metadata 4 0 R >> endobj', info_x, meta_obj],
+                                                    b'<< /Size 5 /Root 1 0 R /Info 3 0 R >>'))
+    bad = (b'3 0 obj\n<< /CreationDate (D:20200101120000+25\'00\') /ModDate (D:20201301) /Producer (20200101 is not a date) '
+           b'>>\nendobj')
+    files['pdf_bad'] = _write(root / 'zle-daty.pdf', _pdf([b'1 0 obj << /Type /Catalog >> endobj', bad],
+                                                         b'<< /Size 4 /Root 1 0 R /Info 3 0 R >>'))
+    nodprefix = (b'3 0 obj\n<< /CreationDate (20200101) /ModDate (D:20200101120000Z00\'00\') /Producer (x) >>\nendobj')
+    files['pdf_nod'] = _write(root / 'bez-prefiksu.pdf', _pdf([b'1 0 obj << /Type /Catalog >> endobj', nodprefix],
+                                                             b'<< /Size 4 /Root 1 0 R /Info 3 0 R >>'))
+    encrypted = b'3 0 obj\n<< /Producer <A1B2C3D4> /CreationDate <00112233> >>\nendobj'
+    files['pdf_encrypted'] = _write(root / 'szyfrowany.pdf', _pdf([b'1 0 obj << /Type /Catalog >> endobj', encrypted],
+                                                                 b'<< /Size 4 /Root 1 0 R /Info 3 0 R /Encrypt 9 0 R >>'))
+    files['pdf_noinfo'] = _write(root / 'bez-info.pdf', _pdf([b'1 0 obj << /Type /Catalog >> endobj'], b'<< /Size 2 /Root 1 0 R >>'))
+    files['ole_doc'] = _write(root / 'stary.doc', b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1' + b'\x00' * 504)
+    return {k: str(v) for k, v in files.items()}
+
+
 def build(root: Path) -> dict:
-    return {'photos': build_photos(root / 'photos'), 'facebook': build_facebook(root / 'facebook')}
+    return {'photos': build_photos(root / 'photos'), 'facebook': build_facebook(root / 'facebook'),
+            'telegram': build_telegram(root / 'telegram'), 'google_chat': build_google_chat(root / 'google_chat'),
+            'x': build_x(root / 'x'), 'linkedin': build_linkedin(root / 'linkedin'),
+            'account_activity': build_account_activity(root / 'account_activity'),
+            'documents': build_documents(root / 'documents')}

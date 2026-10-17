@@ -15,7 +15,7 @@ IMPORTERS = ('google_photos_sidecar', 'google_photos_media', 'facebook_messages'
              'telegram_desktop', 'google_chat', 'twitter_x_archive', 'linkedin_messages', 'account_activity',
              'document_metadata', 'google_keep', 'browser_profile')
 TABLES = ('trace_photo_sidecars', 'trace_photo_matches', 'trace_geotags', 'trace_document_metadata',
-          'trace_browser_visits')
+          'trace_browser_visits', 'trace_provider_locations')
 
 
 def _exists(db, table: str) -> bool:

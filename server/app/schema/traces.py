@@ -14,6 +14,9 @@ Versions 110–114 (AGEDS-TASK-20261017-L2):
   tools as claims, dates raw with parse status.
 * ``trace_browser_visits`` — local browser profile visits (opt-in), one row per
   visit; the timeline gets aggregated ``browser_session`` events.
+* ``trace_provider_locations`` — a provider's own location label of an account
+  activity record (IP geolocation by Facebook/Instagram/Google: third-party
+  inference), stored only under ``enable_location``.
 
 All tables are append-only: re-observing identical values reuses a row, a
 changed interpretation is a new parser version.
@@ -134,4 +137,19 @@ CREATE TABLE IF NOT EXISTS trace_browser_visits (
 );
 CREATE INDEX IF NOT EXISTS idx_trace_browser_visits_time ON trace_browser_visits(visit_utc);
 ''' + _APPEND_ONLY.format(table='trace_browser_visits')),
+    (114, 'trace_provider_locations_v1', r'''
+CREATE TABLE IF NOT EXISTS trace_provider_locations (
+  id INTEGER PRIMARY KEY,
+  event_id INTEGER NOT NULL REFERENCES events(id),
+  artifact_id INTEGER NOT NULL REFERENCES artifacts(id),
+  provider TEXT NOT NULL,
+  values_json TEXT NOT NULL,
+  basis TEXT NOT NULL CHECK(basis = 'provider_inference'),
+  parser TEXT NOT NULL,
+  parser_version TEXT NOT NULL,
+  opt_in_json TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(event_id, parser, parser_version)
+);
+''' + _APPEND_ONLY.format(table='trace_provider_locations')),
 )

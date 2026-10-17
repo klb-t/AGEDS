@@ -280,6 +280,24 @@
      "reason": "Google Takeout Access Log Activity devices CSV header"
     }
    ]
+  },
+  {
+   "id": "traces_document_metadata",
+   "types": [
+    "docx",
+    "xlsx",
+    "pptx",
+    "odt",
+    "ods",
+    "odp",
+    "pdf"
+   ],
+   "candidates": [
+    {
+     "importer": "document_metadata",
+     "reason": "office/PDF document: embedded metadata (authors and dates are claims)"
+    }
+   ]
   }
  ]
 }

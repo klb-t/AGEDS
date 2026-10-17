@@ -52,6 +52,13 @@ def _account_activity(ctx: RunContext) -> dict:
                                    collection_id=ctx.collection_id)
 
 
+def _documents(ctx: RunContext) -> dict:
+    from ...importers.doc_metadata import import_documents
+    item = ctx.single()
+    return import_documents(item.path, source_locator=item.source_locator, original_name=item.name,
+                            collection_id=ctx.collection_id)
+
+
 _EXPORT_LABEL = Param('export_label', False, 'logical export label (groups files of one download for cross-export identity)')
 _OWNER_NAME = Param('owner_name', False, 'account owner display name as exported (sets direction; not stored)')
 _OWNER_ID = Param('owner_id', False, 'account owner id/e-mail as exported (sets direction)')
@@ -87,4 +94,6 @@ IMPORTERS: tuple[Importer, ...] = (
              optional_opt_ins=('enable_location',),
              notes='time, IP raw, user agent, device; cookies never stored; the provider\'s location labels only with '
                    'enable_location; no IP geolocation'),
+    Importer('document_metadata', 'Metadane dokumentu (OOXML/ODF/PDF)', ('file',), _documents,
+             notes='authors/tools are claims; created/modified dates as candidates with stated precision'),
 )

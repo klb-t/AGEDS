@@ -40,6 +40,8 @@ KINDS: dict[str, Kind] = {
     'x-archive': Kind('twitter_x', 'import_archive', _MESSAGES_ID, True,
                       label='X/Twitter archive (tweets.js, direct-messages*.js)'),
     'linkedin': Kind('linkedin', 'import_messages_csv', _MESSAGES, True, label='LinkedIn messages.csv'),
+    'documents': Kind('doc_metadata', 'import_documents', _FILE, True,
+                      label='Document metadata (DOCX/XLSX/PPTX, ODF, PDF Info + XMP)'),
     'account-activity': Kind('account_activity', 'import_account_activity', _FILE | {'enable_location'}, False,
                              label='Login/security activity (Facebook, Instagram, Google access log CSV)'),
 }

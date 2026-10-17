@@ -221,3 +221,15 @@ def test_plan_detects_account_activity_files(world):
     result = execute.execute_plan(plan_id, actor='tester', temp_dir=world['tmp'] / 'work')
     assert {o['status'] for o in result['items']} == {'done'}, result['items']
     assert rows('SELECT COUNT(*) AS n FROM trace_provider_locations')[0]['n'] >= 3
+
+
+def test_plan_proposes_document_metadata(world):
+    _, plan_id = scan_and_plan(world, world['corpus'] / 'documents')
+    items = {i['name']: i for i in items_of(plan_id)}
+    for name in ('Umowa.docx', 'Budzet.xlsx', 'Slajdy.pptx', 'Notatka.odt', 'prosty.pdf', 'strumien.pdf'):
+        assert items[name]['state']['importer'] == 'document_metadata', name
+    approve(plan_id, lambda i: i['state']['importer'] == 'document_metadata')
+    result = execute.execute_plan(plan_id, actor='tester', temp_dir=world['tmp'] / 'work')
+    assert {o['status'] for o in result['items']} == {'done'}, result['items']
+    statuses = {r['status'] for r in rows('SELECT status FROM trace_document_metadata')}
+    assert 'parsed' in statuses

@@ -1,0 +1,67 @@
+<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lokalizacja</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/location.css"></head><body>
+<header>{% include '_nav.html' %}<div><h1>Lokalizacja</h1>
+<p>położenie urządzenia lub konta, nie dowód obecności osoby · wnioskowanie dostawcy ≠ obserwacja · przetwarzanie lokalne, bez geokodowania i bez zewnętrznych kafelków</p></div></header>
+<main class="loc-main" data-location data-state="loading">
+<script type="application/json" id="location-config">{{ config_json|safe }}</script>
+<section class="panel loc-controls" aria-label="Zakres czasu i widok">
+  <form data-loc-form class="loc-form">
+    <label>Od (UTC) <input name="from" data-loc-from placeholder="2024-01-15T00:00:00Z" autocomplete="off"></label>
+    <label>Do (UTC) <input name="to" data-loc-to placeholder="2024-01-16T00:00:00Z" autocomplete="off"></label>
+    <label>Rzutowanie <select name="projection" data-loc-projection>
+      <option value="equirectangular">lokalne równoodległościowe</option><option value="mercator">Web Mercator</option></select></label>
+    <label>Maks. punktów <input name="max_points" data-loc-max-points type="number" min="1" max="20000" value="5000"></label>
+    <button type="submit">Pokaż</button>
+    <button type="button" data-loc-all class="loc-secondary">Całość</button>
+  </form>
+  <div class="loc-slider" aria-label="Suwak czasu">
+    <label>początek <input type="range" min="0" max="1000" value="0" data-loc-slide-start></label>
+    <label>koniec <input type="range" min="0" max="1000" value="1000" data-loc-slide-end></label>
+    <a data-loc-timeline href="/timeline">Ten zakres na osi czasu</a>
+  </div>
+  <p class="loc-status" data-loc-status role="status" aria-live="polite"></p>
+</section>
+<div class="loc-layout">
+  <section class="panel loc-map-panel" aria-labelledby="loc-map-title">
+    <h2 id="loc-map-title">Mapa <small data-loc-map-note></small></h2>
+    <svg data-loc-map class="loc-map" role="img" aria-label="Położenia, ślady i miejsca w wybranym zakresie" viewBox="0 0 900 560"></svg>
+    <ul class="loc-legend" data-loc-legend>
+      <li><span class="loc-swatch loc-raw"></span>próbka urządzenia (surowa)</li>
+      <li><span class="loc-swatch loc-provider"></span>wnioskowanie dostawcy</li>
+      <li><span class="loc-swatch loc-derived"></span>miejsce / obecność pochodna</li>
+      <li><span class="loc-swatch loc-declared"></span>zadeklarowane (trasa, punkt)</li>
+    </ul>
+    <p class="loc-detail" data-loc-detail></p>
+  </section>
+  <aside class="panel loc-side" aria-label="Obecność i źródła">
+    <h2>Obecność w miejscach <small data-loc-run></small></h2>
+    <p><small>Pochodna (reguła <code>place_presence.v1</code>): próbki urządzenia w geofencji prywatnego pliku miejsc. Granice wewnętrzne = pierwsza i ostatnia pasująca próbka; zewnętrzne = sąsiednie próbki.</small></p>
+    <div class="loc-scroll"><table data-loc-presence><thead><tr><th>miejsce</th><th>status</th><th>od – do (UTC)</th><th>granice zewn.</th><th>próbki</th></tr></thead><tbody></tbody></table></div>
+    <h2>Strumienie</h2>
+    <div class="loc-scroll"><table data-loc-streams><thead><tr><th>strumień</th><th>próbki</th><th>od – do</th></tr></thead><tbody>
+    {% for s in summary.streams %}<tr><td><code>{{s.stream_key}}</code></td><td>{{s.fixes}}</td><td><small>{{s.first_utc or '—'}} – {{s.last_utc or '—'}}</small></td></tr>{% else %}<tr><td colspan="3">Brak próbek. Import: <code>location-import PLIK --enable-location</code>.</td></tr>{% endfor %}
+    </tbody></table></div>
+    <h2>Importy</h2>
+    <div class="loc-scroll"><table><thead><tr><th>plik</th><th>format</th><th>parser</th><th>próbki</th><th>pokrycie</th></tr></thead><tbody>
+    {% for i in summary.imports %}<tr><td>{{i.original_name or i.artifact_id}}</td><td>{{i.format}}</td><td><code>{{i.importer}}@{{i.parser_version}}</code></td><td>{{i.counts.fixes_observed}}</td><td>{% if i.coverage and i.coverage.complete %}pełne{% elif i.coverage %}częściowe{% else %}—{% endif %}</td></tr>{% else %}<tr><td colspan="5">Brak importów.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </aside>
+</div>
+<section class="panel" aria-labelledby="loc-lanes-title">
+  <h2 id="loc-lanes-title">Pasy czasu <small>czasy z projekcji osi czasu; wąsy = przedział niepewności</small></h2>
+  <svg data-loc-lanes class="loc-lanes" role="img" aria-label="Pasy obecności, wizyt, przemieszczania i próbkowania" viewBox="0 0 1200 240"></svg>
+</section>
+<section class="panel loc-tiles" data-loc-tiles aria-labelledby="loc-tiles-title">
+  <h2 id="loc-tiles-title">Kafelki mapy (opt-in)</h2>
+  <p class="loc-warning" data-loc-tile-warning>{{ tile_warning }}</p>
+  {% if tiles %}<p data-loc-tiles-on>Kafelki włączone dla tej strony: <code>{{ tiles.template }}</code> (zgoda #{{ tiles.id }}, {{ tiles.recorded_at }}). Tylko w rzutowaniu Web Mercator. <a href="/location">Wyłącz</a></p>
+  {% else %}<p data-loc-tiles-off>Domyślnie mapa nie wysyła żadnych żądań poza ten serwer.</p>{% endif %}
+  <form data-loc-tile-form class="loc-form">
+    <label>Szablon URL (https, {z} {x} {y}) <input name="template" maxlength="500" autocomplete="off" placeholder="https://tiles.example.org/{z}/{x}/{y}.png"></label>
+    <label class="loc-check"><input type="checkbox" name="acknowledge"> rozumiem, że serwer kafelków pozna oglądany obszar</label>
+    <button type="submit">Zapisz zgodę i otwórz z kafelkami</button>
+  </form>
+</section>
+</main>
+<script type="module" src="/static/location.mjs"></script>
+</body></html>

@@ -1,0 +1,37 @@
+{
+  "schema": "ageds.importplan-detectors",
+  "version": "location.1",
+  "notice": "Location area (task L1). Structure probes on bounded prefixes; they only propose an importer. Every location importer needs the per-item opt-in enable_location. Google Takeout Records.json, Semantic Location History and on-device Timeline exports are matched by the base table (importer location_history, parser v2 since 2026-10-17).",
+  "files": [
+    {
+      "id": "location_gpx",
+      "types": ["xml"],
+      "probe": {"kind": "xml_root", "equals": ["gpx"]},
+      "candidates": [{"importer": "gpx_track", "reason": "XML root element <gpx> (GPX 1.0/1.1 tracks, routes, waypoints)"}]
+    },
+    {
+      "id": "location_kml",
+      "types": ["xml"],
+      "probe": {"kind": "xml_root", "equals": ["kml"]},
+      "candidates": [{"importer": "kml_track", "reason": "XML root element <kml> (KML placemarks, gx:Track; also doc.kml inside a KMZ)"}]
+    },
+    {
+      "id": "location_geojson",
+      "types": ["json"],
+      "probe": {"kind": "json_keys", "top": "object", "any": ["features", "geometry"], "all_text": ["\"Feature"]},
+      "candidates": [{"importer": "geojson_track", "reason": "GeoJSON Feature/FeatureCollection object"}]
+    },
+    {
+      "id": "location_ios_history",
+      "types": ["json"],
+      "probe": {"kind": "json_keys", "top": "array", "any": ["timelinePath", "visit", "activity"], "all": ["startTime"]},
+      "candidates": [{"importer": "location_history", "reason": "JSON array of timeline segments (iOS Google Maps location-history.json)"}]
+    },
+    {
+      "id": "location_fit",
+      "name_regex": "(?i).+\\.fit",
+      "probe": {"kind": "text_markers", "all": [".FIT"]},
+      "candidates": [{"importer": "fit_track", "reason": "FIT header signature .FIT (optional fitparse adapter)"}]
+    }
+  ]
+}

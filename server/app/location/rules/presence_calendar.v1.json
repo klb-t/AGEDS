@@ -1,0 +1,25 @@
+{
+  "rule_id": "presence_calendar",
+  "version": 1,
+  "kind": "location_correlation_rule",
+  "status": "released",
+  "relation": "calendar_event_during_device_presence",
+  "description": "Pairs a place presence interval (derived from device samples) with a calendar entry whose time range lies within the interval, its outer bounds or a tolerance. A hypothesis for human review: a device at a place and a calendar entry at the same time do not show that the entry happened there or that the person attended.",
+  "left": {"source": "location_presence_intervals of one presence run"},
+  "right": {"event_types": ["calendar_event"]},
+  "parameters": {
+    "tolerance_s": 900,
+    "require_inner_overlap": false,
+    "max_candidates_per_interval": 50,
+    "max_hypotheses": 100000,
+    "label_match": true
+  },
+  "criteria": {
+    "inner_overlap_s": "seconds of overlap between the calendar range [t_lo, max(t_end, t_hi)] and the interval's observed span [start, end]",
+    "inner_gap_s": "smallest distance between both ranges (0 when they overlap); the gate is inner_gap_s <= tolerance_s",
+    "within_outer_bounds": "the calendar range lies inside [outer_start, outer_end] (no sample of the stream contradicts presence)",
+    "location_text_contains_place_label": "the calendar entry's LOCATION text contains the place label (NFKC + casefold); a text match is not a geocode",
+    "time_basis": "basis of the calendar time from the timeline projection (explicit_offset, utc_epoch, assumed_zone)"
+  },
+  "probability": "none: hypotheses carry per-criterion evidence only; acceptance is a human decision"
+}

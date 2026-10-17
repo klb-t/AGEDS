@@ -132,6 +132,7 @@ function drawMap(data) {
     return;
   }
   const placeLayer = el('g', {'data-loc-places': ''});
+  const placed = [];
   for (const p of places) {
     const c = toPixel(p.lat, p.lon, view);
     const r = Math.max(2, metersToPixels(p.radius_m, p.lat, view));
@@ -139,7 +140,8 @@ function drawMap(data) {
     const g = el('g', {'data-place': p.id});
     g.appendChild(title(el('circle', {class: 'loc-place', cx: c.x, cy: c.y, r}),
       `${p.label} · promień ${formatDistance(p.radius_m)}${p.kind ? ' · ' + p.kind : ''}`));
-    g.appendChild(el('text', {class: 'loc-place-label', x: c.x + r + 4, y: c.y + 4}, p.label));
+    const pos = labelPosition(c, r, String(p.label).length * 6.5, width, height, placed);
+    g.appendChild(el('text', {class: 'loc-place-label', x: pos.x, y: pos.y, 'text-anchor': pos.anchor}, p.label));
     placeLayer.appendChild(g);
   }
   map.appendChild(placeLayer);
@@ -194,6 +196,24 @@ function drawMap(data) {
   map.appendChild(el('text', {class: 'loc-scale-label', x: 20, y: height - 26}, `≈ ${formatDistance(metres)}`));
 }
 
+/** Label beside its circle, flipped left near the right edge and nudged down past earlier labels. */
+function labelPosition(c, r, textWidth, width, height, placed) {
+  const right = c.x + r + 4 + textWidth <= width - 4;
+  const x = right ? c.x + r + 4 : Math.max(4 + textWidth, c.x - r - 4);
+  let y = Math.min(height - 6, Math.max(14, c.y + 4));
+  const left = right ? x : x - textWidth;
+  while (placed.some(b => Math.abs(b.y - y) < 14 && left < b.right && left + textWidth > b.left)) y += 14;
+  placed.push({left, right: left + textWidth, y});
+  return {x, y, anchor: right ? 'start' : 'end'};
+}
+
+function span(a, b) {
+  if (!a) return '—';
+  const day = t => t.slice(0, 10), clock = t => t.slice(11, 16);
+  if (!b) return `${day(a)} ${clock(a)}`;
+  return day(a) === day(b) ? `${day(a)} ${clock(a)}–${clock(b)}` : `${day(a)} ${clock(a)} – ${day(b)} ${clock(b)}`;
+}
+
 function showEvent(e) {
   detail.replaceChildren();
   const strong = document.createElement('strong');
@@ -228,13 +248,14 @@ function drawPresence(run) {
     tr.dataset.interval = String(i.id);
     tr.dataset.status = i.status;
     const cells = [names[i.place_id] || i.place_id, i.status === 'inside' ? 'wewnątrz' : 'niepewne',
-      `${i.start_utc} – ${i.end_utc}`, `${i.outer_start_utc || '—'} – ${i.outer_end_utc || '—'}`,
+      span(i.start_utc, i.end_utc), `${i.outer_start_utc ? span(i.outer_start_utc) : '—'} → ${i.outer_end_utc ? span(i.outer_end_utc) : '—'}`,
       `${i.fixes} (${i.inside_fixes}/${i.uncertain_fixes})`];
-    for (const text of cells) {
+    cells.forEach((text, index) => {
       const td = document.createElement('td');
       td.textContent = text;
+      if (index === 2 || index === 3) td.className = 'loc-nowrap';
       tr.appendChild(td);
-    }
+    });
     body.appendChild(tr);
   }
 }

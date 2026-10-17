@@ -36,7 +36,7 @@
   <aside class="panel loc-side" aria-label="Obecność i źródła">
     <h2>Obecność w miejscach <small data-loc-run></small></h2>
     <p><small>Pochodna (reguła <code>place_presence.v1</code>): próbki urządzenia w geofencji prywatnego pliku miejsc. Granice wewnętrzne = pierwsza i ostatnia pasująca próbka; zewnętrzne = sąsiednie próbki.</small></p>
-    <div class="loc-scroll"><table data-loc-presence><thead><tr><th>miejsce</th><th>status</th><th>od – do (UTC)</th><th>granice zewn.</th><th>próbki</th></tr></thead><tbody></tbody></table></div>
+    <div class="loc-scroll"><table data-loc-presence><thead><tr><th>miejsce</th><th>status</th><th>od–do (UTC)</th><th>granice zewn.</th><th>próbki (wewn./niep.)</th></tr></thead><tbody></tbody></table></div>
     <h2>Strumienie</h2>
     <div class="loc-scroll"><table data-loc-streams><thead><tr><th>strumień</th><th>próbki</th><th>od – do</th></tr></thead><tbody>
     {% for s in summary.streams %}<tr><td><code>{{s.stream_key}}</code></td><td>{{s.fixes}}</td><td><small>{{s.first_utc or '—'}} – {{s.last_utc or '—'}}</small></td></tr>{% else %}<tr><td colspan="3">Brak próbek. Import: <code>location-import PLIK --enable-location</code>.</td></tr>{% endfor %}

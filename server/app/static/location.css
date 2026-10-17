@@ -22,7 +22,7 @@
 .loc-declared{background:#c98500}
 .loc-detail{font-size:.82rem;color:var(--text);min-height:1.2rem;overflow-wrap:anywhere}
 .loc-side h2{font-size:1rem;margin-top:.8rem}
-.loc-scroll{max-height:260px;overflow:auto}
+.loc-scroll{max-height:260px;overflow:auto;max-width:100%}
 .loc-warning{border:1px solid var(--warning);border-radius:8px;padding:.5rem .7rem;color:var(--text);font-size:.85rem}
 .loc-check{flex-direction:row!important;gap:.4rem;align-items:center}
 .loc-check input{width:auto}
@@ -47,4 +47,9 @@
 .loc-lanes .loc-whisker{stroke-width:1.5;stroke-opacity:.8}
 .loc-lanes [data-lane-item]{cursor:pointer}
 .loc-lanes [data-lane-item]:hover .loc-bar,.loc-lanes [data-lane-item]:focus .loc-bar{fill-opacity:1;stroke:var(--text);stroke-width:1}
-@media(max-width:1100px){.loc-layout{grid-template-columns:1fr}}
+@media(max-width:1100px){.loc-layout{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){.loc-main{padding:.5rem}.loc-slider label{min-width:0}.loc-slider input{width:120px}}
+.loc-layout>*{min-width:0}
+.loc-scroll table{min-width:0}
+.loc-nowrap{white-space:nowrap;font-size:.8rem}
+[data-loc-presence] td:first-child{max-width:9rem;overflow-wrap:anywhere}

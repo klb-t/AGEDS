@@ -355,10 +355,16 @@ def _browser_fixture() -> None:  # pragma: no cover - exercised by server/tests/
         files = manifest['files']
         imported = [location.import_location_history_v2(Path(files['Takeout/Location History/Records.json']),
                                                          enable_location=True, stream='synthetic-phone'),
+                    location.import_location_history_v2(
+                        Path(files['Takeout/Location History/Semantic Location History/2024/2024_JANUARY.json']),
+                        enable_location=True, stream='synthetic-phone'),
                     gpx.import_gpx(Path(files['tracks/walk.gpx']), enable_location=True, stream='synthetic-phone')]
-        run = presence.run_presence(parse_places(PLACES), actor='browser-fixture', publish=True)
+        hostile = json.loads(json.dumps(PLACES))
+        hostile['places'][1]['label'] = 'Praca <img src=x onerror="window.__locationExecuted=1">'
+        run = presence.run_presence(parse_places(hostile), actor='browser-fixture', publish=True)
         print(json.dumps({'imports': [i['location_import_id'] for i in imported], 'presence_run': run['run_id'],
-                          'intervals': run['counts']['intervals']}), flush=True)
+                          'intervals': run['counts']['intervals'], 'hostile_label': hostile['places'][1]['label']}),
+              flush=True)
         uvicorn.run('server.app.main:app', host='127.0.0.1', port=int(os.environ['AGEDS_BROWSER_PORT']),
                     log_level='warning')
 

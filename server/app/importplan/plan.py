@@ -95,12 +95,12 @@ def _scans(db, collection_ids: list[int] | None, scan_ids: list[int] | None) -> 
 
 
 def _validate_options(options: dict) -> dict:
-    allowed = {'billing_profile_id', 'billing_profiles_path', 'recording_patterns_path'}
+    allowed = {'billing_profile_id', 'billing_profiles_path', 'recording_patterns_path', 'ledger_profiles_path'}
     unknown = set(options) - allowed
     if unknown:
         raise ValueError(f'unknown plan options: {sorted(unknown)}')
     clean = {k: v for k, v in options.items() if v not in (None, '')}
-    for key in ('billing_profiles_path', 'recording_patterns_path'):
+    for key in ('billing_profiles_path', 'recording_patterns_path', 'ledger_profiles_path'):
         if key in clean:
             path = Path(clean[key]).expanduser().resolve(strict=True)
             if not path.is_file():

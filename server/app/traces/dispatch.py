@@ -42,6 +42,9 @@ KINDS: dict[str, Kind] = {
     'linkedin': Kind('linkedin', 'import_messages_csv', _MESSAGES, True, label='LinkedIn messages.csv'),
     'documents': Kind('doc_metadata', 'import_documents', _FILE, True,
                       label='Document metadata (DOCX/XLSX/PPTX, ODF, PDF Info + XMP)'),
+    'keep': Kind('google_keep', 'import_keep', _FILE, True, label='Google Keep notes (Takeout JSON)'),
+    'browser-profile': Kind('browser_profiles', 'import_profile', _FILE | {'enable_browser_history', 'session_gap_minutes'},
+                            True, label='Local browser profile history (Chromium History, Firefox places.sqlite) - opt-in'),
     'account-activity': Kind('account_activity', 'import_account_activity', _FILE | {'enable_location'}, False,
                              label='Login/security activity (Facebook, Instagram, Google access log CSV)'),
 }

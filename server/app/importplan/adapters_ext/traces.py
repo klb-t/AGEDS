@@ -59,6 +59,21 @@ def _documents(ctx: RunContext) -> dict:
                             collection_id=ctx.collection_id)
 
 
+def _keep(ctx: RunContext) -> dict:
+    from ...importers.google_keep import import_keep
+    item = ctx.single()
+    return import_keep(item.path, source_locator=item.source_locator, original_name=item.name,
+                       collection_id=ctx.collection_id)
+
+
+def _browser_profile(ctx: RunContext) -> dict:
+    from ...importers.browser_profiles import import_profile
+    item = ctx.single()
+    return import_profile(item.path, enable_browser_history=bool(ctx.opt_ins.get('enable_browser_history')),
+                          session_gap_minutes=ctx.params.get('session_gap_minutes'), source_locator=item.source_locator,
+                          original_name=item.name, collection_id=ctx.collection_id)
+
+
 _EXPORT_LABEL = Param('export_label', False, 'logical export label (groups files of one download for cross-export identity)')
 _OWNER_NAME = Param('owner_name', False, 'account owner display name as exported (sets direction; not stored)')
 _OWNER_ID = Param('owner_id', False, 'account owner id/e-mail as exported (sets direction)')
@@ -96,4 +111,12 @@ IMPORTERS: tuple[Importer, ...] = (
                    'enable_location; no IP geolocation'),
     Importer('document_metadata', 'Metadane dokumentu (OOXML/ODF/PDF)', ('file',), _documents,
              notes='authors/tools are claims; created/modified dates as candidates with stated precision'),
+    Importer('google_keep', 'Google Keep: notatka (JSON)', ('file',), _keep,
+             notes='created/edited times in epoch microseconds; trashed/archived notes kept with flags'),
+    Importer('browser_profile', 'Profil przeglądarki: historia (opt-in)', ('file',), _browser_profile,
+             required_opt_ins=('enable_browser_history',),
+             params=(Param('session_gap_minutes', False, 'gap that splits browsing sessions (1-1440, default 30)',
+                           'int', 1, 1440),),
+             notes='reads a private copy (immutable); a -wal file next to it is not part of this unit: use the CLI on '
+                   'the profile folder to include WAL contents'),
 )

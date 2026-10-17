@@ -298,6 +298,39 @@
      "reason": "office/PDF document: embedded metadata (authors and dates are claims)"
     }
    ]
+  },
+  {
+   "id": "traces_google_keep",
+   "types": [
+    "json"
+   ],
+   "probe": {
+    "kind": "json_keys",
+    "top": "object",
+    "any": [
+     "userEditedTimestampUsec",
+     "createdTimestampUsec"
+    ]
+   },
+   "candidates": [
+    {
+     "importer": "google_keep",
+     "reason": "JSON object with Keep note timestamps (…TimestampUsec)"
+    }
+   ]
+  },
+  {
+   "id": "traces_browser_profile",
+   "types": [
+    "sqlite"
+   ],
+   "name_regex": "(?:History|places\\.sqlite)",
+   "candidates": [
+    {
+     "importer": "browser_profile",
+     "reason": "SQLite named like a Chromium History or Firefox places.sqlite (opt-in)"
+    }
+   ]
   }
  ]
 }

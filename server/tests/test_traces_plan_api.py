@@ -233,3 +233,19 @@ def test_plan_proposes_document_metadata(world):
     assert {o['status'] for o in result['items']} == {'done'}, result['items']
     statuses = {r['status'] for r in rows('SELECT status FROM trace_document_metadata')}
     assert 'parsed' in statuses
+
+
+def test_plan_keep_and_browser_profile_opt_in(world):
+    _, plan_id = scan_and_plan(world, world['corpus'] / 'keep')
+    keep = {i['name']: i for i in items_of(plan_id)}
+    assert {n for n, i in keep.items() if i['state']['importer'] == 'google_keep'} == {
+        'Zakupy.json', 'Pomysł.json', 'Kosz.json', 'Jednostki.json'}
+    _, plan_id = scan_and_plan(world, world['corpus'] / 'browsers', label='Laptop (synthetic)')
+    items = [i for i in items_of(plan_id) if i['state']['importer'] == 'browser_profile']
+    assert sorted(i['name'] for i in items) == ['History', 'History', 'places.sqlite']
+    assert all('opt_in_disabled:enable_browser_history' in i['blockers'] for i in items)
+    approve(plan_id, lambda i: i['state']['importer'] == 'browser_profile' and 'chrome-copy' in i['locator'],
+            opt_ins={'enable_browser_history': True})
+    result = execute.execute_plan(plan_id, actor='tester', temp_dir=world['tmp'] / 'work')
+    assert [o['status'] for o in result['items']] == ['done']
+    assert rows("SELECT COUNT(*) AS n FROM trace_browser_visits WHERE reading_key='immutable'")[0]['n'] == 10

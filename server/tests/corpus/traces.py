@@ -674,9 +674,123 @@ def build_documents(root: Path) -> dict:
     return {k: str(v) for k, v in files.items()}
 
 
+def build_keep(root: Path) -> dict:
+    keep = root / 'Takeout' / 'Keep'
+    usec = 1_600_000_000_000_000
+    files = {}
+    files['list'] = _json(keep / 'Zakupy.json', {
+        'color': 'YELLOW', 'isTrashed': False, 'isPinned': True, 'isArchived': False, 'title': 'Zakupy',
+        'listContent': [{'text': 'mleko', 'textHtml': '<p>mleko</p>', 'isChecked': True},
+                        {'text': 'chleb 🍞', 'isChecked': False}],
+        'labels': [{'name': 'dom'}], 'userEditedTimestampUsec': usec + 500_000_000, 'createdTimestampUsec': usec,
+        'sharees': [{'isOwner': True, 'type': 'WRITER', 'email': 'owner@example.com'},
+                    {'isOwner': False, 'type': 'WRITER', 'email': 'ala@example.org'}]}, ascii_escapes=False)
+    _write(keep / 'Zakupy.html', '<html><body>Zakupy</body></html>')
+    _write(keep / 'abc.png', png(None, b'keep'))
+    files['text'] = _json(keep / 'Pomysł.json', {
+        'color': 'DEFAULT', 'isTrashed': False, 'isPinned': False, 'isArchived': True, 'title': 'Pomysł',
+        'textContent': 'Notatka z emoji 😀 i tekstem RTL: שלום', 'textContentHtml': '<p>Notatka</p>',
+        'annotations': [{'description': '', 'source': 'WEBLINK', 'title': 'Example', 'url': 'https://example.org/x'}],
+        'attachments': [{'filePath': 'abc.png', 'mimetype': 'image/png'}, {'filePath': 'missing.jpg', 'mimetype': 'image/jpeg'}],
+        'userEditedTimestampUsec': usec + 3_600_000_000, 'createdTimestampUsec': usec + 60_000_000}, ascii_escapes=False)
+    files['trashed'] = _json(keep / 'Kosz.json', {'isTrashed': True, 'title': '', 'textContent': 'usunięta',
+                                                  'userEditedTimestampUsec': usec, 'createdTimestampUsec': usec})
+    files['wrong_unit'] = _json(keep / 'Jednostki.json', {'title': 'ms in a Usec field', 'textContent': 'x',
+                                                          'createdTimestampUsec': 1_600_000_000_000,
+                                                          'userEditedTimestampUsec': 'not a number'})
+    files['not_note'] = _json(keep / 'Labels.json', {'labels': ['dom']})
+    _write(keep / 'Labels.txt', 'dom\n')
+    return {'root': str(keep), **{k: str(v) for k, v in files.items()}}
+
+
+WEBKIT_OFFSET_S = 11_644_473_600
+
+
+def _webkit(unix_seconds: float) -> int:
+    return int(round((unix_seconds + WEBKIT_OFFSET_S) * 1_000_000))
+
+
+def build_browsers(root: Path) -> dict:
+    import shutil
+    import sqlite3
+    import tempfile
+    t0 = 1_614_592_800  # 2021-03-01T10:00:00Z
+    chrome_dir = root / 'chrome-profile' / 'Default'
+    chrome_dir.mkdir(parents=True, exist_ok=True)
+    work = Path(tempfile.mkdtemp(prefix='ageds-corpus-browser-'))
+    db_path = work / 'History'
+    connection = sqlite3.connect(db_path)
+    connection.executescript("""
+        CREATE TABLE urls(id INTEGER PRIMARY KEY, url LONGVARCHAR, title LONGVARCHAR, visit_count INTEGER DEFAULT 0,
+                          typed_count INTEGER DEFAULT 0, last_visit_time INTEGER NOT NULL DEFAULT 0, hidden INTEGER DEFAULT 0);
+        CREATE TABLE visits(id INTEGER PRIMARY KEY, url INTEGER NOT NULL, visit_time INTEGER NOT NULL, from_visit INTEGER,
+                            transition INTEGER DEFAULT 0, segment_id INTEGER, visit_duration INTEGER DEFAULT 0);
+        PRAGMA journal_mode=WAL;
+    """)
+    long_url = 'https://example.org/' + 'a' * 5000
+    connection.executemany('INSERT INTO urls(id,url,title) VALUES (?,?,?)', [
+        (1, 'https://example.org/start', 'Start'), (2, 'https://example.com/wiadomości?q=zażółć', 'Zażółć 😀'),
+        (3, 'https://ads.example.net/frame', None), (4, long_url, 'Long')])
+    connection.executemany('INSERT INTO visits(id,url,visit_time,from_visit,transition,visit_duration) VALUES (?,?,?,?,?,?)', [
+        (1, 1, _webkit(t0), 0, 1 | 0x30000000, 5_000_000),
+        (2, 2, _webkit(t0 + 600), 1, 0, 0),
+        (3, 3, _webkit(t0 + 601), 2, 3, 0),          # auto subframe: counted, not a session visit
+        (4, 4, _webkit(t0 + 1200), 2, 0, 0),
+        (5, 1, _webkit(t0 + 7200), 0, 1, 0),         # two hours later: a new session
+        (6, 99, _webkit(t0 + 7300), 5, 0, 0),        # url row missing
+        (7, 1, 0, 0, 0, 0),                          # zero placeholder
+        (8, 1, 2**62, 0, 0, 0),                      # out of range
+        (9, 1, (t0 * 1_000_000), 0, 0, 0)])          # unix microseconds written into a WebKit field
+    connection.commit()
+    connection.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+    connection.execute('PRAGMA wal_autocheckpoint=0')
+    connection.execute('INSERT INTO visits(id,url,visit_time,from_visit,transition) VALUES (10,1,?,0,1)', (_webkit(t0 + 7400),))
+    connection.commit()
+    shutil.copyfile(db_path, chrome_dir / 'History')
+    shutil.copyfile(work / 'History-wal', chrome_dir / 'History-wal')  # committed visit 10 lives only in the WAL
+    connection.close()
+    shutil.rmtree(work, ignore_errors=True)
+    nowal_dir = root / 'chrome-copy'
+    nowal_dir.mkdir(parents=True, exist_ok=True)
+    work = Path(tempfile.mkdtemp(prefix='ageds-corpus-browser-'))
+    shutil.copyfile(chrome_dir / 'History', work / 'History')
+    shutil.copyfile(chrome_dir / 'History-wal', work / 'History-wal')
+    merged = sqlite3.connect(work / 'History')
+    merged.execute('PRAGMA journal_mode=DELETE')
+    merged.close()
+    shutil.copyfile(work / 'History', nowal_dir / 'History')
+    shutil.rmtree(work, ignore_errors=True)
+    firefox = root / 'firefox-profile' / 'abcd1234.default-release'
+    firefox.mkdir(parents=True, exist_ok=True)
+    connection = sqlite3.connect(firefox / 'places.sqlite')
+    connection.executescript("""
+        CREATE TABLE moz_places(id INTEGER PRIMARY KEY, url LONGVARCHAR, title LONGVARCHAR, rev_host LONGVARCHAR,
+                                visit_count INTEGER DEFAULT 0, hidden INTEGER DEFAULT 0 NOT NULL, typed INTEGER DEFAULT 0 NOT NULL,
+                                frecency INTEGER DEFAULT -1 NOT NULL, last_visit_date INTEGER, guid TEXT);
+        CREATE TABLE moz_historyvisits(id INTEGER PRIMARY KEY, from_visit INTEGER, place_id INTEGER, visit_date INTEGER,
+                                       visit_type INTEGER, session INTEGER, source INTEGER DEFAULT 0 NOT NULL);
+    """)
+    connection.executemany('INSERT INTO moz_places(id,url,title) VALUES (?,?,?)', [
+        (1, 'https://example.org/ff', 'Firefox start'), (2, 'https://cdn.example.net/embed', None)])
+    connection.executemany('INSERT INTO moz_historyvisits(id,from_visit,place_id,visit_date,visit_type) VALUES (?,?,?,?,?)', [
+        (1, 0, 1, t0 * 1_000_000, 2), (2, 1, 2, t0 * 1_000_000 + 1, 4), (3, 0, 1, (t0 + 60) * 1_000_000, 1),
+        (4, 0, 1, t0 * 1000, 1)])  # milliseconds written into a PRTime (µs) field
+    connection.commit()
+    connection.close()
+    other = root / 'other.sqlite'
+    connection = sqlite3.connect(other)
+    connection.execute('CREATE TABLE t(x)')
+    connection.commit()
+    connection.close()
+    return {'chrome_dir': str(chrome_dir), 'chrome_history': str(chrome_dir / 'History'),
+            'chrome_nowal': str(nowal_dir / 'History'), 'firefox_dir': str(firefox),
+            'firefox_places': str(firefox / 'places.sqlite'), 'other_sqlite': str(other), 't0': t0}
+
+
 def build(root: Path) -> dict:
     return {'photos': build_photos(root / 'photos'), 'facebook': build_facebook(root / 'facebook'),
             'telegram': build_telegram(root / 'telegram'), 'google_chat': build_google_chat(root / 'google_chat'),
             'x': build_x(root / 'x'), 'linkedin': build_linkedin(root / 'linkedin'),
             'account_activity': build_account_activity(root / 'account_activity'),
-            'documents': build_documents(root / 'documents')}
+            'documents': build_documents(root / 'documents'), 'keep': build_keep(root / 'keep'),
+            'browsers': build_browsers(root / 'browsers')}

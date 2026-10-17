@@ -165,12 +165,21 @@ def _browser_history(ctx: RunContext) -> dict:
 
 
 def _location(ctx: RunContext) -> dict:
-    from ..importers.location import import_location_history
+    # Since 2026-10-17 (location area L1): parser version 2 (raw samples, provider inferences, streaming).
+    # An item that still carries the version-1 parameter ``coarse_decimals`` runs version 1 unchanged.
+    from ..importers.location import import_location_history, import_location_history_v2
     item = ctx.single()
-    decimals = ctx.params.get('coarse_decimals', 2)
-    return import_location_history(item.path, enable_location=bool(ctx.opt_ins.get('enable_location')),
-                                   coarse_decimals=int(decimals), source_locator=item.source_locator,
-                                   original_name=item.name, collection_id=ctx.collection_id)
+    enable = bool(ctx.opt_ins.get('enable_location'))
+    if ctx.params.get('coarse_decimals') is not None:
+        return import_location_history(item.path, enable_location=enable,
+                                       coarse_decimals=int(ctx.params['coarse_decimals']),
+                                       source_locator=item.source_locator, original_name=item.name,
+                                       collection_id=ctx.collection_id)
+    decimals = ctx.params.get('store_decimals')
+    return import_location_history_v2(item.path, enable_location=enable,
+                                      store_decimals=int(decimals) if decimals is not None else None,
+                                      stream=ctx.params.get('stream') or None, source_locator=item.source_locator,
+                                      original_name=item.name, collection_id=ctx.collection_id)
 
 
 def _billing(ctx: RunContext) -> dict:
@@ -222,7 +231,12 @@ IMPORTERS: dict[str, Importer] = {i.key: i for i in (
              required_opt_ins=('enable_browser_history',)),
     Importer('location_history', 'Historia lokalizacji (opt-in)', ('file',), _location,
              required_opt_ins=('enable_location',),
-             params=(Param('coarse_decimals', False, 'rounding of coordinates (0-4 decimals, default 2)', 'int', 0, 4),)),
+             params=(Param('store_decimals', False, 'parser v2: stored coordinate precision (0-9 decimals; default: '
+                           'as the source states it)', 'int', 0, 9),
+                     Param('stream', False, 'parser v2: device/account stream key for deduplication'),
+                     Param('coarse_decimals', False, 'parser v1 compatibility: when set, the coarse v1 importer runs '
+                           '(0-4 decimals)', 'int', 0, 4)),
+             notes='parser v2 (2026-10-17): raw samples + provider inferences; coarse_decimals selects v1'),
     Importer('billing', 'Billing operatora', ('file',), _billing,
              params=(Param('profile_id', True, 'explicit billing profile id', 'choice'),)),
     Importer('whatsapp_export', 'Eksport WhatsApp', ('archive', 'directory'), _whatsapp,

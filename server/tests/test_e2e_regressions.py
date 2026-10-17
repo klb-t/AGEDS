@@ -89,7 +89,9 @@ def test_budget_method_record_names_the_rule_that_placed_the_items(database):
                                 zone=activity.ZONE)
     rule = load_rule(None, kind='display_rule')
     method, source = new['result']['method'], new['result']['input']
-    assert method['rule'] == 'time_budget.v3' and 'time_budget.v1' in method['rule_history']
+    # v4 (2026-10-17, location area L1) only changes provider-inferred/derived items; v1-v3 stay in the history.
+    assert method['rule'] == budget.RULE == 'time_budget.v4'
+    assert {'time_budget.v1', 'time_budget.v3'} <= set(method['rule_history'])
     assert method['seam'] == source['seam'] == 'timeline'
     assert method['source_rule'] == source['source_rule'] == f'{rule.rule_id}@{rule.version}'
     assert method['source_rule_sha256'] == source['source_rule_sha256'] == rule.sha256

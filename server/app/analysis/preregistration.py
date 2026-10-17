@@ -44,7 +44,15 @@ ANALYSIS_DEFAULTS = {
     'control_period_s': 86400,
     'flag_threshold': 0.05,
     'density_ratio_warning': 1.5,
+    # Since 2026-10-17 (digital traces, location area L1): passive high-frequency samples (location
+    # sampling sessions, place presence) would inflate documentation density by orders of magnitude, so
+    # new definitions exclude metadata.signal.class=passive from the density set by default. Definitions
+    # registered earlier lack the key and keep their stored behaviour (no class excluded); see
+    # eventstudy.effective_parameters and docs/HYPOTHESES.md.
+    'density_excludes_signal_classes': ['passive'],
 }
+SIGNAL_CLASSES = ('passive', 'active', 'declared')
+LEGACY_DENSITY_SIGNAL_CLASSES: list = []
 MAX_PERMUTATIONS = 100_000
 MAX_SEED = 2**63 - 1
 MAX_ABS_SECONDS = 10 * 366 * 86400
@@ -154,6 +162,10 @@ def _analysis(value) -> dict:
         'flag_threshold': _number(merged['flag_threshold'], 'analysis.flag_threshold', 0, 1),
         'density_ratio_warning': _number(merged['density_ratio_warning'], 'analysis.density_ratio_warning', 1, 1e6),
     }
+    classes = merged['density_excludes_signal_classes']
+    if not isinstance(classes, list) or any(c not in SIGNAL_CLASSES for c in classes):
+        raise HypothesisError('analysis.density_excludes_signal_classes must be a list of ' + ', '.join(SIGNAL_CLASSES))
+    result['density_excludes_signal_classes'] = sorted(set(classes))
     rule = merged['assumption_rule']
     if result['assume_zone'] is not None:
         result['assumption_rule'] = clean_text(rule, 'analysis.assumption_rule (named assumption required with assume_zone)',

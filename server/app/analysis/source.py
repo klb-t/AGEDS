@@ -131,6 +131,19 @@ def _wav_duration(db: sqlite3.Connection, artifact_id: int, cache: dict) -> floa
     return duration
 
 
+def _signal_keys(metadata: dict) -> dict:
+    """Additive keys from the digital-traces contract (location area L1, 2026-10-17).
+
+    ``signal``: ``{'class', 'basis'}`` from ``metadata.signal`` (passive/active/declared;
+    raw_sample/provider_inference/provider_user_edit/derived) or None; ``place_ids``:
+    private place ids an event refers to (``metadata.place.id`` of ``place_presence``).
+    """
+    signal = metadata.get('signal') if isinstance(metadata.get('signal'), dict) else None
+    place = metadata.get('place') if isinstance(metadata.get('place'), dict) else None
+    return {'signal': {'class': signal.get('class'), 'basis': signal.get('basis')} if signal else None,
+            'place_ids': [place['id']] if place and isinstance(place.get('id'), str) else []}
+
+
 def _describe(db: sqlite3.Connection, e: sqlite3.Row, fields: bool) -> dict:
     """Item keys that do not depend on the time choice."""
     metadata = json.loads(e['metadata_json'] or '{}')
@@ -147,6 +160,7 @@ def _describe(db: sqlite3.Connection, e: sqlite3.Row, fields: bool) -> dict:
                  'conversation_id': chat.get('conversation_id'), 'model': chat.get('model')} if chat else None,
         'declared_duration_s': declared,
         'duration_basis': 'source_declared' if declared is not None else None,
+        **_signal_keys(metadata),
     }
     if fields:
         body = e['body']
@@ -297,6 +311,7 @@ def _enrich(db: sqlite3.Connection, items: list[dict], fields: bool, media_durat
             item['end_basis'] = {'kind': 'end', 'source': 'display_rule_end'} if item['t_end'] is not None else None
             item['declared_duration_s'] = declared
             item['duration_basis'] = 'source_declared' if declared is not None else None
+            item.update(_signal_keys(metadata))
             if declared is None and item['t_end'] is None and media_durations and item.get('artifact_id'):
                 wav = _wav_duration(db, item['artifact_id'], wav_cache)
                 if wav is not None:
@@ -322,7 +337,8 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
     timeline keys t_lo, t_hi, basis, candidate_ref, hidden; E1 keys chat,
     end_basis, declared_duration_s, duration_basis and, with ``fields=True``,
     ``fields`` (sender, recipients, subject, contact_label, phone_or_address and the
-    first ``FIELD_BODY_CHARS`` characters of body with ``body_truncated``).
+    first ``FIELD_BODY_CHARS`` characters of body with ``body_truncated``); additive
+    since 2026-10-17 (digital traces): ``signal`` and ``place_ids`` (``_signal_keys``).
 
     ``refresh=False`` is for read-only snapshots (reports): the timeline projection is
     not refreshed (no write); a stale projection raises

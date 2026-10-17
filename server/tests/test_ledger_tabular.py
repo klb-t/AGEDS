@@ -322,3 +322,15 @@ def test_profiles_are_labelled_examples_and_validated(tmp_path):
                                              'number': {'decimal': ',', 'thousands': [',']}}]}))
     with pytest.raises(ValueError, match='decimal separator'):
         tp.load_profiles(bad)
+
+
+def test_corpus_part_is_registered_and_privacy_safe(tmp_path):
+    from server.tests.corpus import PARTS, build_corpus
+    assert 'ledger' in PARTS
+    manifest = build_corpus(tmp_path, ('ledger',))['ledger']
+    assert manifest['ibans']['invalid'].startswith('NL00')
+    import re
+    text = ''.join(p.read_bytes().decode('latin-1') for p in tmp_path.rglob('*') if p.is_file())
+    assert not re.search(r'[A-Za-z0-9._%+-]+@(?!example\.(?:org|com|net))[A-Za-z0-9-]+\.[A-Za-z]{2,}', text)
+    for value in manifest['ibans'].values():
+        assert 'XXXX' in value or value[4:].startswith('0000')  # fictional bank codes only

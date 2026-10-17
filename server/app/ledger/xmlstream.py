@@ -70,10 +70,12 @@ def _split(name: str) -> tuple[str | None, str]:
     return None, name
 
 
-def stream(path: Path, want: Callable[[str, str | None], bool], *, allow_internal_dtd: bool = False,
+def stream(path, want: Callable[[str, str | None], bool], *, allow_internal_dtd: bool = False,
            max_depth: int = 64, max_subtree_nodes: int = 20_000, max_text_chars: int = 65_536,
            markers: frozenset = frozenset()) -> Iterator[tuple]:
-    """Yield ``('root', tag, ns)``, ``('start', tag, attrib)`` for marker tags, ``('end', tag)`` and
+    """``path`` is a file path or a binary stream (e.g. a zip member).
+
+    Yield ``('root', tag, ns)``, ``('start', tag, attrib)`` for marker tags, ``('end', tag)`` and
     ``('node', Node, parent_tag)`` for every wanted subtree (outermost only), in document order."""
     parser = expat.ParserCreate(namespace_separator=' ')
     parser.SetParamEntityParsing(expat.XML_PARAM_ENTITY_PARSING_NEVER)
@@ -145,7 +147,9 @@ def stream(path: Path, want: Callable[[str, str | None], bool], *, allow_interna
     parser.StartElementHandler = start
     parser.EndElementHandler = end
     parser.CharacterDataHandler = chars
-    with path.open('rb') as handle:
+    from contextlib import nullcontext
+    opener = nullcontext(path) if hasattr(path, 'read') else Path(path).open('rb')
+    with opener as handle:
         while True:
             chunk = handle.read(CHUNK)
             try:

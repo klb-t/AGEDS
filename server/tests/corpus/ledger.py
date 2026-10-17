@@ -242,15 +242,176 @@ def _mt940(root: Path) -> dict:
             'no_fields': _write(root / 'not_mt940.txt', 'just a note\n', 'ascii')}
 
 
+APPLE_DTD = """<!DOCTYPE HealthData [
+<!ELEMENT HealthData (ExportDate,Me,(Record|Correlation|Workout|ActivitySummary)*)>
+<!ATTLIST HealthData locale CDATA #REQUIRED>
+<!ATTLIST Record type CDATA #REQUIRED unit CDATA #IMPLIED value CDATA #IMPLIED sourceName CDATA #REQUIRED device CDATA "DEFAULT-DEVICE-FROM-DTD">
+]>"""
+
+
+def _apple_record(kind, start, end, value=None, unit=None, source='Example Phone', device=None, extra='', inner=''):
+    attrs = f'type="{kind}" sourceName="{source}" sourceVersion="17.0"'
+    if device:
+        attrs += f' device="{device}"'
+    if unit:
+        attrs += f' unit="{unit}"'
+    attrs += f' creationDate="{end}" startDate="{start}" endDate="{end}"'
+    if value is not None:
+        attrs += f' value="{value}"'
+    return f' <Record {attrs}{extra}>{inner}</Record>\n' if inner else f' <Record {attrs}{extra}/>\n'
+
+
+SLEEP = 'HKCategoryTypeIdentifierSleepAnalysis'
+WATCH = '&lt;&lt;HKDevice: 0x0&gt;, name:Example Watch, manufacturer:Example&gt;'
+
+
+def apple_export(extra_records: str = '') -> str:
+    v = 'HKCategoryValueSleepAnalysis'
+    body = [
+        ' <ExportDate value="2024-04-01 12:00:00 +0200"/>\n',
+        ' <Me HKCharacteristicTypeIdentifierDateOfBirth="" HKCharacteristicTypeIdentifierBiologicalSex="HKBiologicalSexNotSet"/>\n',
+        _apple_record('HKQuantityTypeIdentifierStepCount', '2024-03-30 10:00:00 +0100', '2024-03-30 10:05:00 +0100', '120', 'count'),
+        _apple_record('HKQuantityTypeIdentifierHeartRate', '2024-03-31 01:59:00 +0100', '2024-03-31 03:01:00 +0200', '61.5',
+                      'count/min', 'Example Watch', WATCH,
+                      inner='<MetadataEntry key="HKMetadataKeyHeartRateMotionContext" value="0"/>'),
+        _apple_record('HKQuantityTypeIdentifierBodyMass', '2024-03-30 08:00:00 +0100', '2024-03-30 08:00:00 +0100', '70.25',
+                      'kg', inner='<MetadataEntry key="HKWasUserEntered" value="1"/>'),
+        _apple_record('HKQuantityTypeIdentifierRestingHeartRate', '2024-03-30 00:00:00 +0100', '2024-03-30 23:59:00 +0100',
+                      '55', 'count/min', 'Example Watch', WATCH),
+        _apple_record('HKQuantityTypeIdentifierStepCount', '2024-03-30 12:00:00 +0100', '2024-03-30 11:00:00 +0100', '5', 'count'),
+        _apple_record('HKQuantityTypeIdentifierStepCount', 'yesterday', '2024-03-30 11:00:00 +0100', '5', 'count'),
+        # night 1, watch: stages across the DST change (02:00 +01:00 -> 03:00 +02:00)
+        _apple_record(SLEEP, '2024-03-30 23:00:00 +0100', '2024-03-31 07:30:00 +0200', f'{v}InBed', None, 'Example Watch', WATCH),
+        _apple_record(SLEEP, '2024-03-30 23:20:00 +0100', '2024-03-31 01:50:00 +0100', f'{v}AsleepCore', None, 'Example Watch', WATCH),
+        _apple_record(SLEEP, '2024-03-31 01:50:00 +0100', '2024-03-31 03:40:00 +0200', f'{v}AsleepREM', None, 'Example Watch', WATCH),
+        _apple_record(SLEEP, '2024-03-31 03:40:00 +0200', '2024-03-31 05:00:00 +0200', f'{v}AsleepDeep', None, 'Example Watch', WATCH),
+        _apple_record(SLEEP, '2024-03-31 05:00:00 +0200', '2024-03-31 05:05:00 +0200', f'{v}Awake', None, 'Example Watch', WATCH),
+        _apple_record(SLEEP, '2024-03-31 05:05:00 +0200', '2024-03-31 07:20:00 +0200', f'{v}AsleepCore', None, 'Example Watch', WATCH),
+        # night 1, phone: overlapping in-bed estimate from a second device
+        _apple_record(SLEEP, '2024-03-30 23:10:00 +0100', '2024-03-31 07:00:00 +0200', f'{v}InBed', None, 'Example Phone'),
+        # night 2, watch: separated by more than the session gap
+        _apple_record(SLEEP, '2024-03-31 23:30:00 +0200', '2024-04-01 06:30:00 +0200', f'{v}AsleepUnspecified', None,
+                      'Example Watch', WATCH),
+        ' <Correlation type="HKCorrelationTypeIdentifierBloodPressure" sourceName="Example Cuff" startDate="2024-03-30 09:00:00 +0100" endDate="2024-03-30 09:00:00 +0100">\n'
+        + _apple_record('HKQuantityTypeIdentifierBloodPressureSystolic', '2024-03-30 09:00:00 +0100', '2024-03-30 09:00:00 +0100', '120', 'mmHg', 'Example Cuff')
+        + _apple_record('HKQuantityTypeIdentifierBloodPressureDiastolic', '2024-03-30 09:00:00 +0100', '2024-03-30 09:00:00 +0100', '80', 'mmHg', 'Example Cuff')
+        + ' </Correlation>\n',
+        ' <Workout workoutActivityType="HKWorkoutActivityTypeRunning" duration="30.5" durationUnit="min" totalDistance="5.01" '
+        'totalDistanceUnit="km" totalEnergyBurned="320" totalEnergyBurnedUnit="kcal" sourceName="Example Watch" sourceVersion="10.1" '
+        f'device="{WATCH}" creationDate="2024-03-30 18:31:00 +0100" startDate="2024-03-30 18:00:00 +0100" endDate="2024-03-30 18:30:30 +0100">\n'
+        '  <MetadataEntry key="HKIndoorWorkout" value="0"/>\n'
+        '  <WorkoutEvent type="HKWorkoutEventTypePause" date="2024-03-30 18:10:00 +0100" duration="0.5" durationUnit="min"/>\n'
+        '  <WorkoutStatistics type="HKQuantityTypeIdentifierHeartRate" startDate="2024-03-30 18:00:00 +0100" endDate="2024-03-30 18:30:30 +0100" average="150.25" minimum="120" maximum="171" unit="count/min"/>\n'
+        '  <WorkoutStatistics type="HKQuantityTypeIdentifierActiveEnergyBurned" startDate="2024-03-30 18:00:00 +0100" endDate="2024-03-30 18:30:30 +0100" sum="320" unit="kcal"/>\n'
+        '  <WorkoutRoute sourceName="Example Watch"><FileReference path="/workout-routes/route_2024-03-30.gpx"/></WorkoutRoute>\n'
+        ' </Workout>\n',
+        ' <Workout workoutActivityType="HKWorkoutActivityTypeYoga" duration="20" durationUnit="min" sourceName="Example Phone" '
+        'creationDate="2024-03-31 19:00:00 +0200" startDate="2024-03-31 18:40:00 +0200" endDate="2024-03-31 19:00:00 +0200">'
+        '<MetadataEntry key="HKWasUserEntered" value="1"/></Workout>\n',
+        ' <ActivitySummary dateComponents="2024-03-30" activeEnergyBurned="512.5" activeEnergyBurnedGoal="500" '
+        'activeEnergyBurnedUnit="kcal" appleExerciseTime="35" appleExerciseTimeGoal="30" appleStandHours="11" appleStandHoursGoal="12"/>\n',
+        extra_records,
+    ]
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' + APPLE_DTD + '\n<HealthData locale="en_NL">\n' + ''.join(body) + '</HealthData>\n'
+
+
+def _health(root: Path) -> dict:
+    import zipfile
+    apple = root / 'apple'
+    apple.mkdir(exist_ok=True)
+    out = {'export': _write(apple / 'export.xml', apple_export(), 'utf-8')}
+    with zipfile.ZipFile(apple / 'export.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr('apple_health_export/export.xml', apple_export())
+        archive.writestr('apple_health_export/export_cda.xml', '<ClinicalDocument/>')
+    out['zip'] = str(apple / 'export.zip')
+    out['entity'] = _write(apple / 'entity.xml', '<?xml version="1.0"?>\n<!DOCTYPE HealthData [<!ENTITY lol "lol">]>\n'
+                           '<HealthData locale="x">&lol;</HealthData>\n', 'utf-8')
+    out['external_dtd'] = _write(apple / 'external.xml', '<?xml version="1.0"?>\n<!DOCTYPE HealthData SYSTEM '
+                                 '"http://example.org/health.dtd">\n<HealthData locale="x"/>\n', 'utf-8')
+    fit = root / 'Takeout' / 'Fit'
+    (fit / 'All Sessions').mkdir(parents=True, exist_ok=True)
+    (fit / 'Daily activity metrics').mkdir(parents=True, exist_ok=True)
+    sleep_session = {'fitnessActivity': 'sleep', 'startTime': '2024-03-30T22:00:00.000Z', 'endTime': '2024-03-31T05:30:00.000Z',
+                     'duration': '27000s', 'segment': [
+                         {'fitnessActivity': 'sleep.light', 'startTime': '2024-03-30T22:00:00.000Z', 'endTime': '2024-03-31T01:00:00.000Z'},
+                         {'fitnessActivity': 'sleep.deep', 'startTime': '2024-03-31T01:00:00.000Z', 'endTime': '2024-03-31T05:30:00.000Z'}],
+                     'aggregate': [{'metricName': 'com.google.calories.expended', 'floatValue': 0.1}]}
+    walk = ('{"fitnessActivity": "walking", "startTime": "2024-03-30T17:00:00.000Z", "endTime": "2024-03-30T17:30:03.512Z", '
+            '"duration": "1700s", "aggregate": [{"metricName": "com.google.calories.expended", "floatValue": 65.12345678901234567}, '
+            '{"metricName": "com.google.step_count.delta", "intValue": 3012}], "application": {"packageName": "com.example.fit"}}')
+    google = {
+        'sleep': _write(fit / 'All Sessions' / '2024-03-30T23_00_00+01_00_SLEEP.json', json.dumps(sleep_session), 'utf-8'),
+        'walk': _write(fit / 'All Sessions' / '2024-03-30T18_00_00+01_00_WALKING.json', walk, 'utf-8'),
+        'daily': _write(fit / 'Daily activity metrics' / 'Daily activity metrics.csv',
+                        'Date,Move Minutes count,Calories (kcal),Distance (m),Low latitude (deg),Low longitude (deg),Step count\n'
+                        '2024-03-30,45,1850.123,3500.5,52.0000,4.0000,6012\n2024-03-31,,1700,,,,\n', 'utf-8'),
+        'intervals': _write(fit / 'Daily activity metrics' / '2024-03-31.csv',
+                            'Start time,End time,Move Minutes count,Step count\n'
+                            '01:45:00.000+01:00,02:00:00.000+01:00,1,20\n03:00:00.000+02:00,03:15:00.000+02:00,,15\n', 'utf-8'),
+    }
+    samsung_dir = root / 'Samsung Health'
+    samsung_dir.mkdir(exist_ok=True)
+    prefix = 'com.samsung.health.sleep.'
+    samsung = {
+        'sleep': _write(samsung_dir / 'com.samsung.shealth.sleep.20240401120000.csv',
+                        'com.samsung.shealth.sleep,6315006,3\n'
+                        f'{prefix}start_time,{prefix}end_time,{prefix}time_offset,{prefix}deviceuuid,{prefix}datauuid,efficiency,sleep_score,\n'
+                        '2024-03-30 22:05:00.000,2024-03-31 05:25:00.000,UTC+0100,device-0001,uuid-0001,91.5,82,\n'
+                        '2024-03-31 21:40:00.000,2024-04-01 04:50:00.000,UTC+0200,device-0001,uuid-0002,88,,\n'
+                        '2024-04-01 21:40:00.000,2024-04-02 04:50:00.000,CET,device-0002,uuid-0003,,,\n', 'utf-8'),
+        'exercise': _write(samsung_dir / 'com.samsung.shealth.exercise.20240401120000.csv',
+                           'com.samsung.shealth.exercise,6315003,5\n'
+                           'com.samsung.health.exercise.start_time,com.samsung.health.exercise.end_time,'
+                           'com.samsung.health.exercise.time_offset,com.samsung.health.exercise.exercise_type,'
+                           'com.samsung.health.exercise.duration,com.samsung.health.exercise.distance,'
+                           'com.samsung.health.exercise.calorie,com.samsung.health.exercise.deviceuuid,'
+                           'com.samsung.health.exercise.datauuid\n'
+                           '2024-03-30 17:00:00.000,2024-03-30 17:30:00.000,UTC+0100,1002,1800000,5010.5,320.25,device-0001,uuid-e1\n',
+                           'utf-8'),
+        'steps': _write(samsung_dir / 'com.samsung.shealth.step_daily_trend.20240401120000.csv',
+                        'com.samsung.shealth.step_daily_trend,6315002,4\n'
+                        'day_time,count,distance,calorie,deviceuuid,datauuid\n1711756800000,6012,4500.25,250.5,device-0001,uuid-s1\n',
+                        'utf-8'),
+        'unmapped': _write(samsung_dir / 'com.samsung.health.weight.20240401120000.csv',
+                           'com.samsung.health.weight,6315001,1\nstart_time,weight\n2024-03-30 07:00:00.000,70.1\n', 'utf-8'),
+        'not_samsung': _write(samsung_dir / 'plain.csv', 'a,b\n1,2\n', 'utf-8'),
+    }
+    fitbit_dir = root / 'Takeout' / 'Fitbit' / 'Global Export Data'
+    fitbit_dir.mkdir(parents=True, exist_ok=True)
+    sleep_logs = [
+        {'logId': 1001, 'dateOfSleep': '2024-03-31', 'startTime': '2024-03-30T23:10:00.000', 'endTime': '2024-03-31T07:00:30.000',
+         'duration': 28230000, 'minutesToFallAsleep': 0, 'minutesAsleep': 420, 'minutesAwake': 50, 'timeInBed': 470,
+         'efficiency': 92, 'type': 'stages', 'infoCode': 0, 'logType': 'auto_detected', 'mainSleep': True,
+         'levels': {'summary': {'deep': {'count': 3, 'minutes': 80}},
+                    'data': [{'dateTime': '2024-03-30T23:10:00.000', 'level': 'wake', 'seconds': 600},
+                             {'dateTime': '2024-03-30T23:20:00.000', 'level': 'light', 'seconds': 3600}],
+                    'shortData': [{'dateTime': '2024-03-31T02:00:00.000', 'level': 'wake', 'seconds': 60}]}},
+        {'logId': 1002, 'dateOfSleep': '2024-03-31', 'startTime': '2024-03-31T14:00:00.000', 'endTime': '2024-03-31T14:30:00.000',
+         'duration': 1800000, 'minutesAsleep': 30, 'type': 'classic', 'logType': 'manual', 'mainSleep': False, 'levels': {}},
+    ]
+    exercise_logs = ('[{"logId": 2001, "activityName": "Walk", "activityTypeId": 90013, "startTime": "03/30/24 18:00:00", '
+                     '"duration": 1800000, "activeDuration": 1800000, "logType": "auto_detected", "steps": 3000, '
+                     '"calories": 150, "distance": 2.12345678901234567, "distanceUnit": "Kilometer", "averageHeartRate": 101}, '
+                     '{"logId": 2002, "activityName": "Yoga", "startTime": "03/31/24 07:00:00", "duration": "oops", '
+                     '"logType": "manual"}]')
+    fitbit = {'sleep': _write(fitbit_dir / 'sleep-2024-03-30.json', json.dumps(sleep_logs), 'utf-8'),
+              'exercise': _write(fitbit_dir / 'exercise-0.json', exercise_logs, 'utf-8')}
+    return {'apple': out, 'apple_expect': {'records': 16, 'workouts': 2, 'sleep_samples': 8, 'sleep_sessions': 3},
+            'google_fit': google, 'samsung': samsung, 'fitbit': fitbit}
+
+
 def build(root: Path) -> dict:
     root.mkdir(parents=True, exist_ok=True)
     tables = root / 'tables'
     tables.mkdir(exist_ok=True)
     statements = root / 'statements'
     statements.mkdir(exist_ok=True)
+    health_root = root / 'health'
+    health_root.mkdir(exist_ok=True)
     manifest = {
         'bank_pl': _bank_pl(tables), 'bank_nl': _bank_nl(tables), 'bank_dc': _bank_dc(tables),
         'transit': _transit(tables), 'rides': _rides(tables), 'camt': _camt(statements), 'mt940': _mt940(statements),
+        'health': _health(health_root),
         'ibans': {'nl_a': IBAN_NL_A, 'nl_b': IBAN_NL_B, 'pl_a': IBAN_PL_A, 'pl_b': IBAN_PL_B, 'invalid': IBAN_INVALID},
     }
     (root / 'manifest.json').write_text(json.dumps(manifest, indent=1, ensure_ascii=False), encoding='utf-8')

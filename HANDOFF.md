@@ -30,11 +30,11 @@ templates and corpus part through the registries in
 
 | Check | Evidence |
 |---|---|
-| Backend | Full `pytest server/tests`: see the latest receipt in [validation](docs/validation/README.md) (1074 passed, 1 opt-in skip at `3ae1b24`, before the second review's fixes). |
+| Backend | Full `pytest server/tests` at `6023d0f`: 1206 passed, 1 opt-in skip (chat scale), 764 subtests. |
 | JavaScript | `node --test server/tests/js/*.test.mjs`: 127 passed. |
-| Browser | Real Chromium: acceptance, timeline, workbench, reports, time budget, hypotheses, import plan, media scripts and the catalog page check (86 PASS lines at `be61c3b`). |
+| Browser | Real Chromium on the R2 head: acceptance 24, timeline 8, workbench 9, reports 10, time budget 9, hypotheses 10, import plan 9, media 7 PASS; catalog page check passed. |
 | End to end | [ACCEPTANCE](docs/ACCEPTANCE.md): one run of the real CLI and service on a generated multi-device layout; 19 of 22 criteria met, 3 not verifiable by a run (covered by suites or by change-set/documentation properties). |
-| Reviews | Two adversarial reviews; findings fixed with regression tests ([first](docs/validation/REVIEW_FIXES_2026-10-16.md); second in `REVIEW2_FIXES_2026-10-16`). |
+| Reviews | Two adversarial reviews (13 + 13 confirmed findings, plus plausible ones verified); all fixed with regression tests: [first](docs/validation/REVIEW_FIXES_2026-10-16.md), [second](docs/validation/REVIEW2_FIXES_2026-10-16.md). Event study is method v2 and time budget `time_budget.v3`; earlier stored runs remain as historical records. |
 | Privacy | `scripts/verify_repository.py` flags e-mails outside example domains, phone-like numbers outside fictional ranges and home-directory paths in tracked files. |
 
 ## Concrete remaining boundaries

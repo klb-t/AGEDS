@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "project": "AGEDS",
-  "state_id": "AGEDS-STATE-20261016-001",
-  "updated_at": "2026-10-16T19:48:46.914244+00:00",
+  "state_id": "AGEDS-STATE-20261017-001",
+  "updated_at": "2026-10-17T07:20:05.348593+00:00",
   "based_on_remote_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
   "local_branch": "ccr-d25c3cb3-qgbhql",
-  "status_summary": "Evidence Timeline & Analysis increment started on 9c1d513: Etap 0 report and F0 extension foundation; parallel tracks A-H claimed with disjoint file scopes.",
+  "status_summary": "Evidence Timeline & Analysis increment integrated on ccr-d25c3cb3-qgbhql (draft PR #6): catalog, import plan, chat/communication importers, timeline, multilingual ASR adapters, time budget, hypotheses, reports, read API + adapters, workbench; two adversarial reviews fixed; e2e acceptance 19/22 met, 3 not verifiable by a run. Full suite 1206 passed at 6023d0f. No real inference, real exports or Android execution in this session.",
   "history": {
     "overnight_ledger": "coordination/archive/2026-09-30_2026-10-01/night-20261001.json",
     "original_tasks": 82,
@@ -26,21 +26,22 @@
   "coordination": {
     "transport": "repository_commits_and_stable_ids",
     "state_editor": "coordinator",
-    "active_claim": "AGEDS-TASK-20261016 tracks (this session)",
+    "active_claim": null,
     "scope": "AGEDS only",
     "ci": "manual workflow_dispatch only",
     "history_is_not_active_schedule": true,
     "plan": "docs/plans/EVIDENCE_TIMELINE_2026-10-16.md"
   },
   "publication": {
-    "status": "published_main",
+    "status": "draft_pr_open",
     "changes_published": true,
     "accepted_source_commit": "b8617575e1dce6c36586ced09623f74b97398e7e",
     "reviewed_local_head": "4725857535ff9024fd242261f3441d79cf187cc4",
     "source_tree": "fa124ba76c3391586bf891634861ed55db8ed2a0",
-    "pull_request": 5,
+    "pull_request": 6,
     "source_commit_map": "coordination/publication-20261002.json",
-    "initial_review_concern_resolved": "New-content and historical provenance review completed; matched case identifiers removed from current files, no new sensitive content found in reviewed additions. Preexisting history preserved."
+    "initial_review_concern_resolved": "New-content and historical provenance review completed; matched case identifiers removed from current files, no new sensitive content found in reviewed additions. Preexisting history preserved.",
+    "branch": "ccr-d25c3cb3-qgbhql"
   },
   "tasks": [
     {
@@ -142,7 +143,7 @@
     {
       "id": "AGEDS-TASK-20261016-F0",
       "owner": "coordinator",
-      "status": "done",
+      "status": "accepted",
       "scope": [
         "server/app/schema/__init__.py",
         "server/app/api/__init__.py",
@@ -359,7 +360,7 @@
     {
       "id": "AGEDS-TASK-20261016-E",
       "owner": "analysis (E1 budget, E2 hypotheses)",
-      "status": "done",
+      "status": "accepted",
       "scope": [
         "server/app/analysis/",
         "server/app/schema/analysis.py",
@@ -390,7 +391,7 @@
     {
       "id": "AGEDS-TASK-20261016-F",
       "owner": "reports",
-      "status": "done",
+      "status": "accepted",
       "scope": [
         "server/app/reports/",
         "server/app/schema/reports.py",
@@ -455,7 +456,7 @@
     {
       "id": "AGEDS-TASK-20261016-H",
       "owner": "workbench (Fable)",
-      "status": "done",
+      "status": "accepted",
       "scope": [
         "server/app/workbench/",
         "server/app/schema/workbench.py",
@@ -503,7 +504,7 @@
     {
       "id": "AGEDS-TASK-20261016-I",
       "owner": "importplan",
-      "status": "done",
+      "status": "accepted",
       "scope": [
         "server/app/importplan/",
         "server/app/schema/importplan.py (90-99)",
@@ -542,7 +543,7 @@
     {
       "id": "AGEDS-TASK-20261016-R",
       "owner": "review_fixes",
-      "status": "claimed",
+      "status": "accepted",
       "scope": [
         "files named in review findings",
         "server/tests/test_review_fixes_*.py",
@@ -552,12 +553,17 @@
       "acceptance": [
         "each finding reproduced by a failing test, then fixed"
       ],
-      "result_refs": []
+      "result_refs": [
+        "docs/validation/REVIEW_FIXES_2026-10-16.json"
+      ],
+      "results": {
+        "regression_tests": 81
+      }
     },
     {
       "id": "AGEDS-TASK-20261016-X",
       "owner": "integration",
-      "status": "claimed",
+      "status": "accepted",
       "scope": [
         "post-merge failures",
         "report providers timeline/budget/dossier",
@@ -567,15 +573,79 @@
       "acceptance": [
         "full pytest, node, verify, all browser scripts green"
       ],
-      "result_refs": []
+      "result_refs": [
+        "docs/validation/INTEGRATION_2026-10-16.json"
+      ]
+    },
+    {
+      "id": "AGEDS-TASK-20261016-Z",
+      "owner": "e2e",
+      "status": "accepted",
+      "scope": [
+        "server/tests/e2e/",
+        "server/tests/test_e2e_*.py",
+        "scripts/e2e_acceptance.py",
+        "docs/ACCEPTANCE.md"
+      ],
+      "based_on_commit": "8e491f7",
+      "acceptance": [
+        "criterion matrix"
+      ],
+      "result_refs": [
+        "docs/ACCEPTANCE.md",
+        "docs/validation/E2E_ACCEPTANCE_2026-10-16.json"
+      ],
+      "results": {
+        "criteria_met": 19,
+        "not_met": 0,
+        "not_verifiable_by_run": 3,
+        "defects_fixed": 3
+      }
+    },
+    {
+      "id": "AGEDS-TASK-20261016-REVIEW2",
+      "owner": "reviewer",
+      "status": "accepted",
+      "scope": [
+        "read-only review of b181c21..8e491f7"
+      ],
+      "based_on_commit": "8e491f7",
+      "acceptance": [
+        "confirmed findings with reproducers"
+      ],
+      "result_refs": [
+        "13 confirmed + 4 plausible; fixes in R2"
+      ]
+    },
+    {
+      "id": "AGEDS-TASK-20261016-R2",
+      "owner": "review2_fixes",
+      "status": "accepted",
+      "scope": [
+        "files named in review 2 findings",
+        "server/tests/test_review2_*.py"
+      ],
+      "based_on_commit": "8e491f7",
+      "acceptance": [
+        "each finding reproduced then fixed"
+      ],
+      "result_refs": [
+        "docs/validation/REVIEW2_FIXES_2026-10-16.json"
+      ],
+      "results": {
+        "regression_tests_passed": 132,
+        "note": "receipt and final checks written by coordinator after the agent hit a usage limit"
+      }
     }
   ],
   "remaining_boundaries": [
-    "Android SAF device/provider execution: no connected device or emulator.",
-    "Polish speech quality/acoustic alignment unmeasured.",
-    "No live restore, signed custody, source media export or connected ecosystem adapters.",
-    "No API authentication.",
-    "Public Git history retains preexisting case-specific identifiers; current-tree cleanup is not history erasure."
+    "No real ASR/OCR/diarization inference (Hugging Face blocked, engines absent): fake-engine tests only.",
+    "No real vendor exports: chat/Takeout/MBOX/billing layouts follow public observations and data-file mappings.",
+    "7z/RAR adapters not executed.",
+    "Android SAF device/provider execution not performed; Android unchanged; no Android token setting.",
+    "Time budgets and hypothesis results are interpretive aids, not observations or causal conclusions.",
+    "Manifests/packages hashed, not signed; five-layer standard, Live Explainer and signed custody are future work.",
+    "Public Git history retains preexisting case-specific identifiers."
   ],
   "previous_state": {
     "state_id": "AGEDS-STATE-20261002-001",

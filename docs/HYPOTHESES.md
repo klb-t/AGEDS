@@ -81,12 +81,29 @@ milliseconds; every statistic below is integer or exact-fraction arithmetic.
 * **Null distribution:** `n` moves of the stimulus times by the registered model, using the versioned
   SplitMix64 generator (`splitmix64.v1`, reference value checked in tests) — not Python's `random`.
   * `circular_shift`: one offset per permutation, wrapped within the observed span (keeps stimulus spacing);
-  * `permutation`: stimuli placed on distinct eligible event times (destroys clustering);
+  * `permutation`: each stimulus takes the time of a distinct eligible *event* (destroys clustering);
   * `stratified_weekday_hour`: permutation inside weekday × hour strata in `stratify_zone`; strata with fewer
-    eligible times than stimuli keep their stimuli in place and are listed;
-  * `block_permutation`: blocks of `block_s` shuffled (keeps clustering inside blocks; needs ≥ 2 blocks).
+    eligible events than stimuli keep their stimuli in place and are listed;
+  * `block_permutation`: the full blocks of `block_s` are shuffled (keeps clustering inside blocks; needs ≥ 2
+    full blocks); when the span is not a multiple of `block_s` the partial last block stays in place with its
+    stimuli (`partial_block_s`, `stimuli_kept_in_partial_block`).
+* **Eligible pool (method `ageds.event-study-method/v2`).** A permuted stimulus borrows an eligible event's
+  time and stands for that event, exactly as an observed stimulus is treated: while `exclude_self_pairs` is on
+  (default) outcome events are **not** eligible — the default `eligible: {}` and a user-defined set that
+  intersects the outcomes alike (`eligible_excluded_outcomes` is recorded) — and, while
+  `density_excludes_stimuli` is on, a borrowed density event is not counted as its own documentation at lag 0.
+  A pool that holds only the stimuli themselves is refused (every permutation would reproduce the data; use
+  `circular_shift`/`block_permutation` or let other documented events be eligible). Density events cannot
+  also be removed from the pool: with the default selectors the pool would then be the stimuli alone.
 * **p-value:** `(k + 1) / (n + 1)`, `k` = null statistics at least as extreme as observed in the registered
-  direction (two-sided: distance from the null mean). Never 0, never above 1. No parametric p-values.
+  direction (two-sided: distance from the null mean; for the normalized share the mean is rounded to a double
+  with `math.fsum` and every distance is compared exactly — fractions are never accumulated, so the cost is
+  linear and counted in `max_work`). Never 0, never above 1. No parametric p-values.
+* **Calibration (tested).** On independent uniform stimuli, outcomes and other documented events (40 seeded
+  datasets × both one-sided directions), every null model gives p ≤ 0.05 in at most 15 % of datasets and a
+  mean p in [0.35, 0.65], for the raw and the density-normalized statistic. Method v1 failed this for
+  `permutation` and `stratified_weekday_hour` (review 2 finding 1: placements on outcome times created
+  lag-0 pairs the data cannot have; on the reviewer's data the null mean was ≈ 48 pairs against ≈ 3 observed).
 * **Detection bias control:** documentation density `D` (default: all timed events that are neither stimuli
   nor outcomes). The control series shows counts per period (`control_period_s`, coarsened to at most 5000
   bins) of all events, documentation, outcomes and stimuli, plus empty periods and the longest gaps. The
@@ -111,7 +128,20 @@ Each result lists all of these with computed values; `flagged` marks the ones th
 | `unknown_zone_excluded` | untimed events by reason (`unknown_zone`, `nonexistent_local_time`, `no_time_candidate`, …) |
 | `time_uncertainty` | events whose time interval (timeline `t_lo`/`t_hi`, else the candidate precision) is wider than `max_time_uncertainty_s` (default: lag bin); excluded or kept per `imprecise_times` |
 | `time_basis` | stimulus/outcome times based on weak kinds (file mtime, export time, …) |
-| `preregistration_deviation` | per-run overrides of `permutations`, `seed`, `null_model`, `block_s`, `stratify_zone` |
+| `preregistration_deviation` | per-run overrides of `permutations`, `seed`, `null_model`, `block_s`, `stratify_zone`; **selected sets that changed among events that already existed at the version's first recorded run** (`changed_sets`, e.g. post-hoc re-tagging, category corrections, time edits); tag edits on tags named in the filters and category corrections of loaded events made **after `registered_at`** (`edits_after_registration`). New events since that run are listed (`new_events_since_baseline`) without flagging. |
+
+### Preregistration check of the inputs (review 2 finding 7)
+
+Filters select by mutable attributes (tags, human category corrections, text, projected times). Every run
+of method v2 stores `selection`: per set (`stimulus`, `outcome`, `density`, `eligible` pool) the count and
+the SHA-256 of the sorted event ids, plus the largest event id the run could see. A later run of the same
+version compares, for events with an id up to that maximum, its sets with the version's first run that has
+such a record (runs of method v1 have none and are skipped) and flags any difference; audit rows
+`tag_bulk_add/remove`, `tag_rename`, `tag_merge` touching a tag named in the filters and
+`analysis_label_annotations` of loaded events after `registered_at` (second resolution, ties counted) are
+flagged as edits after registration. A re-run on unchanged data writes an identical record, so the result
+hash stays reproducible. Text queries are not audited (the FTS index has no edit log); a changed text match
+still shows up as a changed set.
 
 ### Reproducibility
 
@@ -121,7 +151,9 @@ canonical hash. Re-running the same version on the same data yields the same `re
 (`identical_result_runs` lists earlier runs). `code_version` (`git describe --always --dirty`, else
 `unknown`) and the run timestamp are stored on the run row, outside the result hash. Limits are explicit
 (`max_events`, `max_fts_ids`, `max_work`, `max_null_cells`); exceeding one refuses the run instead of
-analysing partial input.
+analysing partial input. Results of method v2 carry `schema: ageds.event-study-result/v2` and
+`method: {id: ageds.event-study-method/v2, history}`; stored v1 runs (no `method` key) stay unchanged and
+valid as historical records with their own hashes — a new run of the same version records the new method.
 
 ## Evidence dossier
 
@@ -144,6 +176,11 @@ only creates `candidate` items:
   references are rejected and counted); its rationale is stored as labelled model text, never as evidence.
 
 ## Theses and epistemic disclosure
+
+Review 2 P3: next to `current_theses_without_evidence` (no pointer) the disclosure lists
+`current_theses_without_accepted_evidence` — current theses flagged `unsupported` or `evidence_not_accepted`
+(pointers only to candidates or rejected items); `list_theses` returns it as
+`without_accepted_evidence_current`.
 
 Each thesis has a status from the typology (rank 1–7): `quote` (cytat) → `paraphrase` (parafraza) →
 `inference_chain` (łańcuch inferencji) → `analogy` (analogia) → `speculation` (spekulacja) →

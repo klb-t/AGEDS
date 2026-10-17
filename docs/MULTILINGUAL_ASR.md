@@ -210,7 +210,18 @@ diarization `num_speakers`, `min_speakers`, `max_speakers`. `engine`, `model`, `
 code, files or network behaviour on the server: they are operator decisions made in a recipe
 preset (built-in or `EW_MEDIA_RECIPE_DIR`) or through the CLI (`media-enqueue --override`).
 A refused key is a 422 naming the key and the permitted list; the HTML form has no override
-field. Reversal: extend `CLIENT_OVERRIDE_KEYS` (code) — an operator who wants another model
+field. **HTTP values are bounded too (review 2 finding 11)**, because decoding options set worker
+CPU/memory: `transcribe_options` — `beam_size`, `best_of` 1–10; `patience` 0.1–5; `length_penalty`
+0–5 or null; `repetition_penalty` 0.1–5; `no_repeat_ngram_size` 0–20; `temperature` a number or 1–10
+numbers in 0–1; `compression_ratio_threshold` 0–100, `log_prob_threshold` −100–0, `no_speech_threshold`
+0–1 (each or null); `prompt_reset_on_temperature` 0–1; `max_initial_timestamp` 0–30;
+`max_new_tokens` 1–448, `chunk_length` 1–30, `hallucination_silence_threshold` 0–30 (or null);
+`initial_prompt`/`hotwords` ≤ 1000 characters, `prefix` ≤ 200, punctuation sets ≤ 100;
+`suppress_tokens` ≤ 64 ids; booleans must be booleans. `vad.parameters`: `threshold`/`neg_threshold`
+0–1, `min_speech_duration_ms`/`min_silence_duration_ms` 0–60 000, `speech_pad_ms` 0–10 000,
+`max_speech_duration_s` 0–86 400. OCR `pdf.dpi` 72–600 and `pdf.max_pages` 1–500; diarization speaker
+counts 1–50. The tables are `recipe.CLIENT_*_BOUNDS`; operator presets and the CLI keep the full
+recipe validation (e.g. `pdf.max_pages` up to 10 000). Reversal: extend `CLIENT_OVERRIDE_KEYS` (code) — an operator who wants another model
 over HTTP adds a private preset and selects it by id.
 
 ## 9. Not done / open

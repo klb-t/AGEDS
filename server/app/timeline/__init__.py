@@ -8,7 +8,7 @@ time, its basis, precision and uncertainty interval. See docs/TIMELINE.md.
 from __future__ import annotations
 
 from ..db import session
-from .projection import ensure_projection
+from .analysis_items import open_snapshot
 from .query import Filters, iter_window, make_filters, window
 from .ruleset import Rule, display_params, load_rule
 from .timeutil import parse_bound
@@ -33,7 +33,7 @@ def iter_projected_items(start: str | None = None, end: str | None = None, *, fi
     """
     resolved = _resolve(rule)
     with session() as db:
-        projection = ensure_projection(db, resolved, params or {})
+        projection = open_snapshot(db, resolved, params or {})
         yield from iter_window(db, projection, resolved, start_us=parse_bound(start), end_us=parse_bound(end, end=True),
                                filters=filters, match=match, candidates=candidates, batch=batch, max_rows=max_rows,
                                group=None)
@@ -45,7 +45,7 @@ def project_window(start: str | None = None, end: str | None = None, *, filters:
     """Materialize a window as one dict: items, rule/projection identity and completeness."""
     resolved = _resolve(rule)
     with session() as db:
-        projection = ensure_projection(db, resolved, params or {})
+        projection = open_snapshot(db, resolved, params or {})
         items = list(iter_window(db, projection, resolved, start_us=parse_bound(start),
                                  end_us=parse_bound(end, end=True), filters=filters, match=match,
                                  candidates=False, max_rows=max_rows + 1, group=None))

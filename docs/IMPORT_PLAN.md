@@ -124,6 +124,13 @@ crash after the first ChatGPT shard was written: final row counts equal a clean 
 `done`) and is retried by the next run. A sync run between two items has no running attempt; another
 run is refused until the operator passes `recover_running`.
 
+**Lease heartbeat (review 2 finding 10).** The attempt lease is renewed every third of
+`lease_seconds`. A renewal that raises (e.g. `database is locked` while another request holds the write
+lock past the 5 s busy timeout) is retried with exponential backoff from 0.25 s, capped at the regular
+interval, and logged; earlier the heartbeat thread ended on the first exception, so after
+`lease_seconds` a second run could start the same item while the first was still importing. Only a renewal
+that finds the lease taken over (`_renew` false) stops the heartbeat.
+
 **Queue mode.** `mode='queue'` enqueues one `import_plan_item` job per item in the existing job queue.
 `import-plan-work` (or the general worker, which now dispatches this kind) claims a job with its lease
 and heartbeat; the attempt's terminal state is written inside `jobs.publish_result`, i.e. in the same

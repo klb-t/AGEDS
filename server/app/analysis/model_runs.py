@@ -6,7 +6,10 @@ with provider, model, version, parameters and the per-run opt-in. Providers:
 
 * ``none`` (default) — records that no model ran; produces no output;
 * ``fake`` — a deterministic synthetic stand-in for tests (hash of the event
-  id). It is explicitly not a model and its outputs say so.
+  id). It is explicitly not a model and its outputs say so. It is a test double:
+  every entry point (HTTP, CLI, Python) refuses it unless the process sets
+  ``EW_ANALYSIS_TEST_PROVIDERS=1`` (review 2 finding 13; like the catalog's
+  ``EW_CATALOG_TEST_PROVIDERS``).
 
 Any other provider name is refused as ``unavailable``: no network or external
 adapter exists in this increment.
@@ -15,12 +18,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
 
 from .categories import CategoryConfig
 from .provenance import canonical_json, event_set_sha256
 
 PROVIDERS = ('none', 'fake')
+TEST_PROVIDERS = ('fake',)
+TEST_PROVIDER_ENV = 'EW_ANALYSIS_TEST_PROVIDERS'
 PURPOSES = ('labels', 'feature:tone')
 FAKE_MODEL = 'synthetic-fake'
 FAKE_VERSION = 'fake.v1'
@@ -31,16 +37,29 @@ def _fraction(event_id: int, salt: str) -> int:
     return int(hashlib.sha256(f'{salt}:{event_id}'.encode()).hexdigest()[:8], 16)
 
 
-def run_model(db: sqlite3.Connection, items: list[dict], *, purpose: str, provider: str = 'none',
-              opt_in: bool = False, config: CategoryConfig | None = None, parameters: dict | None = None) -> dict:
+def test_providers_enabled() -> bool:
+    """Synthetic test doubles are usable only when the operator/test process opts in by environment."""
+    return os.environ.get(TEST_PROVIDER_ENV, '').strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def check_provider(purpose: str, provider: str, opt_in: bool, config: CategoryConfig | None = None) -> None:
+    """Refuse an unknown purpose/provider, a missing opt-in or a disabled test double (no database access)."""
     if purpose not in PURPOSES:
         raise ValueError(f'purpose must be one of {PURPOSES}')
     if provider not in PROVIDERS:
         raise ValueError(f'provider {provider!r} is unavailable: no external model adapter is implemented')
     if provider != 'none' and opt_in is not True:
         raise ValueError('a model provider runs only with an explicit per-run opt_in=true')
+    if provider in TEST_PROVIDERS and not test_providers_enabled():
+        raise ValueError(f'provider {provider!r} is a synthetic test double, not a model; it is available only when '
+                         f'the server/CLI process sets {TEST_PROVIDER_ENV}=1 (tests)')
     if purpose == 'labels' and provider != 'none' and config is None:
         raise ValueError('label hypotheses need a category configuration')
+
+
+def run_model(db: sqlite3.Connection, items: list[dict], *, purpose: str, provider: str = 'none',
+              opt_in: bool = False, config: CategoryConfig | None = None, parameters: dict | None = None) -> dict:
+    check_provider(purpose, provider, opt_in, config)
     ids = [it['event_id'] for it in items]
     status = 'not_run' if provider == 'none' else 'done'
     metadata = {'artifact_class': 'interpretive', 'output_is_hypothesis': True,

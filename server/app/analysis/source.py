@@ -334,6 +334,25 @@ def load_items(db: sqlite3.Connection, *, start_utc: str | None = None, end_utc:
         return load_items_interim(db, start_utc=start_utc, end_utc=end_utc, event_types=event_types,
                                   assume_zone=assume_zone, limit=limit, fields=fields, media_durations=media_durations)
     db.row_factory = sqlite3.Row
+    # One read snapshot for every timeline read below (review 2 finding 4): the projection may be
+    # evicted by another request between statements; inside the snapshot it stays readable.
+    own_snapshot = refresh and not db.in_transaction
+    if own_snapshot:
+        from ..timeline.analysis_items import open_snapshot
+        from ..timeline.ruleset import display_params, load_rule
+        open_snapshot(db, load_rule(timeline_rule, kind='display_rule'), display_params(assume_zone, assumption_rule))
+    try:
+        return _load_timeline_items(db, timeline_load_items, start_utc=start_utc, end_utc=end_utc,
+                                    event_types=event_types, assume_zone=assume_zone, assumption_rule=assumption_rule,
+                                    include_hidden=include_hidden, limit=limit, fields=fields,
+                                    media_durations=media_durations, timeline_rule=timeline_rule, refresh=refresh)
+    finally:
+        if own_snapshot:
+            db.rollback()  # read-only snapshot opened above
+
+
+def _load_timeline_items(db, timeline_load_items, *, start_utc, end_utc, event_types, assume_zone, assumption_rule,
+                         include_hidden, limit, fields, media_durations, timeline_rule, refresh) -> dict:
     try:
         loaded = timeline_load_items(db, start_utc=start_utc, end_utc=end_utc, event_types=event_types,
                                      assume_zone=assume_zone, assumption_rule=assumption_rule, include_hidden=True,

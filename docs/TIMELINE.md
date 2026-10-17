@@ -83,6 +83,19 @@ materialized items; after a full build the least recently built others lose thei
 records projection, build, count and reason; their next use rebuilds them in full. The
 default projection (`{}`) is never evicted. Projection and build-log rows stay
 (append-only); reads still write the cache when data or parameters changed.
+
+**Reads in one snapshot (review 2 finding 4, P4).** A refresh commits before the reads, and
+another request building a different zone may evict the projection in between; earlier the
+reader then saw zero items without any error (an analysis stored a run of an empty input).
+`analysis_items.open_snapshot(db, rule, params)` refreshes, opens a read transaction and
+re-checks the projection inside it (`read_projection`): evicted or stale there means another
+refresh and snapshot, up to 5 attempts, then `ProjectionNotFresh` (HTTP 503, “retry”). Inside the
+snapshot every read sees one consistent state even if the projection is evicted meanwhile (WAL).
+The analysis seam (`analysis.source.load_items`, used by budgets, features and event studies),
+every `/api/timeline/*` route (window, density, facets, undated, items, export, projection and the
+legacy list), `timeline.project_window`/`iter_projected_items` and the CLI `timeline-window` read
+this way; the snapshot ends with the request/session. Raise `EW_TIMELINE_MAX_PROJECTIONS` when many
+zones are used concurrently.
 Rule versions and operator parameters get separate projections, so a new
 version never overwrites an older one. Measured on 200 000 synthetic events: first build
 ≈ 11 s, incremental refresh after 1 000 new events ≈ 0.15 s, fresh check ≈ 1 ms
@@ -191,6 +204,8 @@ database with schema versions 30–31 (start the service once after a backup).
   operator zone cannot place (DST gap) is `nonexistent_local_time`, not `unknown_zone`.
   `refresh=False` reads without writing (`read_projection`, `PRAGMA query_only`): a
   stale projection raises `ProjectionNotFresh` instead of being refreshed or read stale.
+  With `refresh=True` (default) all reads happen in one `open_snapshot` read transaction
+  (closed again unless the caller had one open).
 * `server.app.timeline.report.report_section(db, ...)` feeds the report section
   (`docs/REPORTS.md`) from the caller's read-only snapshot.
 * `server.app.timeline.project_window(start, end, filters=...)` and

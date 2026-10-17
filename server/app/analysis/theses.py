@@ -134,7 +134,9 @@ def list_theses(db: sqlite3.Connection, hypothesis_id: int) -> dict:
     return {'disclaimer': disclaimer(), 'hypothesis_id': hypothesis_id,
             'typology': [{'id': t[0], 'rank': i + 1, 'pl': t[1], 'en': t[2]} for i, t in enumerate(TYPOLOGY)],
             'theses': theses, 'current_count': len(current),
-            'unsupported_current': sum(1 for t in current if t['unsupported'])}
+            'unsupported_current': sum(1 for t in current if t['unsupported']),
+            # Review 2 P3: pointers only to candidates or rejected items are not accepted evidence either.
+            'without_accepted_evidence_current': sum(1 for t in current if {'unsupported', 'evidence_not_accepted'} & set(t['flags']))}
 
 
 # ---------------------------------------------------------------- disclosure
@@ -198,6 +200,8 @@ def disclosure_view(db: sqlite3.Connection, hypothesis_id: int) -> dict:
     known_unknowns = [
         {'fact': 'candidates_awaiting_human_review', 'value': dossier['counts']['candidate']},
         {'fact': 'current_theses_without_evidence', 'value': theses['unsupported_current']},
+        {'fact': 'current_theses_without_accepted_evidence', 'value': theses['without_accepted_evidence_current'],
+         'note': 'no pointer, or pointers only to candidates/rejected items (flags unsupported, evidence_not_accepted)'},
         {'fact': 'items_whose_source_changed_or_vanished',
          'value': sum(1 for i in dossier['items'] if i['source_check'] != 'matches')},
     ]

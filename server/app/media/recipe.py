@@ -83,6 +83,29 @@ CLIENT_OVERRIDE_KEYS = {
     'diarization': {'num_speakers': None, 'min_speakers': None, 'max_speakers': None},
 }
 
+# Ranges for values an HTTP client sends (review 2 finding 11): decoding options choose worker
+# CPU/memory (beam width, candidates, token budget), so HTTP values are bounded; operator presets
+# and the CLI keep the full recipe validation. Spec: (low, high, integer, nullable); ``'bool'``,
+# ``('str', max_chars)``, ``('temperature', low, high, max_items)`` and ``('tokens', max_items)``.
+CLIENT_TRANSCRIBE_BOUNDS = {
+    'beam_size': (1, 10, True, False), 'best_of': (1, 10, True, False), 'patience': (0.1, 5.0, False, False),
+    'length_penalty': (0.0, 5.0, False, True), 'repetition_penalty': (0.1, 5.0, False, False),
+    'no_repeat_ngram_size': (0, 20, True, False), 'temperature': ('temperature', 0.0, 1.0, 10),
+    'compression_ratio_threshold': (0.0, 100.0, False, True), 'log_prob_threshold': (-100.0, 0.0, False, True),
+    'no_speech_threshold': (0.0, 1.0, False, True), 'condition_on_previous_text': 'bool',
+    'prompt_reset_on_temperature': (0.0, 1.0, False, False), 'initial_prompt': ('str', 1000),
+    'prefix': ('str', 200), 'suppress_blank': 'bool', 'suppress_tokens': ('tokens', 64),
+    'without_timestamps': 'bool', 'max_initial_timestamp': (0.0, 30.0, False, False),
+    'prepend_punctuations': ('str', 100), 'append_punctuations': ('str', 100),
+    'max_new_tokens': (1, 448, True, True), 'chunk_length': (1, 30, True, True),
+    'hallucination_silence_threshold': (0.0, 30.0, False, True), 'hotwords': ('str', 1000), 'task': ('str', 20),
+}
+CLIENT_VAD_BOUNDS = {'threshold': (0.0, 1.0), 'neg_threshold': (0.0, 1.0), 'min_speech_duration_ms': (0, 60_000),
+                     'max_speech_duration_s': (0.0, 86_400.0), 'min_silence_duration_ms': (0, 60_000),
+                     'speech_pad_ms': (0, 10_000)}
+CLIENT_PDF_BOUNDS = {'dpi': (72, 600), 'max_pages': (1, 500)}
+CLIENT_SPEAKERS_MAX = 50
+
 
 class RecipeError(ValueError):
     """A recipe, override or pinned payload failed validation."""
@@ -218,6 +241,67 @@ def check_client_overrides(kind: str, overrides) -> None:
         permitted = sorted(k if v is None else f'{k}.{{{",".join(sorted(v))}}}' for k, v in allowed.items())
         raise RecipeError(f'override {", ".join(sorted(refused))} can be set only in a local recipe preset or through '
                           f'the CLI (operator decision); HTTP clients may override only: {", ".join(permitted)}')
+    _check_client_values(kind, overrides)
+
+
+def _client_value(value, spec, name: str) -> None:
+    if spec == 'bool':
+        if type(value) is not bool:
+            raise RecipeError(f'{name} must be true or false')
+        return
+    if spec[0] == 'str':
+        if value is not None and (not isinstance(value, str) or len(value) > spec[1]):
+            raise RecipeError(f'{name} must be null or text of at most {spec[1]} characters')
+        return
+    if spec[0] == 'tokens':
+        if value is None:
+            return
+        if not isinstance(value, list) or len(value) > spec[1]:
+            raise RecipeError(f'{name} must be null or a list of at most {spec[1]} token ids')
+        for item in value:
+            _finite(item, f'{name}[]', low=-1, high=1_000_000, integer=True)
+        return
+    if spec[0] == 'temperature':
+        _, low, high, max_items = spec
+        values = value if isinstance(value, list) else [value]
+        if not values or len(values) > max_items:
+            raise RecipeError(f'{name} must be a number or a list of 1 to {max_items} numbers')
+        for item in values:
+            _finite(item, name, low=low, high=high)
+        return
+    low, high, integer, nullable = spec
+    _finite(value, name, low=low, high=high, integer=integer, allow_none=nullable)
+
+
+def _check_client_values(kind: str, overrides: dict) -> None:
+    """Numeric/size ranges of HTTP override values (``CLIENT_*_BOUNDS``; review 2 finding 11)."""
+    if kind == 'asr':
+        options = overrides.get('transcribe_options')
+        if options is not None:
+            if not isinstance(options, dict):
+                raise RecipeError('override transcribe_options must be an object')
+            unknown = sorted(str(k) for k in options if k not in CLIENT_TRANSCRIBE_BOUNDS)
+            if unknown:
+                raise RecipeError('transcribe_options accepts only faster-whisper decoding options: '
+                                  + ', '.join(sorted(CLIENT_TRANSCRIBE_BOUNDS)) + f'; got {", ".join(unknown)}')
+            for key, value in options.items():
+                _client_value(value, CLIENT_TRANSCRIBE_BOUNDS[key], f'transcribe_options.{key}')
+        vad = overrides.get('vad')
+        if isinstance(vad, dict) and isinstance(vad.get('parameters'), dict):
+            for key, value in vad['parameters'].items():
+                if key in CLIENT_VAD_BOUNDS:
+                    low, high = CLIENT_VAD_BOUNDS[key]
+                    _finite(value, f'vad.parameters.{key}', low=low, high=high, allow_none=key == 'neg_threshold')
+    elif kind == 'ocr':
+        pdf = overrides.get('pdf')
+        if isinstance(pdf, dict):
+            for key, (low, high) in CLIENT_PDF_BOUNDS.items():
+                if key in pdf:
+                    _finite(pdf[key], f'pdf.{key}', low=low, high=high, integer=True)
+    elif kind == 'diarization':
+        for key in ('num_speakers', 'min_speakers', 'max_speakers'):
+            if key in overrides:
+                _finite(overrides[key], key, low=1, high=CLIENT_SPEAKERS_MAX, integer=True, allow_none=True)
 
 
 def _finite(value, name: str, *, low=None, high=None, integer=False, allow_none=False):

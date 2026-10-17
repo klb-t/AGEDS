@@ -65,6 +65,7 @@ class TokenStorageTests(IntegrationCase):
         # Missing/malformed tokens are refused before any database access. Review finding 8:
         # the two secret mismatches of one key in one hour share one audit row and a count of 2.
         self.assertEqual(len(rejected), 5)
+        tokens.flush_rejection_counts()  # review 2 P2: repeats are added lazily
         with db.session() as conn:
             counts = {(r['reason'], r['count']) for r in conn.execute('SELECT reason, count FROM api_token_rejections')}
         self.assertEqual(counts, {('unknown_key', 1), ('secret_mismatch', 2), ('scope', 1), ('revoked', 1), ('expired', 1)})
@@ -123,7 +124,10 @@ class HttpAuthTests(IntegrationCase):
                     self.assertEqual(response.status_code, 401)
                     self.assertEqual(response.headers['www-authenticate'], 'Bearer')
                     self.assertEqual(response.json()['detail']['code'], 'missing_token')
-            self.assertEqual(self.client.get('/').status_code, 200, 'HTML UI is not covered by the switch')
+            page = self.client.get('/')  # review 2 finding 6: HTML pages are covered too (login form instead)
+            self.assertEqual(page.status_code, 401)
+            self.assertIn('action="/integrations/session"', page.text)
+            self.assertEqual(self.client.get('/', headers=self.headers(created)).status_code, 200)
             self.assertEqual(self.client.get('/api/search', params={'q': 'koniec'}, headers=self.headers(created)).status_code, 200)
             content = self.client.get(f'/api/artifacts/{self.artifact}/content', headers=self.headers(created))
             self.assertEqual((content.status_code, content.content), (200, b'RIFF synthetic wav bytes'))

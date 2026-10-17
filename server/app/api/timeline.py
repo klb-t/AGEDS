@@ -14,7 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from ..db import session
 from ..timeline.correlation import (CorrelationError, TransitionError, hypothesis_detail, list_hypotheses, list_runs,
                                     review, run_detail, run_rule)
-from ..timeline.projection import ensure_projection
+from ..timeline.analysis_items import ProjectionNotFresh, open_snapshot
 from ..timeline.query import (Filters, QueryInputError, QueryLimitError, density, export_window, facets, item_detail,
                               legacy_events, make_filters, undated, window)
 from ..timeline.ruleset import RuleError, display_params, load_rule, released_rules
@@ -40,6 +40,9 @@ def _errors(fn):
         raise HTTPException(422, str(exc)) from exc
     except LookupError as exc:
         raise HTTPException(404, str(exc)) from exc
+    except ProjectionNotFresh as exc:
+        raise HTTPException(503, 'The timeline projection was evicted or refreshed by concurrent requests while it was '
+                                 'being read; retry (raise EW_TIMELINE_MAX_PROJECTIONS for many zones).') from exc
     except sqlite3.OperationalError as exc:
         raise HTTPException(503, 'Evidence database is busy or unavailable for the timeline projection.') from exc
 
@@ -51,9 +54,10 @@ class ProjectionParams:
         self.rule_ref, self.assume_zone, self.assumption_rule = rule, assume_zone, assumption_rule
 
     def open(self, db):
+        """Fresh projection plus a read snapshot that lasts until the session ends (review 2 P4)."""
         rule = load_rule(self.rule_ref, kind='display_rule')
         params = display_params(self.assume_zone, self.assumption_rule)
-        return rule, ensure_projection(db, rule, params)
+        return rule, open_snapshot(db, rule, params)
 
 
 class FilterParams:
@@ -94,7 +98,7 @@ def timeline(limit: int = Query(500, ge=1, le=10000), phone: str | None = None, 
     def run():
         with session() as db:
             rule = load_rule(kind='display_rule')
-            projection = ensure_projection(db, rule, {})
+            projection = open_snapshot(db, rule, {})
             rows = legacy_events(db, projection, limit=limit, phone=phone, event_type=event_type)
             return rows, projection
     rows, projection = _errors(run)

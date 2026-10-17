@@ -60,7 +60,7 @@ Build prerequisites are a full JDK 21 with `javac`, Android SDK platform `androi
 
 The APK is written to `androidApp/build/outputs/apk/debug/androidApp-debug.apk`. Android Studio can open the repository. The app targets API 36 and requires API 26 or later; the synthetic instrumentation harness requires API 29 or later.
 
-Set the app's **Evidence server** field to the server address. Android Emulator uses `http://10.0.2.2:8080` for the host machine; a physical device needs the host's reachable LAN address. To accept LAN connections, the operator can start Uvicorn with `--host 0.0.0.0` in a trusted network.
+Set the app's **Evidence server** field to the server address. Android Emulator uses `http://10.0.2.2:8080` for the host machine; a physical device needs the host's reachable LAN address. To accept LAN connections, the operator can start Uvicorn with `--host 0.0.0.0` in a trusted network. The server's Host allowlist (DNS-rebinding guard) accepts `localhost` and any IP address without configuration, so `10.0.2.2` and a LAN IP work as they are; a LAN *hostname* (for example `evidence.lan` or `pc.local`) must be listed in `EW_TRUSTED_HOSTS` (comma-separated, `*.suffix` wildcards allowed), see [read API](READ_API.md).
 
 The **Sources** workspace can inspect a selected SAF directory without a prepared seed. It scans supported files read-only, keeps distinct URI identities and reports unsupported formats or incomplete coverage. Select exact audio URIs for explicit upload to the configured service. An optional private corpus seed remains supported; see [Corpus import](CORPUS_IMPORT.md).
 

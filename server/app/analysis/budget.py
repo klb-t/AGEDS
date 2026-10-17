@@ -1,4 +1,4 @@
-"""Time budget with explicit bounds (rule ``time_budget.v2``); an interpretive artifact.
+"""Time budget with explicit bounds (rule ``time_budget.v3``); an interpretive artifact.
 
 Between two observed timestamps the activity is unknown. For every category the
 budget reports three variants built from intervals on the UTC axis:
@@ -23,7 +23,9 @@ exceed it), ``priority`` (``priority`` list, then configuration order) or
 counted time are reported). For ``split_equal``/``priority`` the variants are
 layered: confirmed time takes precedence over estimates and estimates over gap
 attribution, so lower <= probable <= upper per category. Observed time whose
-label weights sum below 1 is assigned to ``bez_kategorii``.
+label weights sum below 1 is assigned to ``bez_kategorii``; that remainder is
+always taken from the best-supported layer (also under ``count_both``), so it
+keeps the same ordering.
 
 ``nieobserwowane`` is the time no observation covers in a variant: its lower
 value is ``length - observed(U)`` and its upper value ``length - observed(L)``.
@@ -41,6 +43,7 @@ import bisect
 import itertools
 import json
 from collections import Counter, defaultdict
+from contextlib import contextmanager
 from pathlib import Path
 
 from . import calendar as cal
@@ -49,7 +52,7 @@ from . import intervals as iv
 from .provenance import canonical_json, code_sha256, code_version, event_set_sha256, sha256_json
 from .source import RULE_ID as SOURCE_RULE, load_items
 
-RULE = 'time_budget.v2'
+RULE = 'time_budget.v3'
 # Method-record history. The computation is unchanged between versions; only what the
 # stored method record says changed. Runs stored under an earlier version keep their
 # result and result hash (analysis_runs is append-only) and are read as historical.
@@ -60,6 +63,10 @@ RULE_HISTORY = {
     'time_budget.v2': ('method.source_rule, method.source_rule_sha256 and method.seam name the rule that '
                        'actually placed the items (e.g. display_time@1 with its SHA-256); found by the '
                        'end-to-end acceptance AGEDS-TASK-20261016-Z'),
+    'time_budget.v3': ('count_both: the bez_kategorii remainder is taken from the best-supported layer (confirmed > '
+                       'estimated > gap attribution) like split_equal/priority, so lower <= probable <= upper holds for '
+                       'it too; categories keep their full per-variant union (review 2 finding 8, '
+                       'AGEDS-TASK-20261016-R2)'),
 }
 RESULT_SCHEMA = 'ageds.time_budget_result.v1'
 OVERLAP_RULES = ('split_equal', 'priority', 'count_both')
@@ -74,7 +81,7 @@ DISCLAIMER = ('Wynik interpretacyjny: szacunek z jawnym modelem i przedziałami,
 
 _RANGES = {'session_gap_s': (0, 7 * 86400), 'typing_chars_per_min': (1, 100_000),
            'reading_chars_per_min': (1, 1_000_000), 'max_typing_s': (0, 86400), 'max_reading_s': (0, 86400),
-           'max_attribution_s': (0, 7 * 86400), 'flip_tolerance_s': (0, 86400),
+           'max_attribution_s': (0, 7 * 86400), 'flip_tolerance_s': (0, 86400), 'duration_lookback_s': (0, 7 * 86400),
            'max_time_uncertainty_s': (0, 366 * 86400)}
 _INTS = {'max_grid_points': (1, 4096), 'max_candle_events': (0, 1_000_000), 'max_flip_records': (0, 100_000),
          'max_items': (1, 10_000_000)}
@@ -168,23 +175,50 @@ def effective_params(overrides: dict | None = None) -> dict:
     return {key: _check(key, params[key]) for key in sorted(params)}
 
 
-def grid_points(params: dict) -> tuple[list[dict], int, bool]:
-    """Grid points; index 0 is always the run's own parameters."""
-    base = {k: params[k] for k in GRID_KEYS}
-    grid = params['grid']
-    if params['grid_mode'] == 'one_at_a_time':
-        candidates = [base] + [{**base, k: v} for k in GRID_KEYS for v in grid.get(k, []) if v != base[k]]
-    else:
-        axes = [grid.get(k) or [base[k]] for k in GRID_KEYS]
-        candidates = [base] + [dict(zip(GRID_KEYS, combo)) for combo in itertools.product(*axes)]
-    points, seen = [], set()
-    for p in candidates:
-        key = canonical_json(p)
+def _distinct_values(values: list) -> list:
+    """Axis values without repeats (canonical JSON identity), first occurrence first."""
+    out, seen = [], set()
+    for value in values:
+        key = canonical_json(value)
         if key not in seen:
             seen.add(key)
-            points.append(p)
-    total = len(points)
-    return points[:params['max_grid_points']], total, total > params['max_grid_points']
+            out.append(value)
+    return out
+
+
+def grid_points(params: dict) -> tuple[list[dict], int, bool]:
+    """Grid points; index 0 is always the run's own parameters.
+
+    Returns ``(points, points_total, truncated)``. The grid is enumerated lazily
+    and stops after ``max_grid_points`` distinct points; ``points_total`` is
+    computed from the distinct axis values (review 2 finding 3), so a ``full``
+    grid of 64 values on every axis never materializes its Cartesian product.
+    """
+    base = {k: params[k] for k in GRID_KEYS}
+    grid = params['grid']
+    cap = params['max_grid_points']
+    if params['grid_mode'] == 'one_at_a_time':
+        axes = {k: [v for v in _distinct_values(grid.get(k, [])) if v != base[k]] for k in GRID_KEYS}
+        total = 1 + sum(len(values) for values in axes.values())
+        candidates = ({**base, k: v} for k in GRID_KEYS for v in axes[k])
+    else:
+        axes_list = [_distinct_values(grid.get(k) or [base[k]]) for k in GRID_KEYS]
+        base_key = canonical_json(base)
+        base_in_product = all(canonical_json(base[k]) in {canonical_json(v) for v in values}
+                              for k, values in zip(GRID_KEYS, axes_list))
+        total = (0 if base_in_product else 1)
+        size = 1
+        for values in axes_list:
+            size *= len(values)
+        total += size
+        candidates = (point for point in (dict(zip(GRID_KEYS, combo)) for combo in itertools.product(*axes_list))
+                      if canonical_json(point) != base_key)
+    points = [base]
+    for point in candidates:
+        if len(points) >= cap:
+            break
+        points.append(point)
+    return points, total, total > cap
 
 
 # ------------------------------------------------------------------ preparation
@@ -390,6 +424,11 @@ def _allocate(levels: list[list[tuple]], day_list: list[dict], lo: float, hi: fl
                 overlap[v][day] += dt
             if rule != 'count_both':
                 items, rest, _ = resolved_of(layer)
+            else:
+                # Each category keeps its own union per variant, but the unlabelled remainder is derived
+                # from the best-supported layer like the other rules, so lower <= probable <= upper
+                # holds for bez_kategorii too (review 2 finding 8).
+                rest = resolved_of(layer)[1]
             target = alloc[v][day]
             for c, f in items:
                 target[c] += f * dt
@@ -552,6 +591,16 @@ def compute_budget(items: list[dict], labels: dict[int, dict], config: cat.Categ
     }
 
 
+MAX_UTC_OFFSET_S = 14 * 3600
+
+
+def _reaches(item: dict, early: float) -> bool:
+    """The item (with its end, declared duration or uncertainty interval) reaches ``early`` or later."""
+    end = max(item['t_start'], item.get('t_end') or item['t_start'], item.get('t_hi') or item['t_start'],
+              item['t_start'] + (item.get('declared_duration_s') or 0))
+    return end >= early
+
+
 def horizon_margin(params: dict, points: list[dict]) -> float:
     return max([params['max_typing_s'], params['max_reading_s']] +
                [max(p['session_gap_s'], p['max_attribution_s']) for p in points]) + 1.0
@@ -674,6 +723,8 @@ def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_t
     """Validate, load items (window plus margin), filter, label and (optionally) store the labelling run.
 
     Call it before writing in the same connection: the timeline projection refreshes in its own transaction.
+    ``run_budget``/``run_features`` pass ``persist=False`` and store the labelling run only after the
+    computation, in one short write transaction (``persist_labels``; review 2 finding 2).
     """
     from . import model_runs
     p = effective_params(params)
@@ -686,10 +737,19 @@ def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_t
     cal.days(lo, hi, z)  # validates the window length before any loading
     points, _, _ = grid_points(p)
     margin = horizon_margin(p, points)
-    loaded = load_items(db, start_utc=cal.iso_utc(lo - margin), end_utc=cal.iso_utc(hi + margin),
+    # Review 2 P1: a declared duration (call log, WAV header) is not in the projection's end time, so an
+    # item that starts before the margin can still reach into it. Load ``duration_lookback_s`` earlier
+    # and keep from that extra range only the items whose end or declared duration reaches the margin.
+    early = lo - margin
+    lookback = p['duration_lookback_s']
+    loaded = load_items(db, start_utc=cal.iso_utc(early - lookback), end_utc=cal.iso_utc(hi + margin),
                         assume_zone=assume_zone, assumption_rule=assumption_rule, include_hidden=True,
                         limit=p['max_items'], fields=need_fields or cat.needs_fields(config),
                         media_durations=p['wav_header_durations'], timeline_rule=p['timeline_rule'])
+    if lookback:
+        loaded['items'] = [it for it in loaded['items'] if _reaches(it, early)]
+        loaded['untimed'] = [u for u in loaded['untimed']
+                             if u.get('local_as_utc') is None or u['local_as_utc'] + MAX_UTC_OFFSET_S >= early]
     kept, filtered = [], Counter()
     for it in loaded['items']:
         reason = _filter_reason(it, p)
@@ -708,9 +768,6 @@ def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_t
             it['fields'].pop('body', None)
     input_sha = event_set_sha256(ids)
     label_run = None
-    if persist:
-        label_run = cat.record_label_run(db, labels, config, input_sha256=input_sha, code_version=code_version(),
-                                         parameters={'model_label_run_id': p['model_label_run_id']})
     untimed = loaded['untimed']
     in_window = sum(1 for it in kept if it['t_start'] < hi and max(it['t_start'], it['t_end'] or it['t_start']) >= lo)
     window = {'from': window_from, 'to': window_to, 'zone': zone, 'from_utc': cal.iso_utc(lo), 'to_utc': cal.iso_utc(hi),
@@ -719,7 +776,7 @@ def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_t
     day_starts = [d['start'] for d in cal.days(lo, hi, z)]
     crossing = sum(1 for it in kept if it.get('t_hi') is not None and
                    bisect.bisect_right(day_starts, it['t_lo']) != bisect.bisect_right(day_starts, it['t_hi']))
-    return {
+    prepared = {
         'params': p, 'lo': lo, 'hi': hi, 'zone': zone, 'window': window, 'items': kept, 'labels': labels,
         'label_run': label_run, 'input_sha256': input_sha,
         'labels_record': {'label_run_id': label_run['label_run_id'] if label_run else None,
@@ -729,7 +786,7 @@ def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_t
                           'model_label_run_id': p['model_label_run_id']},
         'input': {'seam': loaded.get('seam'), 'source_rule': loaded['rule'], 'source_rule_sha256': loaded.get('rule_sha256'),
                   'projection': loaded.get('projection'), 'projection_params': loaded.get('params'),
-                  'event_ids_sha256': input_sha, 'items_used': len(kept),
+                  'event_ids_sha256': input_sha, 'items_used': len(kept), 'duration_lookback_s': lookback,
                   'items_in_window': in_window, 'items_in_margin_only': len(kept) - in_window,
                   'items_sha256': sha256_json([[it['event_id'], it['t_start'], it['t_end'], it.get('t_lo'), it.get('t_hi'),
                                                 it.get('basis'), it.get('declared_duration_s'), it.get('text_chars'),
@@ -750,14 +807,51 @@ def prepare_inputs(db, config: cat.CategoryConfig, *, window_from: str, window_t
             'source_truncated': loaded['truncated'],
         },
     }
+    if persist:
+        persist_labels(db, prepared, config)
+    return prepared
+
+
+@contextmanager
+def write_transaction(db):
+    """One short write transaction for storing a finished computation (a savepoint inside the caller's)."""
+    if db.in_transaction:
+        db.execute('SAVEPOINT analysis_persist')
+        try:
+            yield db
+        except BaseException:
+            db.execute('ROLLBACK TO SAVEPOINT analysis_persist')
+            db.execute('RELEASE SAVEPOINT analysis_persist')
+            raise
+        db.execute('RELEASE SAVEPOINT analysis_persist')
+        return
+    db.execute('BEGIN IMMEDIATE')
+    try:
+        yield db
+    except BaseException:
+        db.rollback()
+        raise
+    db.commit()
+
+
+def persist_labels(db, prepared: dict, config: cat.CategoryConfig) -> dict:
+    """Store (or reuse) the labelling run of ``prepared`` and record its id in ``labels_record``."""
+    label_run = cat.record_label_run(db, prepared['labels'], config, input_sha256=prepared['input_sha256'],
+                                     code_version=code_version(),
+                                     parameters={'model_label_run_id': prepared['params']['model_label_run_id']})
+    prepared['label_run'] = label_run
+    prepared['labels_record'] = {**prepared['labels_record'], 'label_run_id': label_run['label_run_id']}
+    return label_run
 
 
 def run_budget(db, config: cat.CategoryConfig, *, window_from: str, window_to: str, zone: str,
                params: dict | None = None, assume_zone: str | None = None, assumption_rule: str | None = None,
                persist: bool = True) -> dict:
     from . import runs
+    # Read and compute without a write transaction; the label run and the analysis run are stored
+    # together afterwards in one short transaction (review 2 finding 2: no lock during the grid).
     prepared = prepare_inputs(db, config, window_from=window_from, window_to=window_to, zone=zone, params=params,
-                              assume_zone=assume_zone, assumption_rule=assumption_rule, persist=persist)
+                              assume_zone=assume_zone, assumption_rule=assumption_rule, persist=False)
     p = prepared['params']
     computed = compute_budget(prepared['items'], prepared['labels'], config, lo=prepared['lo'], hi=prepared['hi'],
                               zone_name=zone, params=p)
@@ -771,8 +865,11 @@ def run_budget(db, config: cat.CategoryConfig, *, window_from: str, window_to: s
     }
     stored = None
     if persist:
-        stored = runs.store_run(db, kind='time_budget', parameters={'params': p, 'window': result['window']},
-                                config_sha256=config.sha256, config_version=config.version, source_rule=RULE,
-                                input_sha256=prepared['input_sha256'],
-                                label_run_id=prepared['labels_record']['label_run_id'], result=result)
+        with write_transaction(db):
+            persist_labels(db, prepared, config)
+            result['labels'] = prepared['labels_record']
+            stored = runs.store_run(db, kind='time_budget', parameters={'params': p, 'window': result['window']},
+                                    config_sha256=config.sha256, config_version=config.version, source_rule=RULE,
+                                    input_sha256=prepared['input_sha256'],
+                                    label_run_id=prepared['labels_record']['label_run_id'], result=result)
     return {'run': stored, 'result': result}

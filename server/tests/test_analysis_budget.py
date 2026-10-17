@@ -242,8 +242,9 @@ def test_parameter_validation_and_grid_bounds(corpus):
                                       'keys': list(budget.GRID_KEYS)}
 
 
-def test_model_labels_are_opt_in_hypotheses_below_rules(corpus):
+def test_model_labels_are_opt_in_hypotheses_below_rules(corpus, monkeypatch):
     dbmod, manifest, ids, config = corpus
+    monkeypatch.setenv(model_runs.TEST_PROVIDER_ENV, '1')  # the synthetic 'fake' test double (review 2 #13)
     with dbmod.session() as db:
         items = budget.load_items(db)['items']
         none = model_runs.run_model(db, items, purpose='labels')
@@ -262,8 +263,9 @@ def test_model_labels_are_opt_in_hypotheses_below_rules(corpus):
     assert result['labels']['model_label_run_id'] == fake['model_run_id']
 
 
-def test_feature_series_deterministic_and_model_series_separate(corpus):
+def test_feature_series_deterministic_and_model_series_separate(corpus, monkeypatch):
     dbmod, manifest, ids, config = corpus
+    monkeypatch.setenv(model_runs.TEST_PROVIDER_ENV, '1')  # the synthetic 'fake' test double (review 2 #13)
     with dbmod.session() as db:
         out = features.run_features(db, config, window_from=manifest['window']['from'],
                                     window_to=manifest['window']['to'], zone=activity.ZONE,

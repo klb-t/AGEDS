@@ -73,12 +73,15 @@ def _open_db():
     return db
 
 
-def _projection(db, args):
+def _projection(db, args, *, snapshot: bool = False):
+    from ..timeline.analysis_items import open_snapshot
     from ..timeline.projection import ensure_projection
     from ..timeline.ruleset import display_params, load_rule
     rule = load_rule(args.rule, kind='display_rule')
-    return rule, ensure_projection(db, rule, display_params(args.assume_zone, args.assumption_rule),
-                                   force_full=getattr(args, 'full', False))
+    params = display_params(args.assume_zone, args.assumption_rule)
+    if snapshot:  # reads follow: keep them in one snapshot (review 2 P4)
+        return rule, open_snapshot(db, rule, params)
+    return rule, ensure_projection(db, rule, params, force_full=getattr(args, 'full', False))
 
 
 def handle(args) -> int | None:
@@ -101,7 +104,7 @@ def handle(args) -> int | None:
                                    collections=args.collection, counterparties=args.counterparty, chatbots=args.chatbot,
                                    threads=args.thread, tags=args.tag, q=args.q, transcript_versions=args.transcript_versions,
                                    include_hidden=args.include_hidden)
-            rule, projection = _projection(db, args)
+            rule, projection = _projection(db, args, snapshot=True)
             payload, meta = export_window(db, projection, rule, fmt=fmt, max_rows=args.max_rows,
                                           start_us=parse_bound(args.from_), end_us=parse_bound(args.to, end=True),
                                           filters=filters, match=args.match, order=args.order, group=None)

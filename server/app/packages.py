@@ -68,6 +68,11 @@ EXTENSION_TABLES = (
     # metadata as for core jobs/processing_runs), and audited abandonments of catalog scans.
     'import_plans', 'import_plan_items', 'import_plan_item_members', 'import_plan_versions',
     'import_plan_decisions', 'import_plan_runs', 'import_plan_attempts', 'catalog_scan_abandonments',
+    # L3 (ledger): append-only parser observations of bank statements (stated balances and the
+    # code-computed balance check), typed ledger entries (exact decimal amounts, minor units,
+    # counterparty text) and health/fitness samples (special category data, imported only with a
+    # per-run opt-in; exported like other observations — the package is private metadata).
+    'ledger_statements', 'ledger_entries', 'health_samples',
 )
 EXCLUDED_EXTENSION_TABLES = {
     'api_tokens': 'credential table: token keys, salts and secret digests are never exported',

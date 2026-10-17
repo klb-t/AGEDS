@@ -65,7 +65,8 @@ Rule kinds: `counterparty` (dictionary; phone-like values compared by digits, ot
 case-folded; also addresses in sender/recipients), `email_domain` (domain or subdomain of
 any address in the event), `keyword` (NFKC + case-fold substring or whole word in the
 listed fields; bodies are scanned up to their first 65 536 characters), `chatbot`, `tag`,
-`thread` (conversation id), `event_type`.
+`thread` (conversation id), `event_type`, `signal_basis` (`metadata.signal.basis`, e.g.
+`provider_inference`).
 
 **Weights** are shares of the event's time in `(0, 1]` and are not normalized:
 `{"a": 0.5, "b": 0.5}` splits an event, `{"a": 1, "b": 1}` claims it fully for both and the
@@ -125,6 +126,14 @@ instants. Items whose uncertainty interval `[t_lo, t_hi]` is wider than
 variant covers `[t_lo, t_hi + confirmed duration]` of every remaining uncertain item.
 The interim projection `analysis_source.v1` is only a labelled fallback
 (`seam: interim_fallback`) for a checkout without the timeline package.
+
+**Inferred durations (2026-10-17, ledger task L3).** A start–end range or declared duration of an
+event whose `metadata.signal.basis` is in `inferred_duration_bases` (default `provider_inference`,
+`derived`: sleep and workout sessions, travel segments, provider visits, our own derivations) is an
+estimate in the probable variant (candle role `inferred`), never confirmed time, unless the run sets
+`inferred_duration_layer: lower`. Manually entered records (`provider_user_edit`) are declarations
+like calendar entries and stay confirmed unless that basis is added. Events without `signal` are
+unchanged. Category rules of kind `signal_basis` match the basis. See [LEDGER](LEDGER.md).
 
 **Variants** per category, built from intervals on the UTC axis:
 

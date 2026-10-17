@@ -108,6 +108,14 @@ def _confirmed_duration(metadata: dict) -> float | None:
     return None
 
 
+def _signal(metadata: dict) -> dict | None:
+    """``metadata.signal`` class/basis of the digital-traces contract (2026-10-17), else None."""
+    signal = metadata.get('signal')
+    if not isinstance(signal, dict):
+        return None
+    return {'class': signal.get('class'), 'basis': signal.get('basis')}
+
+
 def _wav_duration(db: sqlite3.Connection, artifact_id: int, cache: dict) -> float | None:
     """Declared WAV duration from the content-store copy's header prefix (never the original)."""
     if artifact_id in cache:
@@ -147,6 +155,7 @@ def _describe(db: sqlite3.Connection, e: sqlite3.Row, fields: bool) -> dict:
                  'conversation_id': chat.get('conversation_id'), 'model': chat.get('model')} if chat else None,
         'declared_duration_s': declared,
         'duration_basis': 'source_declared' if declared is not None else None,
+        'signal': _signal(metadata),
     }
     if fields:
         body = e['body']
@@ -297,6 +306,7 @@ def _enrich(db: sqlite3.Connection, items: list[dict], fields: bool, media_durat
             item['end_basis'] = {'kind': 'end', 'source': 'display_rule_end'} if item['t_end'] is not None else None
             item['declared_duration_s'] = declared
             item['duration_basis'] = 'source_declared' if declared is not None else None
+            item['signal'] = _signal(metadata)
             if declared is None and item['t_end'] is None and media_durations and item.get('artifact_id'):
                 wav = _wav_duration(db, item['artifact_id'], wav_cache)
                 if wav is not None:

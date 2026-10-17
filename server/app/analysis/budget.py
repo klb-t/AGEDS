@@ -85,7 +85,9 @@ _RANGES = {'session_gap_s': (0, 7 * 86400), 'typing_chars_per_min': (1, 100_000)
            'max_time_uncertainty_s': (0, 366 * 86400)}
 _INTS = {'max_grid_points': (1, 4096), 'max_candle_events': (0, 1_000_000), 'max_flip_records': (0, 100_000),
          'max_items': (1, 10_000_000)}
-_STR_LISTS = ('excluded_event_types', 'chat_content_kinds', 'typing_directions', 'reading_directions', 'priority')
+_STR_LISTS = ('excluded_event_types', 'chat_content_kinds', 'typing_directions', 'reading_directions', 'priority',
+              'inferred_duration_bases')
+INFERRED_DURATION_LAYERS = ('probable', 'lower')
 _OPT_STR_LISTS = ('typing_event_types', 'reading_event_types')
 _BOOLS = ('include_hidden', 'wav_header_durations')
 UNCERTAINTY_MODES = ('widen_upper', 'ignore')
@@ -122,6 +124,10 @@ def _check(name, value):
     if name == 'timeline_rule':
         if value is not None and (not isinstance(value, str) or not value or len(value) > 200):
             raise ValueError('timeline_rule must be a rule reference such as display_time@1, or null')
+        return value
+    if name == 'inferred_duration_layer':
+        if value not in INFERRED_DURATION_LAYERS:
+            raise ValueError(f'inferred_duration_layer must be one of {INFERRED_DURATION_LAYERS}')
         return value
     if name == 'grid_mode':
         if value not in GRID_MODES:
@@ -256,6 +262,11 @@ def _prepare(items: list[dict], labels: dict[int, dict], params: dict) -> list[d
             explicit, basis = (it['t_start'], it['t_end']), 'source_end'
         elif it.get('declared_duration_s'):
             explicit, basis = (it['t_start'], it['t_start'] + it['declared_duration_s']), it.get('duration_basis')
+        signal_basis = (it.get('signal') or {}).get('basis')
+        inferred = explicit is not None and signal_basis in params['inferred_duration_bases'] and \
+            params['inferred_duration_layer'] == 'probable'
+        if inferred:
+            basis = f'{basis}:{signal_basis}'
         chars = it.get('text_chars') or 0
         typing = chars > 0 and direction in params['typing_directions'] and \
             (params['typing_event_types'] is None or it['event_type'] in params['typing_event_types'])
@@ -263,6 +274,7 @@ def _prepare(items: list[dict], labels: dict[int, dict], params: dict) -> list[d
             (params['reading_event_types'] is None or it['event_type'] in params['reading_event_types'])
         label = labels[it['event_id']]
         acts.append({'eid': it['event_id'], 't': it['t_start'], 'explicit': explicit, 'explicit_basis': basis,
+                     'inferred': inferred,
                      'lo': it.get('t_lo', it['t_start']), 'hi': it.get('t_hi', it['t_start']),
                      'chars': chars, 'typing': typing, 'reading': reading,
                      'cats': label['categories'], 'path': label['path']})
@@ -275,7 +287,9 @@ def _point_intervals(acts: list[dict], point: dict, params: dict):
     for a in acts:
         spans = []
         if a['explicit']:
-            spans.append((a['explicit'][0], a['explicit'][1], 'explicit'))
+            # A provider-inferred or derived span (sleep/workout session, travel segment) is an estimate
+            # unless inferred_duration_layer='lower' (docs/LEDGER.md, docs/TIME_BUDGET.md).
+            spans.append((a['explicit'][0], a['explicit'][1], 'inferred' if a.get('inferred') else 'explicit'))
         if a['typing']:
             d = min(a['chars'] * 60.0 / point['typing_chars_per_min'], params['max_typing_s'])
             if d > 0:
@@ -684,6 +698,10 @@ def method_record(params: dict, source: dict | None = None) -> dict:
         'interim_fallback_rule': SOURCE_RULE,
         'session_rule': iv.SESSION_RULE, 'labeller': cat.LABELLER_ID,
         'artifact_class': 'interpretive',
+        'inferred_durations': ('a start-end range or declared duration of an event whose metadata.signal.basis is '
+                               'in inferred_duration_bases (provider inferences such as sleep stages, workouts, '
+                               'travel segments; our own derivations) is an estimate in the probable variant '
+                               '(role inferred); inferred_duration_layer=lower counts it as confirmed'),
         'variants': {
             'lower': 'confirmed ranges only: source end time or declared duration (call log, WAV header)',
             'probable': 'lower + typing (outgoing text) + reading (incoming chatbot answer) + session spans per category',

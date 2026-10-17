@@ -49,7 +49,7 @@ RESERVED_COLORS = {UNOBSERVED: '#8b949e', UNLABELLED: '#6e7681'}
 # Validated categorical order (dataviz reference palette, dark steps; checked against the #161b22 panel).
 DEFAULT_COLORS = ('#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#008300', '#9085e9', '#e66767')
 OVERFLOW_COLOR = '#9da7b3'
-RULE_KINDS = ('counterparty', 'email_domain', 'keyword', 'chatbot', 'tag', 'thread', 'event_type')
+RULE_KINDS = ('counterparty', 'email_domain', 'keyword', 'chatbot', 'tag', 'thread', 'event_type', 'signal_basis')
 COMBINE_MODES = ('max', 'first')
 PATHS = ('annotation', 'rule', 'model', 'default')
 MAX_CONFIG_BYTES = 4 * 1024 * 1024
@@ -154,7 +154,7 @@ def _compile(kind: str, values: tuple[str, ...], whole_word: bool) -> tuple:
         if whole_word:
             return (re.compile('|'.join(r'(?<!\w)' + re.escape(v) + r'(?!\w)' for v in folded)),)
         return (tuple(folded),)
-    if kind in ('chatbot', 'tag', 'event_type'):
+    if kind in ('chatbot', 'tag', 'event_type', 'signal_basis'):
         return (frozenset(fold(v) for v in values),)
     return (frozenset(values),)  # thread ids compare exactly
 
@@ -304,6 +304,9 @@ def _rule_matches(rule: Rule, item: dict) -> bool:
         return item.get('thread_id') in matcher
     if rule.kind == 'event_type':
         return isinstance(item.get('event_type'), str) and fold(item['event_type']) in matcher
+    if rule.kind == 'signal_basis':  # metadata.signal.basis (digital-traces contract, 2026-10-17)
+        basis = (item.get('signal') or {}).get('basis')
+        return isinstance(basis, str) and fold(basis) in matcher
     return False
 
 

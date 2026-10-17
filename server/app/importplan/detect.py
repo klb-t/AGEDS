@@ -52,19 +52,51 @@ ENTRY_COLUMNS = ('id', 'scan_id', 'collection_id', 'parent_entry_id', 'locator',
 from .limits import LIMIT_NAMES, PlanLimits  # noqa: E402,F401  (re-exported)
 
 
-def load_detectors(path: Path | str | None = None) -> dict:
-    raw = Path(path or DEFAULT_DETECTORS).read_bytes()
-    table = json.loads(raw)
+EXTENSION_DIR = DATA / 'detectors.d'
+
+
+def _check_table(table: dict, origin: str) -> None:
     if table.get('schema') != 'ageds.importplan-detectors' or not table.get('version'):
-        raise ValueError('detector table must declare schema ageds.importplan-detectors and a version')
+        raise ValueError(f'{origin}: detector table must declare schema ageds.importplan-detectors and a version')
     for rule in table.get('files', []):
         if not rule.get('id') or not rule.get('candidates'):
-            raise ValueError('every file rule needs an id and candidates')
+            raise ValueError(f'{origin}: every file rule needs an id and candidates')
         for candidate in rule['candidates']:
             if candidate.get('preference', 'primary') not in ('primary', 'alternative'):
-                raise ValueError(f'rule {rule["id"]}: preference must be primary or alternative')
-    table['_sha256'] = hashlib.sha256(raw).hexdigest()
-    table['_path'] = str(Path(path or DEFAULT_DETECTORS))
+                raise ValueError(f'{origin}: rule {rule["id"]}: preference must be primary or alternative')
+
+
+def load_detectors(path: Path | str | None = None, *, extensions: bool | None = None) -> dict:
+    """Base table plus area-owned extension tables (``data/detectors.d/*.json``).
+
+    Extensions only append ``files`` rules; rule ids stay unique. The recorded
+    hash covers the base bytes and every extension's name and bytes, so a plan
+    names exactly the rule set it used. An explicit ``path`` (tests, private
+    tables) loads that table alone unless ``extensions=True``.
+    """
+    base_path = Path(path or DEFAULT_DETECTORS)
+    raw = base_path.read_bytes()
+    table = json.loads(raw)
+    _check_table(table, str(base_path))
+    digest = hashlib.sha256(raw)
+    use_extensions = (path is None) if extensions is None else extensions
+    loaded = []
+    if use_extensions and EXTENSION_DIR.is_dir():
+        seen = {rule['id'] for rule in table.get('files', [])}
+        for extension in sorted(EXTENSION_DIR.glob('*.json')):
+            data = extension.read_bytes()
+            extra = json.loads(data)
+            _check_table(extra, str(extension))
+            for rule in extra.get('files', []):
+                if rule['id'] in seen:
+                    raise ValueError(f'{extension.name}: duplicate detector rule id {rule["id"]}')
+                seen.add(rule['id'])
+                table.setdefault('files', []).append(rule)
+            digest.update(b'\0' + extension.name.encode('utf-8') + b'\0' + data)
+            loaded.append({'name': extension.name, 'version': extra['version'], 'sha256': hashlib.sha256(data).hexdigest()})
+    table['_extensions'] = loaded
+    table['_sha256'] = digest.hexdigest() if loaded else hashlib.sha256(raw).hexdigest()
+    table['_path'] = str(base_path)
     return table
 
 

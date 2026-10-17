@@ -234,5 +234,21 @@ IMPORTERS: dict[str, Importer] = {i.key: i for i in (
 )}
 
 
+def _load_extension_importers() -> None:
+    """Area-owned importers: ``importplan/adapters_ext/<area>.py`` exposing ``IMPORTERS``."""
+    import importlib
+    import pkgutil
+    from . import adapters_ext
+    for info in sorted(pkgutil.iter_modules(adapters_ext.__path__), key=lambda m: m.name):
+        module = importlib.import_module(f'{adapters_ext.__name__}.{info.name}')
+        for importer in getattr(module, 'IMPORTERS', ()):
+            if importer.key in IMPORTERS:
+                raise RuntimeError(f'duplicate importer key {importer.key} in adapters_ext.{info.name}')
+            IMPORTERS[importer.key] = importer
+
+
+_load_extension_importers()
+
+
 def catalog_source_locator(collection_id: int, locator: str) -> str:
     return source_locator(collection_id, locator)

@@ -249,3 +249,22 @@ def test_plan_keep_and_browser_profile_opt_in(world):
     result = execute.execute_plan(plan_id, actor='tester', temp_dir=world['tmp'] / 'work')
     assert [o['status'] for o in result['items']] == ['done']
     assert rows("SELECT COUNT(*) AS n FROM trace_browser_visits WHERE reading_key='immutable'")[0]['n'] == 10
+
+
+def test_sidecar_rerun_after_images_appends_a_new_match(world):
+    root = Path(world['m']['photos']['root'])
+    _, plan_id = scan_and_plan(world, root)
+    exact = lambda i: i['name'] == 'IMG_20210101_101500.jpg.json' and 'Photos from 2021' in i['locator']  # noqa: E731
+    approve(plan_id, exact)
+    execute.execute_plan(plan_id, actor='tester', temp_dir=world['tmp'] / 'work')
+    approve(plan_id, lambda i: i['name'] == 'IMG_20210101_101500.jpg' and 'Photos from 2021' in i['locator'])
+    execute.execute_plan(plan_id, actor='tester', temp_dir=world['tmp'] / 'work')
+    result = execute.execute_plan(plan_id, actor='tester', temp_dir=world['tmp'] / 'work', rerun_done=True)
+    assert {o['status'] for o in result['items']} == {'done'}, result['items']
+    matches = rows('SELECT * FROM trace_photo_matches ORDER BY id')
+    assert len(matches) == 2
+    first, second = (json.loads(m['candidates_json'])[0] for m in matches)
+    assert first['artifact_id'] is None and second['artifact_id'] is not None
+    from server.app.traces.geotags import sidecar_media_sha256
+    with dbmod.session() as db:
+        assert sidecar_media_sha256(db, matches[1]['sidecar_id']) == world['m']['photos']['sha256']['a']

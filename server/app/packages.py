@@ -69,9 +69,10 @@ EXTENSION_TABLES = (
     'import_plans', 'import_plan_items', 'import_plan_item_members', 'import_plan_versions',
     'import_plan_decisions', 'import_plan_runs', 'import_plan_attempts', 'catalog_scan_abandonments',
     # L2 (traces): parser observations of personal-data exports and file metadata, all append-only.
-    # Photo sidecars keep third-party ``people`` names raw (exported like every observation); geotag
-    # and browser-visit rows exist only as far as the per-run opt-ins (enable_location /
-    # enable_browser_history) allowed; sidecar-to-media matches are rule-id hypotheses.
+    # Photo sidecars keep third-party ``people`` names raw (exported like every observation); geotag,
+    # provider-location and browser-visit rows exist only as far as the per-run opt-ins
+    # (enable_location / enable_browser_history) allowed; sidecar-to-media matches are rule-id
+    # hypotheses over a hashed candidate scope.
     'trace_photo_sidecars', 'trace_photo_matches', 'trace_geotags', 'trace_document_metadata',
     'trace_browser_visits', 'trace_provider_locations',
 )

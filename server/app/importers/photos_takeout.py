@@ -167,7 +167,13 @@ def match_candidates(sidecar: dict, title: str | None, media_names: list[str], c
 
 
 def _scope_sha(scope_kind: str, files: list[dict]) -> str:
-    return canonical_sha256([scope_kind, sorted([f['name'], f.get('sha256')] for f in files)])
+    """Identity of the candidate scope: names, content and what is already acquired/catalogued.
+
+    A later run over the same directory after more files were acquired is a new
+    scope, so it appends a new match row instead of conflicting with the earlier one.
+    """
+    return canonical_sha256([scope_kind, sorted([f['name'], f.get('sha256'), f.get('artifact_id'),
+                                                 f.get('catalog_entry_id')] for f in files)])
 
 
 def record_match(db, sidecar_id: int, title: str | None, name_info: dict, scope_kind: str, files: list[dict],

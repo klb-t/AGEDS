@@ -98,8 +98,9 @@ def test_records_json_raw_samples_issues_and_recorded_opt_in(env):
     activity = [json.loads(f['extra_json']) for f in fixes if 'provider_activity_guesses' in f['extra_json']]
     assert activity and activity[0]['provider_activity_guesses'][0]['activity'][0]['type'] == 'STILL'
     sessions = events('location_samples')
-    assert sessions and all(s['meta']['signal'] == {'class': 'passive', 'basis': 'raw_sample',
+    assert sessions and all(s['meta']['signal'] == {'class': 'passive', 'basis': 'derived', 'samples_basis': 'raw_sample',
                                                      'provider': 'google_location_history',
+                                                     'derivation': 'sampling_session(gap<=1800s)',
                                                      'device_or_account': s['meta']['signal']['device_or_account']}
                             for s in sessions)
     assert all(s['meta']['opt_in']['enable_location'] for s in sessions)

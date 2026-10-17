@@ -182,7 +182,7 @@ def bbox(points) -> dict | None:
     lats, lons = [], []
     for lat, lon in points:
         lats.append(lat)
-        lons.append(normalize_lon(lon) if lon != 180.0 else 180.0)
+        lons.append(lon if -180.0 <= lon <= 180.0 else normalize_lon(lon))
     if not lats:
         return None
     lons.sort()

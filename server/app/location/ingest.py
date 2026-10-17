@@ -18,8 +18,9 @@ A format module supplies ``parse(path, ctx)`` yielding records:
 
 Raw samples never become one event each: after the samples are stored, contiguous
 sampling sessions of this import become ``location_samples`` events (one per
-session, ``signal.class=passive``) so the timeline shows when a device recorded
-positions without one item per fix.
+session, ``signal.class=passive``, ``basis=derived`` with ``samples_basis=raw_sample``:
+the session span is our aggregation by the gap rule, its samples are raw) so the
+timeline shows when a device recorded positions without one item per fix.
 """
 from __future__ import annotations
 
@@ -282,8 +283,9 @@ def run_import(path: Path, *, importer: str, parser_version: str, parse, enable_
                 metadata = {'parser': {'name': importer, 'version': parser_version},
                             'locator': {'artifact_id': artifact_id, 'location_import_id': import_id,
                                         'first_fix_id': s['first_fix_id'], 'last_fix_id': s['last_fix_id']},
-                            'signal': {'class': 'passive', 'basis': 'raw_sample', 'provider': provider,
-                                       'device_or_account': s['stream']},
+                            'signal': {'class': 'passive', 'basis': 'derived', 'samples_basis': 'raw_sample',
+                                       'provider': provider, 'device_or_account': s['stream'],
+                                       'derivation': f'sampling_session(gap<={params.sample_session_gap_s}s)'},
                             'sampling': {'fixes': s['fixes'], 'gap_rule_s': params.sample_session_gap_s,
                                          'max_gap_s': s['max_gap_us'] / 1e6, 'fix_kinds': s['kinds'],
                                          'provider_sources': s['sources'], 'accuracy_m': s['accuracy_m'],

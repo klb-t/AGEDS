@@ -1,0 +1,12 @@
+{
+  "schema": "ageds.importplan-detectors",
+  "version": "1",
+  "notice": "Traces area (personal-data exports, photo and document metadata). Key and name markers follow publicly observed export layouts; they propose an importer, nothing is imported before approval. Location and browser history importers keep their opt-ins off by default.",
+  "files": [
+    {"id": "traces_google_photos_sidecar", "types": ["json"],
+     "probe": {"kind": "json_keys", "top": "object", "any": ["photoTakenTime", "creationTime", "geoDataExif", "photoLastModifiedTime"]},
+     "candidates": [{"importer": "google_photos_sidecar", "reason": "JSON object with Google Photos sidecar keys (photoTakenTime/creationTime/geoDataExif)"}]},
+    {"id": "traces_photo_geotags", "types": ["jpg", "tiff", "png"], "probe": {"kind": "exif_marker"},
+     "candidates": [{"importer": "photo_geotags", "preference": "alternative", "reason": "EXIF block present: the traces importer also reads the GPS IFD (coordinates only with enable_location)"}]}
+  ]
+}

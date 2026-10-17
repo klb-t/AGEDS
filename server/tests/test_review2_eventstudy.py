@@ -79,7 +79,9 @@ def test_review2_1_default_pool_excludes_outcome_events():
     assert info['eligible_selected'] == 850 and info['eligible_excluded_outcomes'] == 500 and info['eligible_events'] == 350
     assert result['input']['eligible_excluded_outcomes'] == 500
     assert naive['null_mean'] < 10  # pre-fix ~48 (stimuli placed exactly on outcome times) vs observed ~3
-    assert result['method']['id'] == 'ageds.event-study-method/v2' and result['schema'] == 'ageds.event-study-result/v2'
+    # v3 (2026-10-17, location area L1) only adds the passive-signal density default; v2 stays in the history.
+    assert result['method']['id'] == eventstudy.METHOD_ID and result['schema'] == 'ageds.event-study-result/v2'
+    assert 'ageds.event-study-method/v2' in result['method']['history']
 
 
 def test_review2_1_pool_of_only_the_stimuli_is_refused_not_reported_as_p_1():

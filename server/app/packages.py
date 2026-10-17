@@ -68,6 +68,12 @@ EXTENSION_TABLES = (
     # metadata as for core jobs/processing_runs), and audited abandonments of catalog scans.
     'import_plans', 'import_plan_items', 'import_plan_item_members', 'import_plan_versions',
     'import_plan_decisions', 'import_plan_runs', 'import_plan_attempts', 'catalog_scan_abandonments',
+    # L1 (location): import identities and runs (importer, parser version, stored precision, stream, counts,
+    # coverage), private place sets used by presence runs (they define what a presence interval means),
+    # append-only presence runs/intervals and correlation runs, hypotheses and their review history.
+    'location_imports', 'location_import_runs', 'location_place_sets', 'location_presence_runs',
+    'location_presence_intervals', 'location_correlation_runs', 'location_correlation_hypotheses',
+    'location_correlation_status',
 )
 EXCLUDED_EXTENSION_TABLES = {
     'api_tokens': 'credential table: token keys, salts and secret digests are never exported',
@@ -78,6 +84,14 @@ EXCLUDED_EXTENSION_TABLES = {
     'timeline_projection_evictions': 'derived cache bookkeeping: evictions of rebuildable timeline projections',
     'api_token_rejections': ('transient security telemetry (rejected token attempts per hour, key and reason); '
                              'references the excluded credential table api_tokens'),
+    # L1 (location): bulk raw samples. Millions of rows per export; re-derived exactly by re-importing the
+    # preserved original with the parser version and parameters recorded in location_imports.
+    'location_fixes': ('bulk raw position samples (millions per export); rebuilt by re-importing the preserved '
+                       'original with the parser version and parameters recorded in location_imports'),
+    'location_fix_observations': 'per-export locators of the excluded bulk table location_fixes (rebuilt by re-import)',
+    'location_signals': ('bulk raw non-positional signals (Wi-Fi scan summaries, activity records); rebuilt by '
+                         're-importing the preserved original'),
+    'location_signal_observations': 'per-export locators of the excluded bulk table location_signals (rebuilt by re-import)',
 }
 EXCLUDED_EXTENSION_COLUMNS = {
     'annotation_proposals': {'token_id': 'reference into the excluded credential table api_tokens'},

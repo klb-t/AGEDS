@@ -5,7 +5,12 @@ budget reports three variants built from intervals on the UTC axis:
 
 ``lower`` (L)    only explicitly confirmed time: source start–end ranges (call
                  logs, calendar entries, timed blocks) and declared durations
-                 (call ``duration``, WAV header of a recording).
+                 (call ``duration``, WAV header of a recording). Since v4 a
+                 start–end range of a provider inference (``metadata.signal.basis``
+                 ``provider_inference``/``provider_user_edit``, e.g. a provider's
+                 travel segment) or of our own derivation (``derived``, e.g. place
+                 presence) is **not** confirmed: it is an estimate in ``probable``
+                 (roles ``provider_inference`` / ``derived``).
 ``probable`` (P) L plus configurable heuristics: typing time before an outgoing
                  text (``chars / typing_chars_per_min``, capped), reading time
                  after an incoming chatbot answer (``chars /
@@ -52,7 +57,7 @@ from . import intervals as iv
 from .provenance import canonical_json, code_sha256, code_version, event_set_sha256, sha256_json
 from .source import RULE_ID as SOURCE_RULE, load_items
 
-RULE = 'time_budget.v3'
+RULE = 'time_budget.v4'
 # Method-record history. The computation is unchanged between versions; only what the
 # stored method record says changed. Runs stored under an earlier version keep their
 # result and result hash (analysis_runs is append-only) and are read as historical.
@@ -67,7 +72,14 @@ RULE_HISTORY = {
                        'estimated > gap attribution) like split_equal/priority, so lower <= probable <= upper holds for '
                        'it too; categories keep their full per-variant union (review 2 finding 8, '
                        'AGEDS-TASK-20261016-R2)'),
+    'time_budget.v4': ('start-end ranges of items whose metadata.signal.basis is provider_inference, '
+                       'provider_user_edit or derived (provider travel segments, visits, place presence) are '
+                       'estimates in the probable layer (roles provider_inference/derived), never confirmed lower '
+                       'time; items without metadata.signal are computed exactly as in v3 (digital traces, '
+                       'AGEDS-TASK-20261017-L1)'),
 }
+INFERRED_BASES = {'provider_inference': 'provider_inference', 'provider_user_edit': 'provider_inference',
+                  'derived': 'derived'}
 RESULT_SCHEMA = 'ageds.time_budget_result.v1'
 OVERLAP_RULES = ('split_equal', 'priority', 'count_both')
 GRID_KEYS = ('session_gap_s', 'typing_chars_per_min', 'reading_chars_per_min', 'max_attribution_s', 'overlap_rule')
@@ -251,8 +263,11 @@ def _prepare(items: list[dict], labels: dict[int, dict], params: dict) -> list[d
     acts = []
     for it in items:
         direction = _role_direction(it)
-        explicit, basis = None, None
-        if it['t_end'] is not None and it['t_end'] > it['t_start']:
+        explicit, basis, inferred = None, None, None
+        inferred_role = INFERRED_BASES.get((it.get('signal') or {}).get('basis'))
+        if it['t_end'] is not None and it['t_end'] > it['t_start'] and inferred_role:
+            inferred = (it['t_start'], it['t_end'], inferred_role)
+        elif it['t_end'] is not None and it['t_end'] > it['t_start']:
             explicit, basis = (it['t_start'], it['t_end']), 'source_end'
         elif it.get('declared_duration_s'):
             explicit, basis = (it['t_start'], it['t_start'] + it['declared_duration_s']), it.get('duration_basis')
@@ -263,6 +278,7 @@ def _prepare(items: list[dict], labels: dict[int, dict], params: dict) -> list[d
             (params['reading_event_types'] is None or it['event_type'] in params['reading_event_types'])
         label = labels[it['event_id']]
         acts.append({'eid': it['event_id'], 't': it['t_start'], 'explicit': explicit, 'explicit_basis': basis,
+                     'inferred': inferred,
                      'lo': it.get('t_lo', it['t_start']), 'hi': it.get('t_hi', it['t_start']),
                      'chars': chars, 'typing': typing, 'reading': reading,
                      'cats': label['categories'], 'path': label['path']})
@@ -276,6 +292,8 @@ def _point_intervals(acts: list[dict], point: dict, params: dict):
         spans = []
         if a['explicit']:
             spans.append((a['explicit'][0], a['explicit'][1], 'explicit'))
+        if a.get('inferred'):
+            spans.append(a['inferred'])
         if a['typing']:
             d = min(a['chars'] * 60.0 / point['typing_chars_per_min'], params['max_typing_s'])
             if d > 0:
@@ -352,7 +370,8 @@ def _uncertainty_intervals(acts: list[dict]) -> list[tuple]:
     out = []
     for a in acts:
         if a['hi'] > a['lo']:
-            duration = a['explicit'][1] - a['explicit'][0] if a['explicit'] else 0.0
+            duration = a['explicit'][1] - a['explicit'][0] if a['explicit'] else \
+                (a['inferred'][1] - a['inferred'][0] if a.get('inferred') else 0.0)
             for c, w in a['cats'].items():
                 out.append((a['lo'], a['hi'] + duration, c, w, (a['eid'],), 'time_uncertainty'))
     return out
@@ -686,7 +705,9 @@ def method_record(params: dict, source: dict | None = None) -> dict:
         'artifact_class': 'interpretive',
         'variants': {
             'lower': 'confirmed ranges only: source end time or declared duration (call log, WAV header)',
-            'probable': 'lower + typing (outgoing text) + reading (incoming chatbot answer) + session spans per category',
+            'probable': ('lower + typing (outgoing text) + reading (incoming chatbot answer) + session spans per category '
+                         '+ start-end ranges of provider inferences and derived items (signal.basis provider_inference/'
+                         'provider_user_edit/derived: provider travel segments, visits, place presence)'),
             'upper': 'probable + each gap attributed to each neighbouring category, min(gap, max_attribution_s)',
         },
         'union': 'within a category: union of intervals weighted by label weight (maximum); no double counting',

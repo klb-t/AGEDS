@@ -42,6 +42,7 @@ from __future__ import annotations
 import json
 import math
 import sqlite3
+from collections import Counter
 from fractions import Fraction
 from array import array
 from bisect import bisect_left
@@ -52,10 +53,10 @@ from zoneinfo import ZoneInfo
 from .hypotheses import (HypothesisError, HypothesisNotFound, canonical_json, category_event_ids, clean_actor,
                          code_version, disclaimer, fts_event_ids, resolve_category_config, selector_matches,
                          sha256_canonical, utc_now)
-from .preregistration import _analysis, require_registered
+from .preregistration import LEGACY_DENSITY_SIGNAL_CLASSES, _analysis, require_registered
 
 RESULT_SCHEMA = 'ageds.event-study-result/v2'
-METHOD_ID = 'ageds.event-study-method/v2'
+METHOD_ID = 'ageds.event-study-method/v3'
 METHOD_HISTORY = {
     'ageds.event-study-method/v1': (
         'permutation and stratified nulls drew stimulus times from every eligible event, including outcome and density '
@@ -69,6 +70,11 @@ METHOD_HISTORY = {
         'partial last block stays in place; extremes compared exactly without accumulating fractions, display means by '
         'math.fsum; selected-set fingerprints and tag/label edits after registration are checked against the version\'s '
         'first run (review 2, AGEDS-TASK-20261016-R2)'),
+    'ageds.event-study-method/v3': (
+        'documentation density excludes events whose metadata.signal.class is listed in '
+        'analysis.density_excludes_signal_classes (definition default ["passive"] since 2026-10-17: location sampling '
+        'sessions and place presence must not inflate density); definitions registered before lack the key and '
+        'exclude no class, exactly as v2 (digital traces, AGEDS-TASK-20261017-L1)'),
 }
 RNG_ID = 'splitmix64.v1'
 QUANTILE_RULE = 'nearest_rank_ceil'
@@ -671,7 +677,12 @@ def compute_event_study(definition: dict, params: dict, loaded: dict, *, fts: di
     if params['exclude_self_pairs']:
         out_items = [i for i in out_items if i['event_id'] not in stim_ids]
     out_ids = {i['event_id'] for i in out_items}
-    dens_items = [i for i in selected['density']
+    excluded_classes = set(params.get('density_excludes_signal_classes') or ())
+    dens_by_signal = [i for i in selected['density']
+                      if ((i.get('signal') or {}).get('class') not in excluded_classes)]
+    signal_excluded = Counter((i.get('signal') or {}).get('class') for i in selected['density']
+                              if (i.get('signal') or {}).get('class') in excluded_classes)
+    dens_items = [i for i in dens_by_signal
                   if not (params['density_excludes_stimuli'] and i['event_id'] in stim_ids)
                   and not (params['density_excludes_outcomes'] and i['event_id'] in out_ids)]
     # Review 2 finding 1: a permuted stimulus borrows an eligible event's time and stands for that
@@ -746,6 +757,9 @@ def compute_event_study(definition: dict, params: dict, loaded: dict, *, fts: di
             'stimulus_count': len(S), 'outcome_count': len(O), 'density_count': len(D),
             'eligible_events': len(eligible), 'eligible_times': len({t for t, _ in eligible}),
             'eligible_excluded_outcomes': excluded_outcomes,
+            'density_signal_exclusion': {'classes': sorted(excluded_classes),
+                                         'excluded_by_class': dict(sorted(signal_excluded.items())),
+                                         'basis': params.get('density_signal_basis', 'definition')},
             'self_pairs': len(self_pairs), 'self_pairs_excluded': params['exclude_self_pairs'],
             'untimed_excluded': {'count': len(untimed), 'by_reason': dict(sorted(by_reason.items())),
                                  'event_ids': sorted(u['event_id'] for u in untimed)[:limits.max_listed_ids],
@@ -889,7 +903,11 @@ def effective_parameters(definition: dict, overrides: dict | None) -> tuple[dict
         raise HypothesisError('only these parameters can be overridden per run (recorded as deviations): ' +
                               ', '.join(OVERRIDABLE) + f'; got {", ".join(unknown)}')
     registered = definition['analysis']
+    legacy = 'density_excludes_signal_classes' not in registered
+    if legacy:  # registered before the key existed: keep the stored behaviour (no class excluded)
+        registered = {**registered, 'density_excludes_signal_classes': list(LEGACY_DENSITY_SIGNAL_CLASSES)}
     params = _analysis({**registered, **overrides})
+    params['density_signal_basis'] = 'legacy_definition_without_key' if legacy else 'definition'
     deviations = [{'key': key, 'registered': registered[key], 'used': params[key]}
                   for key in OVERRIDABLE if params[key] != registered[key]]
     return params, deviations

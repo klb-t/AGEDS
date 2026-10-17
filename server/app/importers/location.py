@@ -9,6 +9,15 @@ and place IDs stay only in the preserved original file.
 Formats: ``Records.json`` (raw points, aggregated into runs of the same coarse
 cell), ``Semantic Location History`` monthly files (``timelineObjects``) and the
 newer on-device ``Timeline.json`` (``semanticSegments``).
+
+**Parser version 2** (``import_location_history_v2``, 2026-10-17, task L1) is the
+current importer: raw samples go to ``location_fixes``/``location_signals`` at a
+recorded stored precision (default: the source's), provider inferences become
+``location_visit``/``location_segment``/``location_profile`` events, ``rawSignals``,
+``userLocationProfile`` and the iOS ``location-history.json`` are read, and big files
+are streamed with bounded memory (``server/app/location``, ``docs/LOCATION.md``).
+Version 1 above stays callable and unchanged: its stored ``presence`` events are
+never reinterpreted, and a v2 import of the same file adds separate rows.
 """
 from __future__ import annotations
 
@@ -27,8 +36,7 @@ _KEEP = ('activityType', 'confidence', 'probability', 'semanticType', 'placeVisi
 _LATLNG = re.compile(r'^\s*(-?\d+(?:\.\d+)?)°?\s*,\s*(-?\d+(?:\.\d+)?)°?\s*$')
 
 
-class LocationOptInRequired(PermissionError):
-    pass
+from ..location.ingest import LocationOptInRequired  # noqa: E402  (one opt-in error type for v1 and v2)
 
 
 def _coarse(lat, lon, decimals: int):
@@ -197,3 +205,86 @@ def import_location_history(path: Path, *, enable_location: bool = False, coarse
                       counts=counts, coverage=coverage, issues=issues)
     return {'artifact_id': artifact_id, 'source_id': source_id, 'parser_version': PARSER_VERSION, **counts,
             'options': opt_in, 'coverage': coverage, 'issues': issues.as_dict()}
+
+
+# ---------------------------------------------------------------------------
+# Parser version 2 (streaming, raw samples + provider inferences)
+
+PARSER_VERSION_V2 = '2'
+
+
+def _parse_google_v2(path: Path, ctx):
+    from ..location import google, jsonstream
+    gctx = google.Context(keep_place_text=ctx.params.provider_place_text == 'keep',
+                          max_path_points=ctx.limits.max_path_points, raw_limits=ctx.limits.raw())
+    store_decimals = ctx.params.store_decimals
+    source = f'{PARSER_NAME}:{PARSER_VERSION_V2}'
+    report = jsonstream.StreamReport()
+    sections: dict[str, int] = {}
+    unknown_reported: set[str] = set()
+    with path.open('rb') as handle:
+        for key, index, value in jsonstream.iter_document(handle, max_element_bytes=ctx.limits.max_element_bytes,
+                                                          report=report):
+            sections[key] = sections.get(key, 0) + 1
+            issues: list = []
+            records: list = []
+            if key == 'locations' and index is not None:
+                fix = google.records_point(index, value, source=f'{source}:records_json', issues_out=issues)
+                if fix is not None:
+                    records.append(('fix', f'locations[{index}]', fix))
+            elif key == 'timelineObjects' and index is not None:
+                records += [('event', e) for e in google.semantic_object(
+                    index, value, store_decimals=store_decimals, ctx=gctx,
+                    source=f'{source}:semantic_location_history', issues=issues)]
+            elif key == 'semanticSegments' and index is not None:
+                records += [('event', e) for e in google.device_segment(
+                    index, value, store_decimals=store_decimals, ctx=gctx, source=f'{source}:timeline_device',
+                    issues=issues)]
+            elif key == 'rawSignals' and index is not None:
+                found = google.raw_signal(index, value, source=f'{source}:timeline_device', issues=issues)
+                if found is not None:
+                    records.append(found)
+            elif key == 'userLocationProfile' and index is None:
+                event = google.location_profile(value, store_decimals=store_decimals, ctx=gctx)
+                if event is not None:
+                    records.append(('event', event))
+            elif key == '$':
+                records += [('event', e) for e in google.device_segment(
+                    index, value, store_decimals=store_decimals, ctx=gctx, source=f'{source}:ios_location_history',
+                    issues=issues, fmt='ios_location_history', section='$')]
+            elif key not in unknown_reported:
+                unknown_reported.add(key)
+                issues.append(('section_not_imported', {'section': key[:64],
+                                                        'shape': 'array' if index is not None else 'value'}))
+            for code, details in issues:
+                yield ('issue', code, details)
+            yield from records
+    for item in report.issues[:50]:
+        yield ('issue', 'json_stream_' + item['code'], {k: v for k, v in item.items() if k != 'code'})
+    ctx.counts['sections'] = dict(sorted(sections.items()))
+    ctx.counts['json_stream'] = report.as_dict()
+    if not report.complete:
+        yield ('coverage', {'complete': False, 'json_stream_complete': False})
+
+
+def detect_google_format(path: Path) -> str:
+    from ..location import google
+    from ..location.ingest import read_prefix
+    return google.detect_format(read_prefix(path))
+
+
+def import_location_history_v2(path: Path, *, enable_location: bool = False, store_decimals: int | None = None,
+                               stream: str | None = None, provider_place_text: str = 'keep',
+                               sample_session_gap_s: int = 1800, source_locator: str | None = None,
+                               original_name: str | None = None, collection_id: int | None = None,
+                               label: str | None = None, limits=None) -> dict:
+    """Google location exports (all four layouts) with parser version 2; see ``docs/LOCATION.md``."""
+    from ..location.ingest import DEFAULT_LIMITS, ImportParams, run_import
+    params = ImportParams(store_decimals=store_decimals, stream=stream, provider_place_text=provider_place_text,
+                          sample_session_gap_s=sample_session_gap_s)
+    return run_import(path, importer=PARSER_NAME, parser_version=PARSER_VERSION_V2, parse=_parse_google_v2,
+                      enable_location=enable_location, params=params, source_kind='google_takeout',
+                      source_label='Google location history', provider='google_location_history',
+                      mime_type='application/json', detect=detect_google_format, source_locator=source_locator,
+                      original_name=original_name, collection_id=collection_id, label=label,
+                      limits=limits or DEFAULT_LIMITS)

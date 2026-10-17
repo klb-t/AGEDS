@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "project": "AGEDS",
-  "state_id": "AGEDS-STATE-20261017-001",
-  "updated_at": "2026-10-17T07:20:05.348593+00:00",
+  "state_id": "AGEDS-STATE-20261017-002",
+  "updated_at": "2026-10-17T13:21:31.086807+00:00",
   "based_on_remote_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
   "local_branch": "ccr-d25c3cb3-qgbhql",
   "status_summary": "Evidence Timeline & Analysis increment integrated on ccr-d25c3cb3-qgbhql (draft PR #6): catalog, import plan, chat/communication importers, timeline, multilingual ASR adapters, time budget, hypotheses, reports, read API + adapters, workbench; two adversarial reviews fixed; e2e acceptance 19/22 met, 3 not verifiable by a run. Full suite 1206 passed at 6023d0f. No real inference, real exports or Android execution in this session.",
@@ -26,11 +26,12 @@
   "coordination": {
     "transport": "repository_commits_and_stable_ids",
     "state_editor": "coordinator",
-    "active_claim": null,
+    "active_claim": "AGEDS-TASK-20261017 digital traces wave",
     "scope": "AGEDS only",
     "ci": "manual workflow_dispatch only",
     "history_is_not_active_schedule": true,
-    "plan": "docs/plans/EVIDENCE_TIMELINE_2026-10-16.md"
+    "plan": "docs/plans/EVIDENCE_TIMELINE_2026-10-16.md",
+    "plan_traces": "docs/plans/DIGITAL_TRACES_2026-10-17.md"
   },
   "publication": {
     "status": "draft_pr_open",
@@ -636,6 +637,81 @@
         "regression_tests_passed": 132,
         "note": "receipt and final checks written by coordinator after the agent hit a usage limit"
       }
+    },
+    {
+      "id": "AGEDS-TASK-20261017-F1",
+      "owner": "coordinator",
+      "status": "done",
+      "scope": [
+        "importplan/detect.py extension tables",
+        "importplan/adapters.py + adapters_ext/",
+        "schema/api/commands registrations location/traces/ledger",
+        "docs/plans/DIGITAL_TRACES_2026-10-17.md"
+      ],
+      "based_on_commit": "2fe0a50",
+      "acceptance": [
+        "full suite green (1208 passed)"
+      ],
+      "result_refs": []
+    },
+    {
+      "id": "AGEDS-TASK-20261017-L1",
+      "owner": "location",
+      "status": "claimed",
+      "scope": [
+        "server/app/location/",
+        "server/app/importers/location*.py",
+        "server/app/importers/gpx*.py,kml*.py,geojson*.py",
+        "schema/location.py",
+        "api/commands location",
+        "importplan adapters_ext/location.py + detectors.d/location.v1.json",
+        "templates/static location*",
+        "tests",
+        "docs/LOCATION.md"
+      ],
+      "based_on_commit": "2fe0a50",
+      "acceptance": [
+        "all location formats with raw vs provider inference layers, places/geofence presence, timeline lanes, map without external tiles, correlations, budget place rules"
+      ],
+      "result_refs": []
+    },
+    {
+      "id": "AGEDS-TASK-20261017-L2",
+      "owner": "traces",
+      "status": "claimed",
+      "scope": [
+        "server/app/traces/",
+        "server/app/importers/{photos_takeout,facebook,instagram,telegram,google_chat,twitter,linkedin,account_activity,doc_metadata,keep,browser_profiles}*.py",
+        "schema/traces.py",
+        "api/commands traces",
+        "adapters_ext/traces.py + detectors.d/traces.v1.json",
+        "tests",
+        "docs/PERSONAL_EXPORTS.md"
+      ],
+      "based_on_commit": "2fe0a50",
+      "acceptance": [
+        "prevalence-ordered personal exports with raw/decoded layers, opt-ins, idempotence"
+      ],
+      "result_refs": []
+    },
+    {
+      "id": "AGEDS-TASK-20261017-L3",
+      "owner": "ledger",
+      "status": "claimed",
+      "scope": [
+        "server/app/ledger/",
+        "server/app/importers/{tabular_profiles,camt053,mt940,health_*}*.py",
+        "schema/ledger.py",
+        "api/commands ledger",
+        "adapters_ext/ledger.py + detectors.d/ledger.v1.json",
+        "tests",
+        "docs/LEDGER.md"
+      ],
+      "based_on_commit": "2fe0a50",
+      "acceptance": [
+        "exact decimals, day-precision dates with kinds, health opt-in, sessions for budget"
+      ],
+      "result_refs": []
     }
   ],
   "remaining_boundaries": [

@@ -20,6 +20,9 @@ COMMAND_MODULES = (
     'imports_comm',
     'hypotheses',
     'importplan',
+    'location',
+    'traces',
+    'ledger',
 )
 
 

@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS location_fix_observations (
   locator TEXT NOT NULL,
   fix_id INTEGER NOT NULL REFERENCES location_fixes(id),
   PRIMARY KEY(import_id, locator)
-) WITHOUT ROWID;
+);
 CREATE INDEX IF NOT EXISTS idx_location_fix_observations_fix ON location_fix_observations(fix_id);
 
 CREATE TABLE IF NOT EXISTS location_signals (
@@ -109,7 +109,7 @@ CREATE TABLE IF NOT EXISTS location_signal_observations (
   locator TEXT NOT NULL,
   signal_id INTEGER NOT NULL REFERENCES location_signals(id),
   PRIMARY KEY(import_id, locator)
-) WITHOUT ROWID;
+);
 ''' + _append_only('location_imports', 'location_import_runs', 'location_fixes', 'location_fix_observations', 'location_signals',
                    'location_signal_observations')),
     (101, 'location_places_presence', '''

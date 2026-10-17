@@ -21,8 +21,7 @@ from pathlib import Path
 from ..location import geo
 from ..location.ingest import DEFAULT_LIMITS, FormatUnavailable, ImportParams, run_import
 from ..location.tracks import TrackStats
-from ..timeinfo import format_utc
-from ..timeinfo import TimeCandidate
+from ..timeinfo import TimeCandidate, format_utc
 
 PARSER_NAME = 'fit'
 PARSER_VERSION = '1'

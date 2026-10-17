@@ -61,7 +61,8 @@ real file outside the repository.
 | `official_categories` | categories counted by the feature `official_counterparties_distinct` |
 | `rules[]` | `id`, `version`, `kind`, `values`, `weights`, optional `event_types`; keyword rules also `fields` and `whole_word` |
 
-Rule kinds: `counterparty` (dictionary; phone-like values compared by digits, others
+Rule kinds (`place` added 2026-10-17, see [LOCATION](LOCATION.md) §7: private place ids of `place_presence`
+events): `counterparty` (dictionary; phone-like values compared by digits, others
 case-folded; also addresses in sender/recipients), `email_domain` (domain or subdomain of
 any address in the event), `keyword` (NFKC + case-fold substring or whole word in the
 listed fields; bodies are scanned up to their first 65 536 characters), `chatbot`, `tag`,
@@ -93,7 +94,14 @@ sets `EW_ANALYSIS_TEST_PROVIDERS=1` (review 2 finding 13, like `EW_CATALOG_TEST_
 the test suite sets it only in the tests that use it.
 Any other provider is refused as unavailable — no network adapter exists.
 
-## 4. The budget model (rule `time_budget.v3`)
+## 4. The budget model (rule `time_budget.v4`)
+
+`time_budget.v4` (2026-10-17, location area L1): a start–end range of an item whose
+`metadata.signal.basis` is `provider_inference`, `provider_user_edit` or `derived` (provider travel
+segments and visits, place presence, sampling sessions) is an estimate in `probable` (roles
+`provider_inference`/`derived`), never confirmed `lower` time; items without `metadata.signal`
+are computed as in v3. The preset `excluded_event_types` also lists `location_samples`.
+
 
 `time_budget.v3` (2026-10-16, review 2 finding 8, task R2): under `count_both` the
 `bez_kategorii` remainder is taken from the best-supported layer (confirmed > estimated > gap

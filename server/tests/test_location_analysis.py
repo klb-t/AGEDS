@@ -2,7 +2,6 @@
 ranges (time_budget.v4), passive-signal density default of event studies (method v3) — task L1."""
 from __future__ import annotations
 
-import json
 import random
 from dataclasses import replace
 from pathlib import Path

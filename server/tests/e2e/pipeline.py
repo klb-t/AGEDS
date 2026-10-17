@@ -829,6 +829,7 @@ class Pipeline:
 
     def stage_budget(self):
         with self.stage('time_budget'):
+            from server.app.analysis.budget import RULE as BUDGET_RULE  # v4 since 2026-10-17 (location area L1)
             categories = self.private / 'categories.json'
             window = ('--from', '2025-02-24', '--to', '2025-03-10', '--zone', ZONE)
             first = self.cli('budget-run', '--config', categories, *window, self.outputs / 'budget-1.json')
@@ -838,7 +839,8 @@ class Pipeline:
             self.check('budget.method_names_real_rule', ['K3.a'], 'the method record names the rule and hash that placed '
                        'the items (regression: it said analysis_source.v1)', method['source_rule'] == result['input']['source_rule']
                        == 'display_time@1' and method['source_rule_sha256'] == result['input']['source_rule_sha256']
-                       and method['rule'] == 'time_budget.v3', {k: method[k] for k in ('rule', 'seam', 'source_rule', 'source_rule_sha256')})
+                       and method['rule'] == BUDGET_RULE and 'time_budget.v3' in method['rule_history'],
+                       {k: method[k] for k in ('rule', 'seam', 'source_rule', 'source_rule_sha256')})
             days = result['candles']['day']
             empty = [d for d in days if not d['categories']]
             palette = {c['id'] for c in result['categories']}

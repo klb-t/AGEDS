@@ -172,6 +172,8 @@ coarse cell; Semantic Location History `placeVisit`/`activitySegment` and on-dev
 Coordinates are rounded to `coarse_decimals` (default 2, ≈1 km). Exact coordinates,
 addresses, place names and place IDs are **not** copied into metadata; they remain only in
 the preserved original. `rawSignals`/`userLocationProfile` are reported as not imported.
+This is parser version 1; version 2 (2026-10-17: raw samples at a recorded precision, provider
+inferences, raw signals, iOS export, streaming) is described in [LOCATION](LOCATION.md).
 
 ### Browser history (`browser_history.py`, event `browser_visit`) — opt-in
 

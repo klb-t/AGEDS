@@ -24,8 +24,6 @@ timeline shows when a device recorded positions without one item per fix.
 """
 from __future__ import annotations
 
-import json
-import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -320,10 +318,3 @@ def read_prefix(path: Path, size: int = 65536) -> bytes:
     with path.open('rb') as handle:
         return handle.read(size)
 
-
-def env_flag(name: str) -> bool:
-    return os.environ.get(name, '').strip().lower() in ('1', 'true', 'yes')
-
-
-def dumps(value) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, allow_nan=False)

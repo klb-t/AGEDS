@@ -81,7 +81,6 @@ def _time(value, kind: str, source: str, epoch_unit):
     if isinstance(value, (int, float)):
         if epoch_unit is None:
             return None, 'time_unit_unknown'
-        text = getattr(value, 'text', None) or str(value)
         try:
             if isinstance(value, float) and not float(value).is_integer():
                 return None, 'time_unparsed'

@@ -29,6 +29,7 @@
 | AI chat export importers | [ChatGPT/Claude.ai importers and cross-export logical dedup](IMPORTERS_CHAT.md). |
 | Communication, Takeout and media importers | [MBOX/EML, ICS, VCF, call logs, billing, recording names, My Activity, location, browser history, WhatsApp media, EXIF](IMPORTERS_COMM.md). |
 | Common timeline | [Projection rule, correlation hypotheses, timeline API and swimlane view](TIMELINE.md). |
+| Location history and places | [Google/GPX/KML/GeoJSON/FIT samples, provider inferences, private places, geofence presence, map without external tiles](LOCATION.md). |
 | Reports and export | [Report types, method record, manifest verification, citation bundles, extension tables in the metadata package](REPORTS.md). |
 | Hypothesis analyzer (interpretive) | [Preregistration, evidence dossier, thesis typology, permutation event study](HYPOTHESES.md). |
 | Time budget and feature series | [Categories, labels, bounds, candles, sensitivity, feature series](TIME_BUDGET.md). |

@@ -23,7 +23,7 @@ from pathlib import Path
 from ..location import geo, xmlstream
 from ..location.ingest import DEFAULT_LIMITS, ImportParams, run_import
 from ..location.tracks import TrackStats
-from ..timeinfo import TimeCandidate, from_iso
+from ..timeinfo import from_iso
 
 PARSER_NAME = 'kml'
 PARSER_VERSION = '1'
@@ -81,7 +81,6 @@ def parse_stream(handle, ctx, *, prefix: str = '', fmt: str = 'kml'):
     geom = None
     text_target = None
     root_checked = False
-    with_track_pending = []
     for ev in xmlstream.iter_events(handle, report):
         kind, name = ev[0], ev[1]
         if not root_checked and kind == 'start':

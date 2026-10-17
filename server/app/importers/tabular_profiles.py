@@ -224,7 +224,7 @@ def _text_tables(raw: bytes, profiles: list[dict], overrides: dict, limits: Comm
                                           max_raw_chars=limits.max_raw_chars)
             header_index = None
             if header_mode == 'none':
-                header_index = int(read.get('skip_lines', 0))
+                header_index = int(read.get('skip_lines', 0)) + 1  # index of the first data record
                 columns = resolve_profile_columns(profile, None)
             else:
                 for record in parsed['records']:
@@ -491,6 +491,10 @@ def _amount(record: dict, columns: dict, profile: dict, fmt: money.NumberFormat,
     mode = spec.get('mode', 'signed')
     out: dict = {'mode': mode}
     exact = flow = None
+    for field in (spec.get('column', 'amount'), 'debit', 'credit'):
+        if _cell_type(record, columns, field) == 'float':
+            problems.append('amount_from_spreadsheet_float_cell_repr')  # the cell's own text is not exposed
+            break
     if mode == 'signed':
         parsed = _number(_cell(record, columns, spec.get('column', 'amount')), fmt, decided)
         out['amount'] = parsed
@@ -672,6 +676,9 @@ def import_tabular(path: Path, *, profile_id: str | None = None, profiles_path: 
     if not selections:
         message = (f'profile {profile_id} does not match the table header' if profile_id else
                    'no tabular profile matches the table header within its header search rows')
+        failed = [a['error'] for a in (attempt_info['attempts'] if extension not in ('.xlsx', '.xls') else [])]
+        if failed:
+            message += f' (reading failed: {failed[0]})'
         record_import_run(artifact_id=artifact_id, importer=PARSER_NAME, parser_version=PARSER_VERSION,
                           options=options, counts={'records': 0}, coverage={'complete': False}, issues=issues)
         raise ValueError(message)
@@ -700,7 +707,9 @@ def _import_table(selection: dict, *, source_id: int, artifact_id: int, set_labe
                   counts: dict, limits: CommLimits) -> dict:
     profile, table = selection['profile'], selection['table']
     records = table['records']
-    header_position = next(i for i, r in enumerate(records) if r['index'] == selection['header_index'])
+    header_position = next((i for i, r in enumerate(records) if r['index'] == selection['header_index']), None)
+    if header_position is None:
+        raise ValueError(f"table {table['name']} has no record {selection['header_index']} (header or first data row)")
     header_mode = profile.get('read', {}).get('header', 'names')
     if header_mode == 'none':
         header = None

@@ -334,3 +334,45 @@ def test_corpus_part_is_registered_and_privacy_safe(tmp_path):
     assert not re.search(r'[A-Za-z0-9._%+-]+@(?!example\.(?:org|com|net))[A-Za-z0-9-]+\.[A-Za-z]{2,}', text)
     for value in manifest['ibans'].values():
         assert 'XXXX' in value or value[4:].startswith('0000')  # fictional bank codes only
+
+
+def test_headerless_profile_by_positions_and_explicit_encoding_failure(env, tmp_path):
+    source = tmp_path / 'headerless.txt'
+    source.write_bytes('EXPORT 2024\n2024-05-01|Zażółć|-7,25|PLN\n2024-05-02|Opłata|3,00|PLN\n'.encode('iso-8859-2'))
+    private = tmp_path / 'positions.json'
+    private.write_text(json.dumps({'schema': 'private.tabular', 'version': '1', 'profiles': [{
+        'id': 'positions', 'record_kind': 'financial_transaction',
+        'read': {'encoding': 'iso-8859-2', 'delimiter': '|', 'header': 'none', 'skip_lines': 1},
+        'columns': {'booking_date': {'column': 1}, 'description': {'column': 2}, 'amount': {'column': 3},
+                    'currency': {'column': 4}},
+        'required': ['booking_date', 'amount'],
+        'times': {'booking_date': {'kind': 'booking_date', 'date': 'booking_date', 'date_formats': ['YYYY-MM-DD']}},
+        'number': {'decimal': ',', 'thousands': []}, 'amount': {'mode': 'signed'}}]}))
+    result = tp.import_tabular(source, profile_id='positions', profiles_path=private)
+    table = result['tables'][0]
+    assert table['reading']['encoding']['basis'] == 'explicit' and table['preamble_rows'] == 1
+    evs = events(result['artifact_id'])
+    assert [(e['body'], entry(e)['amount_exact']) for e in evs] == [('Zażółć', '-7.25'), ('Opłata', '3.00')]
+    with pytest.raises(ValueError, match='reading failed: bytes are not valid utf-8'):
+        tp.import_tabular(source, profile_id='positions', profiles_path=private, encoding='utf-8',
+                          source_locator='forced-utf8')
+
+
+def test_xlsx_typed_dates_and_float_cells_are_flagged(env, tmp_path):
+    openpyxl = pytest.importorskip('openpyxl')
+    from datetime import datetime as dt
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.append(['Bank example export'])
+    sheet.append(['Date', 'Value date', 'Description', 'Debit', 'Credit', 'Currency'])
+    sheet.append([dt(2024, 3, 4), dt(2024, 3, 5), 'Typed cells', 12.5, None, 'EUR'])
+    sheet.append(['05/03/2024', '05/03/2024', 'Text cells', '1.10', None, 'EUR'])
+    path = tmp_path / 'bank.xlsx'
+    workbook.save(path)
+    result = tp.import_tabular(path, profile_id='example_bank_debit_credit_columns_v1')
+    typed, text = events(result['artifact_id'])
+    booking = [t for t in typed['times'] if t['meta']['date_kind'] == 'booking_date']
+    assert [t['local'] for t in booking] == ['2024-03-04T00:00:00']  # typed date: no day/month ambiguity
+    assert entry(typed)['amount_exact'] == '-12.5'
+    assert 'amount_from_spreadsheet_float_cell_repr' in typed['meta']['issues']
+    assert entry(text)['amount_exact'] == '-1.10' and 'amount_from_spreadsheet_float_cell_repr' not in text['meta']['issues']

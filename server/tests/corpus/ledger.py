@@ -135,13 +135,122 @@ def _rides(root: Path) -> dict:
     return {'path': _write(root / 'rides.csv', text, 'utf-8')}
 
 
+CAMT_NS2 = 'urn:iso:std:iso:20022:tech:xsd:camt.053.001.02'
+CAMT_NS8 = 'urn:iso:std:iso:20022:tech:xsd:camt.053.001.08'
+
+
+def _camt_entry(amount, ccy, indicator, booking, value, *, status='BOOK', reversal=None, tx='', ref='REF'):
+    rvsl = f'<RvslInd>{reversal}</RvslInd>' if reversal else ''
+    return (f'<Ntry><NtryRef>{ref}</NtryRef><Amt Ccy="{ccy}">{amount}</Amt><CdtDbtInd>{indicator}</CdtDbtInd>{rvsl}'
+            f'<Sts>{status}</Sts><BookgDt>{booking}</BookgDt><ValDt>{value}</ValDt><AcctSvcrRef>{ref}-SVC</AcctSvcrRef>'
+            '<BkTxCd><Domn><Cd>PMNT</Cd><Fmly><Cd>RCDT</Cd><SubFmlyCd>ESCT</SubFmlyCd></Fmly></Domn></BkTxCd>'
+            f'<NtryDtls>{tx}</NtryDtls></Ntry>')
+
+
+def _camt_tx(name_role, name, account, text, *, nested=False, amount=None):
+    party = f'<{name_role}><Pty><Nm>{name}</Nm></Pty></{name_role}>' if nested else f'<{name_role}><Nm>{name}</Nm></{name_role}>'
+    amt = f'<AmtDtls><TxAmt><Amt Ccy="EUR">{amount}</Amt></TxAmt></AmtDtls>' if amount else ''
+    return (f'<TxDtls><Refs><EndToEndId>E2E-{name[:3].upper()}</EndToEndId></Refs>{amt}<RltdPties>{party}'
+            f'<{name_role}Acct><Id><IBAN>{account}</IBAN></Id></{name_role}Acct></RltdPties>'
+            f'<RmtInf><Ustrd>{text}</Ustrd></RmtInf></TxDtls>')
+
+
+def _camt_balance(code, amount, indicator, day):
+    return (f'<Bal><Tp><CdOrPrtry><Cd>{code}</Cd></CdOrPrtry></Tp><Amt Ccy="EUR">{amount}</Amt>'
+            f'<CdtDbtInd>{indicator}</CdtDbtInd><Dt><Dt>{day}</Dt></Dt></Bal>')
+
+
+def _camt(root: Path) -> dict:
+    stmt1 = ('<Stmt><Id>STMT-1</Id><ElctrncSeqNb>1</ElctrncSeqNb><CreDtTm>2024-02-03T06:00:00+01:00</CreDtTm>'
+             f'<Acct><Id><IBAN>{IBAN_NL_A}</IBAN></Id><Ccy>EUR</Ccy></Acct>'
+             + _camt_balance('OPBD', '1000.00', 'CRDT', '2024-01-31') + _camt_balance('CLBD', '1090.25', 'CRDT', '2024-02-02')
+             + '<TxsSummry><TtlNtries><NbOfNtries>3</NbOfNtries></TtlNtries></TxsSummry>'
+             + _camt_entry('100.00', 'EUR', 'CRDT', '<Dt>2024-02-01</Dt>', '<Dt>2024-02-01</Dt>', ref='R1',
+                           tx=_camt_tx('Dbtr', 'Payer Example', IBAN_NL_B, 'Invoice 1'))
+             + _camt_entry('9.75', 'EUR', 'DBIT', '<DtTm>2024-02-02T10:15:00+01:00</DtTm>', '<DtTm>2024-02-02T00:00:00</DtTm>',
+                           ref='R2', tx=_camt_tx('Cdtr', 'Shop Example', IBAN_NL_B, 'Coffee'))
+             + _camt_entry('50.00', 'EUR', 'DBIT', '<Dt>2024-02-02</Dt>', '<Dt>2024-02-02</Dt>', status='PDNG', ref='R3')
+             + '</Stmt>')
+    stmt2 = ('<Stmt><Id>STMT-2</Id>'
+             f'<Acct><Id><IBAN>{IBAN_NL_A}</IBAN></Id></Acct>'
+             + _camt_balance('OPBD', '1090.25', 'CRDT', '2024-02-02') + _camt_balance('CLBD', '1200.00', 'CRDT', '2024-02-05')
+             + '<TxsSummry><TtlNtries><NbOfNtries>2</NbOfNtries></TtlNtries><TtlCdtNtries><NbOfNtries>1</NbOfNtries>'
+               '<Sum>100.00</Sum></TtlCdtNtries></TxsSummry>'
+             + _camt_entry('100.00', 'EUR', 'CRDT', '<Dt>2024-02-05</Dt>', '<Dt>2024-02-05</Dt>', ref='R4',
+                           tx=_camt_tx('Dbtr', 'Batch One', IBAN_NL_B, 'Part 1', amount='60.00')
+                           + _camt_tx('Dbtr', 'Batch Two', IBAN_NL_B, 'Part 2', amount='40.00'))
+             + _camt_entry('5.00', 'EUR', 'DBIT', '<Dt>2024-02-05</Dt>', '<Dt>2024-02-05</Dt>', reversal='true', ref='R5')
+             + '</Stmt>')
+    doc = (f'<?xml version="1.0" encoding="UTF-8"?>\n<Document xmlns="{CAMT_NS2}"><BkToCstmrStmt>'
+           '<GrpHdr><MsgId>MSG-1</MsgId><CreDtTm>2024-02-05T07:00:00Z</CreDtTm></GrpHdr>'
+           f'{stmt1}{stmt2}</BkToCstmrStmt></Document>\n')
+    v8 = (f'<?xml version="1.0" encoding="UTF-8"?>\n<Document xmlns="{CAMT_NS8}"><BkToCstmrStmt><GrpHdr><MsgId>M8</MsgId></GrpHdr>'
+          f'<Stmt><Id>S8</Id><Acct><Id><Othr><Id>ACCOUNT-0000-1</Id></Othr></Id></Acct>'
+          + _camt_balance('PRCD', '10.00', 'DBIT', '2024-03-01') + _camt_balance('CLBD', '15.00', 'CRDT', '2024-03-02')
+          + '<Ntry><Amt Ccy="EUR">25.00</Amt><CdtDbtInd>CRDT</CdtDbtInd><Sts><Cd>BOOK</Cd></Sts>'
+            '<BookgDt><Dt>2024-03-02</Dt></BookgDt><ValDt><Dt>2024-03-02</Dt></ValDt><NtryDtls>'
+          + _camt_tx('Dbtr', 'Nested Party', IBAN_PL_B, 'Nested name form', nested=True)
+          + '</NtryDtls></Ntry></Stmt></BkToCstmrStmt></Document>\n')
+    entity = ('<?xml version="1.0"?>\n<!DOCTYPE Document [<!ENTITY x "boom">]>\n'
+              f'<Document xmlns="{CAMT_NS2}"><BkToCstmrStmt>&x;</BkToCstmrStmt></Document>\n')
+    notification = ('<?xml version="1.0"?>\n<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.054.001.02">'
+                    '<BkToCstmrDbtCdtNtfctn><GrpHdr><MsgId>N</MsgId></GrpHdr></BkToCstmrDbtCdtNtfctn></Document>\n')
+    out = {}
+    for name, text in (('two_statements', doc), ('v8', v8), ('entity', entity), ('notification', notification)):
+        out[name] = _write(root / f'camt053_{name}.xml', text, 'utf-8')
+    return out
+
+
+MT940_ONE = """{1:F01EXAMPLEXXXXX0000000000}{2:I940EXAMPLEXXXXXN}{4:
+:20:STMT-2025-12
+:25:@ACCOUNT@
+:28C:00012/001
+:60F:C251230EUR1000,00
+:61:2512311231D25,50NTRFNONREF//BANKREF1
+SUPPLEMENTARY DETAILS
+:86:/EREF/E2E-1/NAME/Shop Example/IBAN/@IBAN_B@/REMI/Groceries
+:61:2512310102C100,NMSCREF2
+:86:?00Przelew?20Zwrot za u?21sluge?32Firma Przyk?33lad?38@IBAN_PL@
+:61:2601020102RD5,00FCHGNONREF
+:86:Free text line one
+continuing line two
+:61:2507010101C1,00NTRFAMBIG
+:86:ambiguous entry date
+:62F:C260102EUR1080,50
+-}
+:20:STMT2
+:25:@ACCOUNT@
+:28C:13/1
+:60F:C260102EUR1080,50
+:61:260105D80,50NTRFX
+:61:260105D80,50NTRFX
+:62F:C260105EUR950,00
+-
+:20:STMT3
+:25:@ACCOUNT@
+:60M:C260105EUR950,00
+:61:THIS IS NOT A STATEMENT LINE
+:62M:C260105EUR950,00
+-
+"""
+
+
+def _mt940(root: Path) -> dict:
+    text = (MT940_ONE.replace('@ACCOUNT@', IBAN_NL_A).replace('@IBAN_B@', IBAN_NL_B).replace('@IBAN_PL@', IBAN_PL_B)
+            .replace('\n', '\r\n'))
+    return {'path': _write(root / 'statement.sta', text, 'ascii'),
+            'no_fields': _write(root / 'not_mt940.txt', 'just a note\n', 'ascii')}
+
+
 def build(root: Path) -> dict:
     root.mkdir(parents=True, exist_ok=True)
     tables = root / 'tables'
     tables.mkdir(exist_ok=True)
+    statements = root / 'statements'
+    statements.mkdir(exist_ok=True)
     manifest = {
         'bank_pl': _bank_pl(tables), 'bank_nl': _bank_nl(tables), 'bank_dc': _bank_dc(tables),
-        'transit': _transit(tables), 'rides': _rides(tables),
+        'transit': _transit(tables), 'rides': _rides(tables), 'camt': _camt(statements), 'mt940': _mt940(statements),
         'ibans': {'nl_a': IBAN_NL_A, 'nl_b': IBAN_NL_B, 'pl_a': IBAN_PL_A, 'pl_b': IBAN_PL_B, 'invalid': IBAN_INVALID},
     }
     (root / 'manifest.json').write_text(json.dumps(manifest, indent=1, ensure_ascii=False), encoding='utf-8')

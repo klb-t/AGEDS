@@ -87,8 +87,13 @@ def fix_row(fix: dict, *, stream: str, store_decimals: int | None, import_id: in
         'vertical_accuracy_m': _num(fix.get('vertical_accuracy_m')), 'speed_mps': _num(fix.get('speed_mps')),
         'heading_deg': _num(fix.get('heading_deg')),
     }
-    time_identity = t_us if t_us is not None else (
-        ['local', candidate.local, candidate.tz_status] if candidate is not None and candidate.local else None)
+    if t_us is not None:
+        time_identity = t_us
+    elif candidate is not None and candidate.local:
+        time_identity = ['local', candidate.local, candidate.tz_status]
+    else:
+        raw_time = candidate.raw if candidate is not None else fix.get('time_raw')
+        time_identity = ['raw', raw_time] if raw_time is not None else None
     identity = canonical([time_identity, f'{lat:.{decimals}f}', f'{lon:.{decimals}f}', decimals,
                           values['accuracy_m'], values['altitude_m'], values['vertical_accuracy_m'],
                           values['speed_mps'], values['heading_deg'], fix['fix_kind'], fix['signal_basis'],

@@ -20,11 +20,13 @@ from __future__ import annotations
 
 import codecs
 import json
+import re
 from dataclasses import dataclass, field
 
 DEFAULT_CHUNK = 1024 * 1024
 DEFAULT_MAX_ELEMENT = 64 * 1024 * 1024
 _WS = ' \t\r\n'
+_NUMBER_TAIL = re.compile(r'[0-9.eE+-]*')
 
 
 class PreciseFloat(float):
@@ -134,8 +136,10 @@ class _Source:
             if end - self.pos > max_chars:
                 self.pos = end
                 return False, None, 'element_too_large'
-            # A number at the very end of the buffer may continue in the next chunk.
-            if end == len(self.buf) and not self.eof and self.buf[self.pos] not in '{["tfn':
+            # A number cut by the chunk boundary ("1" of "1.50", "1." of "1.5e3") may continue in the
+            # next chunk: read more until a delimiter follows or the decoded end stops moving.
+            if isinstance(value, (int, float)) and not isinstance(value, bool) and not self.eof and \
+                    _NUMBER_TAIL.match(self.buf, end).end() == len(self.buf):
                 if self.more():
                     continue
             self.pos = end

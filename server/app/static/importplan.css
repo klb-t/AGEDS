@@ -1,0 +1,42 @@
+.ip-layout{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:1rem;align-items:start}
+.ip-main{display:grid;grid-template-columns:minmax(0,1fr);gap:1rem;min-width:0}
+.importplan .panel{min-width:0}
+.ip-scroll{overflow-x:auto}
+.ip-actor{display:flex;flex-direction:column;font-size:.85rem;color:#8b949e;min-width:180px}
+.ip-form fieldset{border:1px solid #30363d;border-radius:8px;margin:0 0 .6rem;padding:.4rem .6rem}
+.ip-check{display:flex;gap:.4rem;align-items:baseline;padding:.2rem 0 .2rem calc(var(--depth,0) * 1rem)}
+.ip-check input,.ip-check-inline input{width:auto;margin:0}
+.ip-check small{display:block}
+.ip-check-inline{display:inline-flex;gap:.3rem;align-items:center;font-size:.85rem;color:#c9d1d9}
+.ip-plans{list-style:none;margin:0;padding:0}
+.ip-plans li{padding:.35rem .4rem;border-radius:6px}
+.ip-plans li.active{background:#1f6feb33}
+.ip-plans li small{display:block}
+.ip-inline{display:flex;flex-wrap:wrap;gap:.5rem;align-items:flex-end}
+.ip-inline label{flex:1 1 140px;font-size:.85rem;color:#8b949e}
+.ip-inline label.ip-check-inline{flex:0 0 auto}
+.ip-inline button,.ip-decide button{width:auto}
+.ip-actions{justify-content:space-between;margin:.4rem 0}
+.ip-totals{display:flex;flex-wrap:wrap;gap:.4rem 1rem;font-size:.85rem}
+.ip-items code.ip-locator{overflow-wrap:anywhere;word-break:break-all}
+.ip-items td{min-width:4rem}
+.ip-decide{display:flex;flex-direction:column;gap:.2rem;min-width:200px}
+.ip-decide label{font-size:.8rem;color:#8b949e}
+.ip-decide select,.ip-decide input[type=number]{padding:.35rem;margin:.1rem 0}
+.ip-buttons{display:flex;gap:.3rem;flex-wrap:wrap}
+.ip-buttons button{padding:.35rem .6rem}
+.ip-candidate summary{cursor:pointer}
+.ip-candidate ul{margin:.2rem 0;padding-left:1.1rem;font-size:.8rem;color:#c9d1d9}
+.ip-blocker{color:#f0883e;overflow-wrap:anywhere}
+.ip-links a{margin-right:.3rem}
+.ip-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.badge{display:inline-block;padding:0 .4rem;border-radius:999px;font-size:.75rem;background:#30363d}
+.ip-badge-approved{background:#1f6feb55}.ip-badge-done{background:#23863655}.ip-badge-skipped{background:#30363d}
+.ip-badge-failed,.ip-badge-refused{background:#da363355}.ip-badge-running{background:#9e6a0355}.ip-badge-ambiguous{background:#d2992255}
+.ip-run-completed{background:#23863655}.ip-run-partial,.ip-run-running{background:#9e6a0355}.ip-run-failed,.ip-run-interrupted{background:#da363355}
+tr.is-ambiguous{background:#d2992214}tr.ip-row-failed,tr.ip-row-refused{background:#da363314}
+button.secondary{background:#30363d;border-color:#484f58}
+.ip-status:empty{display:none}
+.ip-status{padding:.6rem;border:1px solid #d29922;border-radius:8px}
+@media(max-width:900px){.ip-layout{grid-template-columns:minmax(0,1fr)}.importplan dl{grid-template-columns:minmax(0,1fr)}.ip-actor{min-width:0}}
+.ip-items td:last-child{min-width:12rem}.ip-items td:nth-child(4){min-width:14rem}

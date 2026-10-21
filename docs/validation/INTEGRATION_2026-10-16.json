@@ -1,0 +1,60 @@
+{
+  "task": "AGEDS-TASK-20261016-X",
+  "date": "2026-10-16",
+  "tested_git_head": "e2aaa9c3fc4c516a27be161388922c162135c6f7",
+  "base": {
+    "branch": "wt-X",
+    "base_commit": "cab22bc",
+    "merged": "ccr-d25c3cb3-qgbhql @ 1fcfe53 (track R review fixes) merged as 773be0c"
+  },
+  "environment": {
+    "python": "3.13.16",
+    "fastapi": "0.116.1",
+    "jinja2": "3.1.6",
+    "openpyxl": "3.1.5",
+    "node": "v22.22.0",
+    "playwright": "1.62.1",
+    "chromium_executable": "/opt/pw-browsers/chromium-1194/chrome-linux/chrome (test environment path, not a dependency)"
+  },
+  "commands": [
+    {"command": "/home/user/wt/venv/bin/python -m pytest server/tests -q", "result": "1047 passed, 1 skipped (opt-in chat scale test), 764 subtests passed", "exit": 0},
+    {"command": "node --test server/tests/js/*.test.mjs", "result": "127 passed", "exit": 0},
+    {"command": "python3 scripts/verify_repository.py", "result": "passed after this receipt (the REPORTS.md link to it resolves)", "exit": 0},
+    {"command": "NODE_PATH=<playwright> PYTHON=<venv python> AGEDS_BROWSER_EXECUTABLE=<chromium> node server/tests/browser/acceptance.cjs", "result": "24 PASS", "exit": 0},
+    {"command": "… node server/tests/browser/timeline.cjs", "result": "8 PASS (new: workbench bookmarks strip)", "exit": 0},
+    {"command": "… node server/tests/browser/workbench.cjs", "result": "9 PASS", "exit": 0},
+    {"command": "… node server/tests/browser/reports.cjs", "result": "10 PASS (new: time budget and hypothesis dossier reports from the forms)", "exit": 0},
+    {"command": "… node server/tests/browser/analysis_budget.cjs", "result": "9 PASS", "exit": 0},
+    {"command": "… node server/tests/browser/hypotheses.cjs", "result": "10 PASS", "exit": 0},
+    {"command": "… node server/tests/browser/importplan.cjs", "result": "9 PASS", "exit": 0},
+    {"command": "… node server/tests/browser/media.cjs", "result": "7 PASS (page now requests the Polish UI explicitly)", "exit": 0},
+    {"command": "AGEDS_BROWSER_EXECUTABLE=<chromium> pytest server/tests/test_catalog_browser.py", "result": "1 passed (favicon.ico 404 of full headless Chrome ignored)", "exit": 0}
+  ],
+  "initial_state": {
+    "head": "cab22bc",
+    "pytest": "11 failed, 927 passed, 21 errors (reports read-only refresh, reason mapping, table classification, shell scripts)",
+    "after_merging_R": "new failures fixed: R tables unclassified, review #1/#5 xfails now passing, workbench cross-site code from the global CSRF guard"
+  },
+  "decisions": [
+    {"decision": "Reports refresh the timeline projection (derived cache) in a short write transaction before the read-only snapshot; inside the snapshot it must be fresh (read_projection under PRAGMA query_only), else retry up to 3 times, then ProjectionNotFresh.", "recorded_in": "report.json method.derived_caches (rule id/version/SHA-256, params, projection id, build id/mode/time, refreshed_by_report)", "reversal": "a per-snapshot versioned cache"},
+    {"decision": "Analysis item contract names an operator-zone DST gap nonexistent_local_time (not unknown_zone) on the timeline seam, as the interim seam did.", "test_expectation_changed": "E1 corpus untimed_reasons_assumed_zone {unknown_zone: 1} -> {nonexistent_local_time: 1}; more correct (02:30 does not exist on that day)"},
+    {"decision": "Projection undated reasons mapped to the analysis contract (no_candidates -> no_time_candidate).", "test_expectation_changed": "test_timeline_projection interim-contract test now expects no_time_candidate"},
+    {"decision": "Report parameter assumption_rule is required with assume_zone (named assumption, as on the timeline and in E1).", "reversal": "none planned"},
+    {"decision": "Report chronology hides chat parts hidden by the display rule unless include_hidden_chat_parts; counterparty shown literally (source label/address), the lane key kept as counterparty_key.", "test_expectation_changed": "independent SQL count excludes chat_message_part and metadata.chat.hidden"},
+    {"decision": "Extension tables: E1 analysis_* (6), E2 hypothesis* (8), I import_plan* (7) and catalog_scan_abandonments declared; R's timeline_projection_evictions (derived cache bookkeeping) and api_token_rejections (transient security telemetry) excluded with reasons."},
+    {"decision": "Import planner declares the catalogued mtime (catalog.ingest.declared_mtime) for every acquisition of a materialized member; other importer acquisitions are temporary copies (evidence.declared_source_times + temporary_copy_acquisitions)."}
+  ],
+  "runtime_executed": [
+    "timeline, time_budget and hypothesis_dossier report sections with stored synthetic runs (pytest and real Chromium from the forms)",
+    "bookmarks strip on /timeline in real Chromium",
+    "derived-cache refresh recorded and evidence tables unchanged by report creation (digest test)"
+  ],
+  "unit_tested_only": ["stale snapshot retry and refusal (monkeypatched refresh)"],
+  "not_run": ["PDF report format in this run (no EW_PDF_CHROMIUM)", "light theme of /timeline (not opted in)", "Android/JVM builds"],
+  "shared_edits": [
+    "server/app/evidence.py: additive declared_source_times() context and its lookup in ingest_file (R's file; merged after R finished)",
+    "server/app/timeline/analysis_items.py, server/app/analysis/source.py: read path without refresh, reason mapping, hidden flag on untimed",
+    "server/app/static/timeline.mjs, timeline.css, templates/timeline.html (C): bookmarks strip, theme tokens",
+    "server/app/importplan/adapters.py, execute.py (I): declared catalogued mtime"
+  ]
+}

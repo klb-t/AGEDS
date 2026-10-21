@@ -1,0 +1,48 @@
+/* Workbench pages; colours come only from app.css tokens. */
+.wb-main{max-width:1600px}
+.wb-layout{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:1rem;margin-bottom:1rem}
+@media(max-width:900px){.wb-layout{grid-template-columns:1fr}}
+.wb-row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.wb-row>*{width:auto}
+.wb-row input[type=text],.wb-row input[type=search],.wb-row input:not([type]){flex:1 1 14rem}
+.wb-inline{display:inline;margin:0}
+.wb-inline button,.wb-small{width:auto;padding:.3rem .65rem;margin:.1rem;font-size:.85rem}
+.wb-secondary{background:var(--neutral-button);border-color:var(--border);color:var(--text)}
+.wb-secondary:hover{background:var(--neutral-button-hover)}
+.wb-layers{display:flex;flex-wrap:wrap;gap:.3rem .9rem;margin:.4rem 0;border:0;padding:0}
+.wb-layers label{display:inline-flex;gap:.3rem;align-items:center;font-size:.9rem}
+.wb-layers input,.wb-check{width:auto;margin:0}
+.wb-facets{display:flex;flex-wrap:wrap;gap:.4rem;margin:.5rem 0;padding:0;list-style:none}
+.wb-facets li{border:1px solid var(--border);border-radius:999px;padding:.15rem .6rem;font-size:.82rem}
+.wb-facets li[data-zero]{color:var(--muted)}
+.wb-badge{display:inline-block;border:1px solid currentColor;border-radius:999px;padding:0 .5rem;font-size:.75rem;font-weight:600;white-space:nowrap}
+.wb-badge-raw_source_field{color:var(--badge-raw)}
+.wb-badge-parser_output{color:var(--badge-parser)}
+.wb-badge-model_output{color:var(--badge-model)}
+.wb-badge-human_annotation{color:var(--badge-human)}
+.wb-badge-unclassified{color:var(--badge-unclassified)}
+.wb-hit{display:grid;grid-template-columns:auto minmax(0,1fr);gap:.2rem .6rem;padding:.6rem 0;border-bottom:1px solid var(--border-subtle)}
+.wb-hit h3{font-size:1rem;margin:.1rem 0;overflow-wrap:anywhere}
+.wb-hit p{margin:.2rem 0;overflow-wrap:anywhere;white-space:pre-wrap}
+.wb-meta{color:var(--muted);font-size:.8rem}
+.wb-alert{color:var(--danger);font-weight:600}
+.wb-done{color:var(--ok);font-weight:600}
+.wb-status-missing{color:var(--danger)}
+.wb-status-changed{color:var(--warning)}
+.wb-status-unchanged{color:var(--ok)}
+.wb-tree{list-style:none;padding:0;margin:0}
+.wb-tree li{padding:.25rem 0}
+.wb-list{list-style:none;padding:0;margin:0}
+.wb-list>li{padding:.6rem 0;border-bottom:1px solid var(--border-subtle)}
+.wb-kbd,kbd{font-family:ui-monospace,monospace;font-size:.8rem;border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;padding:0 .3rem;background:var(--input-bg);color:var(--text)}
+.wb-overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-start;justify-content:center;padding:8vh 1rem;background:#0008}
+.wb-overlay[hidden]{display:none}
+.wb-dialog{width:min(720px,100%);max-height:80vh;overflow:auto;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:1rem 1.2rem;box-shadow:0 20px 60px #0006}
+.wb-dialog h2{margin-top:0}
+.wb-dialog table td,.wb-dialog table th{padding:.3rem .5rem}
+.wb-palette-list{list-style:none;padding:0;margin:.4rem 0;max-height:50vh;overflow:auto}
+.wb-palette-list li{padding:.35rem .5rem;border-radius:6px;cursor:pointer;display:flex;justify-content:space-between;gap:1rem}
+.wb-palette-list li[aria-selected=true]{background:var(--neutral-button-hover)}
+.wb-palette-list small{white-space:nowrap}
+.wb-copy-fallback{width:100%;min-height:6rem;font-family:ui-monospace,monospace;font-size:.8rem}
+details.wb-details summary{cursor:pointer;color:var(--link)}

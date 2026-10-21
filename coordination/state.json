@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "project": "AGEDS",
-  "state_id": "AGEDS-STATE-20261002-001",
-  "updated_at": "2026-10-02T20:47:52.084022+00:00",
+  "state_id": "AGEDS-STATE-20261021-001",
+  "updated_at": "2026-10-21T00:29:48.605329+00:00",
   "based_on_remote_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
-  "local_branch": "main",
-  "status_summary": "Recovery completed and merged into main via PR5; all82 overnight tasks reconciled, current checks passed, experiments and incremental history preserved. SAF device runtime remains unperformed.",
+  "local_branch": "ccr-d25c3cb3-qgbhql",
+  "status_summary": "Digital traces wave integrated (L1 location, L2 personal-data exports, L3 ledger/health/transport) on top of the 2026-10-16 increment. Full suite 1376 passed; 11 browser scripts PASS. L2/L3 agents stopped at a usage limit after committing code; coordinator committed their docs, merged, unified time_budget.v5 and wired photo geotags as a point source.",
   "history": {
     "overnight_ledger": "coordination/archive/2026-09-30_2026-10-01/night-20261001.json",
     "original_tasks": 82,
@@ -29,17 +29,20 @@
     "active_claim": null,
     "scope": "AGEDS only",
     "ci": "manual workflow_dispatch only",
-    "history_is_not_active_schedule": true
+    "history_is_not_active_schedule": true,
+    "plan": "docs/plans/EVIDENCE_TIMELINE_2026-10-16.md",
+    "plan_traces": "docs/plans/DIGITAL_TRACES_2026-10-17.md"
   },
   "publication": {
-    "status": "published_main",
+    "status": "draft_pr_open",
     "changes_published": true,
     "accepted_source_commit": "b8617575e1dce6c36586ced09623f74b97398e7e",
     "reviewed_local_head": "4725857535ff9024fd242261f3441d79cf187cc4",
     "source_tree": "fa124ba76c3391586bf891634861ed55db8ed2a0",
-    "pull_request": 5,
+    "pull_request": 6,
     "source_commit_map": "coordination/publication-20261002.json",
-    "initial_review_concern_resolved": "New-content and historical provenance review completed; matched case identifiers removed from current files, no new sensitive content found in reviewed additions. Preexisting history preserved."
+    "initial_review_concern_resolved": "New-content and historical provenance review completed; matched case identifiers removed from current files, no new sensitive content found in reviewed additions. Preexisting history preserved.",
+    "branch": "ccr-d25c3cb3-qgbhql"
   },
   "tasks": [
     {
@@ -137,13 +140,650 @@
         "docs/validation/BACKEND_COMPLETION_2026-10-02.json",
         "coordination/publication-20261002.json"
       ]
+    },
+    {
+      "id": "AGEDS-TASK-20261016-F0",
+      "owner": "coordinator",
+      "status": "accepted",
+      "scope": [
+        "server/app/schema/__init__.py",
+        "server/app/api/__init__.py",
+        "server/app/commands/__init__.py",
+        "server/app/web.py",
+        "server/app/timeinfo.py",
+        "server/app/schema/catalog.py#v10",
+        "server/app/schema/records.py#v20",
+        "server/app/evidence.py#collection_id",
+        "server/tests/corpus/__init__.py",
+        "docs/plans/EVIDENCE_TIMELINE_2026-10-16.md"
+      ],
+      "based_on_commit": "9c1d513b",
+      "acceptance": [
+        "Full backend suite green; migrations idempotent; DST fold/gap explicit."
+      ],
+      "result_refs": []
+    },
+    {
+      "id": "AGEDS-TASK-20261016-A",
+      "owner": "catalog",
+      "status": "accepted",
+      "scope": [
+        "server/app/catalog/",
+        "server/app/schema/catalog.py",
+        "server/app/api/catalog.py",
+        "server/app/commands/catalog.py",
+        "server/app/templates/catalog*.html",
+        "server/app/static/catalog*",
+        "server/tests/corpus/catalog_files.py",
+        "server/tests/test_catalog*.py",
+        "docs/CATALOG.md"
+      ],
+      "based_on_commit": "9c1d513b",
+      "acceptance": [
+        "Nested zip/tar virtual locators, signature-over-extension, content dedup with all observations, coverage gaps, sidecar hypotheses, originals unchanged."
+      ],
+      "result_refs": [
+        "docs/CATALOG.md",
+        "docs/validation/CATALOG_2026-10-16.json"
+      ],
+      "results": {
+        "backend_after_merge": "718 passed, 1 skipped, 680 subtests",
+        "catalog_tests": 108,
+        "browser": "real Chromium 141 page test (catalog)",
+        "originals_unchanged": "tree hash identical before/after scan/export/describe/ingest"
+      },
+      "decisions": [
+        "scan observations stored separately from acquisitions (AGENTS.md wins over prompt wording)",
+        "coverage_report() plain-dict contract for reports"
+      ],
+      "coordinator_followup": "CSV export formula guard (apostrophe_prefix_v1); XLSX already forced string cells",
+      "not_done": [
+        "7z/RAR adapters not executed (py7zr/rarfile absent)",
+        "no large real roots/performance",
+        "HTTP scan synchronous",
+        "abandoned running scan has no close command",
+        "no node unit tests for catalog.mjs"
+      ]
+    },
+    {
+      "id": "AGEDS-TASK-20261016-B",
+      "owner": "importers",
+      "status": "accepted",
+      "scope": [
+        "server/app/importers/ (new files)",
+        "server/app/importers/data/",
+        "server/app/schema/records.py (>=v21)",
+        "server/tests/corpus/chat_exports.py",
+        "server/tests/corpus/communications.py",
+        "server/tests/test_import_*.py",
+        "docs/IMPORTERS.md"
+      ],
+      "based_on_commit": "9c1d513b",
+      "acceptance": [
+        "Tree-preserving chat imports, logical dedup across 3 exports with edit/branch, raw fields, idempotent reimport, explicit tz ambiguity."
+      ],
+      "result_refs": [],
+      "parts": {
+        "B1_chat": {
+          "status": "accepted",
+          "integrated_commit": "4e9097d",
+          "result_refs": [
+            "docs/IMPORTERS_CHAT.md",
+            "docs/validation/IMPORT_CHAT_2026-10-16.json"
+          ],
+          "results": {
+            "backend_after_merge": "498 passed, 1 skipped (opt-in scale), 658 subtests",
+            "scale_opt_in": "126 MB synthetic export, 57,825 events, 43 s, +19.5 MB RSS"
+          },
+          "shared_edits": [
+            "evidence.add_event(db=None) caller transaction",
+            "imports_chat router/command registration"
+          ],
+          "not_done": [
+            "ZIP export input",
+            "browser view of dedup report",
+            "real vendor exports unavailable"
+          ]
+        },
+        "B2_comm": {
+          "status": "accepted",
+          "integrated_commit": "merge of wt-B2 de29aaf",
+          "result_refs": [
+            "docs/IMPORTERS_COMM.md",
+            "docs/validation/IMPORT_COMM_2026-10-16.json"
+          ],
+          "results": {
+            "backend_after_merge": "610 passed, 1 skipped, 680 subtests",
+            "cli_runtime": "12 commands, 14 import runs exit 0, 4 refusals exit 2, 34 corpus files hashes unchanged"
+          },
+          "shared_edits": [
+            "evidence.ingest_file(parent_artifact_id=None)",
+            "records.py COMM_MIGRATIONS 25-27",
+            "imports_comm registration"
+          ],
+          "deviations": [
+            "alphabetic email zones (CET) not converted; RFC 5322 -0000 reading kept as alternative",
+            "ICS TZID stored as explicit_offset + zone_declaration",
+            "ts_start/ts_end filled only when UTC instant fixed"
+          ],
+          "not_done": [
+            "correlations (track C)",
+            "XLS billing",
+            "PNG tEXt",
+            "TNEF/uuencode",
+            "UI"
+          ]
+        }
+      }
+    },
+    {
+      "id": "AGEDS-TASK-20261016-C",
+      "owner": "timeline",
+      "status": "accepted",
+      "scope": [
+        "server/app/timeline/",
+        "server/app/schema/timeline.py",
+        "server/app/api/timeline.py",
+        "server/app/commands/timeline.py",
+        "server/app/main.py#/api/timeline",
+        "server/app/templates/timeline*.html",
+        "server/app/static/timeline*",
+        "server/tests/test_timeline*.py",
+        "server/tests/js/timeline*.test.mjs",
+        "docs/TIMELINE.md"
+      ],
+      "based_on_commit": "9c1d513b",
+      "acceptance": [
+        "Versioned display rule, revocable correlation hypotheses, paginated filtered API keeping old shape, virtualized swimlanes."
+      ],
+      "result_refs": [
+        "docs/TIMELINE.md",
+        "docs/validation/TIMELINE_2026-10-16.json"
+      ],
+      "results": {
+        "backend_after_merge": "763 passed, 1 skipped",
+        "js": 95,
+        "browser": "timeline.cjs 7/7 at 5k and 200k events; acceptance.cjs 24 PASS",
+        "perf_200k": {
+          "first_build_s": 10.7,
+          "incremental_1000_s": 0.15,
+          "density_s": "0.27-0.35",
+          "day_window_ms": 40,
+          "first_render_ms": 606
+        }
+      },
+      "behaviour_change": "/api/timeline ordered by projected time desc, undated last by id (no created_at)",
+      "coordinator_followup": "dashboard list and /export/events.csv use projected order; events.csv formula guard apostrophe_prefix_v1"
+    },
+    {
+      "id": "AGEDS-TASK-20261016-D",
+      "owner": "media",
+      "status": "accepted",
+      "scope": [
+        "server/app/worker.py",
+        "server/app/transcription.py",
+        "server/app/jobs.py",
+        "server/app/media/",
+        "server/app/schema/media.py",
+        "server/app/api/media.py",
+        "server/app/commands/media.py",
+        "server/tests/corpus/audio.py",
+        "server/tests/test_media*.py",
+        "docs/MULTILINGUAL_ASR.md"
+      ],
+      "based_on_commit": "9c1d513b",
+      "acceptance": [
+        "Recipe pinned to job, per-segment language run with alternatives, run comparison, WER/CER tool, OCR/diarization adapters unavailable-explicit."
+      ],
+      "result_refs": [
+        "docs/MULTILINGUAL_ASR.md",
+        "docs/validation/MEDIA_2026-10-16.json"
+      ],
+      "results": {
+        "backend_after_merge": "556 passed, 1 skipped, 680 subtests",
+        "real_inference": "not executed (HF blocked; whisper/tesseract/pyannote absent)",
+        "runtime_executed": [
+          "CLI subprocess asr-recipes/media-capabilities/asr-benchmark hypotheses mode",
+          "uvicorn pages",
+          "worker explicit unavailable failures",
+          "poppler rasterization in OCR job"
+        ]
+      },
+      "coordinator_followup": "HTTP enqueue refuses model_options download_root/local_files_only (operator-only)",
+      "not_done": [
+        "real Whisper/Tesseract/pyannote",
+        "browser acceptance of /media pages",
+        "PDF text layer",
+        "event candidate review/promotion",
+        "B-AG-01 audit probes unavailable"
+      ]
+    },
+    {
+      "id": "AGEDS-TASK-20261016-E",
+      "owner": "analysis (E1 budget, E2 hypotheses)",
+      "status": "accepted",
+      "scope": [
+        "server/app/analysis/",
+        "server/app/schema/analysis.py",
+        "server/app/api/analysis.py",
+        "server/app/commands/analysis.py",
+        "server/app/templates/analysis*.html",
+        "server/app/static/analysis*",
+        "server/tests/corpus/activity.py",
+        "server/tests/test_analysis*.py",
+        "docs/TIME_BUDGET.md",
+        "docs/HYPOTHESES.md"
+      ],
+      "based_on_commit": "9c1d513b",
+      "acceptance": [
+        "Interval-union budgets with bounds, unobserved band, sensitivity grid, preregistered hypotheses, permutation event study with fixed disclaimers."
+      ],
+      "result_refs": [
+        "docs/TIME_BUDGET.md",
+        "docs/HYPOTHESES.md",
+        "docs/validation/TIME_BUDGET_2026-10-16.json",
+        "docs/validation/HYPOTHESES_2026-10-16.json"
+      ],
+      "results": {
+        "E1": "797 passed own head; analysis_budget.cjs 9/9; 20k events 7-9 s, 100k 38-43 s (11-point grid, 90 days)",
+        "E2": "835 passed own head; hypotheses.cjs 10 PASS; planted effect p<=0.02, density-burst null flagged, weekday confound removed by stratified null"
+      }
+    },
+    {
+      "id": "AGEDS-TASK-20261016-F",
+      "owner": "reports",
+      "status": "accepted",
+      "scope": [
+        "server/app/reports/",
+        "server/app/schema/reports.py",
+        "server/app/api/reports.py",
+        "server/app/commands/reports.py",
+        "server/app/templates/reports/",
+        "server/app/packages.py#extension_tables",
+        "server/tests/test_reports*.py",
+        "docs/REPORTS.md"
+      ],
+      "based_on_commit": "9c1d513b",
+      "acceptance": [
+        "Every number from code, method section, report manifest verifiable, outputs only to user directory."
+      ],
+      "result_refs": [
+        "docs/REPORTS.md",
+        "docs/validation/REPORTS_2026-10-16.json"
+      ],
+      "results": {
+        "own_suite": "750 passed; reports.cjs 9 PASS"
+      },
+      "pending": "timeline/budget/dossier providers wired by X"
+    },
+    {
+      "id": "AGEDS-TASK-20261016-G",
+      "owner": "ecosystem",
+      "status": "accepted",
+      "scope": [
+        "server/app/integrations/",
+        "server/app/schema/integrations.py",
+        "server/app/api/integrations.py",
+        "server/app/commands/integrations.py",
+        "server/tests/test_integrations*.py",
+        "docs/READ_API.md",
+        "docs/ECOSYSTEM_ADAPTERS.md",
+        "chatadhd: engine/ageds_adapter.py (stub) + docs"
+      ],
+      "based_on_commit": "9c1d513b",
+      "acceptance": [
+        "Read contract with local token, ChatADHD stub returning anchored quotes only, Loom graph export with hypothesis quarantine."
+      ],
+      "result_refs": [
+        "docs/validation/INTEGRATIONS_2026-10-16.json",
+        "docs/READ_API.md",
+        "docs/ECOSYSTEM_ADAPTERS.md",
+        "chatadhd ccr-d25c3cb3-qgbhql b0ffa8f (PR klb-t/chatadhd#46)"
+      ],
+      "results": {
+        "integrated_commit": "b6f3dd7",
+        "backend_after_merge": "471 passed, 658 subtests",
+        "chatadhd_unittest": 11,
+        "not_executed": [
+          "live ChatADHD/Loom against live AGEDS",
+          "browser run of /integrations",
+          "Android token setting"
+        ]
+      },
+      "shared_edits": [
+        "server/app/api/__init__.py: install_app hook (accepted)"
+      ]
+    },
+    {
+      "id": "AGEDS-TASK-20261016-H",
+      "owner": "workbench (Fable)",
+      "status": "accepted",
+      "scope": [
+        "server/app/workbench/",
+        "server/app/schema/workbench.py",
+        "server/app/api/workbench.py",
+        "server/app/commands/workbench.py",
+        "server/app/static/i18n/",
+        "server/app/templates/workbench*.html",
+        "server/tests/test_workbench*.py",
+        "docs/WORKBENCH.md"
+      ],
+      "based_on_commit": "887cc55",
+      "acceptance": [
+        "Layer-filtered search, saved searches, bulk tags, folders, bookmarks, theme, PL/NL/EN."
+      ],
+      "result_refs": [
+        "docs/WORKBENCH.md",
+        "docs/validation/WORKBENCH_2026-10-16.json"
+      ],
+      "results": {
+        "own_suite": "526 passed, 742 subtests; node 98; workbench.cjs 9 PASS; acceptance.cjs 24 PASS",
+        "wcag": "22 text pairs AA both themes"
+      },
+      "note": "first attempt on Fable stopped (credits exhausted) before writing; rerun on default model"
+    },
+    {
+      "id": "AGEDS-TASK-20261016-P",
+      "owner": "coordinator",
+      "status": "accepted",
+      "scope": [
+        "scripts/verify_repository.py"
+      ],
+      "based_on_commit": "9c1d513b",
+      "acceptance": [
+        "Privacy heuristics without false positives on current tree."
+      ],
+      "result_refs": [],
+      "results": {
+        "commits": [
+          "8c23ea8",
+          "887cc55"
+        ],
+        "tests": "server/tests/test_repository_privacy.py 2 passed"
+      }
+    },
+    {
+      "id": "AGEDS-TASK-20261016-I",
+      "owner": "importplan",
+      "status": "accepted",
+      "scope": [
+        "server/app/importplan/",
+        "server/app/schema/importplan.py (90-99)",
+        "api/commands importplan",
+        "templates/static importplan",
+        "tests"
+      ],
+      "based_on_commit": "e1ce8d2",
+      "acceptance": [
+        "plan exact, ambiguous never auto-approved, opt-ins off, idempotent rerun, tamper refused, crash resume"
+      ],
+      "result_refs": [
+        "docs/IMPORT_PLAN.md",
+        "docs/validation/IMPORT_PLAN_2026-10-16.json"
+      ],
+      "results": {
+        "own_suite": "748 passed, 2 xfailed (review #1/#5 pending R)",
+        "browser": "importplan.cjs 9 PASS, media.cjs 7 PASS"
+      }
+    },
+    {
+      "id": "AGEDS-TASK-20261016-REVIEW",
+      "owner": "reviewer",
+      "status": "accepted",
+      "scope": [
+        "read-only review of 9c1d513..b181c21"
+      ],
+      "based_on_commit": "b181c21",
+      "acceptance": [
+        "confirmed findings with reproducers"
+      ],
+      "result_refs": [
+        "13 confirmed + 6 plausible findings; fixes in task R"
+      ]
+    },
+    {
+      "id": "AGEDS-TASK-20261016-R",
+      "owner": "review_fixes",
+      "status": "accepted",
+      "scope": [
+        "files named in review findings",
+        "server/tests/test_review_fixes_*.py",
+        "docs/validation/REVIEW_FIXES_2026-10-16.*"
+      ],
+      "based_on_commit": "b181c21",
+      "acceptance": [
+        "each finding reproduced by a failing test, then fixed"
+      ],
+      "result_refs": [
+        "docs/validation/REVIEW_FIXES_2026-10-16.json"
+      ],
+      "results": {
+        "regression_tests": 81
+      }
+    },
+    {
+      "id": "AGEDS-TASK-20261016-X",
+      "owner": "integration",
+      "status": "accepted",
+      "scope": [
+        "post-merge failures",
+        "report providers timeline/budget/dossier",
+        "bookmarks on timeline"
+      ],
+      "based_on_commit": "cab22bc",
+      "acceptance": [
+        "full pytest, node, verify, all browser scripts green"
+      ],
+      "result_refs": [
+        "docs/validation/INTEGRATION_2026-10-16.json"
+      ]
+    },
+    {
+      "id": "AGEDS-TASK-20261016-Z",
+      "owner": "e2e",
+      "status": "accepted",
+      "scope": [
+        "server/tests/e2e/",
+        "server/tests/test_e2e_*.py",
+        "scripts/e2e_acceptance.py",
+        "docs/ACCEPTANCE.md"
+      ],
+      "based_on_commit": "8e491f7",
+      "acceptance": [
+        "criterion matrix"
+      ],
+      "result_refs": [
+        "docs/ACCEPTANCE.md",
+        "docs/validation/E2E_ACCEPTANCE_2026-10-16.json"
+      ],
+      "results": {
+        "criteria_met": 19,
+        "not_met": 0,
+        "not_verifiable_by_run": 3,
+        "defects_fixed": 3
+      }
+    },
+    {
+      "id": "AGEDS-TASK-20261016-REVIEW2",
+      "owner": "reviewer",
+      "status": "accepted",
+      "scope": [
+        "read-only review of b181c21..8e491f7"
+      ],
+      "based_on_commit": "8e491f7",
+      "acceptance": [
+        "confirmed findings with reproducers"
+      ],
+      "result_refs": [
+        "13 confirmed + 4 plausible; fixes in R2"
+      ]
+    },
+    {
+      "id": "AGEDS-TASK-20261016-R2",
+      "owner": "review2_fixes",
+      "status": "accepted",
+      "scope": [
+        "files named in review 2 findings",
+        "server/tests/test_review2_*.py"
+      ],
+      "based_on_commit": "8e491f7",
+      "acceptance": [
+        "each finding reproduced then fixed"
+      ],
+      "result_refs": [
+        "docs/validation/REVIEW2_FIXES_2026-10-16.json"
+      ],
+      "results": {
+        "regression_tests_passed": 132,
+        "note": "receipt and final checks written by coordinator after the agent hit a usage limit"
+      }
+    },
+    {
+      "id": "AGEDS-TASK-20261017-F1",
+      "owner": "coordinator",
+      "status": "done",
+      "scope": [
+        "importplan/detect.py extension tables",
+        "importplan/adapters.py + adapters_ext/",
+        "schema/api/commands registrations location/traces/ledger",
+        "docs/plans/DIGITAL_TRACES_2026-10-17.md"
+      ],
+      "based_on_commit": "2fe0a50",
+      "acceptance": [
+        "full suite green (1208 passed)"
+      ],
+      "result_refs": []
+    },
+    {
+      "id": "AGEDS-TASK-20261017-L1",
+      "owner": "location",
+      "status": "accepted",
+      "scope": [
+        "server/app/location/",
+        "server/app/importers/location*.py",
+        "server/app/importers/gpx*.py,kml*.py,geojson*.py",
+        "schema/location.py",
+        "api/commands location",
+        "importplan adapters_ext/location.py + detectors.d/location.v1.json",
+        "templates/static location*",
+        "tests",
+        "docs/LOCATION.md"
+      ],
+      "based_on_commit": "2fe0a50",
+      "acceptance": [
+        "all location formats with raw vs provider inference layers, places/geofence presence, timeline lanes, map without external tiles, correlations, budget place rules"
+      ],
+      "result_refs": [
+        "docs/LOCATION.md",
+        "docs/validation/LOCATION_2026-10-17.json"
+      ],
+      "results": {
+        "location_tests": 43,
+        "browser": "location.cjs 7 PASS",
+        "scale": "300k points 31 s import; presence 300k x 100 places 7 s"
+      }
+    },
+    {
+      "id": "AGEDS-TASK-20261017-L2",
+      "owner": "traces",
+      "status": "accepted",
+      "scope": [
+        "server/app/traces/",
+        "server/app/importers/{photos_takeout,facebook,instagram,telegram,google_chat,twitter,linkedin,account_activity,doc_metadata,keep,browser_profiles}*.py",
+        "schema/traces.py",
+        "api/commands traces",
+        "adapters_ext/traces.py + detectors.d/traces.v1.json",
+        "tests",
+        "docs/PERSONAL_EXPORTS.md"
+      ],
+      "based_on_commit": "2fe0a50",
+      "acceptance": [
+        "prevalence-ordered personal exports with raw/decoded layers, opt-ins, idempotence"
+      ],
+      "result_refs": [
+        "docs/PERSONAL_EXPORTS.md",
+        "docs/validation/TRACES_2026-10-17.json"
+      ],
+      "results": {
+        "browser": "traces.cjs 5 PASS",
+        "note": "agent stopped at a usage limit after committing code; docs/receipt committed by coordinator"
+      }
+    },
+    {
+      "id": "AGEDS-TASK-20261017-L3",
+      "owner": "ledger",
+      "status": "accepted",
+      "scope": [
+        "server/app/ledger/",
+        "server/app/importers/{tabular_profiles,camt053,mt940,health_*}*.py",
+        "schema/ledger.py",
+        "api/commands ledger",
+        "adapters_ext/ledger.py + detectors.d/ledger.v1.json",
+        "tests",
+        "docs/LEDGER.md"
+      ],
+      "based_on_commit": "2fe0a50",
+      "acceptance": [
+        "exact decimals, day-precision dates with kinds, health opt-in, sessions for budget"
+      ],
+      "result_refs": [
+        "docs/LEDGER.md",
+        "docs/validation/LEDGER_2026-10-17.json"
+      ],
+      "results": {
+        "browser": "ledger.cjs 6 PASS",
+        "note": "agent stopped at a usage limit after committing code; docs/receipt committed by coordinator"
+      }
+    },
+    {
+      "id": "AGEDS-TASK-20261021-INT",
+      "owner": "coordinator",
+      "status": "accepted",
+      "scope": [
+        "merge L1/L2/L3",
+        "analysis/budget.py time_budget.v5 (L1 v4 + L3 parameters; provider_user_edit estimate by default)",
+        "location/sources.py photo geotags point source + places-match-source"
+      ],
+      "based_on_commit": "eb8193a",
+      "acceptance": [
+        "full suite green",
+        "all browser scripts PASS"
+      ],
+      "results": {
+        "backend": "1376 passed, 1 skipped, 764 subtests",
+        "node": 137,
+        "browser": {
+          "acceptance": 24,
+          "timeline": 8,
+          "workbench": 9,
+          "reports": 10,
+          "analysis_budget": 9,
+          "hypotheses": 10,
+          "importplan": 9,
+          "media": 7,
+          "location": 7,
+          "traces": 5,
+          "ledger": 6,
+          "catalog": "1 passed"
+        }
+      },
+      "decisions": [
+        "time_budget.v5: provider_user_edit (self-entered records) is an estimate by default; reversible per run via inferred_duration_bases",
+        "photo geotag matching is a read-only projection; presence runs still use location_fixes only"
+      ]
     }
   ],
   "remaining_boundaries": [
-    "Android SAF device/provider execution: no connected device or emulator.",
-    "Polish speech quality/acoustic alignment unmeasured.",
-    "No live restore, signed custody, source media export or connected ecosystem adapters.",
-    "No API authentication.",
-    "Public Git history retains preexisting case-specific identifiers; current-tree cleanup is not history erasure."
-  ]
+    "No real ASR/OCR/diarization inference (Hugging Face blocked, engines absent): fake-engine tests only.",
+    "No real vendor exports: chat/Takeout/MBOX/billing layouts follow public observations and data-file mappings.",
+    "7z/RAR adapters not executed.",
+    "Android SAF device/provider execution not performed; Android unchanged; no Android token setting.",
+    "Time budgets and hypothesis results are interpretive aids, not observations or causal conclusions.",
+    "Manifests/packages hashed, not signed; five-layer standard, Live Explainer and signed custody are future work.",
+    "Public Git history retains preexisting case-specific identifiers."
+  ],
+  "previous_state": {
+    "state_id": "AGEDS-STATE-20261002-001",
+    "commit": "9c1d513"
+  }
 }

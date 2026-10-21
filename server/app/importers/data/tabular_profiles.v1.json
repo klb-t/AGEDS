@@ -1,0 +1,177 @@
+{
+  "schema": "ageds.tabular-profiles",
+  "version": "1",
+  "notice": "EXAMPLE profiles only. Header aliases are generic words in Polish, Dutch and English; no profile is verified against, or claims to match, any bank's, transit operator's or ride app's export. Copy a profile into a private profile file, adapt aliases, encoding, separators, date formats and negative notation to the exports you actually have, and pass it with --profiles.",
+  "profiles": [
+    {
+      "id": "example_bank_pl_style_v1",
+      "label": "Example (PL-style): semicolon CSV, CP1250 or UTF-8, bank name/period preamble, decimal comma, signed amounts, booking/transaction/value dates",
+      "record_kind": "financial_transaction",
+      "provider": "bank_csv_export",
+      "read": {"encoding": "auto", "encoding_preference": ["cp1250", "iso-8859-2", "cp1252"], "delimiter": ";", "header": "names", "header_search_rows": 40},
+      "columns": {
+        "booking_date": ["data księgowania", "data ksiegowania"],
+        "transaction_date": ["data operacji", "data transakcji"],
+        "value_date": ["data waluty"],
+        "amount": ["kwota", "kwota operacji"],
+        "currency": ["waluta"],
+        "counterparty_name": ["kontrahent", "nadawca / odbiorca", "odbiorca / nadawca", "odbiorca/nadawca"],
+        "counterparty_account": ["rachunek kontrahenta", "numer rachunku kontrahenta"],
+        "description": ["tytuł", "tytul", "opis operacji", "opis"],
+        "transaction_type": ["typ transakcji", "rodzaj operacji"],
+        "balance_after": ["saldo po operacji", "saldo"]
+      },
+      "required": ["booking_date", "amount"],
+      "times": {
+        "transaction_date": {"kind": "transaction_date", "date": "transaction_date", "date_formats": ["DD.MM.YYYY", "YYYY-MM-DD"]},
+        "booking_date": {"kind": "booking_date", "date": "booking_date", "date_formats": ["DD.MM.YYYY", "YYYY-MM-DD"]},
+        "value_date": {"kind": "value_date", "date": "value_date", "date_formats": ["DD.MM.YYYY", "YYYY-MM-DD"]}
+      },
+      "number": {"decimal": ",", "thousands": [" ", " ", "."], "negative": ["leading_minus"]},
+      "amount": {"mode": "signed", "default_currency": null},
+      "assumed_zone": null
+    },
+    {
+      "id": "example_bank_nl_style_v1",
+      "label": "Example (NL-style): comma CSV, quoted fields, YYYYMMDD dates, unsigned amount with an Af/Bij (debit/credit) indicator, decimal comma",
+      "record_kind": "financial_transaction",
+      "provider": "bank_csv_export",
+      "read": {"encoding": "auto", "encoding_preference": ["cp1252", "cp1250", "iso-8859-2"], "delimiter": ",", "header": "names", "header_search_rows": 10},
+      "columns": {
+        "booking_date": ["boekdatum", "datum"],
+        "value_date": ["rentedatum", "valutadatum"],
+        "counterparty_name": ["naam tegenpartij", "naam / omschrijving", "tegenpartij"],
+        "own_account": ["rekening", "eigen rekening"],
+        "counterparty_account": ["tegenrekening"],
+        "indicator": ["af bij", "af/bij", "bij/af"],
+        "amount": ["bedrag (eur)", "bedrag"],
+        "currency": ["valuta", "munt"],
+        "transaction_type": ["mutatiesoort", "code"],
+        "description": ["mededelingen", "omschrijving"]
+      },
+      "required": ["booking_date", "amount", "indicator"],
+      "times": {
+        "booking_date": {"kind": "booking_date", "date": "booking_date", "date_formats": ["YYYYMMDD", "DD-MM-YYYY"]},
+        "value_date": {"kind": "value_date", "date": "value_date", "date_formats": ["YYYYMMDD", "DD-MM-YYYY"]}
+      },
+      "number": {"decimal": ",", "thousands": ["."], "negative": ["leading_minus"]},
+      "amount": {"mode": "indicator", "indicator_map": {"af": "debit", "bij": "credit", "d": "debit", "c": "credit"}, "default_currency": "EUR"},
+      "assumed_zone": null
+    },
+    {
+      "id": "example_bank_debit_credit_columns_v1",
+      "label": "Example: separate debit and credit columns, day/month order inferred from the file (both readings kept when undecidable), decimal point, trailing-minus or parentheses negatives",
+      "record_kind": "financial_transaction",
+      "provider": "bank_csv_export",
+      "read": {"encoding": "auto", "delimiter": "auto", "header": "names", "header_search_rows": 20},
+      "columns": {
+        "booking_date": ["date", "booking date", "posted"],
+        "value_date": ["value date"],
+        "debit": ["debit", "paid out", "money out"],
+        "credit": ["credit", "paid in", "money in"],
+        "currency": ["currency"],
+        "counterparty_name": ["counterparty", "payee", "name"],
+        "counterparty_account": ["counterparty account", "iban"],
+        "description": ["description", "details", "reference"],
+        "balance_after": ["balance"]
+      },
+      "required": ["booking_date", "debit", "credit"],
+      "times": {
+        "booking_date": {"kind": "booking_date", "date": "booking_date", "order": "infer_from_file"},
+        "value_date": {"kind": "value_date", "date": "value_date", "order": "infer_from_file"}
+      },
+      "number": {"decimal": ".", "thousands": [","], "negative": ["leading_minus", "trailing_minus", "parentheses"]},
+      "amount": {"mode": "debit_credit", "default_currency": null},
+      "assumed_zone": null
+    },
+    {
+      "id": "example_transit_journeys_same_row_v1",
+      "label": "Example: public-transport card history, one journey per row (check-in and check-out time on the row's date; a check-out earlier than the check-in rolls over to the next day), fare signed, non-journey rows mapped",
+      "record_kind": "travel_segment",
+      "provider": "transit_card_history_export",
+      "transport_mode": "public_transport",
+      "read": {"encoding": "auto", "encoding_preference": ["cp1252", "cp1250", "iso-8859-2"], "delimiter": ";", "header": "names", "header_search_rows": 10},
+      "columns": {
+        "date": ["datum", "data", "date"],
+        "check_in_time": ["check-in", "check in", "wejście", "wejscie"],
+        "origin": ["vertrek", "start", "origin", "skąd", "skad"],
+        "check_out_time": ["check-uit", "check-out", "check out", "wyjście", "wyjscie"],
+        "destination": ["bestemming", "destination", "dokąd", "dokad"],
+        "fare": ["bedrag", "fare", "opłata", "oplata", "kwota"],
+        "row_type": ["transactie", "transaction", "typ"],
+        "card": ["kaartnummer", "card", "karta"]
+      },
+      "required": ["date", "check_in_time", "check_out_time"],
+      "times": {
+        "check_in": {"kind": "check_in", "date": "date", "time": "check_in_time", "date_formats": ["DD-MM-YYYY", "DD.MM.YYYY", "YYYY-MM-DD"], "time_formats": ["HH:mm", "HH:mm:ss"]},
+        "check_out": {"kind": "check_out", "date": "date", "time": "check_out_time", "date_formats": ["DD-MM-YYYY", "DD.MM.YYYY", "YYYY-MM-DD"], "time_formats": ["HH:mm", "HH:mm:ss"], "rollover_from": "check_in"}
+      },
+      "times_by_row_kind": {
+        "financial_transaction": {
+          "transaction_date": {"kind": "transaction_date", "date": "date", "date_formats": ["DD-MM-YYYY", "DD.MM.YYYY", "YYYY-MM-DD"]},
+          "check_in": {"kind": "transaction_date", "date": "date", "time": "check_in_time", "date_formats": ["DD-MM-YYYY", "DD.MM.YYYY", "YYYY-MM-DD"], "time_formats": ["HH:mm", "HH:mm:ss"]}
+        }
+      },
+      "row_type_map": {"reis": "travel", "journey": "travel", "przejazd": "travel", "saldo opgeladen": "financial_transaction", "top-up": "financial_transaction", "doładowanie": "financial_transaction", "*": "travel"},
+      "number": {"decimal": ",", "thousands": ["."], "negative": ["leading_minus"]},
+      "amount": {"mode": "signed", "column": "fare", "default_currency": "EUR"},
+      "assumed_zone": null
+    },
+    {
+      "id": "example_transit_taps_v1",
+      "label": "Example: public-transport card history with one tap per row (entry/exit); taps are paired by code (rule ledger.tap_pairing.v1, max_pair_gap_s), unpaired taps stay explicit",
+      "record_kind": "travel_taps",
+      "provider": "transit_card_history_export",
+      "transport_mode": "public_transport",
+      "read": {"encoding": "auto", "delimiter": "auto", "header": "names", "header_search_rows": 10},
+      "columns": {
+        "date": ["date", "data", "datum"],
+        "time": ["time", "godzina", "tijd"],
+        "stop": ["stop", "station", "przystanek", "halte"],
+        "tap": ["tap", "event", "zdarzenie", "type"],
+        "fare": ["fare", "opłata", "oplata", "bedrag"],
+        "card": ["card", "karta", "kaart"]
+      },
+      "required": ["date", "time", "tap"],
+      "times": {
+        "tap": {"kind": "tap", "date": "date", "time": "time", "date_formats": ["YYYY-MM-DD", "DD.MM.YYYY", "DD-MM-YYYY"], "time_formats": ["HH:mm:ss", "HH:mm"]}
+      },
+      "tap_map": {"entry": "in", "check-in": "in", "in": "in", "wejście": "in", "wejscie": "in", "exit": "out", "check-out": "out", "out": "out", "wyjście": "out", "wyjscie": "out"},
+      "pairing": {"rule": "ledger.tap_pairing.v1", "max_pair_gap_s": 18000},
+      "number": {"decimal": "auto", "thousands": [], "negative": ["leading_minus"]},
+      "amount": {"mode": "signed", "column": "fare", "positive_is": "debit", "default_currency": null},
+      "assumed_zone": null
+    },
+    {
+      "id": "example_ride_trips_v1",
+      "label": "Example: ride-hailing trips CSV with request/begin/dropoff times carrying an explicit offset, distance with a stated unit, fare amount and currency, trip status",
+      "record_kind": "ride",
+      "provider": "ride_hailing_trips_export",
+      "transport_mode": "ride_hailing",
+      "read": {"encoding": "auto", "delimiter": ",", "header": "names", "header_search_rows": 5},
+      "columns": {
+        "request_time": ["request time", "requested at"],
+        "begin_time": ["begin trip time", "trip start time", "pickup time"],
+        "dropoff_time": ["dropoff time", "trip end time"],
+        "distance": ["distance (km)", "distance (miles)", "distance"],
+        "fare": ["fare amount", "fare"],
+        "currency": ["fare currency", "currency"],
+        "status": ["trip or order status", "status"],
+        "product": ["product type", "product"],
+        "city": ["city"]
+      },
+      "required": ["request_time", "status"],
+      "times": {
+        "request": {"kind": "request", "datetime": "request_time", "formats": ["YYYY-MM-DD HH:mm:ss ZZ[ UTC]", "YYYY-MM-DD HH:mm:ss ZZ", "YYYY-MM-DD[T]HH:mm:ssZZ"]},
+        "begin": {"kind": "start", "datetime": "begin_time", "formats": ["YYYY-MM-DD HH:mm:ss ZZ[ UTC]", "YYYY-MM-DD HH:mm:ss ZZ", "YYYY-MM-DD[T]HH:mm:ssZZ"]},
+        "dropoff": {"kind": "end", "datetime": "dropoff_time", "formats": ["YYYY-MM-DD HH:mm:ss ZZ[ UTC]", "YYYY-MM-DD HH:mm:ss ZZ", "YYYY-MM-DD[T]HH:mm:ssZZ"]}
+      },
+      "distance_unit_by_header": {"distance (km)": "km", "distance (miles)": "mi"},
+      "distance_unit": null,
+      "status_map": {"completed": "completed", "canceled": "canceled", "cancelled": "canceled", "driver_canceled": "canceled", "rider_canceled": "canceled", "failed": "failed"},
+      "number": {"decimal": ".", "thousands": [], "negative": ["leading_minus"]},
+      "amount": {"mode": "signed", "column": "fare", "positive_is": "debit", "default_currency": null},
+      "assumed_zone": null
+    }
+  ]
+}

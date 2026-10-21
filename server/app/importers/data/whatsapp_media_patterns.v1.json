@@ -1,0 +1,20 @@
+{
+  "schema": "ageds.whatsapp-media-references",
+  "version": "1",
+  "notice": "EXAMPLE patterns for attachment and omission markers in WhatsApp chat exports (Android and iOS, EN/NL/PL wording). Wording differs between app versions and locales; these are examples, not a verified catalogue. An unmatched marker stays plain message text.",
+  "attached": [
+    {"id": "android_file_attached_en_v1", "regex": "^[\\u200e\\u200f]*(?P<file>[^\\s<>][^<>]*?\\.[A-Za-z0-9]{1,5}) \\(file attached\\)$"},
+    {"id": "android_file_attached_nl_v1", "regex": "^[\\u200e\\u200f]*(?P<file>[^\\s<>][^<>]*?\\.[A-Za-z0-9]{1,5}) \\(bestand bijgevoegd\\)$"},
+    {"id": "android_file_attached_pl_v1", "regex": "^[\\u200e\\u200f]*(?P<file>[^\\s<>][^<>]*?\\.[A-Za-z0-9]{1,5}) \\(załączono plik\\)$"},
+    {"id": "ios_attached_en_v1", "regex": "^[\\u200e\\u200f]*<attached: (?P<file>[^<>]+)>$"},
+    {"id": "ios_attached_nl_v1", "regex": "^[\\u200e\\u200f]*<bijgevoegd: (?P<file>[^<>]+)>$"},
+    {"id": "ios_attached_pl_v1", "regex": "^[\\u200e\\u200f]*<załączono: (?P<file>[^<>]+)>$"}
+  ],
+  "omitted": [
+    {"id": "android_media_omitted_en_v1", "regex": "^[\\u200e\\u200f]*<Media omitted>$"},
+    {"id": "android_media_omitted_nl_v1", "regex": "^[\\u200e\\u200f]*<Media weggelaten>$"},
+    {"id": "android_media_omitted_pl_v1", "regex": "^[\\u200e\\u200f]*<Pominięto multimedia>$"},
+    {"id": "ios_omitted_en_v1", "regex": "^[\\u200e\\u200f]*(?P<media>image|video|audio|sticker|GIF|document) omitted$"},
+    {"id": "ios_omitted_nl_v1", "regex": "^[\\u200e\\u200f]*(?P<media>afbeelding|video|audio|sticker|GIF|document) weggelaten$"}
+  ]
+}

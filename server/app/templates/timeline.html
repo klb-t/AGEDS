@@ -1,0 +1,58 @@
+<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Oś czasu · Evidence Workbench</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/timeline.css"></head><body>
+<header>{% include '_nav.html' %}<div><h1>Oś czasu</h1><p>Projekcja reguły <code>{{ rule.rule_id }}@{{ rule.version }}</code> — wybrany czas to decyzja reguły, nie nowa prawda; wszystkie kandydackie czasy są widoczne w szczegółach.</p></div></header>
+<main class="tl-main" data-timeline data-rule="{{ rule.rule_id }}@{{ rule.version }}" data-reports-available="{{ 'true' if reports_available else 'false' }}" data-state="init">
+<section class="panel tl-controls" aria-label="Filtry i widok">
+  <form data-filters class="tl-filters">
+    <label>Pasy według<select name="group" data-group>
+      <option value="source">źródła</option><option value="collection">kolekcji</option><option value="counterparty">kontrahenta</option>
+      <option value="chatbot">chatbota</option><option value="thread">wątku / rozmowy</option><option value="type">typu zdarzenia</option><option value="kind">rodzaju elementu</option>
+    </select></label>
+    <label>Typ zdarzenia<select name="event_type" multiple size="3" data-facet="event_types"></select></label>
+    <label>Rodzaj<select name="kind"><option value="">wszystkie</option><option value="event">zdarzenia</option><option value="transcript_segment">segmenty transkrypcji</option></select></label>
+    <label>Chatbot<select name="chatbot" multiple size="3" data-facet="chatbots"></select></label>
+    <label>Źródło<select name="source" multiple size="3" data-facet="sources"></select></label>
+    <label>Kolekcja<select name="collection" multiple size="3" data-facet="collections"></select></label>
+    <label>Tag<select name="tag" multiple size="3" data-facet="tags"></select></label>
+    <label>Kontrahent / osoba<input name="counterparty" placeholder="numer, adres lub wątek; przecinki"></label>
+    <label>Kategoria<select name="category" disabled title="Kategorie aktywności dostarczy tor E (prywatna konfiguracja); filtr jest zarezerwowany."><option>— tor E —</option></select></label>
+    <label>Tekst (FTS)<input name="q" placeholder='np. "umowa" OR termin'></label>
+    <label>Wersje transkrypcji<select name="transcript_versions"><option value="latest">najnowsza</option><option value="all">wszystkie</option></select></label>
+    <label class="tl-check"><span>Ukryte domyślnie</span><span><input type="checkbox" name="include_hidden" value="true"> pokaż części wiadomości i ukryte wiadomości</span></label>
+    <fieldset class="tl-zone"><legend>Przyjęta strefa (opcjonalnie, jawnie)</legend>
+      <input name="assume_zone" placeholder="np. Europe/Amsterdam" autocomplete="off">
+      <input name="assumption_rule" placeholder="identyfikator założenia" autocomplete="off">
+    </fieldset>
+    <button type="submit">Zastosuj</button>
+  </form>
+  <div class="tl-toolbar" role="toolbar" aria-label="Nawigacja osi czasu">
+    <button type="button" data-action="pan-left" title="Przesuń wcześniej (←)">◀</button>
+    <button type="button" data-action="zoom-in" title="Przybliż (+)">＋</button>
+    <button type="button" data-action="zoom-out" title="Oddal (−)">−</button>
+    <button type="button" data-action="pan-right" title="Przesuń później (→)">▶</button>
+    <button type="button" data-action="fit" title="Cały zakres">Całość</button>
+    <span class="tl-level" data-level></span>
+    <a data-export="csv" href="/api/timeline/export?format=csv" download>Eksport widoku CSV</a>
+    <a data-export="json" href="/api/timeline/export?format=json" download>JSON</a>
+    <button type="button" data-action="undated" data-undated-button>Bez czasu</button>
+  </div>
+  <p data-status role="status" class="tl-status">Ładowanie…</p>
+</section>
+<div class="tl-layout">
+  <section class="panel tl-stage" aria-label="Pasy osi czasu">
+    <div class="tl-ruler" data-ruler title="Przeciągnij, aby zaznaczyć zakres"></div>
+    <div class="tl-bookmarks" data-bookmarks aria-label="Zakładki — adnotacje człowieka, nie czasy zdarzeń"></div>
+    <div class="tl-lanes" data-lanes tabindex="0" aria-label="Pasy; strzałki przesuwają, + i − zmieniają przybliżenie">
+      <div class="tl-spacer" data-spacer></div>
+      <div class="tl-selection" data-selection hidden></div>
+    </div>
+    <p class="tl-legend"><span class="tl-key tl-key-item"></span> element · <span class="tl-key tl-key-interval"></span> przedział niepewności · <span class="tl-key tl-key-duration"></span> czas trwania · <span class="tl-key tl-key-unknown"></span> strefa nieznana (gęstość) · <span class="tl-key tl-key-bookmark"></span> zakładka (adnotacja człowieka)</p>
+  </section>
+  <aside class="panel tl-side">
+    <section data-range-panel hidden aria-label="Zaznaczony zakres"></section>
+    <section data-detail aria-live="polite"><h2>Szczegóły</h2><p>Kliknij element, aby zobaczyć wszystkie kandydackie czasy, regułę wyboru i odnośniki do źródła.</p></section>
+    <section data-undated hidden aria-label="Elementy bez czasu"></section>
+  </aside>
+</div>
+</main>
+<script type="module" src="/static/timeline.mjs"></script>
+</body></html>

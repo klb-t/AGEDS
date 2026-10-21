@@ -60,6 +60,8 @@ def _parser() -> argparse.ArgumentParser:
     citation.add_argument("output", type=Path, help="new packet file; existing files are never overwritten")
     inspect = commands.add_parser("citation-inspect", help="independently inspect a bounded citation packet without source access")
     inspect.add_argument("input", type=Path)
+    from .commands import register_all
+    register_all(commands)
     return parser
 
 
@@ -97,6 +99,10 @@ def _write_new_bytes(payload: bytes, output: Path, *, max_bytes: int):
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        from .commands import dispatch
+        extension_result = dispatch(args)
+        if extension_result is not None:
+            return extension_result
         if args.command == "scan":
             from .scanner import ScanLimits, export_manifest, scan_sources
             limits = ScanLimits(**{name: getattr(args, name) for name in _LIMIT_NAMES if getattr(args, name) is not None})

@@ -1,0 +1,142 @@
+{%- macro disc() -%}
+<p class="hyp-disclaimer" data-disclaimer data-disclaimer-id="{{disclaimer.id}}" data-disclaimer-sha256="{{disclaimer.sha256_pl}}" data-disclaimer-sha256-en="{{disclaimer.sha256_en}}"><span lang="pl">{{disclaimer.pl}}</span> <span lang="en">{{disclaimer.en}}</span></p>
+{%- endmacro -%}
+{%- macro pval(v) -%}{% if v is none %}—{% else %}{{'%.4f'|format(v)}}{% endif %}{%- endmacro -%}
+{%- macro num(v) -%}{% if v is none %}—{% elif v is number and v != v|int %}{{'%.3f'|format(v)}}{% else %}{{v}}{% endif %}{%- endmacro -%}
+<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hipotezy</title>
+<link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/hypotheses.css"></head>
+<body><div class="hyp-page" data-hypotheses-page data-hypothesis-id="{{selected.hypothesis_id if selected else ''}}">
+<header>{% include '_nav.html' %}<div><h1>Hipotezy</h1><p>Prerejestracja, dossier, typologia tez i analiza czasowa z testem permutacyjnym — warstwa interpretacyjna.</p></div></header>
+<main>
+<section class="panel" data-section="register">{{ disc() }}
+<div class="hyp-two">
+<div><h2>Zarejestrowane hipotezy</h2>
+<table data-hypothesis-list><tr><th>#</th><th>Tytuł</th><th>Wersja</th><th>Zarejestrowano</th><th>Pierwsza analiza</th><th>Integralność</th></tr>
+{% for h in listing %}<tr{% if selected and selected.hypothesis_id == h.hypothesis_id %} class="hyp-current"{% endif %}><td>{{h.hypothesis_id}}</td><td><a href="/hypotheses?id={{h.hypothesis_id}}">{{h.title}}</a></td><td>v{{h.latest_version_number}}</td><td><time>{{h.registered_at}}</time></td><td>{% if h.first_analysed_at %}<time>{{h.first_analysed_at}}</time>{% else %}jeszcze nie analizowano{% endif %}</td><td>{{h.integrity}}</td></tr>
+{% else %}<tr><td colspan="6">Brak hipotez. Zarejestruj definicję przed analizą.</td></tr>{% endfor %}</table></div>
+<form data-definition-form data-register-form>
+<h2>Nowa hipoteza (prerejestracja)</h2>
+<p class="hyp-note">Zapis przed analizą: definicja jest normalizowana, haszowana (SHA-256 kanonicznego JSON) i nie może być zmieniona — zmiana tworzy nową wersję.</p>
+<label>Definicja (JSON)<textarea name="definition" rows="14" spellcheck="false">{{ example|tojson(indent=2) }}</textarea></label>
+<div class="hyp-row"><label>Autor (deklarowany)<input name="actor" placeholder="np. analityk"></label><label>Notatka<input name="change_note"></label></div>
+<div class="hyp-row"><button type="button" data-preview>Podgląd hasha</button><button type="submit">Zarejestruj</button></div>
+<dl class="hyp-hash"><dt>SHA-256 (serwer)</dt><dd><code data-preview-hash>—</code></dd><dt>Weryfikacja w przeglądarce</dt><dd data-browser-hash>—</dd></dl>
+<details><summary>Kanoniczny JSON (to, co jest haszowane)</summary><pre class="hyp-pre" data-preview-canonical></pre></details>
+<p class="hyp-status" data-form-status role="status"></p>
+</form></div></section>
+
+{% if selected %}{% set latest = selected.versions[-1] %}{% set d = latest.definition %}
+<section class="panel" data-section="versions">{{ disc() }}
+<h2>{{d.title}} <small>hipoteza #{{selected.hypothesis_id}}</small></h2>
+<p class="hyp-text">{{d.text}}</p>
+<table data-versions><tr><th>Wersja</th><th>Zarejestrowano</th><th>Pierwsza analiza</th><th>Hash definicji</th><th>Hash rekordu (łańcuch)</th><th>Poprzednia</th><th>Integralność</th><th>Autor / notatka</th></tr>
+{% for v in selected.versions %}<tr data-version-id="{{v.version_id}}"><td>v{{v.version_number}} <small>(#{{v.version_id}})</small></td><td><time data-registered-at>{{v.registered_at}}</time></td><td>{% if v.first_analysed_at %}<time data-first-analysed-at>{{v.first_analysed_at}}</time>{% else %}—{% endif %}</td><td><code data-definition-sha256>{{v.definition_sha256}}</code></td><td><code>{{v.record_sha256[:16]}}…</code></td><td>{{v.previous_version_id or '—'}}</td><td>{{v.integrity.status}}</td><td>{{v.actor}}{% if v.change_note %} — {{v.change_note}}{% endif %}</td></tr>{% endfor %}</table>
+<div class="hyp-two">
+<dl class="hyp-def"><dt>Bodziec</dt><dd><code>{{d.stimulus|tojson}}</code></dd><dt>Wynik</dt><dd><code>{{d.outcome|tojson}}</code></dd>
+<dt>Gęstość dokumentacji</dt><dd><code>{{d.density|tojson}}</code> {% if not d.density %}(wszystkie zdarzenia){% endif %}</dd>
+<dt>Okna</dt><dd>{% for w in d.windows %}<span class="hyp-chip">{{w.label}}: [{{w.start_s}} s, {{w.end_s}} s)</span> {% endfor %}</dd>
+<dt>Kierunek</dt><dd>{{d.direction}}</dd><dt>Analiza</dt><dd><code>{{d.analysis|tojson}}</code></dd></dl>
+<form data-definition-form data-version-form data-hypothesis-id="{{selected.hypothesis_id}}">
+<h3>Nowa wersja definicji</h3><p class="hyp-note">Poprzednie wersje i ich wyniki pozostają bez zmian.</p>
+<textarea name="definition" rows="10" spellcheck="false">{{ d|tojson(indent=2) }}</textarea>
+<div class="hyp-row"><label>Autor<input name="actor"></label><label>Powód zmiany<input name="change_note"></label></div>
+<div class="hyp-row"><button type="button" data-preview>Podgląd hasha</button><button type="submit">Zarejestruj nową wersję</button></div>
+<dl class="hyp-hash"><dt>SHA-256 (serwer)</dt><dd><code data-preview-hash>—</code></dd><dt>Weryfikacja w przeglądarce</dt><dd data-browser-hash>—</dd></dl>
+<details><summary>Kanoniczny JSON</summary><pre class="hyp-pre" data-preview-canonical></pre></details>
+<p class="hyp-status" data-form-status role="status"></p></form></div></section>
+
+<section class="panel" data-section="event-study">{{ disc() }}
+<h2>Analiza czasowa (event study)</h2>
+<form data-run-form class="hyp-row hyp-inline">
+<label>Wersja<select name="version_id">{% for v in selected.versions|reverse %}<option value="{{v.version_id}}">v{{v.version_number}} — {{v.definition_sha256[:12]}}</option>{% endfor %}</select></label>
+<label>Permutacje<input name="permutations" inputmode="numeric" placeholder="zarejestrowane"></label>
+<label>Ziarno<input name="seed" inputmode="numeric" placeholder="zarejestrowane"></label>
+<label>Model zerowy<select name="null_model"><option value="">zarejestrowany</option>{% for m in null_models %}<option>{{m}}</option>{% endfor %}</select></label>
+<label>Blok [s]<input name="block_s" inputmode="numeric" placeholder="zarejestrowany"></label>
+<label>Autor<input name="actor"></label><button type="submit">Uruchom</button>
+<p class="hyp-status" data-form-status role="status"></p></form>
+<p class="hyp-note">Odstępstwo od zarejestrowanych parametrów jest dozwolone, ale zapisywane w wyniku jako odchylenie od prerejestracji.</p>
+{% set studies = selected.runs|selectattr('kind', 'equalto', 'event_study')|list %}
+<table data-runs><tr><th>Przebieg</th><th>Wersja</th><th>Czas</th><th>Ziarno</th><th>Hash wyniku</th><th>Hash wejścia</th><th>Kod</th></tr>
+{% for r in studies|reverse %}<tr{% if run and run.run_id == r.id %} class="hyp-current"{% endif %}><td><a href="/hypotheses?id={{selected.hypothesis_id}}&amp;run={{r.id}}">#{{r.id}}</a></td><td>v{{r.version_number}}</td><td><time>{{r.created_at}}</time></td><td>{{r.seed}}</td><td><code>{{r.result_sha256[:16]}}…</code></td><td><code>{{r.input_sha256[:12]}}…</code></td><td><code>{{r.code_version[:12]}}</code></td></tr>{% else %}<tr><td colspan="7">Brak przebiegów.</td></tr>{% endfor %}</table>
+{% if run %}{% set res = run.result %}
+<div class="hyp-run" data-run-id="{{run.run_id}}" data-result-sha256="{{run.result_sha256}}">
+<h3>Przebieg #{{run.run_id}} — {{res.status}}</h3>
+<dl class="hyp-meta"><dt>Hipoteza</dt><dd>v{{res.hypothesis.version_number}}, <code>{{res.hypothesis.definition_sha256}}</code></dd>
+<dt>Model zerowy</dt><dd>{{res.null_model.name}}, n = {{res.parameters.permutations}}, ziarno {{res.seed}} ({{res.rng}})</dd>
+<dt>Wejście</dt><dd>bodźce {{res.input.stimulus_count}}, wyniki {{res.input.outcome_count}}, dokumentacja {{res.input.density_count}}, wyłączone bez czasu UTC <strong data-untimed-count>{{res.input.untimed_excluded.count}}</strong>{% if res.input.untimed_excluded.by_reason %} ({% for k, v in res.input.untimed_excluded.by_reason.items() %}{{k}}: {{v}}{% if not loop.last %}, {% endif %}{% endfor %}){% endif %}, poza zakresem {{res.input.outside_span}}</dd>
+<dt>Zakres</dt><dd>{% if res.input.span %}{{res.input.span.start_utc}} → {{res.input.span.end_utc}}{% else %}—{% endif %}</dd>
+<dt>Hash wejścia / wyniku</dt><dd><code>{{res.input.input_sha256}}</code> / <code>{{run.result_sha256}}</code> ({{run.integrity}}{% if run.identical_result_runs %}; identyczny wynik: {% for i in run.identical_result_runs %}#{{i}} {% endfor %}{% endif %})</dd>
+<dt>Reguła czasu</dt><dd data-source-rule>{{res.input.source.rule}} <code>{{res.input.source.rule_sha256}}</code>{% if res.parameters.assume_zone %}; założona strefa {{res.parameters.assume_zone}} ({{res.parameters.assumption_rule}}){% endif %}</dd>
+<dt>Niepewność czasu</dt><dd data-time-uncertainty>próg {{res.input.time_uncertainty.threshold_s}} s, polityka {{res.input.time_uncertainty.policy}}: szersze {{res.input.time_uncertainty.imprecise}}, nieznana szerokość {{res.input.time_uncertainty.unknown_width}}</dd>
+{% if res.input.categories %}<dt>Kategorie</dt><dd>konfiguracja <code>{{res.input.categories.config.sha256}}</code> (wersja {{res.input.categories.config.version}})</dd>{% endif %}
+<dt>Wersja kodu</dt><dd><code>{{run.code_version}}</code></dd></dl>
+<h3>Ostrzeżenia (zawsze widoczne)</h3>
+<ul class="hyp-warnings" data-warnings>{% for w in res.warnings %}<li data-warning-id="{{w.id}}" data-flagged="{{'1' if w.flagged else '0'}}" class="hyp-sev-{{w.severity}}"><strong>{{'⚠ ' if w.flagged else 'ℹ '}}{{w.id}}</strong> <span>{{w.text_pl}}</span><details><summary>EN / wartości</summary><p lang="en">{{w.text_en}}</p><pre class="hyp-pre">{{w.computed|tojson(indent=1)}}</pre></details></li>{% endfor %}</ul>
+{% if res.status == 'ok' %}
+<table data-windows class="hyp-num"><tr><th>Okno</th><th>Pary obs.</th><th>Średnia zerowa</th><th>Pasmo zerowe 2,5–97,5%</th><th>p (surowe)</th><th>Różnica / bodziec</th><th>Iloraz</th><th>Udział wyniku w dokumentacji: obs. − zerowy</th><th>p (znormalizowane gęstością)</th><th>Gęstość dokumentacji vs zerowa</th><th>Bodźce z ≥1 wynikiem</th></tr>
+{% for w in res.windows %}<tr data-window="{{w.label}}"><td>{{w.label}}<br><small>[{{w.start_s}} s, {{w.end_s}} s)</small></td><td>{{num(w.naive.observed)}}</td><td>{{num(w.naive.null_mean)}}</td><td>{{num(w.naive.null_q025)}}–{{num(w.naive.null_q975)}}</td>
+<td data-p-naive>{{pval(w.naive.p_value)}} <small>k={{w.naive.k_extreme}}, n={{w.naive.n_permutations}}</small></td><td>{{num(w.naive.difference_per_stimulus)}}</td><td>{{num(w.naive.ratio_to_null_mean)}}</td>
+<td>{% if w.normalized.p_value is defined %}{{num(w.normalized.share_difference)}}{% else %}—{% endif %}</td><td data-p-normalized>{% if w.normalized.p_value is defined %}{{pval(w.normalized.p_value)}} <small>k={{w.normalized.k_extreme}}, n={{w.normalized.n_permutations}}</small>{% else %}niedostępne: {{w.normalized.reason}}{% endif %}</td>
+<td>{{num(w.density.ratio)}}</td><td>{{w.naive.stimuli_with_outcome}} / {{res.input.stimulus_count}}</td></tr>{% endfor %}</table>
+<p class="hyp-note">p = (k+1)/(n+1), gdzie k to liczba permutacji co najmniej tak skrajnych jak obserwacja (kierunek: {{res.definition.direction}}). Brak parametrycznych wartości p. Pary w nakładających się oknach nie są niezależne.</p>
+<figure class="hyp-figure"><figcaption>Histogram opóźnień: obserwowane pary bodziec→wynik (kolumny) i rozkład przy losowym położeniu bodźców ({{res.null_model.name}})</figcaption>
+<ul class="hyp-legend"><li><span class="hyp-key-bar"></span>obserwowane</li><li><span class="hyp-key-band"></span>pasmo zerowe 2,5–97,5%</li><li><span class="hyp-key-line"></span>średnia zerowa</li></ul>
+<div class="hyp-chart-box" data-histogram></div>
+<details><summary>Tabela histogramu</summary><table class="hyp-num" data-histogram-table><tr><th>Od [s]</th><th>Do [s]</th><th>Obserwowane</th><th>Średnia zerowa</th><th>2,5%</th><th>97,5%</th></tr>
+{% for o in res.lag_histogram.observed %}<tr><td>{{res.lag_histogram.edges_s[loop.index0]}}</td><td>{{res.lag_histogram.edges_s[loop.index]}}</td><td>{{o}}</td><td>{{num(res.lag_histogram.null_mean[loop.index0])}}</td><td>{{res.lag_histogram.null_q025[loop.index0]}}</td><td>{{res.lag_histogram.null_q975[loop.index0]}}</td></tr>{% endfor %}</table></details></figure>
+{% else %}<p data-insufficient>Za mało danych: {{res.reasons|join('; ')}}</p>{% endif %}
+<figure class="hyp-figure"><figcaption>Kontrola gęstości dokumentacji: liczba zdarzeń na okres ({{res.control_series.period_s}} s{% if res.control_series.coarsened_by_factor > 1 %}, zgrubione ×{{res.control_series.coarsened_by_factor}}{% endif %}); puste okresy: {{res.control_series.empty_periods}}</figcaption>
+<div class="hyp-chart-box" data-control-series></div>
+<details><summary>Najdłuższe luki bez dokumentacji</summary><ul>{% for g in res.control_series.longest_gaps %}<li>{{g.start_utc}} → {{g.end_utc}} ({{g.periods}} okr.)</li>{% else %}<li>brak</li>{% endfor %}</ul></details></figure>
+<details><summary>Sezonowość: dzień tygodnia ({{res.seasonality.zone}})</summary><table class="hyp-num" data-seasonality><tr><th></th>{% for n in ['pn','wt','śr','cz','pt','so','nd'] %}<th>{{n}}</th>{% endfor %}</tr>
+{% for key, label in [('stimulus','bodźce'),('outcome','wyniki'),('all','wszystkie')] %}<tr><td>{{label}}</td>{% for c in res.seasonality.weekday[key] %}<td>{{c}}</td>{% endfor %}</tr>{% endfor %}</table></details>
+<script type="application/json" id="hyp-run-data">{{ res|tojson }}</script>
+</div>{% endif %}</section>
+
+<section class="panel" data-section="dossier">{{ disc() }}
+<h2>Dossier dowodowe</h2>
+<p class="hyp-note">{{selected.dossier.note}} Liczniki: {% for k, v in selected.dossier.counts.items() %}<span class="hyp-chip" data-count="{{k}}">{{k}}: {{v}}</span> {% endfor %}</p>
+<div class="hyp-two">
+<form data-candidates-form><h3>Szukaj kandydatów</h3>
+<label>Zapytania FTS (po jednym w wierszu; puste = z definicji)<textarea name="queries" rows="2"></textarea></label>
+<div class="hyp-row"><label><input type="checkbox" name="use_rules" checked> reguły (bodźce i wyniki w oknach)</label><label>Limit<input name="limit" value="50" inputmode="numeric"></label></div>
+<div class="hyp-row"><label>Dostawca LLM<select name="provider">{% for p in providers %}<option>{{p}}</option>{% endfor %}</select></label><label><input type="checkbox" name="opt_in"> zgoda na wysłanie danych (opt-in tego przebiegu)</label></div>
+<label>Autor<input name="actor"></label><button type="submit">Zaproponuj kandydatów</button><p class="hyp-status" data-form-status role="status"></p></form>
+<form data-add-item-form><h3>Dodaj wskazanie ręcznie</h3>
+<div class="hyp-row"><label>Rodzaj<select name="target_kind">{% for k in ['event','artifact','derived_text','anchor','annotation'] %}<option>{{k}}</option>{% endfor %}</select></label><label>ID<input name="target_id" inputmode="numeric" required></label><label>Obserwacja (artefakt)<input name="observation_id" inputmode="numeric"></label></div>
+<div class="hyp-row"><label>Klasyfikacja<select name="classification"><option value="">kandydat</option>{% for c in classifications if c != 'candidate' %}<option>{{c}}</option>{% endfor %}</select></label><label>Uzasadnienie<input name="rationale"></label><label>Autor<input name="actor"></label></div>
+<button type="submit">Dodaj</button><p class="hyp-status" data-form-status role="status"></p></form></div>
+<table data-dossier><tr><th>#</th><th>Klasyfikacja</th><th>Pochodzenie</th><th>Źródło i wersja</th><th>Fragment (z bazy)</th><th>Źródło dziś</th><th>Decyzja człowieka</th></tr>
+{% for i in selected.dossier['items'] %}<tr data-item-id="{{i.item_id}}" data-classification="{{i.classification}}"><td>{{i.item_id}}</td><td><span class="hyp-class hyp-class-{{i.classification}}">{{i.classification}}</span><br><small>{{i.classified_by}}</small></td>
+<td>{{i.origin}}{% if i.origin_run_id %} (#{{i.origin_run_id}}){% endif %}{% if i.metadata.hint %}<details><summary>wskazówka</summary><pre class="hyp-pre">{{i.metadata.hint|tojson(indent=1)}}</pre></details>{% endif %}</td>
+<td>{{i.target_kind}} #{{i.target_id}}{% if i.locator.artifact_id %}<br><a href="/artifact/{{i.locator.artifact_id}}">artefakt {{i.locator.artifact_id}}</a>{% endif %}{% if i.target_kind == 'anchor' %}<br><a href="/api/artifacts/{{i.locator.artifact_id}}/citations/{{i.target_id}}/packet">pakiet cytatu</a> (wersja {{i.locator.derived_text_id}}){% endif %}<details><summary>lokator</summary><pre class="hyp-pre">{{i.locator|tojson(indent=1)}}</pre><code>{{i.locator_sha256}}</code></details></td>
+<td class="hyp-excerpt">{{i.excerpt or ''}}</td><td>{{i.source_check}}</td>
+<td><form data-classify-form data-item-id="{{i.item_id}}" class="hyp-mini"><select name="classification">{% for c in classifications %}<option{% if c == i.classification %} selected{% endif %}>{{c}}</option>{% endfor %}</select><input name="rationale" placeholder="uzasadnienie"><button type="submit">Zapisz decyzję</button><p class="hyp-status" data-form-status role="status"></p></form>
+<details><summary>historia ({{i.decisions|length}})</summary><ol>{% for dd in i.decisions %}<li>{{dd.created_at}} — {{dd.classification}} ({{dd.decided_by}}, {{dd.actor}}, v{{dd.version_number}}){% if dd.rationale %}: {{dd.rationale}}{% endif %}</li>{% endfor %}</ol></details></td></tr>
+{% else %}<tr><td colspan="7">Dossier jest puste.</td></tr>{% endfor %}</table></section>
+
+<section class="panel" data-section="theses">{{ disc() }}
+<h2>Tezy i ich status</h2>
+<ol class="hyp-typology">{% for t in typology %}<li><strong>{{t[1]}}</strong> <small>{{t[0]}}</small></li>{% endfor %}</ol>
+<table data-theses><tr><th>#</th><th>Status</th><th>Teza</th><th>Dowody (pozycje dossier)</th><th>Flagi (wyliczane)</th></tr>
+{% for t in selected.theses.theses %}<tr data-thesis-id="{{t.thesis_id}}" data-flags="{{t.flags|join(' ')}}"{% if t.superseded_by %} class="hyp-superseded"{% endif %}><td>{{t.thesis_id}}{% if t.previous_thesis_id %}<br><small>← {{t.previous_thesis_id}}</small>{% endif %}</td><td>{{t.status_rank}}. {{t.status_label_pl}}</td><td>{{t.text}}</td>
+<td>{% for e in t.evidence %}<span class="hyp-chip">#{{e.item_id}} {{e.target_kind}} {{e.target_id}} · {{e.classification}}</span> {% else %}—{% endfor %}</td>
+<td>{% for f in t.flags %}<span class="hyp-flag hyp-flag-{{f}}" data-flag="{{f}}">{{t.flags_text[f][0]}}</span> {% else %}—{% endfor %}</td></tr>
+{% else %}<tr><td colspan="5">Brak tez.</td></tr>{% endfor %}</table>
+<form data-thesis-form><h3>Dodaj tezę</h3>
+<label>Treść<textarea name="text" rows="2" required></textarea></label>
+<div class="hyp-row"><label>Status<select name="status_type">{% for t in typology %}<option value="{{t[0]}}">{{t[1]}}</option>{% endfor %}</select></label><label>Pozycje dossier (ID, przecinki)<input name="evidence"></label><label>Rewizja tezy #<input name="previous_thesis_id" inputmode="numeric"></label><label>Autor<input name="actor"></label></div>
+<button type="submit">Dodaj tezę</button><p class="hyp-status" data-form-status role="status"></p></form></section>
+
+<section class="panel" data-section="disclosure">{{ disc() }}
+<h2>Ujawnienie epistemiczne</h2>
+<div class="hyp-quadrants">{% for q in selected.disclosure.quadrants %}<div class="hyp-quadrant" data-quadrant="{{q.quadrant}}"><h3>{{q.label_pl}} <small>{{q.label_en}}</small></h3>
+<p class="hyp-human">{% if q.human_text %}{{q.human_text}}{% else %}<em>brak opisu człowieka</em>{% endif %}</p>
+<h4>Fakty wyliczone</h4><ul class="hyp-facts">{% for f in q.computed_facts %}<li data-fact="{{f.fact}}"><code>{{f.fact}}</code>: {{ (f.value if f.value is defined else f)|tojson }}{% if f.note %} <small>{{f.note}}</small>{% endif %}</li>{% endfor %}</ul>
+<form data-disclosure-form data-quadrant="{{q.quadrant}}" class="hyp-mini"><textarea name="text" rows="2" required placeholder="opis człowieka (nowy wpis; poprzednie zostają)"></textarea><button type="submit">Zapisz</button><p class="hyp-status" data-form-status role="status"></p></form>
+{% if q.human_history|length > 1 %}<details><summary>historia ({{q.human_history|length}})</summary><ol>{% for hh in q.human_history %}<li>{{hh.created_at}} ({{hh.actor}}): {{hh.text}}</li>{% endfor %}</ol></details>{% endif %}</div>{% endfor %}</div>
+</section>
+{% endif %}
+</main></div>
+<script type="module" src="/static/hypotheses.mjs"></script></body></html>

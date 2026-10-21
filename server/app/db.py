@@ -328,6 +328,10 @@ def migrate_db(db: sqlite3.Connection) -> None:
     except Exception:
         db.rollback()
         raise
+    # Area-owned additive versions (10+) run after the core contract, each in
+    # its own transaction; see server/app/schema/__init__.py.
+    from .schema import apply_extension_migrations
+    apply_extension_migrations(db)
 
 
 def init_db() -> None:

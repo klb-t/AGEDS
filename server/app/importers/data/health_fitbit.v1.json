@@ -1,0 +1,11 @@
+{
+  "schema": "ageds.health-fitbit",
+  "version": "1",
+  "notice": "Field names follow publicly observed Fitbit data exports (sleep-YYYY-MM-DD.json, exercise-N.json in Takeout 'Fitbit/Global Export Data'). EXAMPLES only. Exercise start times are written month-first with a two-digit year; two_digit_year_base is this mapping's explicit, recorded assumption. Times carry no zone.",
+  "sleep_time_formats": ["YYYY-MM-DD[T]HH:mm:ss.SSS", "YYYY-MM-DD[T]HH:mm:ss"],
+  "exercise_time_formats": ["MM/DD/YY HH:mm:ss", "YYYY-MM-DD[T]HH:mm:ss.SSS", "YYYY-MM-DD[T]HH:mm:ss"],
+  "two_digit_year_base": 2000,
+  "sleep_summary_fields": ["minutesToFallAsleep", "minutesAsleep", "minutesAwake", "minutesAfterWakeup", "timeInBed", "efficiency"],
+  "exercise_summary_fields": ["steps", "calories", "distance", "averageHeartRate", "elevationGain", "activeDuration"],
+  "log_types": {"manual": {"class": "declared", "basis": "provider_user_edit"}, "auto_detected": {"class": "passive", "basis": "provider_inference"}, "tracker": {"class": "active", "basis": "provider_inference"}, "mobile_run": {"class": "active", "basis": "provider_inference"}}
+}

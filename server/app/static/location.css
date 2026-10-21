@@ -1,0 +1,55 @@
+/* /location: app.css theme tokens; data colours are the validated categorical order of analysis_budget
+   (#3987e5 raw sample, #d95926 provider inference, #199e70 derived/places, #c98500 declared; checked on #161b22).
+   Identity is never colour alone: shapes differ (dot, hollow diamond, ring, square) and a legend is always shown. */
+.loc-main{max-width:none;padding:1rem 1.5rem}
+.loc-form{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:.4rem .8rem;align-items:end}
+.loc-form label{display:flex;flex-direction:column;font-size:.8rem;color:var(--muted)}
+.loc-form button{align-self:end}
+.loc-secondary{background:var(--neutral-button);border-color:var(--border);color:var(--text)}
+.loc-secondary:hover{background:var(--neutral-button-hover)}
+.loc-slider{display:flex;flex-wrap:wrap;gap:1rem;align-items:center;margin-top:.5rem;font-size:.8rem;color:var(--muted)}
+.loc-slider label{display:flex;gap:.4rem;align-items:center;min-width:240px}
+.loc-slider input{width:200px}
+.loc-status{color:var(--muted);font-size:.85rem;margin:.5rem 0 0;overflow-wrap:anywhere}
+.loc-layout{display:grid;grid-template-columns:minmax(0,1fr) 440px;gap:1rem;margin:1rem 0}
+.loc-map{width:100%;height:auto;background:var(--bg);border:1px solid var(--border);border-radius:8px;display:block}
+.loc-lanes{width:100%;height:auto;background:var(--bg);border:1px solid var(--border);border-radius:8px;display:block}
+.loc-legend{list-style:none;display:flex;flex-wrap:wrap;gap:.4rem 1.2rem;padding:0;margin:.5rem 0 0;font-size:.78rem;color:var(--muted)}
+.loc-swatch{display:inline-block;width:10px;height:10px;margin-right:.35rem;vertical-align:middle}
+.loc-raw{background:#3987e5;border-radius:50%}
+.loc-provider{border:2px solid #d95926;transform:rotate(45deg);width:8px;height:8px}
+.loc-derived{border:2px solid #199e70;border-radius:50%}
+.loc-declared{background:#c98500}
+.loc-detail{font-size:.82rem;color:var(--text);min-height:1.2rem;overflow-wrap:anywhere}
+.loc-side h2{font-size:1rem;margin-top:.8rem}
+.loc-scroll{max-height:260px;overflow:auto;max-width:100%}
+.loc-warning{border:1px solid var(--warning);border-radius:8px;padding:.5rem .7rem;color:var(--text);font-size:.85rem}
+.loc-check{flex-direction:row!important;gap:.4rem;align-items:center}
+.loc-check input{width:auto}
+.loc-map .loc-bg{fill:var(--bg)}
+.loc-map .loc-track{fill:none;stroke:#3987e5;stroke-width:2;stroke-opacity:.7;stroke-linejoin:round;stroke-linecap:round}
+.loc-map .loc-track-provider{stroke:#d95926;stroke-dasharray:5 4}
+.loc-map .loc-track-declared{stroke:#c98500;stroke-dasharray:2 4}
+.loc-map .loc-fix{fill:#3987e5;stroke:var(--bg);stroke-width:1}
+.loc-map .loc-fix-provider_inference,.loc-map .loc-fix-provider_user_edit{fill:none;stroke:#d95926;stroke-width:1.5}
+.loc-map .loc-fix-declared{fill:#c98500}
+.loc-map .loc-place{fill:#199e70;fill-opacity:.12;stroke:#199e70;stroke-width:2}
+.loc-map .loc-place-label{fill:var(--text);font-size:12px;paint-order:stroke;stroke:var(--bg);stroke-width:3px}
+.loc-map .loc-visit{fill:none;stroke:#d95926;stroke-width:2}
+.loc-map .loc-visit-edit{stroke-dasharray:3 2}
+.loc-map .loc-segment{stroke:#d95926;stroke-width:1.5;stroke-dasharray:6 4;fill:none}
+.loc-map .loc-scale{stroke:var(--muted);stroke-width:2}
+.loc-map .loc-scale-label,.loc-lanes .loc-axis-label,.loc-lanes .loc-lane-label{fill:var(--muted);font-size:11px}
+.loc-map .loc-empty{fill:var(--muted);font-size:14px}
+.loc-lanes .loc-lane-bg{fill:var(--surface)}
+.loc-lanes .loc-axis{stroke:var(--border);stroke-width:1}
+.loc-lanes .loc-bar{fill-opacity:.85}
+.loc-lanes .loc-whisker{stroke-width:1.5;stroke-opacity:.8}
+.loc-lanes [data-lane-item]{cursor:pointer}
+.loc-lanes [data-lane-item]:hover .loc-bar,.loc-lanes [data-lane-item]:focus .loc-bar{fill-opacity:1;stroke:var(--text);stroke-width:1}
+@media(max-width:1100px){.loc-layout{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){.loc-main{padding:.5rem}.loc-slider label{min-width:0}.loc-slider input{width:120px}}
+.loc-layout>*{min-width:0}
+.loc-scroll table{min-width:0}
+.loc-nowrap{white-space:nowrap;font-size:.8rem}
+[data-loc-presence] td:first-child{max-width:9rem;overflow-wrap:anywhere}

@@ -1,0 +1,36 @@
+<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Raport {{ report.id }} — Evidence Workbench</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/reports.css"></head><body>
+<header>{% include '_nav.html' %}<div><h1>Raport #{{ report.id }} · {{ report.report_type }}</h1><p>{{ report.created_at }} · szablon {{ report.template_id }} v{{ report.template_version }} · <a href="/reports">wszystkie raporty</a></p></div></header>
+<main>
+<section class="grid">
+<div class="panel">
+<h2>Weryfikacja</h2>
+<p data-verification="{{ 'valid' if verification.valid else 'invalid' }}"><b>{{ 'Pliki zgodne z manifestem' if verification.valid else 'NIEZGODNOŚĆ — raport zmieniony lub niekompletny' }}</b></p>
+<p><small>Sprawdzono: SHA-256 manifestu względem rejestru, każdy plik (rozmiar i SHA-256), pliki spoza manifestu, hash treści report.json, pakiet cytatów. To nie jest podpis.</small></p>
+{% if verification.errors %}<ul data-verification-errors>{% for e in verification.errors %}<li><code>{{ e.code }}</code> {{ e.path }} — {{ e.message }}</li>{% endfor %}</ul>{% endif %}
+<dl>
+<dt>Identyfikator</dt><dd><code>{{ report.report_uid }}</code></dd>
+<dt>Hash raportu (treść)</dt><dd><code>{{ report.content_sha256 }}</code></dd>
+<dt>Hash manifestu</dt><dd><code data-manifest-sha256>{{ report.manifest_sha256 }}</code></dd>
+<dt>Parametry (SHA-256)</dt><dd><code>{{ report.params_sha256 }}</code></dd>
+<dt>Commit</dt><dd><code>{{ report.git_commit }}</code></dd>
+<dt>Katalog</dt><dd><code>{{ report.output_dir }}</code></dd>
+</dl>
+<h3>Sekcje</h3>
+<table><tr><th>Sekcja</th><th>Status</th><th>Powód</th><th>Odczyt</th></tr>{% for s in report.sections %}<tr><td>{{ s.section }}</td><td>{{ s.status }}</td><td>{{ s.reason or '' }}</td><td>{{ s.snapshot }}</td></tr>{% endfor %}</table>
+<h3>Parametry</h3>
+<pre class="transcript">{{ report.params|tojson(indent=2) }}</pre>
+<h3>Pliki</h3>
+<table data-report-files><tr><th>Plik</th><th>Rola</th><th>Bajty</th><th>SHA-256</th></tr>
+{% for f in files %}<tr><td><a href="/reports/{{ report.id }}/files/{{ f.path }}" download>{{ f.path }}</a></td><td>{{ f.role }}</td><td>{{ f.size_bytes }}</td><td><code>{{ f.sha256 }}</code></td></tr>{% else %}<tr><td colspan="4">Pliki niedostępne (manifest niezgodny z rejestrem).</td></tr>{% endfor %}
+</table>
+<p><a href="/reports/{{ report.id }}/manifest" download data-manifest-link>manifest.json</a> (serwowany tylko, gdy jego SHA-256 zgadza się z rejestrem). Weryfikacja offline: <code>python -m server.app.cli report-verify KATALOG/manifest.json --expected-manifest-sha256 {{ report.manifest_sha256 }}</code></p>
+</div>
+<div class="panel">
+<h2>Podgląd HTML</h2>
+<p><small>Podgląd w izolowanej ramce (sandbox, bez skryptów, bez zasobów zewnętrznych). Tekst źródeł jest wyświetlany jako dane.</small></p>
+{% if verification.files_valid and verification.digest_valid %}
+<iframe class="report-preview" sandbox="" src="/reports/{{ report.id }}/view/report.html" title="Podgląd raportu" data-report-preview></iframe>
+{% else %}<p data-preview-blocked>Podgląd zablokowany: pliki raportu nie zgadzają się z manifestem.</p>{% endif %}
+</div>
+</section>
+</main></body></html>

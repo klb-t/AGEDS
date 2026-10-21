@@ -1,0 +1,135 @@
+<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Plan importu</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/importplan.css"></head><body>
+<header>{% include '_nav.html' %}<div><h1>Plan importu</h1><p>katalog → plan do przeglądu → zatwierdzenie → import · oryginały tylko do odczytu</p></div>
+<label class="ip-actor">Osoba decydująca <input id="ip-actor" value="web" maxlength="200" autocomplete="off"></label></header>
+<main class="importplan"{% if selected %} data-plan-id="{{selected.plan.id}}" data-base-version="{{selected.plan.latest_version}}" data-viewing-version="{{selected.version}}"{% endif %}>
+<p id="importplan-status" class="ip-status" role="status" aria-live="polite"></p>
+<div class="ip-layout">
+<aside class="panel ip-side" aria-label="Plany">
+  <h2>Nowy plan</h2>
+  <form data-ip-action="create" class="ip-form">
+    <fieldset><legend>Kolekcje (bieżące skany)</legend>
+    {% for c in collections %}<label class="ip-check" style="--depth: {{c.tree_depth}}"><input type="checkbox" name="collection" value="{{c.id}}" {% if not c.current_scan_ids %}disabled{% endif %}>
+      {{c.label}} <small>#{{c.id}} · {{c.entry_count}} wpisów · skany {{c.current_scan_ids|join(', ') or 'brak'}}</small></label>
+    {% else %}<p><small>Brak kolekcji. Najpierw <a href="/catalog">katalog</a> i <code>catalog-scan</code>.</small></p>{% endfor %}
+    </fieldset>
+    <label>Profil billingu (jawny, opcjonalnie) <select name="billingProfileId"><option value="">— brak (wybór przy pozycji)</option>{% for p in billing_profiles %}<option value="{{p}}">{{p}}</option>{% endfor %}</select></label>
+    <button>Generuj plan</button>
+    <p><small>Generowanie czyta tylko ograniczone prefiksy skatalogowanych bajtów i zapisuje wyłącznie plan.</small></p>
+  </form>
+  <h2>Plany</h2>
+  <ul class="ip-plans">{% for p in plans %}<li class="{% if selected and selected.plan.id == p.id %}active{% endif %}"><a href="/import?plan={{p.id}}">Plan #{{p.id}}</a>
+    <small>{{p['items']}} pozycji · wersja {{p.latest_version}} · uruchomień {{p.runs}} · {{p.created_at}}</small></li>
+  {% else %}<li><small>Brak planów.</small></li>{% endfor %}</ul>
+</aside>
+<div class="ip-main">
+{% if selected %}{% set s = selected.summary %}{% set p = selected.plan %}
+<section class="panel" aria-labelledby="plan-title">
+  <h2 id="plan-title">Plan #{{p.id}} <small>wersja {{selected.version}} z {{p.latest_version}}{% if selected.version != p.latest_version %} · <a href="/import?plan={{p.id}}">najnowsza</a>{% endif %}</small></h2>
+  <dl>
+    <dt>Detektory</dt><dd><code>{{p.detector_schema}} v{{p.detector_version}}</code> <small>sha256 {{p.detector_sha256[:16]}}</small> · {{p.planner_version}}</dd>
+    <dt>Skany</dt><dd>{{p.scan_ids|join(', ')}} <small>(kolekcje: {% for cid in p.collection_ids %}{{labels.get(cid, cid)}}{% if not loop.last %}, {% endif %}{% endfor %})</small></dd>
+    <dt>Opcje</dt><dd><code>{{p.options|tojson}}</code></dd>
+    <dt>Utworzył</dt><dd>{{p.actor}} · {{p.created_at}}</dd>
+  </dl>
+  <details><summary>Wersje ({{selected.versions|length}})</summary><ul>{% for v in selected.versions %}<li><a href="/import?plan={{p.id}}&amp;version={{v.version}}">v{{v.version}}</a> · {{v.actor}} · {{v.created_at}} · decyzji {{v.decisions}}{% if v.note %} · {{v.note}}{% endif %}</li>{% endfor %}</ul></details>
+</section>
+<section class="panel" aria-labelledby="summary-title">
+  <h2 id="summary-title">Podsumowanie (na sucho)</h2>
+  <p class="ip-totals">{% for st in statuses %}<span class="badge ip-badge-{{st}}">{{status_labels[st]}} {{s.by_status.get(st, 0)}}</span> {% endfor %}
+    <span>niejednoznaczne <b>{{s.ambiguous}}</b></span> <span>opt-in wyłączony <b>{{s.opt_in_disabled}}</b></span>
+    <span>do uruchomienia <b data-ip-to-run>{{s.to_run['items']}}</b> ({{s.to_run.estimated_bytes}} B, {{s.to_run.members}} plików)</span></p>
+  <div class="ip-scroll"><table class="ip-summary"><thead><tr><th>importer</th><th>pozycje</th><th>zatwierdzone</th><th>zaimportowane</th><th>błąd / odmowa</th><th>bajty (szac.)</th></tr></thead><tbody>
+  {% for key, row in s.by_importer.items() %}<tr><td>{{importers[key].label if key in importers else key}} <small><code>{{key}}</code></small></td><td>{{row['items']}}</td><td>{{row.approved}}</td><td>{{row.done}}</td><td>{{row.failed}} / {{row.refused}}</td><td>{{row.estimated_bytes}}</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% if s.blocked %}<p><small>Blokady: {% for k, v in s.blocked.items() %}<code>{{k}}</code> {{v}}{% if not loop.last %} · {% endif %}{% endfor %}</small></p>{% endif %}
+  <p><small>Nie zaplanowano: {% for k, v in s.not_planned.items() %}<code>{{k}}</code> {{v}}{% if not loop.last %} · {% endif %}{% else %}—{% endfor %}.
+    {% if not s.coverage_complete %} Pokrycie planu niepełne: <code>{{s.coverage_incomplete_reasons|tojson}}</code>.{% endif %}
+    Podsumowanie czyta zapisany plan; nic nie jest odczytywane ze źródeł ani zapisywane.</small></p>
+</section>
+<section class="panel" aria-labelledby="cross-title">
+  <h2 id="cross-title">Te same rozmowy w wielu eksportach</h2>
+  <p><small>Każde wystąpienie jest importowane; niczego nie deduplikujemy ani nie usuwamy.</small></p>
+  {% set pre = p.cross_export %}
+  {% if pre.identical_conversation_files %}<p>Identyczne pliki rozmów: {% for g in pre.identical_conversation_files %}pozycje {{g.item_ordinals|join(', ')}}{% if not loop.last %}; {% endif %}{% endfor %}</p>{% endif %}
+  <div class="ip-scroll"><table class="ip-cross"><thead><tr><th>przestrzeń</th><th>id rozmowy</th><th>przed importem: pozycje planu</th><th>po imporcie: eksporty</th></tr></thead><tbody>
+  {% set after = {} %}{% for c in (post.conversations if post else []) %}{% set _ = after.update({c.namespace ~ ':' ~ c.conversation_id: c}) %}{% endfor %}
+  {% for c in pre.shared_conversations %}{% set a = after.get(c.namespace ~ ':' ~ c.conversation_id) %}<tr><td>{{c.namespace}}</td><td><code>{{c.conversation_id}}</code></td><td>{{c.item_ordinals|join(', ')}}</td>
+    <td>{% if a %}{% for e in a.exports %}<div><small>eksport #{{e.export_id}} · kolekcja {{labels.get(e.collection_id, e.collection_id)}}</small></div>{% endfor %}<a href="{{a.dedup_report}}">raport różnic</a>{% else %}<small>jeszcze nie zaimportowano</small>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="4">Brak wspólnych rozmów w granicach skanu planu.</td></tr>{% endfor %}</tbody></table></div>
+  {% if pre.shared_conversations_truncated %}<p><small>Lista skrócona o {{pre.shared_conversations_truncated}}.</small></p>{% endif %}
+</section>
+<section class="panel" aria-labelledby="items-title">
+  <h2 id="items-title">Pozycje planu <small>{{selected.matching}} pasujących</small></h2>
+  <form method="get" action="/import" class="ip-inline ip-filters"><input type="hidden" name="plan" value="{{p.id}}">{% if selected.version != p.latest_version %}<input type="hidden" name="version" value="{{selected.version}}">{% endif %}
+    <label>Importer <select name="importer"><option value="">wszystkie</option>{% for key, imp in importers.items() %}<option value="{{key}}" {% if key == filters.importer %}selected{% endif %}>{{imp.label}}</option>{% endfor %}</select></label>
+    <label>Status <select name="status"><option value="">wszystkie</option>{% for st in statuses %}<option value="{{st}}" {% if st == filters.status %}selected{% endif %}>{{status_labels[st]}}</option>{% endfor %}</select></label>
+    <label>Kolekcja <select name="collection"><option value="">wszystkie</option>{% for c in collections %}<option value="{{c.id}}" {% if c.id == filters.collection %}selected{% endif %}>{{c.label}}</option>{% endfor %}</select></label>
+    <label class="ip-check-inline"><input type="checkbox" name="ambiguous" value="true" {% if filters.ambiguous %}checked{% endif %}> niejednoznaczne</label>
+    <label class="ip-check-inline"><input type="checkbox" name="blocked" value="true" {% if filters.blocked %}checked{% endif %}> zablokowane</label>
+    <label>Tekst <input name="q" value="{{filters.q}}"></label><button>Filtruj</button></form>
+  {% if selected.version == p.latest_version %}
+  <div class="ip-inline ip-actions">
+    <form data-ip-action="bulk" id="ip-bulk" class="ip-inline">
+      <button name="bulk" value="approve-ready">Zatwierdź wszystkie gotowe</button>
+      <button name="bulk" value="approve-selected" class="secondary">Zatwierdź zaznaczone</button>
+      <button name="bulk" value="skip-selected" class="secondary">Pomiń zaznaczone</button>
+    </form>
+    <form data-ip-action="run" class="ip-inline">
+      <label>Tryb <select name="mode"><option value="sync">teraz (synchronicznie)</option><option value="queue">kolejka (worker)</option></select></label>
+      <label class="ip-check-inline"><input type="checkbox" name="rerunDone" value="true"> ponów zaimportowane</label>
+      <label class="ip-check-inline"><input type="checkbox" name="recoverRunning" value="true"> wznów przerwane (poprzedni proces nie działa)</label>
+      <button>Importuj zatwierdzone</button>
+    </form>
+  </div>
+  <p><small>Niejednoznaczne pozycje i importery opt-in (lokalizacja, historia przeglądania) nie są zatwierdzane hurtowo, dopóki nie wybierzesz importera lub nie włączysz opt-in przy pozycji.</small></p>
+  {% else %}<p><small>Oglądasz starszą wersję; decyzje są możliwe tylko na najnowszej.</small></p>{% endif %}
+  <div class="ip-scroll"><table class="ip-items"><thead><tr><th><span class="ip-sr">zaznacz</span></th><th>#</th><th>kolekcja</th><th>lokator</th><th>kandydaci</th><th>decyzja</th><th>status</th><th>wynik</th></tr></thead><tbody>
+  {% for it in selected['items'] %}{% set st = it.state %}<tr class="ip-row ip-row-{{it.status}}{% if it.ambiguous %} is-ambiguous{% endif %}" data-item-id="{{it.id}}" data-ordinal="{{it.ordinal}}">
+    <td><input type="checkbox" class="ip-select" value="{{it.id}}" aria-label="Zaznacz pozycję {{it.ordinal}}"></td>
+    <td>{{it.ordinal}}</td>
+    <td>{{it.collection_label}}</td>
+    <td><code class="ip-locator">{{it.locator}}</code><br><small>{{it.unit_kind}} · {{it.effective_type}} · {{it.member_count}} plik(ów) · {{it.estimated_bytes}} B{% for c in it.context %} · <span class="badge">{{c}}</span>{% endfor %}</small></td>
+    <td>{% for c in it.candidates %}<details class="ip-candidate"><summary>{{c.label}}{% if c.preference == 'alternative' %} <small>(alternatywa)</small>{% endif %}</summary>
+      <ul>{% for r in c.reasons %}<li>{{r}}</li>{% endfor %}</ul>{% if c.profiles_matching_header %}<small>profile pasujące do nagłówka: {{c.profiles_matching_header|join(', ')}}</small>{% endif %}</details>{% endfor %}
+      {% if it.ambiguous %}<span class="badge ip-badge-ambiguous">niejednoznaczne — wybierz</span>{% endif %}</td>
+    <td>{% if selected.version == p.latest_version %}<form data-ip-action="decide" data-item-id="{{it.id}}" class="ip-decide">
+      {% if it.candidates|length > 1 or not st.importer %}<label>Importer <select name="importer"><option value="">— wybierz —</option>{% for c in it.candidates %}<option value="{{c.importer}}" {% if c.importer == st.importer %}selected{% endif %}>{{c.label}}</option>{% endfor %}</select></label>
+      {% else %}<input type="hidden" name="importer" value="{{st.importer}}">{% endif %}
+      {% for name, value in st.opt_ins.items() %}<label class="ip-check-inline ip-optin"><input type="checkbox" name="optin:{{name}}" value="true" {% if value %}checked{% endif %}> {{name}}</label>{% endfor %}
+      {% if st.importer == 'billing' or 'billing' in it.candidates|map(attribute='importer') %}<label>Profil <select name="param:profile_id"><option value="">—</option>{% for bp in billing_profiles %}<option value="{{bp}}" {% if st.parameters.get('profile_id') == bp %}selected{% endif %}>{{bp}}</option>{% endfor %}</select></label>{% endif %}
+      {% if it.chat_members and it.chat_members|length > 1 %}<label>Czat <select name="param:chat_member"><option value="">—</option>{% for m in it.chat_members %}<option value="{{m}}" {% if st.parameters.get('chat_member') == m %}selected{% endif %}>{{m}}</option>{% endfor %}</select></label>{% endif %}
+      {% if st.importer == 'location_history' %}<label>Zaokrąglenie <input name="param:coarse_decimals" type="number" min="0" max="4" value="{{st.parameters.get('coarse_decimals', '')}}"></label>{% endif %}
+      <span class="ip-buttons"><button name="status" value="approved">Zatwierdź</button><button name="status" value="skipped" class="secondary">Pomiń</button>{% if st.status != 'proposed' %}<button name="status" value="proposed" class="secondary">Cofnij</button>{% endif %}</span>
+    </form>{% else %}{{st.importer or '—'}}{% endif %}</td>
+    <td><span class="badge ip-badge-{{it.status}}">{{status_labels.get(it.status, it.status)}}</span>
+      {% for b in it.blockers %}<div><small class="ip-blocker">{{b}}</small></div>{% endfor %}</td>
+    <td>{% set la = it.last_attempt %}{% if la %}<small>próba {{la.attempt}} ({{la.status}})</small>
+      {% set fp = la.result.footprint %}{% if fp %}<div><small>artefakty {{fp.artifacts}} (nowe {{fp.artifacts_new}}) · zdarzenia {{fp.events}} (nowe {{fp.events_new}})</small></div>
+      <div class="ip-links">{% for aid in (la.result.artifact_ids or [])[:8] %}<a href="/artifact/{{aid}}">#{{aid}}</a> {% endfor %}</div>{% endif %}
+      {% if la.result.refusal %}<div><small class="ip-blocker">{{la.result.refusal.code}}: {{la.result.refusal.message}}</small></div>{% endif %}
+      {% if la.error and not la.result.refusal %}<div><small class="ip-blocker">{{la.error[:300]}}</small></div>{% endif %}
+      {% endif %}</td>
+  </tr>{% else %}<tr><td colspan="8">Brak pozycji dla tych filtrów.</td></tr>{% endfor %}
+  </tbody></table></div>
+  <p>{% if next_url %}<a href="{{next_url}}" rel="next">Następna strona →</a>{% endif %} <small>strona do {{selected.limit}} pozycji</small></p>
+</section>
+<section class="panel" aria-labelledby="runs-title">
+  <h2 id="runs-title">Uruchomienia</h2>
+  <div class="ip-scroll"><table class="ip-runs"><thead><tr><th>#</th><th>wersja</th><th>tryb</th><th>status</th><th>start</th><th>koniec</th><th>wynik</th></tr></thead><tbody>
+  {% for r in selected.runs %}<tr><td><a href="/api/import-plan-runs/{{r.id}}">{{r.id}}</a></td><td>{{r.plan_version}}</td><td>{{r.mode}}</td><td><span class="badge ip-run-{{r.status}}">{{r.status}}</span></td><td>{{r.started_at}}</td><td>{{r.finished_at or ''}}</td><td><code>{{r.summary.item_outcomes|tojson if r.summary.item_outcomes else ''}}</code>{% if r.error %} <small>{{r.error}}</small>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="7">Jeszcze nie uruchomiono.</td></tr>{% endfor %}</tbody></table></div>
+</section>
+{% else %}
+<section class="panel"><h2>Jak to działa</h2>
+  <ol><li>W <a href="/catalog">katalogu</a> utwórz kolekcje (telefony, konta, dyski) i zeskanuj katalogi lub archiwa.</li>
+  <li>Wybierz kolekcje i wygeneruj plan: detektory proponują importer dla każdej pozycji (także plików w archiwach).</li>
+  <li>Przejrzyj plan, wybierz importer dla niejednoznacznych pozycji, włącz opt-in tam, gdzie chcesz, zatwierdź.</li>
+  <li>Uruchom import: bajty są weryfikowane SHA-256 względem katalogu, a każde zdarzenie dostaje kolekcję i lokator wirtualny.</li></ol>
+</section>
+{% endif %}
+</div>
+</div>
+</main>
+<script type="module" src="/static/importplan.mjs"></script>
+</body></html>

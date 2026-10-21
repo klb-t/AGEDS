@@ -1,0 +1,11 @@
+{
+  "schema": "ageds.messaging_mapping",
+  "version": "1",
+  "notice": "Google Takeout 'Google Chat' (Groups/<DM|Space id>/messages.json + group_info.json) as publicly observed. Dates are localized display strings: the weekday and the 'at' joiner are removed, then the Takeout display-date patterns (takeout_activity.v1.json) apply; zone abbreviations other than UTC/GMT stay unknown.",
+  "weekday_prefix_regex": "^[^\\W\\d_]+,\\s+",
+  "joiners": [" at ", " o ", " om ", " um ", " à ", " a las "],
+  "time_fields": {"created_date": "created", "updated_date": "updated"},
+  "messages_file": "messages.json",
+  "group_info_file": "group_info.json",
+  "service_start_year": 2017
+}

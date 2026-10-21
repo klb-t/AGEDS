@@ -1,0 +1,63 @@
+<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Raporty — Evidence Workbench</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/reports.css"></head><body>
+<header>{% include '_nav.html' %}<div><h1>Raporty</h1><p>HTML główny · JSON · CSV/XLSX · PDF z HTML (opcjonalnie) · manifest z SHA-256 · bez podpisu</p></div></header>
+<main>
+{% if error %}<div class="panel report-error" role="alert" data-report-error>{{ error }}</div>{% endif %}
+<section class="grid">
+<div class="panel" data-report-forms>
+<h2>Nowy raport</h2>
+{% if not output_enabled %}
+<p data-output-disabled>Tworzenie przez przeglądarkę jest wyłączone: operator musi ustawić <code>{{ reports_dir_env }}</code> (prywatny katalog poza repozytorium, magazynem treści i katalogami skanu). Wiersz poleceń: <code>python -m server.app.cli report-create --type … --output KATALOG</code>.</p>
+{% else %}
+<p>Raport trafia do nowego podkatalogu w <code>{{ reports_dir_env }}</code>; nic nie jest nadpisywane. Zmiana parametrów tworzy nowy raport, poprzedni pozostaje.</p>
+{% endif %}
+{% for name, spec in types.types.items() %}
+<details class="report-form" {% if prefill.get('type') == name or (not prefill and loop.first) %}open{% endif %} data-type-form="{{ name }}">
+<summary>{{ {'catalog': 'Raport katalogu', 'timeline': 'Raport osi czasu', 'time_budget': 'Raport budżetu czasu', 'hypothesis_dossier': 'Dossier hipotezy', 'lawyer_package': 'Pakiet dla prawnika'}[name] }} <small>({{ spec.sections|join(', ') }})</small></summary>
+<form method="post" action="/reports/create" class="report-fields">
+<input type="hidden" name="type" value="{{ name }}">
+<label>Od (UTC lub z przesunięciem)<input name="from" value="{{ prefill.get('from', '') if prefill.get('type') == name else '' }}" placeholder="2025-01-01 lub 2025-01-01T00:00:00Z"></label>
+<label>Do<input name="to" value="{{ prefill.get('to', '') if prefill.get('type') == name else '' }}"></label>
+{% if name in ('timeline', 'lawyer_package') %}
+<label>Kontrahent (podciąg)<input name="counterparty" value="{{ prefill.get('counterparty', '') if prefill.get('type') == name else '' }}"></label>
+<label>Temat (podciąg treści)<input name="topic" value="{{ prefill.get('topic', '') if prefill.get('type') == name else '' }}"></label>
+<label>Typy zdarzeń (przecinki)<input name="event_types"></label>
+<label>Przyjęta strefa (IANA, opcjonalnie)<input name="assume_zone" placeholder="np. Europe/Warsaw"></label>
+<label>Nazwa założenia strefy (wymagana ze strefą)<input name="assumption_rule" placeholder="np. operator: zegar telefonu"></label>
+<label>ID kotwic cytatów (przecinki)<input name="anchor_ids"></label>
+<label class="check"><input type="checkbox" name="include_hidden_chat_parts" value="1"> Uwzględnij ukryte części czatów</label>
+{% endif %}
+{% if name == 'lawyer_package' %}
+<label>Grupowanie<select name="group_by"><option value="counterparty">kontrahent</option><option value="domain">domena e-mail</option><option value="collection">kolekcja</option></select></label>
+<label>Otwarte kwestie (jedna w linii)<textarea name="open_questions"></textarea></label>
+{% endif %}
+{% if name == 'catalog' %}
+<label>Kolekcja (ID, opcjonalnie)<input name="collection_id" inputmode="numeric"></label>
+<label>Minimalna luka w dniach<input name="min_gap_days" inputmode="numeric" placeholder="{{ types.defaults.min_gap_days }}"></label>
+{% endif %}
+{% if name == 'time_budget' %}<label>Przebieg budżetu (ID)<input name="budget_run_id" inputmode="numeric"></label>{% endif %}
+{% if name == 'hypothesis_dossier' %}<label>Hipoteza (ID)<input name="hypothesis_id" inputmode="numeric"></label>{% endif %}
+<label>Tytuł (opcjonalnie)<input name="title"></label>
+<label>Język etykiet<select name="language"><option value="pl">polski</option><option value="en">English</option></select></label>
+<fieldset><legend>Formaty</legend>
+<label class="check"><input type="checkbox" checked disabled> HTML</label><label class="check"><input type="checkbox" checked disabled> JSON</label>
+<label class="check"><input type="checkbox" name="formats" value="csv" checked> CSV</label>
+<label class="check"><input type="checkbox" name="formats" value="xlsx" checked> XLSX</label>
+<label class="check"><input type="checkbox" name="formats" value="pdf"> PDF (wymaga EW_PDF_CHROMIUM)</label>
+</fieldset>
+<label>Podkatalog wyjściowy (opcjonalnie)<input name="output_subdir" pattern="[A-Za-z0-9_./-]*"></label>
+<label>Dodatkowe parametry (JSON, opcjonalnie)<textarea name="params_json" placeholder='{"max_rows": 500}'></textarea></label>
+<button {% if not output_enabled %}disabled{% endif %} data-create="{{ name }}">Utwórz raport</button>
+</form>
+</details>
+{% endfor %}
+</div>
+<div class="panel">
+<h2>Rejestr raportów</h2>
+<p>Rejestr jest tylko dopisywany. Hash raportu to SHA-256 obliczonej treści; hash manifestu wykrywa zmianę plików, nie jest podpisem.</p>
+<table data-report-list><tr><th>ID</th><th>Typ</th><th>Utworzono (UTC)</th><th>Sekcje</th><th>Formaty</th><th>Hash manifestu</th></tr>
+{% for r in reports %}<tr><td><a href="/reports/{{ r.id }}">{{ r.id }}</a></td><td>{{ r.report_type }}</td><td>{{ r.created_at }}</td><td>{% for s in r.sections %}<span class="pill s-{{ s.status }}">{{ s.section }}: {{ s.status }}</span> {% endfor %}</td><td>{% for k, v in r.formats.items() %}{{ k }}={{ v }} {% endfor %}</td><td><code>{{ r.manifest_sha256 }}</code></td></tr>
+{% else %}<tr><td colspan="6">Brak raportów.</td></tr>{% endfor %}
+</table>
+</div>
+</section>
+</main></body></html>

@@ -1,0 +1,19 @@
+{
+  "schema": "ageds.takeout-activity",
+  "version": "1",
+  "notice": "Settings for Google Takeout 'My Activity' parsing. Product names, month abbreviations and HTML date shapes are EXAMPLES observed in public descriptions of the export format; exports change between versions and locales. Unrecognised values are kept raw and flagged.",
+  "browser_history_products": ["Chrome", "YouTube", "YouTube Music"],
+  "html_response_products": ["Gemini Apps", "Bard"],
+  "month_names": {
+    "jan": 1, "january": 1, "feb": 2, "february": 2, "mar": 3, "march": 3, "apr": 4, "april": 4,
+    "may": 5, "jun": 6, "june": 6, "jul": 7, "july": 7, "aug": 8, "august": 8, "sep": 9, "sept": 9,
+    "september": 9, "oct": 10, "october": 10, "nov": 11, "november": 11, "dec": 12, "december": 12,
+    "sty": 1, "lut": 2, "kwi": 4, "maj": 5, "cze": 6, "lip": 7, "sie": 8, "wrz": 9, "paź": 10, "paz": 10,
+    "lis": 11, "gru": 12,
+    "mrt": 3, "mei": 5, "okt": 10
+  },
+  "html_date_patterns": [
+    {"id": "month_day_year_v1", "regex": "^(?P<mon>[^\\W\\d_]+)\\.? (?P<day>\\d{1,2}), (?P<year>\\d{4}),? (?P<h>\\d{1,2}):(?P<m>\\d{2})(?::(?P<s>\\d{2}))? ?(?P<ampm>[AaPp]\\.?[Mm]\\.?)? ?(?P<zone>\\S.*)?$"},
+    {"id": "day_month_year_v1", "regex": "^(?P<day>\\d{1,2})\\.? (?P<mon>[^\\W\\d_]+)\\.? (?P<year>\\d{4}),? (?P<h>\\d{1,2}):(?P<m>\\d{2})(?::(?P<s>\\d{2}))? ?(?P<ampm>[AaPp]\\.?[Mm]\\.?)? ?(?P<zone>\\S.*)?$"}
+  ]
+}

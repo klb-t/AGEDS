@@ -1,0 +1,11 @@
+{
+  "schema": "ageds.health-google-fit",
+  "version": "1",
+  "notice": "Layouts follow publicly observed Google Takeout Fit folders ('All Sessions' JSON, 'Daily activity metrics' CSV); examples, not a claim about every Takeout version. Location-like columns (latitude/longitude bounds) are not imported here: location belongs to the opt-in location importers.",
+  "time_formats": ["YYYY-MM-DD[T]HH:mm:ss.SSSZZ", "YYYY-MM-DD[T]HH:mm:ssZZ"],
+  "interval_time_formats": ["HH:mm:ss.SSSZZ", "HH:mm:ssZZ"],
+  "date_formats": ["YYYY-MM-DD"],
+  "sleep_activities": ["sleep", "sleep.light", "sleep.deep", "sleep.rem", "sleep.awake", "72"],
+  "location_column_regex": "(?i)(latitude|longitude)",
+  "interval_file_date_regex": "(\\d{4}-\\d{2}-\\d{2})(?:[^\\d]|$)"
+}

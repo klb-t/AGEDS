@@ -1,0 +1,14 @@
+{
+  "schema": "ageds.messaging_mapping",
+  "version": "1",
+  "notice": "Telegram Desktop 'Export chat history' JSON (result.json) as publicly observed (2020-2025): full exports (chats.list, left_chats.list) and single-chat exports. Examples, not a vendor specification.",
+  "chat_lists": ["chats", "left_chats"],
+  "media_fields": {"photo": "photo", "file": "file", "thumbnail": "thumbnail"},
+  "omitted_media_regex": "^\\(File [^)]*not included[^)]*\\)$|^\\(File exceeds maximum size[^)]*\\)$",
+  "location_fields": ["location_information", "live_location_period_seconds", "venue"],
+  "service_kinds": {"phone_call": "call", "group_call": "call", "create_group": "service", "invite_members": "service",
+                    "remove_members": "service", "join_group_by_link": "service", "pin_message": "service",
+                    "edit_group_title": "service", "edit_group_photo": "service", "migrate_to_supergroup": "service",
+                    "clear_history": "service", "delete_group_photo": "service"},
+  "service_start_year": 2013
+}

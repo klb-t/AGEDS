@@ -1,0 +1,174 @@
+{
+ "schema_version": 1,
+ "task_id": "AGEDS-TASK-20261016-D",
+ "area": "media",
+ "recorded_at": "2026-10-16",
+ "branch": "wt-D",
+ "base_commit": "f09e8f7",
+ "tested_source_head": "fcc21ee75420a790d80af13ad678c7700dbe28de",
+ "tested_source_head_note": "receipt/docs commit follows this head; it changes no executable code",
+ "commits": [
+  "ca63e28",
+  "08feeac",
+  "8c451c7",
+  "fcc21ee"
+ ],
+ "environment": {
+  "python": "3.13.16",
+  "venv": "/home/user/wt/venv (shared, no packages added)",
+  "node": "v22.22.0",
+  "faster_whisper": "not installed (requirements-whisper.txt separate); API read from faster_whisper-1.2.0 wheel source",
+  "huggingface": "blocked (403); no model download attempted",
+  "tesseract": "absent",
+  "pyannote.audio": "absent",
+  "poppler": "pdftoppm/pdfinfo 24.02.0 present",
+  "tts": "absent"
+ },
+ "commands": [
+  {
+   "command": "/home/user/wt/venv/bin/python -m pytest server/tests -q",
+   "result": "492 passed, 610 subtests passed, 0 failed"
+  },
+  {
+   "command": "/home/user/wt/venv/bin/python -m pytest server/tests/test_media_*.py -q",
+   "result": "58 passed, 22 subtests passed, 0 failed"
+  },
+  {
+   "command": "node --test server/tests/js/*.test.mjs",
+   "result": "85 passed, 0 failed (no JS changed)"
+  },
+  {
+   "command": "python3 scripts/verify_repository.py",
+   "result": "passed after receipt files were added"
+  },
+  {
+   "command": "baseline before changes: pytest server/tests -q",
+   "result": "434 passed, 588 subtests passed"
+  }
+ ],
+ "runtime_executed": [
+  {
+   "what": "CLI subprocess: asr-recipes, media-capabilities",
+   "result": "exit 0; capabilities report faster-whisper, tesseract, pyannote unavailable with reasons; poppler available"
+  },
+  {
+   "what": "uvicorn server + HTTP: upload synthetic tone WAV, enqueue legacy twice (dedup reused job 1), per-segment (job 2), diarize (job 3); GET /media, /media/queue, /media/artifact/1, /api/media/recipes, /api/media/capabilities",
+   "result": "all 200; queue estimates 'unknown' (no measured runs) with WAV-header work 18.0 s"
+  },
+  {
+   "what": "real worker process (python -m server.app.worker, 12 s) on that queue",
+   "result": "jobs 1-2 failed 'Install requirements-whisper.txt to enable transcription', job 3 failed 'diarization unavailable: pyannote.audio is not importable'; runs record pinned recipe hashes; 0 derived_text rows"
+  },
+  {
+   "what": "CLI subprocess asr-benchmark --hypotheses (no inference) on a 3-item manifest",
+   "result": "exit 0; WER 0.625, CER 0.325 known-answer; output inside repository refused with exit 2, nothing written"
+  },
+  {
+   "what": "poppler pdftoppm/pdfinfo on generated 3-page PDF inside the OCR job (fake OCR engine)",
+   "result": "2 PNG pages rasterized via stdin/stdout, partial coverage recorded (max_pages 2)"
+  }
+ ],
+ "unit_tested_only": [
+  "CodeSwitchingAdapter and legacy adapter against a fake faster-whisper module (call parameters captured)",
+  "OCR TSV parsing, line grouping and chat-screenshot candidate heuristic against prepared Tesseract TSV",
+  "diarization turn validation, storage and speaker precedence against a fake diarizer",
+  "lease expiry / late-worker fencing for ocr, diarize and code-switching transcribe jobs",
+  "comparison determinism, WER/CER known answers, benchmark output-path refusal and exclusive writes"
+ ],
+ "not_run": [
+  "real faster-whisper inference (auto per file or per segment) on any audio",
+  "real Tesseract OCR",
+  "real pyannote diarization",
+  "browser/Playwright checks of the new pages",
+  "Android (unchanged)",
+  "audit probes semantic_probes.py from the ecosystem audit (not present in any accessible checkout)"
+ ],
+ "recipe_hashes": {
+  "hash_rule": "sha256 of canonical JSON (sort_keys, separators , :, UTF-8, allow_nan false) of the effective recipe without description",
+  "settings_for_effective": {
+   "EW_WHISPER_MODEL": "small",
+   "EW_WHISPER_DEVICE": "cpu",
+   "EW_WHISPER_COMPUTE_TYPE": "int8"
+  },
+  "legacy": {
+   "effective_sha256": "78921f93a049506cbeab800d125a8e08d7d94e3477554592061485dcd0678548",
+   "preset_sha256": "e768f85cf01c299ba26d88ce48b5ddeb33ab7a34f2c7c9de20b2aab2a560c319"
+  },
+  "per-segment-pl-nl-en": {
+   "effective_sha256": "b5530b0e5f3dac066426e869c7f718287df413416236d5162d7a14bed7149171",
+   "preset_sha256": "c6f05bdb18b4f18ab8b201f40cacca7324ae35a673bf306134388783c5b99d0e"
+  },
+  "ocr-tesseract-pol-nld-eng": {
+   "effective_sha256": "8ddcef5b9f09dccadd891b08434eaf14a34f535ff2a1b0dd81c3a6e9bdcfe349"
+  },
+  "ocr-chat-screenshot-pol-nld-eng": {
+   "effective_sha256": "465b66c491293e15e0d3642bf1d3f6441d84529b1085cb01c5eb6cf54336864a"
+  },
+  "diarization-pyannote": {
+   "effective_sha256": "4063ac80e06887b5c0452b8dd4c0c27f29a5fb57153c2b475f9ba08c2ed7dcd6"
+  }
+ },
+ "decisions": [
+  {
+   "id": "D-MEDIA-01",
+   "decision": "legacy preset = pre-recipe call; model/device/compute from EW_WHISPER_* via $setting placeholders resolved into the hashed effective recipe",
+   "reverse": "edit preset (new revision) or pass overrides; pinned jobs unaffected"
+  },
+  {
+   "id": "D-MEDIA-02",
+   "decision": "empty payload jobs run as legacy resolved at run time; recorded unpinned_pre_recipe_job / historical_recipe unknown; no backfill",
+   "reverse": "none needed; history untouched"
+  },
+  {
+   "id": "D-MEDIA-03",
+   "decision": "dedup default reuse (active only, as before); reuse_completed and duplicate selectable; different hash = new job",
+   "reverse": "EW_MEDIA_DEDUP_POLICY"
+  },
+  {
+   "id": "D-MEDIA-04",
+   "decision": "code-switching output stays derived_text kind transcript (version language 'mul') so existing citations apply",
+   "reverse": "a separate kind would need citation changes"
+  },
+  {
+   "id": "D-MEDIA-05",
+   "decision": "human speaker assignment as dedicated append-only table, not annotations",
+   "reverse": "additive; annotations remain available for free-form notes"
+  },
+  {
+   "id": "D-MEDIA-06",
+   "decision": "event_candidates status fixed to 'candidate'; review/promotion must be a separate append-only table",
+   "reverse": "new migration"
+  },
+  {
+   "id": "D-MEDIA-07",
+   "decision": "estimates only from measured runs of the same job kind and recipe hash; otherwise unknown",
+   "reverse": "estimate model is isolated in media/estimates.py"
+  },
+  {
+   "id": "D-MEDIA-08",
+   "decision": "normalization ageds-asr-eval-norm/1 keeps diacritics, keeps , . : between digits and apostrophes between letters",
+   "reverse": "new normalization id"
+  }
+ ],
+ "brief_b_ag_01": {
+  "implemented": [
+   "EA-AGEDS-001 recipe as data with hash, run pins full effective recipe",
+   "EA-AGEDS-002 job payload pin, two hashes two jobs, dedup policy, defaults never change pinned jobs",
+   "effective_recipe() shared by enqueue, worker, comparison and run-recipe verification; export carries job pin and run recipe (tested)",
+   "recipe without word timestamps marks citations limited to segments"
+  ],
+  "out_of_scope_here": [
+   "EA-AGEDS-003 scan limits through Android/HTTP/CLI (not this task's file scope)"
+  ],
+  "decision_record_location": "this receipt (decisions); docs/reports/decisions/ does not exist in AGEDS and is outside this task's scope"
+ },
+ "shared_edits": [
+  "docs/README.md: one index row"
+ ],
+ "boundaries": [
+  "Language identification probability is not transcript correctness; no WER/CER claim on real speech exists",
+  "Synthetic fixtures are sine tones labelled NOT speech; fake model output is derived from tone frequency",
+  "New tables are not in the metadata package's fixed table list (export task F)",
+  "API authentication not implemented (unchanged)"
+ ]
+}

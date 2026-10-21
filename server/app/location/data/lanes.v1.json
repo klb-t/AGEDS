@@ -1,0 +1,17 @@
+{
+  "schema": "ageds.location-lanes.v1",
+  "version": "1",
+  "description": "Data-driven lanes of the location views. Each lane lists event types; items keep their own signal class and basis. Lanes are a view, not a classification of the evidence.",
+  "lanes": [
+    {"id": "presence", "label": "Obecność w miejscach (pochodna)", "event_types": ["place_presence"], "basis": "derived",
+     "note": "derived from stored device samples and a private place set; not a person's presence"},
+    {"id": "visits", "label": "Wizyty (wnioskowanie dostawcy)", "event_types": ["location_visit"], "basis": "provider_inference"},
+    {"id": "travel", "label": "Przemieszczanie", "event_types": ["location_segment", "location_track"],
+     "basis": "provider_inference | raw_sample"},
+    {"id": "declared", "label": "Trasy i punkty zadeklarowane", "event_types": ["location_route", "location_waypoint"], "basis": "declared"},
+    {"id": "samples", "label": "Próbkowanie położenia urządzenia", "event_types": ["location_samples"], "basis": "raw_sample",
+     "note": "passive sampling sessions; excluded from documentation density by default"},
+    {"id": "legacy", "label": "Obecność v1 (zgrubna, historyczna)", "event_types": ["presence"],
+     "note": "events of parser google_location v1; kept unchanged"}
+  ]
+}

@@ -6,6 +6,8 @@
 - [Features and boundaries](FEATURES.md): implemented behavior and precise limitations.
 - [Development](DEVELOPMENT.md): reproducible local checks, acceptance runners and upgrades.
 - [Corpus import](CORPUS_IMPORT.md): optional private catalog workflow.
+- [Source catalog](CATALOG.md): collections, read-only archive-aware catalog scans, signature types, duplicates, coverage gaps, hypotheses and exports.
+- [Import plan](IMPORT_PLAN.md): catalog → reviewable, versioned import plan → confirmed, idempotent, resumable import with collection and virtual-locator provenance.
 - [Change history](../CHANGELOG.md): functional development increments.
 
 ## Architecture and evidence contracts
@@ -15,12 +17,27 @@
 | Project boundary and decision semantics | [Architecture](ARCHITECTURE.md), [Service architecture](../server/ARCHITECTURE.md), [Architecture rules](ARCHITECTURE_RULES.md), [Ecosystem](../ECOSYSTEM.md). |
 | Search, pagination and client limits | [Literal FTS search](SEARCH_CONTRACT.md), [Read pages](READ_PAGES.md), [Client history budget](CLIENT_HISTORY_PAYLOAD_BUDGET.md). |
 | Citation transfer | [Evidence exchange](EVIDENCE_EXCHANGE.md), [Independent consumer](EVIDENCE_CONSUMER.md). |
+| Ecosystem embedding | [Read API v1 and local tokens](READ_API.md), [Ecosystem adapters: ChatADHD and Loom](ECOSYSTEM_ADAPTERS.md). |
+| Workbench conveniences | [Layered search, saved searches, bulk tags, folders, bookmarks, shortcuts, theme, PL/NL/EN](WORKBENCH.md). |
 | Metadata archives | [Inert archive](METADATA_ARCHIVE.md), [Interpreted verification](ARCHIVE_VERIFICATION_BUDGET.md), [Archive budgets](ARCHIVE_VERIFICATION_BUDGETS.md). |
 | Verified media and decoding | [Media serving](VERIFIED_MEDIA.md), [Decoder reader](VERIFIED_READER.md). |
+| ASR recipes, code-switching, OCR, diarization, media queue | [Multilingual ASR and media jobs](MULTILINGUAL_ASR.md). |
 | Native source formats | [Format profiles](NATIVE_SOURCE_FORMATS.md), [BIFF8 XLS](NATIVE_XLS.md), [XLSX phonetic hints](XLSX_PHONETIC_PROJECTION.md). |
 | WAV observations | [Common-core header probe](WAV_HEADER_PROBE.md), [Server probe](SERVER_WAV_HEADER.md), [Server scan integration](SERVER_WAV_HEADER_SCAN.md), [Android display](ANDROID_WAV_HEADER_UI.md). |
 | Source scan and cache lifecycle | [Production engine](SOURCE_SCAN_ENGINE.md), [Android adapter](ANDROID_SOURCE_SCAN_ADAPTER.md), [Publication gate](SOURCE_SCAN_PUBLICATION_GATE.md), [Guarded cache](SOURCE_SCAN_CACHE_PUBLICATION.md), [ViewModel integration](ANDROID_SCAN_PUBLICATION_INTEGRATION.md). |
 | Device acceptance | [SAF provider harness](ANDROID_SAF_PROVIDER_ACCEPTANCE.md). |
+| AI chat export importers | [ChatGPT/Claude.ai importers and cross-export logical dedup](IMPORTERS_CHAT.md). |
+| Communication, Takeout and media importers | [MBOX/EML, ICS, VCF, call logs, billing, recording names, My Activity, location, browser history, WhatsApp media, EXIF](IMPORTERS_COMM.md). |
+| Common timeline | [Projection rule, correlation hypotheses, timeline API and swimlane view](TIMELINE.md). |
+| Location history and places | [Google/GPX/KML/GeoJSON/FIT samples, provider inferences, private places, geofence presence, map without external tiles](LOCATION.md). |
+| Personal-data exports and file metadata | [Google Photos sidecars and geotags, Facebook/Instagram/Telegram/Google Chat/X/LinkedIn messages, login activity, document metadata, Keep, local browser profiles](PERSONAL_EXPORTS.md). |
+| Ledger: bank, transport, health | [Tabular profiles, CAMT.053, MT940, transit/rides, health exports (opt-in), provider-inferred durations](LEDGER.md). |
+| Reports and export | [Report types, method record, manifest verification, citation bundles, extension tables in the metadata package](REPORTS.md). |
+| Hypothesis analyzer (interpretive) | [Preregistration, evidence dossier, thesis typology, permutation event study](HYPOTHESES.md). |
+| Time budget and feature series | [Categories, labels, bounds, candles, sensitivity, feature series](TIME_BUDGET.md). |
+| Adversarial review fixes | [Findings → regression tests → status](validation/REVIEW_FIXES_2026-10-16.md). |
+| Second adversarial review fixes | [Findings → regression tests → status](validation/REVIEW2_FIXES_2026-10-16.md). |
+| End-to-end acceptance | [Criterion → evidence matrix, CLI/HTTP pipeline on a multi-device synthetic layout](ACCEPTANCE.md). |
 
 ## Development state and records
 

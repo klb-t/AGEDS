@@ -1,0 +1,123 @@
+<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Katalog źródeł</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/catalog.css"></head><body>
+<header>{% include '_nav.html' %}<div><h1>Katalog źródeł</h1><p>obserwacje skanu · oryginały tylko do odczytu · typ z sygnatury bajtów</p></div>
+<form method="get" action="/catalog" class="catalog-search">{% if filters.collection %}<input type="hidden" name="collection" value="{{filters.collection}}">{% endif %}<input name="q" value="{{filters.q}}" placeholder="Nazwa lub lokator" aria-label="Szukaj w nazwach i lokatorach"><button>Szukaj</button></form></header>
+<main class="catalog">
+<p id="catalog-status" class="catalog-status" role="status" aria-live="polite"></p>
+<div class="catalog-layout">
+<aside class="panel catalog-tree" aria-label="Kolekcje">
+  <h2>Kolekcje</h2>
+  <ul>
+    <li class="{% if not selected %}active{% endif %}"><a href="/catalog">Wszystkie kolekcje</a></li>
+    {% for c in collections %}<li class="{% if selected and selected.id == c.id %}active{% endif %}" style="--depth: {{c.tree_depth}}">
+      <a href="{{ query(collection=c.id, after=None, group=None) }}">{{c.label}}</a>
+      <small>#{{c.id}} · {{c.entry_count}} wpisów{% if c.priority is not none %} · priorytet {{c.priority}}{% endif %}</small>
+    </li>{% else %}<li><small>Brak kolekcji. Dodaj pierwszą poniżej, potem uruchom <code>catalog-scan</code>.</small></li>{% endfor %}
+  </ul>
+  <details><summary>Nowa kolekcja</summary>
+    <form data-catalog-action="collection-create" class="catalog-form">
+      <label>Etykieta <input name="label" required maxlength="500"></label>
+      <label>Urządzenie / konto (prywatna etykieta) <input name="device_or_account"></label>
+      <label>Data eksportu (jak podana) <input name="export_date_raw"></label>
+      <label>Metoda pozyskania <input name="acquisition_method"></label>
+      <label>Operator <input name="operator"></label>
+      <label>Priorytet <input name="priority" type="number" step="1"></label>
+      <label>Nadrzędna <select name="parent_collection_id"><option value="">—</option>{% for c in collections %}<option value="{{c.id}}">#{{c.id}} {{c.label}}</option>{% endfor %}</select></label>
+      <label>Uwagi <textarea name="notes" rows="3"></textarea></label>
+      <button>Dodaj kolekcję</button>
+    </form>
+  </details>
+</aside>
+<div class="catalog-main">
+{% if selected %}
+<section class="panel" aria-labelledby="collection-title">
+  <h2 id="collection-title">{{selected.label}} <small>#{{selected.id}}</small></h2>
+  <dl>
+    <dt>Urządzenie / konto</dt><dd>{{selected.device_or_account or '—'}}</dd>
+    <dt>Data eksportu</dt><dd>{{selected.export_date_raw or '—'}}</dd>
+    <dt>Metoda pozyskania</dt><dd>{{selected.acquisition_method or '—'}}</dd>
+    <dt>Operator</dt><dd>{{selected.operator or '—'}}</dd>
+    <dt>Bieżące skany</dt><dd>{{selected.current_scan_ids|join(', ') or 'brak'}} · {{selected.entry_count}} wpisów</dd>
+  </dl>
+  <form data-catalog-action="collection-update" data-collection-id="{{selected.id}}" class="catalog-form catalog-inline">
+    <label>Priorytet <input name="priority" type="number" step="1" value="{{selected.priority if selected.priority is not none else ''}}"></label>
+    <label class="wide">Uwagi <textarea name="notes" rows="2">{{selected.notes or ''}}</textarea></label>
+    <button>Zapisz (poprzednie wartości trafiają do historii)</button>
+  </form>
+  <details><summary>Historia zmian ({{selected.history|length}})</summary><ul class="catalog-history">{% for h in selected.history %}<li><small>{{h.ts}} · {{h.actor}} · {{h.action}}</small> <code>{{h.details|tojson}}</code></li>{% endfor %}</ul></details>
+  <details><summary>Skany ({{scans|length}})</summary><div class="catalog-scroll"><table><tr><th>ID</th><th>status</th><th>bieżący</th><th>start</th><th>koniec</th><th>niekompletne</th></tr>
+  {% for s in scans %}<tr><td>{{s.id}}</td><td>{{s.status}}</td><td>{{'tak' if s.current else 'nie'}}</td><td>{{s.started_at}}</td><td>{{s.finished_at or ''}}</td><td><code>{{s.coverage.incomplete_reasons|tojson if s.coverage else ''}}</code></td></tr>{% endfor %}</table></div></details>
+</section>
+{% if coverage %}
+<section class="panel" aria-labelledby="coverage-title">
+  <h2 id="coverage-title">Pokrycie i luki</h2>
+  <form method="get" action="/catalog" class="catalog-inline"><input type="hidden" name="collection" value="{{selected.id}}">
+    <label>Minimalna luka (dni) <input name="minGap" type="number" min="1" value="{{filters.minGap}}"></label><button>Przelicz</button></form>
+  <p class="catalog-totals">{% for k, v in coverage.totals.items() %}<span><b>{{v}}</b> {{k}}</span>{% endfor %}</p>
+  <p><small>Luka = dni bez żadnego wpisu na danej podstawie czasu (rodzaj, źródło, strefa); podstaw nie łączymy. Czas pliku nie jest czasem zdarzenia; brak danych nie oznacza bezczynności.</small></p>
+  <div class="catalog-scroll"><table><tr><th>typ</th><th>wpisy</th><th>bajty</th><th>konflikty</th><th>statusy</th><th>czas: źródło (strefa) zakres</th><th>luki</th></tr>
+  {% for t in coverage.types %}<tr><td><a href="{{ query(type=t.type, after=None) }}">{{t.type}}</a></td><td>{{t.entries}}</td><td>{{t.bytes}}</td><td>{{t.type_conflicts}}</td>
+    <td>{% for k, v in t.by_status.items() if v %}<span class="badge badge-{{k}}">{{k}} {{v}}</span> {% endfor %}</td>
+    <td>{% for b in t.time_bases %}<div>{{b.source}} ({{b.tz_status}}{% if b.value_field == 'local' %}, czas lokalny{% endif %}): {{b.first or '—'}} – {{b.last or '—'}}{% if b.placeholder_values_excluded %} <small>pominięto znaczniki zastępcze: {{b.placeholder_values_excluded}}</small>{% endif %}</div>{% endfor %}</td>
+    <td>{% for b in t.time_bases %}{% for g in b.gaps %}<div>{{g.last_observed_day}} → {{g.next_observed_day}} <small>({{g.empty_days}} dni, {{b.source}})</small></div>{% endfor %}{% endfor %}</td></tr>{% endfor %}
+  </table></div>
+</section>
+{% endif %}
+<section class="panel" aria-labelledby="describe-title">
+  <h2 id="describe-title">Opis kolekcji (hipoteza)</h2>
+  <p><small>Profil liczy kod. Model może pisać wyłącznie placeholdery rozwiązywane z profilu; wynik to hipoteza zapisana w sidecarze NDJSON z proweniencją. Domyślny provider <code>none</code> niczego nie wysyła.</small></p>
+  <form data-catalog-action="explain" data-collection-id="{{selected.id}}" class="catalog-inline">
+    <label>Provider <select name="provider">{% for p in providers %}<option value="{{p}}">{{p}}</option>{% endfor %}</select></label>
+    <button>Profil / opis</button></form>
+  {% for a in annotations %}<article class="catalog-annotation">
+    <small>#{{a.id}} · {{a.provider}} / {{a.model}} {{a.model_version}} · status: <b>{{a.current_status}}</b> · prompt <code>{{a.prompt_sha256[:12]}}</code> · profil <code>{{a.input_profile_sha256[:12]}}</code></small>
+    <p>{{a.resolved_text}}</p>
+    {% if a.warnings %}<p><small>Ostrzeżenia: {% for w in a.warnings %}{{w.code}} {% endfor %}</small></p>{% endif %}
+    {% if a.current_status == 'hypothesis' %}<form data-catalog-action="decision" data-annotation-id="{{a.id}}" class="catalog-inline">
+      <label>Kto decyduje <input name="actor" required maxlength="200"></label><label>Uzasadnienie <input name="reason"></label>
+      <button name="decision" value="promoted">Promuj</button><button name="decision" value="rejected" class="secondary">Odrzuć</button></form>{% endif %}
+  </article>{% endfor %}
+</section>
+{% endif %}
+<section class="panel" aria-labelledby="entries-title">
+  <h2 id="entries-title">Wpisy {% if not selected %}<small>(wszystkie kolekcje)</small>{% endif %}</h2>
+  <form method="get" action="/catalog" class="catalog-inline catalog-filters">
+    {% if filters.collection %}<input type="hidden" name="collection" value="{{filters.collection}}">{% endif %}
+    <label>Typ <select name="type"><option value="">wszystkie</option>{% for t in types %}<option value="{{t}}" {% if t == filters.type %}selected{% endif %}>{{t}}</option>{% endfor %}</select></label>
+    <label>Status <select name="status"><option value="">wszystkie</option>{% for s in statuses %}<option value="{{s}}" {% if s == filters.status %}selected{% endif %}>{{s}}</option>{% endfor %}</select></label>
+    <label class="check"><input type="checkbox" name="conflict" value="true" {% if filters.conflict %}checked{% endif %}> konflikt typu</label>
+    <label class="check"><input type="checkbox" name="dup" value="true" {% if filters.dup %}checked{% endif %}> duplikaty treści</label>
+    {% if filters.group %}<input type="hidden" name="group" value="{{filters.group}}">{% endif %}
+    <label>Tekst <input name="q" value="{{filters.q}}"></label>
+    <button>Filtruj</button>
+  </form>
+  <p class="catalog-exports">Eksport: <a href="{{ export_url('csv') }}">CSV</a> · <a href="{{ export_url('xlsx') }}">XLSX</a> · <a href="{{ export_url('html') }}">HTML</a>
+    {% if filters.group %} · grupa treści #{{filters.group}} <a href="{{ query(group=None, after=None) }}">(wyczyść)</a>{% endif %}</p>
+  <div class="catalog-scroll"><table class="catalog-entries"><thead><tr><th>ID</th><th>lokator</th><th>typ (bajty / nazwa)</th><th>rozmiar</th><th>sha256</th><th>status</th><th>znacznik</th></tr></thead><tbody>
+  {% for e in page.entries %}<tr class="{% if e.status != 'ok' %}is-problem{% elif e.type_conflict %}is-conflict{% endif %}">
+    <td>{{e.id}}</td>
+    <td><code>{{e.locator}}</code>{% if e.depth %} <small>głęb. {{e.depth}}</small>{% endif %}{% if e.name_flags %}<br><small>{{e.name_flags|join(', ')}}</small>{% endif %}</td>
+    <td>{{e.sniffed_type or '—'}} / {{e.extension_type or e.extension or '—'}}{% if e.type_conflict %} <span class="badge badge-conflict" title="{{e.type_relation}}">konflikt</span>{% endif %}<br><small>{{e.sniff_basis}}</small></td>
+    <td>{{e.size_bytes if e.size_bytes is not none else '?'}}</td>
+    <td>{% if e.sha256 %}<code>{{e.sha256[:12]}}</code>{% if e.group_current_observations > 1 or e.group_artifacts %} <a href="{{ query(group=e.content_group_id, after=None) }}" title="te same bajty w innych miejscach">×{{e.group_current_observations}}{% if e.group_artifacts %}+{{e.group_artifacts}}A{% endif %}</a>{% endif %}{% else %}<small>{{e.hash_status}}</small>{% endif %}</td>
+    <td><span class="badge badge-{{e.status}}">{{e.status}}</span>{% if e.issue_code %}<br><small>{{e.issue_code}}</small>{% endif %}</td>
+    <td><form data-catalog-action="mark" data-collection-id="{{e.collection_id}}" data-locator="{{e.locator}}" class="catalog-mark">
+      <input name="priority" type="number" step="1" aria-label="Priorytet" value="{{e.mark.priority if e.mark and e.mark.priority is not none else ''}}">
+      <input name="note" aria-label="Notatka" value="{{e.mark.note if e.mark and e.mark.note else ''}}"><button>✓</button></form></td>
+  </tr>{% else %}<tr><td colspan="7">Brak wpisów dla tych filtrów.</td></tr>{% endfor %}
+  </tbody></table></div>
+  <p>{% if next_url %}<a href="{{ next_url }}" rel="next">Następna strona →</a>{% endif %} <small>strona do {{page.limit}} wpisów; zapytania są ograniczone po stronie serwera</small></p>
+</section>
+<div class="catalog-pair">
+<section class="panel" aria-labelledby="groups-title"><h2 id="groups-title">Te same bajty w wielu miejscach</h2>
+  <div class="catalog-scroll"><table><tr><th>grupa</th><th>sha256</th><th>wpisy</th><th>kolekcje</th><th>artefakty</th></tr>
+  {% for g in groups %}<tr><td><a href="{{ query(group=g.id, after=None) }}">#{{g.id}}</a></td><td><code>{{g.sha256[:16]}}</code></td><td>{{g.entries}}</td><td>{{g.collections}}</td><td>{{g.artifacts}}</td></tr>{% else %}<tr><td colspan="5">Brak.</td></tr>{% endfor %}</table></div></section>
+<section class="panel" aria-labelledby="collisions-title"><h2 id="collisions-title">Kolizje nazw (różne bajty)</h2>
+  <div class="catalog-scroll"><table><tr><th>nazwa</th><th>warianty</th><th>lokatory</th></tr>
+  {% for c in collisions %}<tr><td>{{c.name}}</td><td>{{c.variants}}</td><td>{% for l in c.locations %}<div><code>{{l.locator}}</code></div>{% endfor %}</td></tr>{% else %}<tr><td colspan="3">Brak.</td></tr>{% endfor %}</table></div></section>
+</div>
+</div>
+</div>
+</main>
+<script type="module" src="/static/catalog.mjs"></script>
+</body></html>

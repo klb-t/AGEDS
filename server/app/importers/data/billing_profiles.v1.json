@@ -1,0 +1,43 @@
+{
+  "schema": "ageds.billing-profiles",
+  "version": "1",
+  "notice": "EXAMPLE profiles only. They are not verified against any real operator's export format. Copy a profile into a private profile file and adapt the header aliases, date order and duration format to the bills you actually have; pass it with --profiles.",
+  "profiles": [
+    {
+      "id": "example_semicolon_daymonth_v1",
+      "label": "Example: semicolon CSV, separate date and time columns, day-first dates, mm:ss durations",
+      "columns": {
+        "date": ["data", "datum", "date"],
+        "time": ["godzina", "tijd", "time"],
+        "number": ["numer", "nummer", "number", "numer docelowy", "gebeld nummer"],
+        "direction": ["kierunek", "richting", "direction"],
+        "service": ["usługa", "usluga", "dienst", "service"],
+        "duration": ["czas", "duur", "duration", "czas trwania"],
+        "cost": ["koszt", "kosten", "cost", "kwota"]
+      },
+      "required": ["date", "time", "number", "duration"],
+      "date_order": "day_first",
+      "duration_format": "mm:ss",
+      "direction_map": {"przychodzące": "incoming", "wychodzące": "outgoing", "inkomend": "incoming", "uitgaand": "outgoing", "in": "incoming", "out": "outgoing"},
+      "service_map": {"rozmowa": "call", "gesprek": "call", "voice": "call", "sms": "sms", "dane": null, "data": null},
+      "assumed_zone": null
+    },
+    {
+      "id": "example_datetime_infer_order_v1",
+      "label": "Example: single date-time column with unknown day/month order, seconds or hh:mm:ss durations",
+      "columns": {
+        "datetime": ["start", "start time", "datetime", "call start", "data i godzina"],
+        "number": ["called number", "number", "b-number", "numer"],
+        "direction": ["direction", "type"],
+        "duration": ["duration", "duration (s)", "seconds", "czas"],
+        "cost": ["charge", "cost"]
+      },
+      "required": ["datetime", "number", "duration"],
+      "date_order": "infer_from_file",
+      "duration_format": "auto",
+      "direction_map": {"incoming": "incoming", "outgoing": "outgoing", "mo": "outgoing", "mt": "incoming"},
+      "service_map": {},
+      "assumed_zone": null
+    }
+  ]
+}

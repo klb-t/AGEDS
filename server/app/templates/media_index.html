@@ -1,0 +1,11 @@
+<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Transkrypcje i OCR</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/media.css"></head><body>
+<header>{% include '_nav.html' %}<div><h1>Transkrypcje, OCR, diaryzacja</h1><p>każda próba modelu to osobny run z przypiętą recepturą</p></div></header>
+<main>
+<section class="grid"><div class="panel"><h2>Dostępność silników (lokalnie)</h2><table><tr><th>Silnik</th><th>Stan</th><th>Uwagi</th></tr>
+{% for name, item in capabilities.items() if name != 'note' %}<tr><td>{{name}}</td><td>{{item.status}}</td><td>{{item.reason or item.version or ''}}</td></tr>{% endfor %}</table><p class="media-note">{{capabilities.note}}</p></div>
+<div class="panel"><h2>Receptury</h2><table><tr><th>ID</th><th>Rodzaj</th><th>Strategia / układ</th><th>Hash (SHA-256)</th></tr>
+{% for r in recipes %}<tr><td>{{r.id}}</td><td>{{r.kind}}</td><td>{{r.effective.strategy or r.effective.layout or r.effective.engine}}</td><td><code>{{r.sha256[:16]}}…</code></td></tr>{% endfor %}</table>
+<p class="media-note">Hash obejmuje efektywną recepturę (z wartościami z ustawień). Zadanie przypina recepturę w chwili zakolejkowania; późniejsza zmiana domyślnych nie zmienia przypiętego zadania.</p></div></section>
+<section class="panel"><h2>Materiały</h2>{% if more %}<p>Pokazano 500 najnowszych.</p>{% endif %}<table><tr><th>#</th><th>Plik</th><th>Typ</th><th>Transkrypcje</th><th>OCR</th><th>Aktywne zadania</th></tr>
+{% for a in artifacts %}<tr><td>{{a.id}}</td><td><a href="/media/artifact/{{a.id}}">{{a.original_name}}</a></td><td>{{a.mime_type or ''}}</td><td class="num">{{a.transcripts}}</td><td class="num">{{a.ocr}}</td><td class="num">{{a.active_jobs}}</td></tr>{% else %}<tr><td colspan="6">Brak materiałów audio/obrazów/PDF.</td></tr>{% endfor %}</table></section>
+</main></body></html>

@@ -13,7 +13,7 @@ import json
 import sys
 from pathlib import Path
 
-COMMANDS = ('location-import', 'places-check', 'presence-run', 'presence-show', 'location-window', 'location-correlate',
+COMMANDS = ('location-import', 'places-check', 'places-match-source', 'presence-run', 'presence-show', 'location-window', 'location-correlate',
             'location-correlation-review', 'location-status')
 
 
@@ -55,6 +55,13 @@ def register(subparsers) -> None:
     p.add_argument('--max-fixes', type=_positive)
     p.add_argument('--max-events', type=_positive)
     p.add_argument('--max-element-bytes', type=_positive)
+    match = subparsers.add_parser('places-match-source', help='match a registered point source (e.g. photo geotags) against private places; read-only')
+    match.add_argument('--source', default='traces.photo_geotags')
+    match.add_argument('--places', default=None)
+    match.add_argument('--from', dest='from_', default=None)
+    match.add_argument('--to', default=None)
+    match.add_argument('--limit', type=int, default=100_000)
+    match.add_argument('--include-outside', action='store_true')
     check = subparsers.add_parser('places-check', help='validate a private places file and print its hash (no write)')
     check.add_argument('--places', type=Path, help='places JSON (default: AGEDS_LOCATION_PLACES)')
     run = subparsers.add_parser('presence-run', help='derive place presence from stored samples (append-only run)')
@@ -126,6 +133,12 @@ def _run(args) -> dict:
     if command == 'places-check':
         from ..location import places
         return places.summary(_places(args.places))
+    if command == 'places-match-source':
+        from ..location import sources
+        return sources.match_source(args.source, _places(args.places),
+                                    start_us=_us(args.from_),
+                                    end_us=_us(args.to),
+                                    limit=args.limit, include_outside=args.include_outside)
     if command == 'presence-run':
         from ..location import presence
         return presence.run_presence(_places(args.places), params=args.params, start_utc=args.from_, end_utc=args.to,

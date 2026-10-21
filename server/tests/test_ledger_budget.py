@@ -36,17 +36,19 @@ def test_provider_inferred_durations_are_estimates_unless_the_parameter_says_so(
     tabular_profiles.import_tabular(Path(env['m']['rides']['path']))
     default = _run()
     assert default['parameters']['inferred_duration_layer'] == 'probable'
-    assert default['parameters']['inferred_duration_bases'] == ['provider_inference', 'derived']
+    # time_budget.v5 default (integration 2026-10-21): provider-side user edits are estimates too.
+    assert default['parameters']['inferred_duration_bases'] == ['provider_inference', 'provider_user_edit', 'derived']
     assert 'inferred_durations' in default['method']
     sen, transport, ruch = (default['by_category'][c] for c in ('sen', 'transport', 'ruch'))
     assert sen['lower'] == 0 and sen['probable'] > 0  # sleep sessions and the run: estimates
     assert transport['lower'] == 0 and transport['probable'] == 2570 + 1500  # two ride trips with explicit offsets
-    assert ruch['lower'] == ruch['probable'] == 1200  # the user-entered yoga workout is declared, not inferred
+    # The user-entered yoga workout (provider_user_edit) is a self-report, not independently confirmed time.
+    assert ruch['lower'] == 0 and ruch['probable'] == 1200
     counted = _run({'inferred_duration_layer': 'lower'})
     assert counted['by_category']['sen']['lower'] == counted['by_category']['sen']['probable'] > 0
     assert counted['by_category']['transport']['lower'] > 0
-    narrowed = _run({'inferred_duration_bases': ['provider_inference', 'derived', 'provider_user_edit']})
-    assert narrowed['by_category']['ruch']['lower'] == 0 and narrowed['by_category']['ruch']['probable'] > 0
+    declared = _run({'inferred_duration_bases': ['provider_inference', 'derived']})
+    assert declared['by_category']['ruch']['lower'] == declared['by_category']['ruch']['probable'] == 1200
     only_derived = _run({'inferred_duration_bases': ['derived']})
     assert only_derived['by_category']['sen']['lower'] == only_derived['by_category']['sen']['probable'] > 0
 

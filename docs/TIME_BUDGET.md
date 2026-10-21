@@ -136,12 +136,13 @@ The interim projection `analysis_source.v1` is only a labelled fallback
 (`seam: interim_fallback`) for a checkout without the timeline package.
 
 **Inferred durations (2026-10-17, ledger task L3).** A start–end range or declared duration of an
-event whose `metadata.signal.basis` is in `inferred_duration_bases` (default `provider_inference`,
-`derived`: sleep and workout sessions, travel segments, provider visits, our own derivations) is an
-estimate in the probable variant (candle role `inferred`), never confirmed time, unless the run sets
-`inferred_duration_layer: lower`. Manually entered records (`provider_user_edit`) are declarations
-like calendar entries and stay confirmed unless that basis is added. Events without `signal` are
-unchanged. Category rules of kind `signal_basis` match the basis. See [LEDGER](LEDGER.md).
+event whose `metadata.signal.basis` is in `inferred_duration_bases` (default since `time_budget.v5`:
+`provider_inference`, `provider_user_edit`, `derived` — sleep and workout sessions, travel segments,
+provider visits, user-edited provider records, our own derivations) is an estimate in the probable
+variant (role `provider_inference`, `derived` or `inferred`), never confirmed time, unless the run
+sets `inferred_duration_layer: lower`. Self-entered records (`provider_user_edit`) count as
+declarations only when a run removes that basis from the list. Events without `signal` are
+unchanged. `time_budget.v5` joins the location (v4) and ledger rules; see `RULE_HISTORY`. Category rules of kind `signal_basis` match the basis. See [LEDGER](LEDGER.md).
 
 **Variants** per category, built from intervals on the UTC axis:
 

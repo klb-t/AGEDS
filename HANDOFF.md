@@ -26,6 +26,18 @@ templates and corpus part through the registries in
 | Ecosystem | Read API v1 with local hashed tokens, optional enforcement, CSRF and host checks; ChatADHD intents (anchored quotes) and proposals; Loom graph export with quarantine. ChatADHD client stub: klb-t/chatadhd#46. | [READ_API](docs/READ_API.md), [ECOSYSTEM_ADAPTERS](docs/ECOSYSTEM_ADAPTERS.md) |
 | Workbench | Layered search with epistemic labels, saved searches, bulk tags, folders, bookmarks, shortcuts, command palette, light/dark themes, PL/NL/EN. | [WORKBENCH](docs/WORKBENCH.md) |
 
+## Digital traces wave (2026-10-17 – 2026-10-21)
+
+Plan: [DIGITAL_TRACES](docs/plans/DIGITAL_TRACES_2026-10-17.md). Location history and places
+([LOCATION](docs/LOCATION.md)), personal-data exports, photo and document metadata
+([PERSONAL_EXPORTS](docs/PERSONAL_EXPORTS.md)), bank/transport/health records
+([LEDGER](docs/LEDGER.md)). Time budget is now `time_budget.v5`: provider inferences, provider-side
+user edits and derived spans are estimates unless a run says otherwise. At integration: 1376 backend
+tests passed, 137 Node tests, 11 browser scripts PASS (location 7, traces 5, ledger 6 among them).
+Passive sources are excluded from event-study density controls by default (method v3). No real
+provider export, bank statement or health export was available; all formats were tested on generated
+data.
+
 ## Acceptance (this session, synthetic data only)
 
 | Check | Evidence |

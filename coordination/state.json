@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "project": "AGEDS",
-  "state_id": "AGEDS-STATE-20261017-002",
-  "updated_at": "2026-10-17T13:21:31.086807+00:00",
+  "state_id": "AGEDS-STATE-20261021-001",
+  "updated_at": "2026-10-21T00:29:48.605329+00:00",
   "based_on_remote_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
   "local_branch": "ccr-d25c3cb3-qgbhql",
-  "status_summary": "Evidence Timeline & Analysis increment integrated on ccr-d25c3cb3-qgbhql (draft PR #6): catalog, import plan, chat/communication importers, timeline, multilingual ASR adapters, time budget, hypotheses, reports, read API + adapters, workbench; two adversarial reviews fixed; e2e acceptance 19/22 met, 3 not verifiable by a run. Full suite 1206 passed at 6023d0f. No real inference, real exports or Android execution in this session.",
+  "status_summary": "Digital traces wave integrated (L1 location, L2 personal-data exports, L3 ledger/health/transport) on top of the 2026-10-16 increment. Full suite 1376 passed; 11 browser scripts PASS. L2/L3 agents stopped at a usage limit after committing code; coordinator committed their docs, merged, unified time_budget.v5 and wired photo geotags as a point source.",
   "history": {
     "overnight_ledger": "coordination/archive/2026-09-30_2026-10-01/night-20261001.json",
     "original_tasks": 82,
@@ -26,7 +26,7 @@
   "coordination": {
     "transport": "repository_commits_and_stable_ids",
     "state_editor": "coordinator",
-    "active_claim": "AGEDS-TASK-20261017 digital traces wave",
+    "active_claim": null,
     "scope": "AGEDS only",
     "ci": "manual workflow_dispatch only",
     "history_is_not_active_schedule": true,
@@ -657,7 +657,7 @@
     {
       "id": "AGEDS-TASK-20261017-L1",
       "owner": "location",
-      "status": "claimed",
+      "status": "accepted",
       "scope": [
         "server/app/location/",
         "server/app/importers/location*.py",
@@ -673,12 +673,20 @@
       "acceptance": [
         "all location formats with raw vs provider inference layers, places/geofence presence, timeline lanes, map without external tiles, correlations, budget place rules"
       ],
-      "result_refs": []
+      "result_refs": [
+        "docs/LOCATION.md",
+        "docs/validation/LOCATION_2026-10-17.json"
+      ],
+      "results": {
+        "location_tests": 43,
+        "browser": "location.cjs 7 PASS",
+        "scale": "300k points 31 s import; presence 300k x 100 places 7 s"
+      }
     },
     {
       "id": "AGEDS-TASK-20261017-L2",
       "owner": "traces",
-      "status": "claimed",
+      "status": "accepted",
       "scope": [
         "server/app/traces/",
         "server/app/importers/{photos_takeout,facebook,instagram,telegram,google_chat,twitter,linkedin,account_activity,doc_metadata,keep,browser_profiles}*.py",
@@ -692,12 +700,19 @@
       "acceptance": [
         "prevalence-ordered personal exports with raw/decoded layers, opt-ins, idempotence"
       ],
-      "result_refs": []
+      "result_refs": [
+        "docs/PERSONAL_EXPORTS.md",
+        "docs/validation/TRACES_2026-10-17.json"
+      ],
+      "results": {
+        "browser": "traces.cjs 5 PASS",
+        "note": "agent stopped at a usage limit after committing code; docs/receipt committed by coordinator"
+      }
     },
     {
       "id": "AGEDS-TASK-20261017-L3",
       "owner": "ledger",
-      "status": "claimed",
+      "status": "accepted",
       "scope": [
         "server/app/ledger/",
         "server/app/importers/{tabular_profiles,camt053,mt940,health_*}*.py",
@@ -711,7 +726,51 @@
       "acceptance": [
         "exact decimals, day-precision dates with kinds, health opt-in, sessions for budget"
       ],
-      "result_refs": []
+      "result_refs": [
+        "docs/LEDGER.md",
+        "docs/validation/LEDGER_2026-10-17.json"
+      ],
+      "results": {
+        "browser": "ledger.cjs 6 PASS",
+        "note": "agent stopped at a usage limit after committing code; docs/receipt committed by coordinator"
+      }
+    },
+    {
+      "id": "AGEDS-TASK-20261021-INT",
+      "owner": "coordinator",
+      "status": "accepted",
+      "scope": [
+        "merge L1/L2/L3",
+        "analysis/budget.py time_budget.v5 (L1 v4 + L3 parameters; provider_user_edit estimate by default)",
+        "location/sources.py photo geotags point source + places-match-source"
+      ],
+      "based_on_commit": "eb8193a",
+      "acceptance": [
+        "full suite green",
+        "all browser scripts PASS"
+      ],
+      "results": {
+        "backend": "1376 passed, 1 skipped, 764 subtests",
+        "node": 137,
+        "browser": {
+          "acceptance": 24,
+          "timeline": 8,
+          "workbench": 9,
+          "reports": 10,
+          "analysis_budget": 9,
+          "hypotheses": 10,
+          "importplan": 9,
+          "media": 7,
+          "location": 7,
+          "traces": 5,
+          "ledger": 6,
+          "catalog": "1 passed"
+        }
+      },
+      "decisions": [
+        "time_budget.v5: provider_user_edit (self-entered records) is an estimate by default; reversible per run via inferred_duration_bases",
+        "photo geotag matching is a read-only projection; presence runs still use location_fixes only"
+      ]
     }
   ],
   "remaining_boundaries": [

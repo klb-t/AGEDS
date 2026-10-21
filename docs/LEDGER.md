@@ -120,10 +120,13 @@ run audit and on every session (`metadata.opt_in`). There is no network code. Sa
 
 Sessions and travel segments are evidence of **provider-inferred durations**: in the budget
 ([TIME_BUDGET](TIME_BUDGET.md) §4) an event whose `metadata.signal.basis` is in
-`inferred_duration_bases` (default `provider_inference`, `derived`) contributes its span to the
-probable variant (role `inferred`), never to the lower bound, unless the run sets
-`inferred_duration_layer: lower`. Manual entries (`provider_user_edit`) are declarations, like
-calendar entries, and stay confirmed unless that basis is added to the list. Category rules can use
+`inferred_duration_bases` (default since `time_budget.v5`: `provider_inference`,
+`provider_user_edit`, `derived`) contributes its span to the probable variant, never to the lower
+bound, unless the run sets `inferred_duration_layer: lower`. Manual entries (`provider_user_edit`)
+are self-reports, not independently confirmed time, so they are estimates by default; a run that
+treats them as declarations removes that basis from the list (recorded in the run). The L3 branch
+had them confirmed by default without a rule version; the integration chose the conservative
+default (decision 2026-10-21, reversible per run). Category rules can use
 `event_type` (`health_session`, `travel_segment`, `financial_transaction`) and the new kind
 `signal_basis`. Fitbit and other zone-less sessions are excluded as unknown-zone unless the run names
 an `assume_zone` with an assumption rule. Shared edit (E1): `analysis/source.py` exposes

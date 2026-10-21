@@ -273,3 +273,14 @@ one origin in its CSP.
   only in the import.
 * `/timeline` has no location-specific lane grouping; the location page shows the lanes.
 * The page has not opted in to the light theme (like `/timeline`).
+
+## Photo geotags as a point source (integration 2026-10-21)
+
+`server/app/location/sources.py` registers the traces area's photo geotags (EXIF GPS and Google
+Photos sidecar `geoData`/`geoDataExif`, stored only under `enable_location`) as the point source
+`traces.photo_geotags`. `places-match-source --source traces.photo_geotags --places PATH
+[--from --to]` classifies each timed geotag against the private places (rule
+`place_match_source.v1`, accuracy-aware like `place_match.v1`) and returns the matches with the
+place-set hash. It is a read-only projection: nothing is stored, and presence runs (`presence-run`)
+still use `location_fixes` only. A photo geotag is a file or provider claim about a camera position at
+an instant; sidecar `geoData` keeps its basis `provider_inference_or_user_edit` per point.

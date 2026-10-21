@@ -3,9 +3,15 @@
 Reads only: ``DateTimeOriginal``, ``DateTimeDigitized`` (CreateDate),
 ``DateTime`` (ModifyDate), their ``OffsetTime*`` and ``SubSecTime*`` tags,
 ``Make``/``Model``/``Software`` and whether a GPS IFD exists (coordinates are
-never decoded). Each EXIF time is a ``exif`` candidate: zone ``unknown`` unless
-the matching offset tag is present. EXIF is editable metadata; it is an
-observation of what the file claims, not the capture truth.
+never decoded by ``exif_minimal``). Each EXIF time is a ``exif`` candidate: zone
+``unknown`` unless the matching offset tag is present. EXIF is editable metadata;
+it is an observation of what the file claims, not the capture truth.
+
+``read_exif(..., gps=True)`` additionally returns the raw GPS IFD values
+(``values['gps']``: rationals as ``[numerator, denominator]`` pairs, ASCII refs,
+date stamp). That reading is a separate parser identity (``GPS_PARSER_NAME`` /
+``GPS_PARSER_VERSION``) used by the traces area (``traces.geotags``); the default
+``gps=False`` keeps ``exif_minimal`` version 1 byte-for-byte unchanged.
 """
 from __future__ import annotations
 
@@ -21,6 +27,8 @@ from .comm_common import (DEFAULT_LIMITS, CommLimits, Issues, acquire, add_event
 
 PARSER_NAME = 'exif_minimal'
 PARSER_VERSION = '1'
+GPS_PARSER_NAME = 'exif_gps'
+GPS_PARSER_VERSION = '1'
 _TYPE_SIZES = {1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 7: 1, 9: 4, 10: 8}
 _IFD0_TAGS = {0x010F: 'Make', 0x0110: 'Model', 0x0131: 'Software', 0x0132: 'DateTime'}
 _EXIF_TAGS = {0x9003: 'DateTimeOriginal', 0x9004: 'DateTimeDigitized', 0x9010: 'OffsetTime',
@@ -29,12 +37,64 @@ _EXIF_TAGS = {0x9003: 'DateTimeOriginal', 0x9004: 'DateTimeDigitized', 0x9010: '
 _TIMES = (('DateTimeOriginal', 'OffsetTimeOriginal', 'SubSecTimeOriginal'),
           ('DateTimeDigitized', 'OffsetTimeDigitized', 'SubSecTimeDigitized'),
           ('DateTime', 'OffsetTime', 'SubSecTime'))
+# GPS IFD (EXIF 2.32 §4.6.6): tag -> (name, accepted TIFF types, max count)
+_GPS_TAGS = {0x0000: ('GPSVersionID', (1,), 4), 0x0001: ('GPSLatitudeRef', (2,), 4),
+             0x0002: ('GPSLatitude', (5, 10), 3), 0x0003: ('GPSLongitudeRef', (2,), 4),
+             0x0004: ('GPSLongitude', (5, 10), 3), 0x0005: ('GPSAltitudeRef', (1,), 1),
+             0x0006: ('GPSAltitude', (5, 10), 1), 0x0007: ('GPSTimeStamp', (5, 10), 3),
+             0x000B: ('GPSDOP', (5, 10), 1), 0x0012: ('GPSMapDatum', (2,), 64),
+             0x001D: ('GPSDateStamp', (2,), 16), 0x001F: ('GPSHPositioningError', (5, 10), 1)}
 _EXIF_DT = re.compile(r'^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})$')
 _OFFSET = re.compile(r'^([+-])(\d{2}):(\d{2})$')
 
 
-def _tiff(block: bytes, problems: list[str]) -> dict:
-    """Parse IFD0, the EXIF sub-IFD and the presence of a GPS IFD from a TIFF block."""
+def _gps_ifd(block: bytes, order: str, offset: int, problems: list[str]) -> dict:
+    """Raw GPS IFD values; nothing is converted to degrees here."""
+    out: dict = {}
+    if offset + 2 > len(block):
+        problems.append('gps_ifd_offset_invalid')
+        return out
+    count = struct.unpack(order + 'H', block[offset:offset + 2])[0]
+    if count > 512:
+        problems.append('gps_ifd_entry_count_over_limit')
+        return out
+    for i in range(count):
+        entry = offset + 2 + i * 12
+        if entry + 12 > len(block):
+            problems.append('gps_ifd_entry_truncated')
+            break
+        tag, kind, n = struct.unpack(order + 'HHI', block[entry:entry + 8])
+        if tag not in _GPS_TAGS:
+            continue
+        name, kinds, max_count = _GPS_TAGS[tag]
+        if kind not in kinds:
+            problems.append(f'gps_tag_unexpected_type:{name}')
+            continue
+        if n < 1 or n > max_count:
+            problems.append(f'gps_tag_unexpected_count:{name}')
+            continue
+        size = _TYPE_SIZES[kind] * n
+        start = entry + 8 if size <= 4 else struct.unpack(order + 'I', block[entry + 8:entry + 12])[0]
+        raw = block[start:start + size]
+        if len(raw) != size:
+            problems.append(f'gps_tag_value_out_of_bounds:{name}')
+            continue
+        if kind == 2:
+            out[name] = raw.split(b'\x00', 1)[0].decode('latin-1').strip()
+        elif kind == 1:
+            out[name] = list(raw)
+        else:
+            fmt = order + ('II' if kind == 5 else 'ii') * n
+            numbers = struct.unpack(fmt, raw)
+            out[name] = [[numbers[j], numbers[j + 1]] for j in range(0, len(numbers), 2)]
+    return out
+
+
+def _tiff(block: bytes, problems: list[str], gps: bool = False) -> dict:
+    """Parse IFD0, the EXIF sub-IFD and the presence of a GPS IFD from a TIFF block.
+
+    With ``gps=True`` the GPS IFD's raw values are added as ``values['gps']``.
+    """
     if len(block) < 8 or block[:2] not in (b'II', b'MM'):
         problems.append('tiff_header_invalid')
         return {}
@@ -84,10 +144,12 @@ def _tiff(block: bytes, problems: list[str]) -> dict:
     values['gps_ifd_present'] = 0x8825 in pointers
     if 0x8769 in pointers:
         read_ifd(pointers[0x8769], _EXIF_TAGS)
+    if gps and 0x8825 in pointers:
+        values['gps'] = _gps_ifd(block, order, pointers[0x8825], problems)
     return values
 
 
-def read_exif(path: Path, limits: CommLimits = DEFAULT_LIMITS) -> tuple[dict | None, list[str], str]:
+def read_exif(path: Path, limits: CommLimits = DEFAULT_LIMITS, *, gps: bool = False) -> tuple[dict | None, list[str], str]:
     """Return (values or None, problems, container) reading at most ``max_exif_bytes``."""
     problems: list[str] = []
     with path.open('rb') as handle:
@@ -110,11 +172,11 @@ def read_exif(path: Path, limits: CommLimits = DEFAULT_LIMITS) -> tuple[dict | N
                 problems.append('jpeg_segment_truncated_or_beyond_read_limit')
                 return None, problems, 'jpeg'
             if marker == 0xE1 and segment.startswith(b'Exif\x00\x00'):
-                return _tiff(segment[6:], problems), problems, 'jpeg'
+                return _tiff(segment[6:], problems, gps), problems, 'jpeg'
             position += 2 + length
         return None, problems, 'jpeg'
     if head[:4] in (b'II*\x00', b'MM\x00*'):
-        return _tiff(head, problems), problems, 'tiff'
+        return _tiff(head, problems, gps), problems, 'tiff'
     if head[:8] == b'\x89PNG\r\n\x1a\n':
         position = 8
         while position + 8 <= len(head):
@@ -124,7 +186,7 @@ def read_exif(path: Path, limits: CommLimits = DEFAULT_LIMITS) -> tuple[dict | N
                 if len(data) != length:
                     problems.append('png_exif_truncated_or_beyond_read_limit')
                     return None, problems, 'png'
-                return _tiff(data, problems), problems, 'png'
+                return _tiff(data, problems, gps), problems, 'png'
             if kind == b'IEND':
                 break
             position += 12 + length

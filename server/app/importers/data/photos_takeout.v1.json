@@ -1,0 +1,27 @@
+{
+  "schema": "ageds.photos_takeout_rules",
+  "version": "1",
+  "notice": "Google Photos Takeout naming rules are public observations of exports (2019-2025), not a vendor specification. Every sidecar-to-media link is a hypothesis named by its rule id; ambiguous matches choose nothing. Edit this file (new version) when a real export shows other rules.",
+  "sidecar_keys_any": ["photoTakenTime", "creationTime", "geoDataExif", "geoData", "photoLastModifiedTime"],
+  "sidecar_suffix": ".json",
+  "supplemental_marker": ".supplemental-metadata",
+  "observed_max_sidecar_name_chars": 51,
+  "min_truncated_prefix_chars": 30,
+  "observed_max_media_name_chars": 47,
+  "min_truncated_media_chars": 40,
+  "edited_suffixes": ["-edited", "-bearbeitet", "-modifié", "-edytowane", "-bewerkt", "-editado", "-modificato", "-redigeret", "-muokattu"],
+  "media_extensions": [".jpg", ".jpeg", ".png", ".gif", ".heic", ".heif", ".webp", ".tif", ".tiff", ".bmp", ".dng", ".cr2", ".nef", ".arw", ".raw",
+                       ".mp4", ".mov", ".m4v", ".3gp", ".mkv", ".avi", ".webm", ".mpg", ".mts"],
+  "exif_readable_extensions": [".jpg", ".jpeg", ".png", ".tif", ".tiff"],
+  "geo_agreement_tolerance_deg": 0.000001,
+  "unicode_normalization": "NFC",
+  "rules": {
+    "sidecar_name_exact_v1": "sidecar name = <media name> + .json or + .supplemental-metadata.json",
+    "duplicate_counter_v1": "sidecar <name>.<ext>(N).json or <name>.<ext>.supplemental-metadata(N).json describes media <name>(N).<ext>",
+    "title_exact_v1": "sidecar title equals the media file name (only when the sidecar name has no counter)",
+    "base_without_extension_v1": "sidecar <stem>.json (no media extension in the name) describes media <stem>.<any media ext>",
+    "truncated_sidecar_prefix_v1": "sidecar name at the observed length limit: its (cut) base is a prefix of the media name",
+    "truncated_media_name_v1": "media name at the observed length limit: its stem is a prefix of the sidecar title stem, same extension",
+    "edited_variant_v1": "media <stem><edited suffix>.<ext> is an edited copy of a described media file; listed, never counted as the described file"
+  }
+}

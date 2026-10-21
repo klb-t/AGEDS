@@ -74,6 +74,13 @@ EXTENSION_TABLES = (
     'location_imports', 'location_import_runs', 'location_place_sets', 'location_presence_runs',
     'location_presence_intervals', 'location_correlation_runs', 'location_correlation_hypotheses',
     'location_correlation_status',
+    # L2 (traces): parser observations of personal-data exports and file metadata, all append-only.
+    # Photo sidecars keep third-party ``people`` names raw (exported like every observation); geotag,
+    # provider-location and browser-visit rows exist only as far as the per-run opt-ins
+    # (enable_location / enable_browser_history) allowed; sidecar-to-media matches are rule-id
+    # hypotheses over a hashed candidate scope.
+    'trace_photo_sidecars', 'trace_photo_matches', 'trace_geotags', 'trace_document_metadata',
+    'trace_browser_visits', 'trace_provider_locations',
 )
 EXCLUDED_EXTENSION_TABLES = {
     'api_tokens': 'credential table: token keys, salts and secret digests are never exported',

@@ -1,0 +1,46 @@
+{
+  "schema": "ageds.account_activity_mapping",
+  "version": "1",
+  "notice": "Account security/login activity layouts as publicly observed: Facebook (account_activity, logins_and_logouts, where you're logged in, authorized logins, IP address activity; *_v2 roots and the newer label_values records), Instagram (login/logout/password change history, string_map_data and the older login_history) and Google Takeout Access Log Activity / Devices CSVs. Examples, not vendor specifications.",
+  "json_roots": {
+    "account_activity_v2": {"provider": "facebook", "kind": "account_activity"},
+    "account_activity": {"provider": "facebook", "kind": "account_activity"},
+    "account_accesses_v2": {"provider": "facebook", "kind": "login_logout"},
+    "active_sessions_v2": {"provider": "facebook", "kind": "active_session"},
+    "recognized_devices_v2": {"provider": "facebook", "kind": "recognized_device"},
+    "used_ip_address_v2": {"provider": "facebook", "kind": "ip_address_activity"},
+    "account_history_login_history": {"provider": "instagram", "kind": "login"},
+    "account_history_logout_history": {"provider": "instagram", "kind": "logout"},
+    "account_history_password_change_history": {"provider": "instagram", "kind": "password_change"},
+    "login_history": {"provider": "instagram", "kind": "login"}
+  },
+  "label_values_files": {
+    "account_activity.json": "account_activity",
+    "logins_and_logouts.json": "login_logout",
+    "where_you're_logged_in.json": "active_session",
+    "authorized_logins.json": "recognized_device",
+    "ip_address_activity.json": "ip_address_activity"
+  },
+  "fields": {
+    "action": ["action", "Action", "Event", "Activity Type"],
+    "time": ["timestamp", "Time", "time", "Activity Timestamp", "Date", "Timestamp"],
+    "start": ["created_timestamp", "Created", "Session created", "Device First Activity Timestamp"],
+    "updated": ["updated_timestamp", "Last active", "Updated", "Last activity", "Device Last Activity Timestamp"],
+    "ip": ["ip_address", "ip", "IP Address", "IP address", "IP"],
+    "user_agent": ["user_agent", "User Agent", "User agent", "User Agent String", "Browser"],
+    "device": ["device", "name", "Name", "Device", "Device name", "Device Model", "Device Type", "Marketing Name", "OS"],
+    "app": ["app", "App", "site_name", "site", "Site", "Product Name"],
+    "session_type": ["session_type", "Session type", "Sub-Product Name"],
+    "language": ["language_code", "Language Code"],
+    "cookie": ["datr_cookie", "cookie_name", "Cookie Name", "Cookie", "datr cookie"],
+    "provider_location": ["city", "region", "country", "location", "Location", "Activity City", "Activity Region",
+                          "Activity Country", "Estimated location", "Device Last Location"]
+  },
+  "csv_profiles": [
+    {"id": "google_access_log_activities_v1", "provider": "google", "kind": "access_log",
+     "name_regex": "(?i)^activities.*\\.csv$", "required": ["Activity Timestamp", "IP Address"]},
+    {"id": "google_devices_v1", "provider": "google", "kind": "device",
+     "name_regex": "(?i)^devices.*\\.csv$", "required": ["Device Type"]}
+  ],
+  "provider_text_decoding": {"facebook": "fb_latin1_utf8_v1", "instagram": "fb_latin1_utf8_v1", "google": null}
+}

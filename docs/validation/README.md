@@ -22,6 +22,7 @@ execution.
 | Review 2 fixes @ 8e491f7 (task R2, 2026-10-16) | [Report](REVIEW2_FIXES_2026-10-16.md), [receipt](REVIEW2_FIXES_2026-10-16.json) |
 | End-to-end acceptance of the whole increment (task Z, 2026-10-16) | [Report](E2E_ACCEPTANCE_2026-10-16.md), [receipt](E2E_ACCEPTANCE_2026-10-16.json), [matrix](../ACCEPTANCE.md) |
 | Location history, places and presence (task L1, 2026-10-17) | [Report](LOCATION_2026-10-17.md), [receipt](LOCATION_2026-10-17.json) |
+| Personal-data exports and file metadata (task L2, 2026-10-17) | [Report](TRACES_2026-10-17.md), [receipt](TRACES_2026-10-17.json) |
 
 Native completion: 411 executed JVM tests, main APK signature verification and
 synthetic-provider test APK compilation passed with pinned versions. SAF device

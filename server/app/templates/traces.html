@@ -1,0 +1,30 @@
+<!doctype html><html {{ ui_html_attrs() }}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ślady cyfrowe — Evidence Workbench</title><link rel="stylesheet" href="/static/app.css"></head><body>
+<header>{% include '_nav.html' %}<div><h1>Ślady cyfrowe</h1><p>Eksporty danych osobowych, metadane zdjęć i dokumentów, aktywność kont. Każdy wiersz to obserwacja pliku lub konta (urządzenia), nie osoby. Lokalizacja i historia przeglądania wymagają jawnej zgody na każdy import.</p></div></header>
+<main>
+<section class="stats">{% for table, count in summary.tables.items() %}<div><b>{{count}}</b><span>{{table}}</span></div>{% endfor %}</section>
+<section class="grid">
+<div class="panel"><h2>Zdarzenia</h2>
+<table data-traces-events><tr><th>Typ zdarzenia</th><th>Liczba</th></tr>
+{% for type, count in summary.events.items() %}<tr><td><code>{{type}}</code></td><td>{{count}}</td></tr>{% else %}<tr><td colspan="2">Brak zaimportowanych śladów.</td></tr>{% endfor %}</table>
+{% if summary.chat_platforms %}<h3>Wiadomości według platformy</h3><table><tr><th>Platforma</th><th>Liczba</th></tr>{% for p, c in summary.chat_platforms.items() %}<tr><td>{{p}}</td><td>{{c}}</td></tr>{% endfor %}</table>{% endif %}
+</div>
+<div class="panel"><h2>Zdjęcia: geotagi i dopasowania</h2>
+<table data-traces-geotags><tr><th>Źródło : status</th><th>Liczba</th></tr>
+{% for key, count in summary.geotags.items() %}<tr><td>{{key}}</td><td>{{count}}</td></tr>{% else %}<tr><td colspan="2">Brak geotagów.</td></tr>{% endfor %}</table>
+<p><small>Status <code>present_not_stored</code>: geotag istnieje, ale współrzędne nie zostały zapisane (brak zgody <code>enable_location</code>).</small></p>
+<table><tr><th>Dopasowanie sidecar → plik</th><th>Liczba</th></tr>
+{% for key, count in summary.photo_matches.items() %}<tr><td>{{key}}</td><td>{{count}}</td></tr>{% else %}<tr><td colspan="2">Brak dopasowań.</td></tr>{% endfor %}</table>
+<p><small>Dopasowanie to hipoteza z identyfikatorem reguły; niejednoznaczne nie wybierają pliku.</small></p></div>
+<div class="panel"><h2>Metadane dokumentów</h2>
+<table><tr><th>Format : status</th><th>Liczba</th></tr>
+{% for key, count in summary.documents.items() %}<tr><td>{{key}}</td><td>{{count}}</td></tr>{% else %}<tr><td colspan="2">Brak.</td></tr>{% endfor %}</table>
+<p><small>Autorzy i programy to deklaracje zapisane w pliku, nie tożsamości.</small></p></div>
+</section>
+<section class="panel"><h2>Ostatnie importy</h2>
+<table data-traces-runs><tr><th>#</th><th>Czas</th><th>Importer</th><th>Wersja</th><th>Opcje / zgody</th><th>Pokrycie</th><th>Problemy</th></tr>
+{% for run in summary.recent_runs %}<tr><td>{{run.id}}</td><td>{{run.created_at}}</td><td><code>{{run.importer}}</code></td><td>{{run.parser_version}}</td><td><small>{{run.options|tojson}}</small></td><td>{{ 'pełne' if run.coverage and run.coverage.complete else 'częściowe' }}</td><td><small>{{run.issue_counts|tojson}}</small></td></tr>{% else %}<tr><td colspan="7">Brak importów.</td></tr>{% endfor %}</table></section>
+<section class="panel"><h2>Obsługiwane rodzaje importu</h2>
+<p>CLI: <code>python -m server.app.cli import-trace RODZAJ ŚCIEŻKA [--enable-location] [--enable-browser-history]</code>; HTTP: <code>POST /api/traces/import/RODZAJ</code>.</p>
+<table><tr><th>Rodzaj</th><th>Opis</th><th>Katalog</th><th>Opcje</th></tr>
+{% for k in kinds %}<tr><td><code>{{k.kind}}</code></td><td>{{k.label}}</td><td>{{ 'tak' if k.directory else 'nie' }}</td><td><small>{{k.options|join(', ')}}</small></td></tr>{% endfor %}</table></section>
+</main></body></html>

@@ -1,0 +1,26 @@
+{
+  "schema": "ageds.messaging_mapping",
+  "version": "1",
+  "notice": "Facebook/Messenger and Instagram 'Download your information' JSON layouts as publicly observed (2019-2025). Examples, not a vendor specification; a new layout needs a new mapping version, not a code change.",
+  "variants": [
+    {"id": "legacy_download",
+     "detect_message_keys": ["sender_name", "timestamp_ms"],
+     "thread": {"participants": "participants", "participant_name": "name", "title": "title", "thread_path": "thread_path", "messages": "messages"},
+     "message": {"sender": "sender_name", "timestamp_ms": "timestamp_ms", "text": "content", "unsent": "is_unsent", "type": "type", "reactions": "reactions"},
+     "text_decoding": "fb_latin1_utf8_v1"},
+    {"id": "e2ee_secure_storage",
+     "detect_message_keys": ["senderName", "timestamp"],
+     "thread": {"participants": "participants", "participant_name": null, "title": "threadName", "thread_path": null, "messages": "messages"},
+     "message": {"sender": "senderName", "timestamp_ms": "timestamp", "text": "text", "unsent": "isUnsent", "type": "type", "reactions": "reactions"},
+     "text_decoding": null}
+  ],
+  "media_lists": {"photos": "photo", "videos": "video", "audio_files": "audio", "files": "file", "gifs": "gif", "media": "media"},
+  "single_media": {"sticker": "sticker"},
+  "share_key": "share",
+  "type_kinds": {"Generic": "text", "Share": "share", "Call": "call", "Subscribe": "service", "Unsubscribe": "service",
+                 "text": "text", "media": "media", "call": "call"},
+  "message_file_regex": "message_(\\d+)\\.json",
+  "messages_dir_name": "messages",
+  "service_start_year": {"facebook": 2004, "instagram": 2010},
+  "instagram_path_markers": ["your_instagram_activity", "instagram"]
+}

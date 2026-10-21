@@ -31,6 +31,7 @@
 | Common timeline | [Projection rule, correlation hypotheses, timeline API and swimlane view](TIMELINE.md). |
 | Location history and places | [Google/GPX/KML/GeoJSON/FIT samples, provider inferences, private places, geofence presence, map without external tiles](LOCATION.md). |
 | Personal-data exports and file metadata | [Google Photos sidecars and geotags, Facebook/Instagram/Telegram/Google Chat/X/LinkedIn messages, login activity, document metadata, Keep, local browser profiles](PERSONAL_EXPORTS.md). |
+| Ledger: bank, transport, health | [Tabular profiles, CAMT.053, MT940, transit/rides, health exports (opt-in), provider-inferred durations](LEDGER.md). |
 | Reports and export | [Report types, method record, manifest verification, citation bundles, extension tables in the metadata package](REPORTS.md). |
 | Hypothesis analyzer (interpretive) | [Preregistration, evidence dossier, thesis typology, permutation event study](HYPOTHESES.md). |
 | Time budget and feature series | [Categories, labels, bounds, candles, sensitivity, feature series](TIME_BUDGET.md). |

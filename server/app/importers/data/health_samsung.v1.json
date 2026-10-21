@@ -1,0 +1,14 @@
+{
+  "schema": "ageds.health-samsung",
+  "version": "1",
+  "notice": "Table names and columns follow publicly observed Samsung Health personal-data CSV exports (first line: table name and two numbers; second line: header; column names prefixed with the data type). EXAMPLES only. time_basis records how the start/end columns are read: utc_wall_clock_with_offset_column means the clock text is UTC and time_offset states the device's local offset; change it in a private copy if your export differs.",
+  "time_basis": "utc_wall_clock_with_offset_column",
+  "time_formats": ["YYYY-MM-DD HH:mm:ss.SSS", "YYYY-MM-DD HH:mm:ss"],
+  "tables": {
+    "com.samsung.shealth.sleep": {"kind": "sleep_session", "start": "start_time", "end": "end_time", "offset": "time_offset", "device": "deviceuuid", "id": "datauuid", "values": ["efficiency", "sleep_score", "sleep_duration", "mental_recovery", "physical_recovery"]},
+    "com.samsung.shealth.exercise": {"kind": "workout_session", "start": "start_time", "end": "end_time", "offset": "time_offset", "device": "deviceuuid", "id": "datauuid", "type": "exercise_type", "declared_duration_ms": "duration", "values": ["distance", "calorie", "mean_heart_rate", "max_heart_rate", "count"]},
+    "com.samsung.health.heart_rate": {"kind": "samples", "start": "start_time", "end": "end_time", "offset": "time_offset", "device": "deviceuuid", "id": "datauuid", "values": ["heart_rate", "min", "max"]},
+    "com.samsung.shealth.step_daily_trend": {"kind": "daily_samples", "day_epoch_ms": "day_time", "device": "deviceuuid", "id": "datauuid", "values": ["count", "distance", "calorie", "speed"]}
+  },
+  "exercise_type_labels_example": {"1001": "walking", "1002": "running", "11007": "cycling", "15005": "yoga"}
+}

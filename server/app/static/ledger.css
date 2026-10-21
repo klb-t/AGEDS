@@ -1,0 +1,16 @@
+/* Ledger page (task AGEDS-TASK-20261017-L3); colours come from the shared tokens in app.css. */
+.ledger{display:grid;grid-template-columns:minmax(0,1fr);gap:1rem}
+.ledger .panel{min-width:0;overflow-x:auto}
+.ledger-counts{display:grid;grid-template-columns:max-content 1fr;gap:.25rem 1rem;margin:0}
+.ledger-counts dt{color:var(--muted)}
+.ledger-counts dd{margin:0}
+.ledger-table{width:100%;border-collapse:collapse;font-size:.85rem}
+.ledger-table th,.ledger-table td{border-bottom:1px solid var(--border-subtle);padding:.3rem .45rem;text-align:left;vertical-align:top}
+.ledger-table td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ledger-check{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:0 .45rem;font-size:.8rem}
+.ledger-check-match{color:var(--ok);border-color:var(--ok)}
+.ledger-check-mismatch{color:var(--danger);border-color:var(--danger)}
+.ledger-check-not_checkable{color:var(--warning);border-color:var(--warning)}
+.ledger-filter{display:flex;gap:.5rem;align-items:flex-end;flex-wrap:wrap;margin:.3rem 0 .6rem}
+.ledger-filter button{width:auto}
+.ledger-profiles{margin:0;padding-left:1.1rem}

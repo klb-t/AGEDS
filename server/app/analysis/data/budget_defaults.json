@@ -24,6 +24,8 @@
     "reading_event_types": ["chat_message", "chat_message_part"],
     "wav_header_durations": true,
     "duration_lookback_s": 86400,
+    "inferred_duration_bases": ["provider_inference", "provider_user_edit", "derived"],
+    "inferred_duration_layer": "probable",
     "model_label_run_id": null,
     "grid_mode": "one_at_a_time",
     "grid": {

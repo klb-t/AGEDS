@@ -77,7 +77,7 @@ def test_budget_v4_inferred_and_derived_ranges_are_probable_not_confirmed(env):
         run = budget.run_budget(db, config, window_from='2024-01-15T00:00:00Z', window_to='2024-01-16T00:00:00Z',
                                 zone='UTC')
     result = run['result']
-    assert result['method']['rule'] == 'time_budget.v4' and 'time_budget.v4' in result['method']['rule_history']
+    assert result['method']['rule'] == 'time_budget.v5' and 'time_budget.v4' in result['method']['rule_history']
     totals = result['totals']['categories']
     for category in ('dom', 'praca', 'dojazd'):  # derived presence / provider travel segment: never confirmed
         assert totals[category]['lower'] == 0.0 and totals[category]['probable'] > 0, category

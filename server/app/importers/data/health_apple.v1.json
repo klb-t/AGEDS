@@ -1,0 +1,19 @@
+{
+  "schema": "ageds.health-apple",
+  "version": "1",
+  "notice": "Element and attribute names follow publicly observed Apple Health export.xml files (HealthData with Record, Workout, ActivitySummary, Correlation). The lists below are examples, not a claim about every iOS version. Types listed as provider_inference are values the device or app computes from other signals; all other Record types are stored as raw samples of a device, never as observations of a person.",
+  "time_formats": ["YYYY-MM-DD HH:mm:ss ZZ", "YYYY-MM-DD[T]HH:mm:ssZZ"],
+  "sleep_type": "HKCategoryTypeIdentifierSleepAnalysis",
+  "sleep_asleep_values": ["HKCategoryValueSleepAnalysisAsleep", "HKCategoryValueSleepAnalysisAsleepUnspecified", "HKCategoryValueSleepAnalysisAsleepCore", "HKCategoryValueSleepAnalysisAsleepDeep", "HKCategoryValueSleepAnalysisAsleepREM"],
+  "provider_inference_types": [
+    "HKCategoryTypeIdentifierSleepAnalysis", "HKQuantityTypeIdentifierRestingHeartRate", "HKQuantityTypeIdentifierWalkingHeartRateAverage",
+    "HKQuantityTypeIdentifierVO2Max", "HKQuantityTypeIdentifierHeartRateVariabilitySDNN", "HKQuantityTypeIdentifierAppleExerciseTime",
+    "HKQuantityTypeIdentifierAppleStandTime", "HKCategoryTypeIdentifierAppleStandHour", "HKQuantityTypeIdentifierAppleWalkingSteadiness",
+    "HKQuantityTypeIdentifierSixMinuteWalkTestDistance", "HKQuantityTypeIdentifierAppleSleepingWristTemperature",
+    "HKQuantityTypeIdentifierRespiratoryRate", "HKCategoryTypeIdentifierHighHeartRateEvent", "HKCategoryTypeIdentifierLowHeartRateEvent",
+    "HKCategoryTypeIdentifierIrregularHeartRhythmEvent"
+  ],
+  "user_entered_metadata_keys": ["HKWasUserEntered"],
+  "activity_summary_metrics": ["activeEnergyBurned", "activeEnergyBurnedGoal", "appleMoveTime", "appleMoveTimeGoal", "appleExerciseTime", "appleExerciseTimeGoal", "appleStandHours", "appleStandHoursGoal"],
+  "activity_summary_units": {"activeEnergyBurned": "activeEnergyBurnedUnit", "activeEnergyBurnedGoal": "activeEnergyBurnedUnit"}
+}

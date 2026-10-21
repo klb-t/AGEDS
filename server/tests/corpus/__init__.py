@@ -12,7 +12,8 @@ from __future__ import annotations
 import importlib
 from pathlib import Path
 
-PARTS = ('catalog_files', 'chat_exports', 'communications', 'audio', 'activity', 'hypotheses', 'location', 'traces')
+PARTS = ('catalog_files', 'chat_exports', 'communications', 'audio', 'activity', 'hypotheses', 'location', 'traces',
+         'ledger')
 
 
 def build_corpus(root: Path, parts: tuple[str, ...] = PARTS) -> dict:

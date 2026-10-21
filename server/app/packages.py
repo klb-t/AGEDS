@@ -81,6 +81,11 @@ EXTENSION_TABLES = (
     # hypotheses over a hashed candidate scope.
     'trace_photo_sidecars', 'trace_photo_matches', 'trace_geotags', 'trace_document_metadata',
     'trace_browser_visits', 'trace_provider_locations',
+    # L3 (ledger): append-only parser observations of bank statements (stated balances and the
+    # code-computed balance check), typed ledger entries (exact decimal amounts, minor units,
+    # counterparty text) and health/fitness samples (special category data, imported only with a
+    # per-run opt-in; exported like other observations — the package is private metadata).
+    'ledger_statements', 'ledger_entries', 'health_samples',
 )
 EXCLUDED_EXTENSION_TABLES = {
     'api_tokens': 'credential table: token keys, salts and secret digests are never exported',

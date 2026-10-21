@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import re
-import unicodedata
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -21,17 +20,14 @@ from ..scanner import ScanLimits, _Scan
 from ..timeinfo import TimeCandidate, assume_zone
 from .comm_common import (DEFAULT_LIMITS, CommLimits, Issues, acquire, add_event_with_times, bound_json,
                           legacy_instant, load_data, local_candidate, record_import_run, stored_path)
+# The header/date mechanics are shared with the generic tabular profiles (moved there
+# unchanged on 2026-10-17, task AGEDS-TASK-20261017-L3); billing parser version 1 output is
+# byte-identical (server/tests/test_ledger_billing_golden.py).
+from .tabular_profiles import (_DATETIME_SPLIT, _date_parts, _norm, _resolve_columns,  # noqa: F401  (re-exported)
+                               _time_parts, infer_date_order)
 
 PARSER_NAME = 'billing_table'
 PARSER_VERSION = '1'
-_DATE = re.compile(r'^\s*(\d{1,4})[./-](\d{1,2})[./-](\d{1,4})\s*$')
-_TIME = re.compile(r'^\s*(\d{1,2}):(\d{2})(?::(\d{2}))?(?:[.,](\d{1,6}))?\s*([AaPp]\.?[Mm]\.?)?\s*$')
-_DATETIME_SPLIT = re.compile(r'^\s*(\S+)[ T]+(.+?)\s*$')
-
-
-def _norm(value) -> str:
-    text = unicodedata.normalize('NFKC', str(value or '')).strip().lower()
-    return re.sub(r'\s+', ' ', text)
 
 
 def load_profiles(path: Path | None = None) -> dict:
@@ -42,18 +38,6 @@ def load_profiles(path: Path | None = None) -> dict:
     if not isinstance(data.get('profiles'), list):
         raise ValueError('profile file must contain a "profiles" list')
     return data
-
-
-def _resolve_columns(profile: dict, header: list) -> dict[str, int]:
-    names = [_norm(h) for h in header]
-    resolved = {}
-    for field, aliases in profile['columns'].items():
-        wanted = {_norm(a) for a in aliases}
-        for index, name in enumerate(names):
-            if name in wanted:
-                resolved[field] = index
-                break
-    return resolved
 
 
 def choose_profile(profiles: dict, rows: list[dict], profile_id: str | None) -> tuple[dict, int, dict, str]:
@@ -85,54 +69,6 @@ def _cell(row: dict, column: int | None):
         if cell['column'] == column + 1:
             return cell
     return None
-
-
-def _date_parts(text: str):
-    match = _DATE.match(text)
-    if not match:
-        return None
-    a, b, c = match.groups()
-    if len(a) == 4:
-        return {'year': int(a), 'month': int(b), 'day': int(c), 'order': 'year_first', 'ambiguous': False}
-    if len(c) not in (2, 4):
-        return None
-    first, second = int(a), int(b)
-    return {'first': first, 'second': second, 'year': int(c), 'year_digits': len(c),
-            'ambiguous': first <= 12 and second <= 12 and first != second}
-
-
-def _time_parts(text: str):
-    match = _TIME.match(text)
-    if not match:
-        return None
-    hour, minute, second, fraction, ampm = match.groups()
-    hour = int(hour)
-    if ampm:
-        if not 1 <= hour <= 12:
-            return None
-        hour = hour % 12 + (12 if ampm[0].lower() == 'p' else 0)
-    micro = int((fraction + '000000')[:6]) if fraction else 0
-    return hour, int(minute), int(second or 0), micro, second is not None, ampm
-
-
-def infer_date_order(values: list[str]) -> dict:
-    """File-level evidence for day/month order from rows that are not ambiguous."""
-    day_first = month_first = 0
-    for text in values:
-        parts = _date_parts(text)
-        if not parts or parts.get('order') == 'year_first':
-            continue
-        if parts['first'] > 12 >= parts['second']:
-            day_first += 1
-        elif parts['second'] > 12 >= parts['first']:
-            month_first += 1
-    if day_first and not month_first:
-        decision = 'day_first'
-    elif month_first and not day_first:
-        decision = 'month_first'
-    else:
-        decision = 'conflict' if day_first and month_first else 'undetermined'
-    return {'decision': decision, 'day_first_evidence_rows': day_first, 'month_first_evidence_rows': month_first}
 
 
 def parse_duration(cell, fmt: str) -> tuple[float | None, dict]:

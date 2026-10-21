@@ -57,7 +57,7 @@ from . import intervals as iv
 from .provenance import canonical_json, code_sha256, code_version, event_set_sha256, sha256_json
 from .source import RULE_ID as SOURCE_RULE, load_items
 
-RULE = 'time_budget.v4'
+RULE = 'time_budget.v5'
 # Method-record history. The computation is unchanged between versions; only what the
 # stored method record says changed. Runs stored under an earlier version keep their
 # result and result hash (analysis_runs is append-only) and are read as historical.
@@ -77,6 +77,11 @@ RULE_HISTORY = {
                        'estimates in the probable layer (roles provider_inference/derived), never confirmed lower '
                        'time; items without metadata.signal are computed exactly as in v3 (digital traces, '
                        'AGEDS-TASK-20261017-L1)'),
+    'time_budget.v5': ('v4 joined with the ledger parameters: the inferred bases are the parameter '
+                       'inferred_duration_bases (default provider_inference, provider_user_edit, derived) and cover '
+                       'declared durations (sleep/workout sessions) as well as start-end ranges; '
+                       'inferred_duration_layer=lower counts them as confirmed time with a basis naming the signal. '
+                       'L3 had introduced the parameters without a rule version (integration 2026-10-21)'),
 }
 INFERRED_BASES = {'provider_inference': 'provider_inference', 'provider_user_edit': 'provider_inference',
                   'derived': 'derived'}
@@ -97,7 +102,9 @@ _RANGES = {'session_gap_s': (0, 7 * 86400), 'typing_chars_per_min': (1, 100_000)
            'max_time_uncertainty_s': (0, 366 * 86400)}
 _INTS = {'max_grid_points': (1, 4096), 'max_candle_events': (0, 1_000_000), 'max_flip_records': (0, 100_000),
          'max_items': (1, 10_000_000)}
-_STR_LISTS = ('excluded_event_types', 'chat_content_kinds', 'typing_directions', 'reading_directions', 'priority')
+_STR_LISTS = ('excluded_event_types', 'chat_content_kinds', 'typing_directions', 'reading_directions', 'priority',
+              'inferred_duration_bases')
+INFERRED_DURATION_LAYERS = ('probable', 'lower')
 _OPT_STR_LISTS = ('typing_event_types', 'reading_event_types')
 _BOOLS = ('include_hidden', 'wav_header_durations')
 UNCERTAINTY_MODES = ('widen_upper', 'ignore')
@@ -134,6 +141,10 @@ def _check(name, value):
     if name == 'timeline_rule':
         if value is not None and (not isinstance(value, str) or not value or len(value) > 200):
             raise ValueError('timeline_rule must be a rule reference such as display_time@1, or null')
+        return value
+    if name == 'inferred_duration_layer':
+        if value not in INFERRED_DURATION_LAYERS:
+            raise ValueError(f'inferred_duration_layer must be one of {INFERRED_DURATION_LAYERS}')
         return value
     if name == 'grid_mode':
         if value not in GRID_MODES:
@@ -263,14 +274,24 @@ def _prepare(items: list[dict], labels: dict[int, dict], params: dict) -> list[d
     acts = []
     for it in items:
         direction = _role_direction(it)
+        # A start-end range (or a declared duration) of an item whose metadata.signal.basis is in
+        # inferred_duration_bases (provider inferences, provider-side user edits, our derivations) is an
+        # estimate in the probable layer (role per INFERRED_BASES) unless inferred_duration_layer='lower',
+        # which counts it as confirmed time with a basis that names the signal (time_budget.v5).
         explicit, basis, inferred = None, None, None
-        inferred_role = INFERRED_BASES.get((it.get('signal') or {}).get('basis'))
-        if it['t_end'] is not None and it['t_end'] > it['t_start'] and inferred_role:
-            inferred = (it['t_start'], it['t_end'], inferred_role)
-        elif it['t_end'] is not None and it['t_end'] > it['t_start']:
-            explicit, basis = (it['t_start'], it['t_end']), 'source_end'
+        span, span_basis = None, None
+        if it['t_end'] is not None and it['t_end'] > it['t_start']:
+            span, span_basis = (it['t_start'], it['t_end']), 'source_end'
         elif it.get('declared_duration_s'):
-            explicit, basis = (it['t_start'], it['t_start'] + it['declared_duration_s']), it.get('duration_basis')
+            span, span_basis = (it['t_start'], it['t_start'] + it['declared_duration_s']), it.get('duration_basis')
+        signal_basis = (it.get('signal') or {}).get('basis')
+        inferred_role = (INFERRED_BASES.get(signal_basis, 'inferred')
+                         if signal_basis in params['inferred_duration_bases'] else None)
+        if span and inferred_role and params['inferred_duration_layer'] == 'probable':
+            inferred = (span[0], span[1], inferred_role)
+        elif span:
+            explicit = span
+            basis = f'{span_basis}:{signal_basis}' if inferred_role else span_basis
         chars = it.get('text_chars') or 0
         typing = chars > 0 and direction in params['typing_directions'] and \
             (params['typing_event_types'] is None or it['event_type'] in params['typing_event_types'])
@@ -703,6 +724,10 @@ def method_record(params: dict, source: dict | None = None) -> dict:
         'interim_fallback_rule': SOURCE_RULE,
         'session_rule': iv.SESSION_RULE, 'labeller': cat.LABELLER_ID,
         'artifact_class': 'interpretive',
+        'inferred_durations': ('a start-end range or declared duration of an event whose metadata.signal.basis is '
+                               'in inferred_duration_bases (provider inferences such as sleep stages, workouts, '
+                               'travel segments; our own derivations) is an estimate in the probable variant '
+                               '(role inferred); inferred_duration_layer=lower counts it as confirmed'),
         'variants': {
             'lower': 'confirmed ranges only: source end time or declared duration (call log, WAV header)',
             'probable': ('lower + typing (outgoing text) + reading (incoming chatbot answer) + session spans per category '

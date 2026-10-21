@@ -108,6 +108,14 @@ def _confirmed_duration(metadata: dict) -> float | None:
     return None
 
 
+def _signal(metadata: dict) -> dict | None:
+    """``metadata.signal`` class/basis of the digital-traces contract (2026-10-17), else None."""
+    signal = metadata.get('signal')
+    if not isinstance(signal, dict):
+        return None
+    return {'class': signal.get('class'), 'basis': signal.get('basis')}
+
+
 def _wav_duration(db: sqlite3.Connection, artifact_id: int, cache: dict) -> float | None:
     """Declared WAV duration from the content-store copy's header prefix (never the original)."""
     if artifact_id in cache:

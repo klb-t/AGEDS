@@ -28,8 +28,18 @@ jobs:
         run: |
           SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
           yes | "$SDKMANAGER" --licenses > /dev/null || true
-          "$SDKMANAGER" --install "platforms;android-37" "platform-tools"
+          for channel in 0 1 3; do
+            echo "== channel $channel"
+            "$SDKMANAGER" --list --channel=$channel 2>/dev/null | grep -E '^ *(platforms;|build-tools;)' | sort -u | tail -40 || true
+            package=$("$SDKMANAGER" --list --channel=$channel 2>/dev/null | grep -oE 'platforms;android-37[^ |]*' | sort -u | head -1 || true)
+            if [ -n "$package" ]; then
+              echo "installing $package from channel $channel"
+              yes | "$SDKMANAGER" --channel=$channel --install "$package" "platform-tools"
+              break
+            fi
+          done
           ls "$ANDROID_HOME/platforms"
+          ls "$ANDROID_HOME/platforms" | grep -q -- '-37' || { echo "no API 37 platform available on this runner"; exit 1; }
       - uses: gradle/actions/setup-gradle@v4
       # The pinned wrapper (gradle-wrapper.properties) is the build's Gradle version.
       - run: ./gradlew :androidApp:assembleDebug :androidApp:testDebugUnitTest :core:desktopTest --stacktrace

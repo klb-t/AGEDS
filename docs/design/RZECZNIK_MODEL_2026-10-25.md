@@ -486,6 +486,15 @@ przeglądarka (sztuczny mikrofon Chromium) w `advocate_model.cjs`: zgoda wymagan
 odpowiedzi. Prawdziwe wywołania STT/TTS nie zostały wykonane; cena TTS (16 USD / 1M znaków) niezweryfikowana; API
 Text-to-Speech musi być włączone w projekcie.
 
+**Stan P11 (2026-10-25):** wykonane, commit `f0a2248`. Token w polu ustawień (prywatne `SharedPreferences`), nagłówek
+`X-AGEDS-Token` w Ktor i w `MediaPlayer` (`setDataSource(context, uri, headers)`); `AccountSession` czyści stan pochodzący
+z serwera (lista, otwarty materiał, cytaty, rozmowy) przy zmianie serwera/tokenu i po 401; lokalne skany SAF zostają
+(dane urządzenia). Ekran „Rzecznik” (`AdvocateUi.kt`). Testy JVM `AccountSessionTest`, `AdvocateContractTest` na
+prawdziwych odpowiedziach serwera wygenerowanych z danych syntetycznych (`androidApp/src/test/resources/advocate`).
+Odbiór: ręczny workflow „Manual verification”, bieg GitHub Actions 40216681267 na `f0a2248` — `assembleDebug`,
+`testDebugUnitTest`, `core:desktopTest` i backend zielone (wynik przekazany przez sesję koordynatora; ta sesja nie ma
+narzędzi GitHuba, nie odczytała biegu sama). Brak testu na urządzeniu/emulatorze (instrumentacja i SAF nadal niewykonane).
+
 Równoległość: P4 i P5 mogą iść równolegle po P3 (inne pliki); reszta sekwencyjnie. Każdy pakiet: krótki brief
 (pliki, decyzje, stan), commit pośredni po każdym kawałku, bez zależności od kontekstu sesji.
 

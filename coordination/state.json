@@ -454,6 +454,33 @@
         "real_stt_tts_calls": "not_executed",
         "avatar": "planned, not implemented"
       }
+    },
+    {
+      "id": "AGEDS-TASK-20261025-P11",
+      "owner": "rzecznik_p11",
+      "status": "done",
+      "scope": [
+        "androidApp/src/main/java/dev/klbt/ageds/{AccountSession,AdvocateModels,AdvocateProjection,AdvocateUi,Api,AndroidRangeAudio,MainActivity}.kt",
+        "androidApp/src/test/java/dev/klbt/ageds/{AccountSessionTest,AdvocateContractTest}.kt",
+        "androidApp/src/test/resources/advocate",
+        ".github/workflows/android.yml"
+      ],
+      "based_on_commit": "1908ae0",
+      "acceptance": [
+        "Manual workflow green: assembleDebug, testDebugUnitTest, core:desktopTest, backend smoke."
+      ],
+      "results": {
+        "ci_run": "https://github.com/klb-t/AGEDS/actions/runs/40216681267",
+        "ci_commit": "f0a2248",
+        "ci_result_source": "reported by coordinator session chatadhd-9c; not read by this session",
+        "earlier_runs": {
+          "40215574606": "setup-android failed",
+          "40215770798": "platforms;android-37 not found",
+          "40215963800": "baseline green"
+        },
+        "device_tests_executed": 0,
+        "data": "synthetic"
+      }
     }
   ],
   "remaining_boundaries": [

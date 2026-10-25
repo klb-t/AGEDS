@@ -382,6 +382,16 @@ Odmowa dla ukrytego i nieistniejącego obiektu jest bajtowo identyczna przy `den
 tokenu, kanarki przez wszystkie trasy GET, cofnięcie grantu i tokenu, S4 przez HTTP; pięć celowych mutacji wykrytych.
 S14: wszystkie wcześniejsze testy bez zmian w `legacy_open`; przeglądarka 24/24 przed i po zmianie.
 
+**Stan P4 (2026-10-25):** wykonane, wariant „indeks per zakres” budowany na żądanie zamiast kolumny `scope_key`
+w globalnym FTS. Powód: bm25 liczy statystyki z całego indeksu, więc filtr w `WHERE` na globalnym indeksie zmienia
+ranking widocznych wyników zależnie od ukrytych dokumentów (narusza P3). `scoped_search_page` buduje tymczasowy FTS5
+w pamięci tylko z wierszy przepuszczonych przez `ContentGate` (`read_text`) i wykonuje na nim to samo zapytanie;
+właściciel (zakres instalacji) zostaje na dotychczasowej ścieżce. Koszt O(widoczne dokumenty) na zapytanie, limit
+50 000 dokumentów (`SearchWorkLimitError`); cache per `Coverage.key()` to P7. Testy `test_scoped_search.py`: wynik ==
+wyszukiwanie w instalacji zawierającej tylko widoczne dokumenty (z rankingiem i `has_more`), dodanie ukrytych
+dokumentów z tymi samymi słowami nic nie zmienia (hypothesis, 40 przykładów); mutacja „globalny indeks + filtr po
+wynikach” wykryta.
+
 Równoległość: P4 i P5 mogą iść równolegle po P3 (inne pliki); reszta sekwencyjnie. Każdy pakiet: krótki brief
 (pliki, decyzje, stan), commit pośredni po każdym kawałku, bez zależności od kontekstu sesji.
 

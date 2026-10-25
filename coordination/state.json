@@ -215,6 +215,26 @@
         "default_auth_mode": "legacy_open",
         "deployed_to_vm": false
       }
+    },
+    {
+      "id": "AGEDS-TASK-20261025-P4",
+      "owner": "rzecznik_p4",
+      "status": "done",
+      "scope": [
+        "server/app/search.py",
+        "server/app/main.py",
+        "server/tests/test_scoped_search.py",
+        "server/tests/test_http_authz.py"
+      ],
+      "based_on_commit": "fccd9e5",
+      "acceptance": [
+        "Scoped search equals search over an installation with only visible documents (rank, has_more); hidden documents do not change output."
+      ],
+      "results": {
+        "data": "synthetic",
+        "property_examples": 40,
+        "mutation_post_filter_detected": true
+      }
     }
   ],
   "remaining_boundaries": [

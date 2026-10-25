@@ -131,7 +131,7 @@ class HttpAuthzTests(unittest.TestCase):
         listed = self.client.get('/api/artifacts', headers=headers).json()
         self.assertEqual([row['id'] for row in listed], [self.shared])
         self.assertEqual(self.client.get(f'/api/artifacts/{self.shared}/transcript', headers=headers).json()['text'], 'jawny tekst')
-        for path in ('/', '/api/search?q=tekst', '/api/timeline', '/export/events.csv', '/export/manifest.json',
+        for path in ('/', '/api/timeline', '/export/events.csv', '/export/manifest.json',
                      f'/api/artifacts/{self.shared}/annotations', f'/api/artifacts/{self.shared}/annotations/page',
                      f'/artifact/{self.shared}', f'/api/artifacts/{self.shared}/citations/1/packet'):
             with self.subTest(path=path):
@@ -140,6 +140,16 @@ class HttpAuthzTests(unittest.TestCase):
         self.assertEqual(self.client.get(f'/api/artifacts/{self.shared}/content', headers=headers).status_code, 404)
         self.assertEqual(self.client.post('/api/artifacts/upload', headers=headers,
                                           files={'file': ('x.wav', b'x', 'audio/wav')}).status_code, 403)
+
+    def test_recipient_search_is_scoped(self):
+        self.tokens_mode()
+        recipient = self.client.get('/api/search', params={'q': 'CANARY'}, headers=self.as_(self.recipient_token))
+        self.assertEqual((recipient.status_code, recipient.json()), (200, []))
+        self.assertEqual(recipient.headers['X-AGEDS-Search-Has-More'], 'false')
+        found = self.client.get('/api/search', params={'q': 'jawny'}, headers=self.as_(self.recipient_token)).json()
+        self.assertEqual([(r['object_kind'], r['snippet']) for r in found], [('derived_text', 'jawny tekst')])
+        owner = self.client.get('/api/search', params={'q': 'CANARY'}, headers=self.as_(self.owner_token)).json()
+        self.assertTrue(owner)
 
     def test_hidden_and_missing_are_indistinguishable_by_default(self):
         self.tokens_mode()

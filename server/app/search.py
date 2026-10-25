@@ -141,6 +141,65 @@ def search_page(q: str, limit: int = 100):
             'has_more': has_more, 'complete': not has_more}
 
 
+MAX_SCOPED_DOCUMENTS = 50_000
+SEARCH_KINDS = ('artifact', 'event', 'derived_text')
+
+
+def _visible_documents(db, gate) -> list:
+    rows = []
+    for row in db.execute('SELECT rowid,object_kind,object_id,title,content FROM search_fts ORDER BY rowid'):
+        if row['object_kind'] in SEARCH_KINDS and gate.allows(row['object_kind'], int(row['object_id']), 'read_text'):
+            rows.append(tuple(row))
+            if len(rows) > MAX_SCOPED_DOCUMENTS:
+                raise SearchWorkLimitError('visible index exceeds the scoped search budget')
+    return rows
+
+
+def scoped_search_page(q: str, limit: int, gate):
+    """Search only what the gate lets this principal read.
+
+    Ranking statistics, snippets, `has_more` and `complete` come from an index
+    built from visible rows alone, so hidden material cannot change order or
+    counts (non-interference). Rowids are kept to preserve tie order.
+    """
+    validate_query(q, limit)
+    if not q.strip():
+        return {'query': q, 'results': [], 'limit': limit, 'has_more': False, 'complete': True}
+    source = connect(read_only=True)
+    try:
+        source.execute('BEGIN')
+        documents = _visible_documents(source, gate)
+    finally:
+        source.close()
+    index = sqlite3.connect(':memory:')
+    index.row_factory = sqlite3.Row
+    steps, exhausted = 0, False
+    def progress():
+        nonlocal steps, exhausted
+        steps += PROGRESS_INTERVAL
+        exhausted = steps >= MAX_VM_STEPS
+        return int(exhausted)
+    try:
+        index.execute('''CREATE VIRTUAL TABLE search_fts USING fts5(
+            object_kind UNINDEXED, object_id UNINDEXED, title, content,
+            tokenize='unicode61 remove_diacritics 2')''')
+        index.executemany('INSERT INTO search_fts(rowid,object_kind,object_id,title,content) VALUES(?,?,?,?,?)', documents)
+        index.set_progress_handler(progress, PROGRESS_INTERVAL)
+        try:
+            rows = index.execute("""SELECT object_kind,object_id,title,
+                snippet(search_fts,3,'','','…',24) AS snippet,bm25(search_fts) AS rank
+                FROM search_fts WHERE search_fts MATCH ? ORDER BY rank,rowid LIMIT ?""", (q, limit + 1)).fetchall()
+        except sqlite3.OperationalError as error:
+            if exhausted and getattr(error, 'sqlite_errorcode', None) == sqlite3.SQLITE_INTERRUPT:
+                raise SearchWorkLimitError('search exceeded SQLite work budget; simplify the query') from error
+            raise
+    finally:
+        index.close()
+    has_more = len(rows) > limit
+    return {'query': q, 'results': [dict(row) for row in rows[:limit]], 'limit': limit,
+            'has_more': has_more, 'complete': not has_more}
+
+
 def search(q: str, limit: int = 100):
     """Compatibility list API; use search_page when reporting result coverage."""
     return search_page(q, limit)['results']

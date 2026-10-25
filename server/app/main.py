@@ -8,13 +8,14 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
-from .db import init_db, session
+from contextlib import closing
+from .db import connect, init_db, session
 from .config import settings
 from .evidence import IntegrityError, ensure_source, ingest_file
 from .citations import anchor_payload, create_citation, loads_transcript_segments, milliseconds
 from .importers.sms_backup import import_sms_backup
 from .importers.whatsapp import import_whatsapp_txt
-from .search import SearchQueryError, SearchWorkLimitError, search_page
+from .search import SearchQueryError, SearchWorkLimitError, scoped_search_page, search_page
 from .read_pages import PageInputError, PageNotFound, PageStoredError, PageLimitError, read_page
 from .verified_media import MediaUnavailable, MediaIntegrityError, MediaLimitError, verified_media_response
 from .transcription import queue_all_audio, queue_transcription, word_timing_capabilities
@@ -172,10 +173,15 @@ def transcribe(artifact_id:SqlPathId): return api_queue_transcription(artifact_i
 @app.post('/transcribe/all',dependencies=[installation('process')])
 def transcribe_all(): return {'queued_artifacts':queue_all_audio()}
 
-@app.get('/api/search',dependencies=[installation('read_text')])
-def api_search(q:str):
+@app.get('/api/search')
+def api_search(q:str,access:Access=scoped('read_text')):
     try:
-        page = search_page(q, 200)
+        if access.open:
+            page = search_page(q, 200)
+        else:
+            with closing(connect(read_only=True)) as db:
+                gate = access.gate(db)
+                page = search_page(q, 200) if gate.installation('read_text') else scoped_search_page(q, 200, gate)
     except SearchQueryError as exc:
         raise HTTPException(422, str(exc)) from exc
     except SearchWorkLimitError as exc:

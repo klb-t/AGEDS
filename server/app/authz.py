@@ -294,8 +294,36 @@ class Coverage:
 
     def key(self) -> str:
         value = [self.installation, self.legacy, sorted(self.cases), sorted(map(list, self.objects)),
-                 sorted(map(list, self.frozen)), sorted(self.scopes)]
+                 sorted(map(list, self.frozen)), sorted(self.scopes), self.principal_id, self.conversations_visible]
         return hashlib.sha256(_json(value).encode()).hexdigest()
+
+
+# Every table whose rows can change what a principal sees or reads.
+GENERATION_TABLES = ('audit_log', 'cases', 'sources', 'artifacts', 'source_observations', 'events',
+                     'derived_text', 'evidence_anchors', 'fragments', 'assignments', 'links', 'annotations',
+                     'grants', 'scopes', 'principals', 'packages', 'package_items', 'package_snapshots',
+                     'case_relations', 'search_fts')
+
+
+def data_generation(db: sqlite3.Connection) -> str:
+    """A fingerprint that changes whenever data affecting visibility or content changes.
+
+    Counts and maxima catch inserts and deletes; the mutable columns that decide
+    visibility (withdrawals, revocations, status, settings) are hashed directly.
+    """
+    parts = []
+    for table in GENERATION_TABLES:
+        key = 'rowid' if table == 'search_fts' else 'id'
+        parts.append(tuple(db.execute(f'SELECT count(*), max({key}) FROM {table}').fetchone()))
+    for sql in ('SELECT group_concat(id || ":" || COALESCE(withdrawn_at,"") || ":" || status || ":" || COALESCE(visibility_scope_id,"")) FROM assignments',
+                'SELECT group_concat(id || ":" || COALESCE(revoked_at,"")) FROM grants',
+                'SELECT group_concat(id || ":" || status) FROM principals',
+                'SELECT group_concat(id || ":" || COALESCE(withdrawn_at,"")) FROM package_items',
+                'SELECT group_concat(key || "=" || value_json) FROM authz_settings',
+                'SELECT group_concat(id || ":" || COALESCE(owner_principal_id,"")) FROM cases',
+                'SELECT group_concat(id || ":" || COALESCE(case_id,"")) FROM links'):
+        parts.append(db.execute(sql).fetchone()[0])
+    return hashlib.sha256(_json(parts).encode()).hexdigest()
 
 
 def _active(grant_row, at: datetime) -> bool:

@@ -281,6 +281,25 @@
         "mutations_detected": "4/4",
         "network_calls": 0
       }
+    },
+    {
+      "id": "AGEDS-TASK-20261025-P7",
+      "owner": "rzecznik_p7",
+      "status": "done",
+      "scope": [
+        "server/app/search.py",
+        "server/app/authz.py",
+        "server/tests/test_search_cache.py"
+      ],
+      "based_on_commit": "5468c02",
+      "acceptance": [
+        "P5: cached == uncached after every generated operation; cache keyed per principal, coverage and data generation."
+      ],
+      "results": {
+        "backend_tests": 494,
+        "data": "synthetic",
+        "property_sequences": 60
+      }
     }
   ],
   "remaining_boundaries": [

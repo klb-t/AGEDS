@@ -417,6 +417,16 @@ wszystkich wejść (`require_inputs`). Bez dostawcy: `retrieval_only` (bez gener
 S3, S4, S6, S7, S8, S15 (blokada gniazd), weryfikator, statyczny (moduł nie czyta tabel treści), HTTP end-to-end; 4
 celowe mutacje wykryte. Granica: dopasowanie słów jest leksykalne (bez lematyzacji i embeddingów).
 
+**Stan P7 (2026-10-25):** wykonane. Cache widocznych dokumentów wyszukiwania (`search._visible_documents`) z kluczem
+(tożsamość pliku bazy: ścieżka+inode+urządzenie, rodzaj bramki, principal, `Coverage.key()` dla `read_text` i
+`chat_with_advocate`, `authz.data_generation`); baza w pamięci nie jest cache'owana; maks. 16 wpisów. Generacja =
+liczności i maksima tabel wpływających na widoczność + skrót kolumn zmiennych (wycofania, cofnięcia, statusy,
+ustawienia). Wyszukiwanie z zakresem czyta dokumenty przez połączenie bramki (jeden stan bazy). Pamięć rozmowy: od P6
+referencje i `basis`, ponowna autoryzacja przy każdym odczycie (S7). Testy `test_search_cache.py`: P5 (wynik z cache ==
+bez cache po każdej z losowych operacji, hypothesis 60 ciągów), cache użyty i niewspółdzielony. Mutacja „bez generacji”
+wykryta; usunięcie principala lub cofnięć z klucza jest maskowane redundancją `Coverage.key` (świadoma obrona w głąb).
+Pomiar (syntetyczny korpus): 8000 dokumentów, pierwsze zapytanie 0,4–1,2 s.
+
 Równoległość: P4 i P5 mogą iść równolegle po P3 (inne pliki); reszta sekwencyjnie. Każdy pakiet: krótki brief
 (pliki, decyzje, stan), commit pośredni po każdym kawałku, bez zależności od kontekstu sesji.
 

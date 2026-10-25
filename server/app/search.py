@@ -145,7 +145,46 @@ MAX_SCOPED_DOCUMENTS = 50_000
 SEARCH_KINDS = ('artifact', 'event', 'derived_text')
 
 
+CACHE_ENTRIES = 16
+_visible_cache: dict = {}
+cache_stats = {'hits': 0, 'misses': 0}
+
+
+def _cache_key(db, gate):
+    """Per principal, per effective coverage and per data generation; never shared."""
+    from .authz import data_generation
+    import os
+    covers = tuple(gate.coverage(capability).key() for capability in ('read_text', 'chat_with_advocate'))
+    path = next((row[2] for row in db.execute('PRAGMA database_list') if row[1] == 'main'), '') or ''
+    try:
+        identity = (path, os.stat(path).st_ino, os.stat(path).st_dev)
+    except OSError:
+        identity = (path, None, None)
+    if not path:
+        return None  # in-memory databases are never cached
+    return (identity, type(gate).__name__, gate.principal_id, covers, data_generation(db))
+
+
 def _visible_documents(db, gate) -> list:
+    key = _cache_key(db, gate)
+    if key is None:
+        return _scan_visible_documents(db, gate)
+    if key in _visible_cache:
+        cache_stats['hits'] += 1
+        return _visible_cache[key]
+    cache_stats['misses'] += 1
+    rows = _scan_visible_documents(db, gate)
+    if len(_visible_cache) >= CACHE_ENTRIES:
+        _visible_cache.pop(next(iter(_visible_cache)))
+    _visible_cache[key] = rows
+    return rows
+
+
+def clear_cache() -> None:
+    _visible_cache.clear()
+
+
+def _scan_visible_documents(db, gate) -> list:
     rows = []
     for row in db.execute('SELECT rowid,object_kind,object_id,title,content FROM search_fts ORDER BY rowid'):
         if row['object_kind'] in SEARCH_KINDS and gate.allows(row['object_kind'], int(row['object_id']), 'read_text'):
@@ -165,12 +204,9 @@ def scoped_search_page(q: str, limit: int, gate):
     validate_query(q, limit)
     if not q.strip():
         return {'query': q, 'results': [], 'limit': limit, 'has_more': False, 'complete': True}
-    source = connect(read_only=True)
-    try:
-        source.execute('BEGIN')
-        documents = _visible_documents(source, gate)
-    finally:
-        source.close()
+    # Read documents through the gate's own connection: the visibility decision
+    # and the rows it admits come from the same database state.
+    documents = _visible_documents(gate.db, gate)
     index = sqlite3.connect(':memory:')
     index.row_factory = sqlite3.Row
     steps, exhausted = 0, False

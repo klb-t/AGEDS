@@ -44,6 +44,48 @@ def _json(value) -> str:
     return json.dumps(value, ensure_ascii=False, sort_keys=True, allow_nan=False)
 
 
+def _bucket(count: int) -> str:
+    return '0' if count == 0 else '1-9' if count < 10 else '10-99' if count < 100 else '100+'
+
+
+GROWTH_POLICIES = ('frozen', 'notify_only', 'propose_to_owner', 'auto_include_by_rule:<kind>')
+
+
+def set_growth_policy(db: sqlite3.Connection, package_id: int, policy: str, *, actor: str | None = None) -> dict:
+    """How material added after a snapshot reaches recipients (scope.growth_policy, per package).
+
+    frozen (preset): only an explicit snapshot adds it; notify_only and
+    propose_to_owner: package_growth() lists it for the owner, a snapshot
+    approves it; auto_include_by_rule:<kind>: new objects of that kind reached
+    through the snapshot items are included live. Other values are kept and
+    behave as frozen.
+    """
+    row = db.execute('SELECT metadata_json FROM packages WHERE id=?', (package_id,)).fetchone()
+    if row is None:
+        raise ValueError('package does not exist')
+    metadata = json.loads(row['metadata_json'] or '{}')
+    previous = metadata.get('growth_policy', 'frozen')
+    metadata['growth_policy'] = policy
+    db.execute('UPDATE packages SET metadata_json=? WHERE id=?', (_json(metadata), package_id))
+    known = policy in GROWTH_POLICIES[:3] or policy.startswith('auto_include_by_rule:')
+    authz._audit(db, 'package_growth_policy', 'package', package_id, {'from': previous, 'to': policy}, actor)
+    return {'from': previous, 'to': policy, 'warnings': [] if known else [{'code': 'value_not_in_presets', 'value': policy}]}
+
+
+def package_growth(db: sqlite3.Connection, package_id: int) -> dict:
+    """Objects the package's snapshot items reach now but its latest snapshot does not."""
+    row = db.execute('SELECT metadata_json FROM packages WHERE id=?', (package_id,)).fetchone()
+    if row is None:
+        raise ValueError('package does not exist')
+    latest = db.execute('SELECT objects_json FROM package_snapshots WHERE package_id=? ORDER BY id DESC LIMIT 1',
+                        (package_id,)).fetchone()
+    frozen = {tuple(item) for item in json.loads(latest['objects_json'])} if latest else set()
+    pending = [item for item in _reachable(db, package_id) if tuple(item) not in frozen]
+    policy = json.loads(row['metadata_json'] or '{}').get('growth_policy', 'frozen')
+    return {'policy': policy, 'pending': pending,
+            'action': {'notify_only': 'notify', 'propose_to_owner': 'approve_with_snapshot'}.get(policy, 'none')}
+
+
 def create_package(db: sqlite3.Connection, name: str, *, mode: str = 'snapshot',
                    owner_principal_id: int | None = None, metadata: dict | None = None,
                    actor: str | None = None) -> dict:
@@ -184,6 +226,16 @@ def export_scope_package(db: sqlite3.Connection, principal_id: int, *, capabilit
                    for kind, object_id in ends):
                 kept.append(link)
         tables['links'] = kept
+    disclosure = authz.get_setting(db, 'count_disclosure', 'none')
+    omitted_counts = None
+    if disclosure in ('bucketed', 'exact'):
+        omitted_counts = {}
+        for name in TABLES:
+            if name == 'schema_migrations':
+                continue
+            total = db.execute(f'SELECT count(*) FROM {name}').fetchone()[0]
+            hidden = total - len(tables[name])
+            omitted_counts[name] = hidden if disclosure == 'exact' else _bucket(hidden)
     payload = {
         'schema': SCHEMA_ID, 'metadata_only': True, 'source_bytes_included': False,
         'replay_supported': False, 'signed': False, 'exported_at': authz.utc_now(),
@@ -193,8 +245,10 @@ def export_scope_package(db: sqlite3.Connection, principal_id: int, *, capabilit
             'SELECT uid FROM principals WHERE id=?', (principal_id,)).fetchone()['uid'],
             'capability': capability, 'coverage_key': gate.coverage(capability).key(),
             'omitted_categories': ['audit_log', 'tags', 'annotations_without_scope', 'tables_after_metadata_package_v1'],
-            'counts_disclosed': False},
+            'counts_disclosed': omitted_counts is not None, 'count_disclosure': disclosure},
         'redacted_references': redacted,
     }
+    if omitted_counts is not None:
+        payload['scope']['omitted_counts'] = omitted_counts
     payload['integrity'] = _integrity(payload)
     return payload

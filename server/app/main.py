@@ -535,11 +535,55 @@ def api_advocate_start(body: ConversationIn, access: Access = scoped('chat_with_
         return _advocate_call(lambda: start_conversation(db, principal, title=body.title))
 
 @app.get('/api/advocate/conversations')
-def api_advocate_conversations(access: Access = scoped('chat_with_advocate')):
+def api_advocate_conversations(others: bool = False, access: Access = scoped('chat_with_advocate')):
+    """Own conversations; with others=true, those of other principals whose own mode lets this one see them."""
+    from .authz import ContentGate
     with session() as db:
         principal = _advocate_principal(db, access)
-        return [dict(r) for r in db.execute(
-            'SELECT uid,title,settings_json,created_at FROM conversations WHERE principal_id=? ORDER BY id DESC', (principal,))]
+        if not others:
+            return [dict(r) for r in db.execute(
+                'SELECT uid,title,settings_json,created_at FROM conversations WHERE principal_id=? ORDER BY id DESC', (principal,))]
+        gate = ContentGate(db, principal)
+        return [{'uid': r['uid'], 'title': r['title'], 'settings_json': r['settings_json'], 'created_at': r['created_at']}
+                for r in gate.list('conversation', 'read_metadata', where='WHERE principal_id<>?', params=(principal,))]
+
+class ShareIn(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    shared: bool
+
+@app.post('/api/advocate/conversations/{conversation_uid}/share')
+def api_advocate_share(conversation_uid: str, body: ShareIn, access: Access = scoped('chat_with_advocate')):
+    from .advocate import share_with_owner
+    with session() as db:
+        principal = _advocate_principal(db, access)
+        return _advocate_call(lambda: share_with_owner(db, principal, conversation_uid, body.shared))
+
+class DelegationIn(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    display_name: str = Field(min_length=1, max_length=200)
+    capabilities: list[str] = Field(min_length=1, max_length=20)
+
+@app.post('/api/delegations')
+def api_delegate(body: DelegationIn, access: Access = scoped('invite')):
+    """Pass on part of one's own grants (capability invite) to a new principal; the token is shown once."""
+    from . import authz
+    from .assignments import create_principal
+    from .auth import issue_token
+    if access.open:
+        raise HTTPException(409, 'delegation needs auth.mode=tokens')
+    with session() as db:
+        scopes = sorted({r['scope_id'] for r in db.execute(
+            'SELECT scope_id FROM grants WHERE principal_id=? AND revoked_at IS NULL', (access.principal_id,))})
+        grantee = create_principal(db, body.display_name, kind='human', actor=f'principal:{access.principal_id}')
+        delegated = []
+        for scope_id in scopes:
+            try:
+                delegated.append(authz.delegate(db, access.principal_id, scope_id, grantee, body.capabilities)['uid'])
+            except authz.Denied:
+                continue
+        if not delegated:
+            raise HTTPException(403, 'no grant of yours allows passing on these capabilities')
+        return {'grant_uids': delegated, 'token': issue_token(db, grantee, label='delegated'), 'token_shown_once': True}
 
 @app.post('/api/advocate/conversations/{conversation_uid}/turns')
 def api_advocate_ask(conversation_uid: str, body: QuestionIn, access: Access = scoped('chat_with_advocate')):

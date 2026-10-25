@@ -80,6 +80,15 @@ def _parser() -> argparse.ArgumentParser:
     revoke.add_argument("--grant-uid", required=True)
     mode = commands.add_parser("authz-mode", help="set auth.mode (legacy_open or tokens)")
     mode.add_argument("mode")
+    mode.add_argument("--confirm", action="store_true", help="apply a change that widens access")
+    setting = commands.add_parser("authz-setting", help="show the effect of an open setting, then apply it")
+    setting.add_argument("--key", required=True)
+    setting.add_argument("--value-json", required=True, help='JSON value, e.g. \'"whole_document"\'')
+    setting.add_argument("--confirm", action="store_true", help="apply although it widens access")
+    setting.add_argument("--preview", action="store_true", help="report the access diff without applying")
+    growth = commands.add_parser("authz-package-growth", help="list material a snapshot package does not include yet; optionally set its growth policy")
+    growth.add_argument("--package-uid", required=True)
+    growth.add_argument("--policy")
     package = commands.add_parser("authz-package-create", help="create a package (references, never byte copies)")
     package.add_argument("--name", required=True)
     package.add_argument("--mode", default="snapshot")
@@ -220,7 +229,18 @@ def _authz_command(args) -> dict:
                                       WHERE p.uid=? AND m.revoked_at IS NULL''', (owner_uid,)).fetchone()
                 if owner is None:
                     raise ValueError("run authz-owner-init first; no owner token exists")
-            return authz.set_setting(db, "auth.mode", args.mode, actor="cli")
+            return authz.set_setting(db, "auth.mode", args.mode, actor="cli", confirm_widening=args.confirm)
+        if args.command == "authz-setting":
+            try:
+                return authz.set_setting(db, args.key, json.loads(args.value_json), actor="cli",
+                                         confirm_widening=args.confirm, preview=args.preview)
+            except authz.SettingWidensAccess as exc:
+                return {**exc.change, "refused": "widens access; review effective_access_diff and rerun with --confirm"}
+        if args.command == "authz-package-growth":
+            from .sharing import package_growth, set_growth_policy
+            if args.policy:
+                set_growth_policy(db, package_id(args.package_uid), args.policy, actor="cli")
+            return package_growth(db, package_id(args.package_uid))
         return {
             "settings": {r["key"]: json.loads(r["value_json"]) for r in db.execute("SELECT * FROM authz_settings ORDER BY key")},
             "principals": [dict(r) for r in db.execute("SELECT uid,display_name,kind,status,created_at FROM principals ORDER BY id")],

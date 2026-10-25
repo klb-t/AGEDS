@@ -94,7 +94,7 @@ class HttpAuthzTests(unittest.TestCase):
         with db.session() as conn:
             authz.set_setting(conn, 'auth.mode', 'tokens')
             for key, value in extra.items():
-                authz.set_setting(conn, key.replace('__', '.'), value)
+                authz.set_setting(conn, key.replace('__', '.'), value, confirm_widening=True)
 
     def as_(self, token):
         return {'X-AGEDS-Token': token}
@@ -249,6 +249,24 @@ class HttpAuthzTests(unittest.TestCase):
             self.assertIn(flag.lower(), cookie.lower())
         out = self.client.post('/advocate/logout', follow_redirects=False)
         self.assertIn('ageds_token=""', out.headers['set-cookie'])
+
+    def test_delegation_over_http(self):
+        self.tokens_mode()
+        headers = self.as_(self.recipient_token)
+        denied = self.client.post('/api/delegations', json={'display_name': 'aplikant', 'capabilities': ['read_text']}, headers=headers)
+        self.assertEqual(denied.status_code, 403)
+        with db.session() as conn:  # the refused request left no principal behind
+            self.assertIsNone(conn.execute("SELECT 1 FROM principals WHERE display_name='aplikant'").fetchone())
+        with db.session() as conn:
+            scope = authz.create_scope(conn, 'case', {'case_id': self.case_a})
+            authz.grant(conn, self.recipient, scope, ['read_text', 'read_metadata', 'invite'])
+        made = self.client.post('/api/delegations', json={'display_name': 'aplikant', 'capabilities': ['read_text', 'read_metadata']},
+                                headers=headers)
+        self.assertEqual(made.status_code, 200, made.text)
+        aide = {'X-AGEDS-Token': made.json()['token']}
+        self.assertEqual([r['id'] for r in self.client.get('/api/artifacts', headers=aide).json()], [self.shared])
+        too_much = self.client.post('/api/delegations', json={'display_name': 'x', 'capabilities': ['read_bytes']}, headers=headers)
+        self.assertEqual(too_much.status_code, 403)
 
     def test_unknown_auth_mode_admits_nobody(self):
         with db.session() as conn:

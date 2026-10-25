@@ -20,6 +20,7 @@ const player = createRangePlayer($('player'));
 const basisCache = new Map();
 let current = null;
 let providerModel = null;
+const conversationSettings = new Map();
 
 function el(tag, text, className) {
   const node = document.createElement(tag);
@@ -151,6 +152,9 @@ async function openConversation(uid) {
     button.setAttribute('aria-current', String(button.dataset.uid === uid));
   }
   $('turns').replaceChildren();
+  const settings = conversationSettings.get(uid) || {};
+  $('share-row').hidden = settings.owner_visibility !== 'opt_in_by_recipient';
+  $('share').checked = settings.shared_with_owner === true;
   const result = await api(`/api/advocate/conversations/${encodeURIComponent(uid)}`);
   if (result.status !== 200) { $('status').textContent = 'Nie udało się otworzyć rozmowy.'; return; }
   for (const turn of result.body.turns) renderTurn(turn.question, turn.answers);
@@ -165,6 +169,7 @@ async function loadConversations() {
     const button = el('button', conversation.title || `Rozmowa z ${conversation.created_at.slice(0, 16).replace('T', ' ')}`);
     button.type = 'button';
     button.dataset.uid = conversation.uid;
+    conversationSettings.set(conversation.uid, JSON.parse(conversation.settings_json || '{}'));
     button.addEventListener('click', () => openConversation(conversation.uid));
     item.append(button);
     list.append(item);
@@ -239,7 +244,9 @@ async function start() {
       ? `Odpowiedzi formułuje model ${status.body.provider.model} (Google Vertex) na podstawie wyszukanych fragmentów; każde twierdzenie ma etykietę i cytaty.`
       : 'Model językowy nie jest włączony: rzecznik pokazuje wyszukane fragmenty materiału z cytatami.'),
     el('p', {none: 'Właściciel materiału nie widzi treści tej rozmowy.',
-             full: 'Właściciel materiału może czytać tę rozmowę.'}[status.body.owner_visibility]
+             full: 'Właściciel materiału może czytać tę rozmowę.',
+             metadata_only: 'Właściciel materiału widzi, że rozmowa istnieje i kiedy była prowadzona, ale nie jej treść.',
+             opt_in_by_recipient: 'Właściciel materiału nie widzi rozmowy, dopóki jej nie udostępnisz.'}[status.body.owner_visibility]
       || `Widoczność rozmowy dla właściciela: ${status.body.owner_visibility}.`),
     el('p', 'Etykiety opisują rodzaj twierdzenia, nie prawdopodobieństwo. Transkrypcje są wynikiem rozpoznawania mowy i mogą zawierać błędy.', 'meta'));
   if (status.headers.get('X-AGEDS-Auth-Mode') === 'legacy_open') {
@@ -251,6 +258,17 @@ async function start() {
     $('summarize').addEventListener('submit', summarize);
     await loadSummaries();
   }
+  $('share').addEventListener('change', async () => {
+    const result = await api(`/api/advocate/conversations/${encodeURIComponent(current)}/share`,
+      {method: 'POST', body: JSON.stringify({shared: $('share').checked})});
+    if (result.status === 200) {
+      conversationSettings.set(current, {...(conversationSettings.get(current) || {}), shared_with_owner: result.body.shared_with_owner});
+      $('status').textContent = result.body.shared_with_owner ? 'Właściciel może teraz czytać tę rozmowę.' : 'Rozmowa znów jest prywatna.';
+    } else {
+      $('share').checked = !$('share').checked;
+      $('status').textContent = 'Nie udało się zmienić udostępnienia.';
+    }
+  });
   $('new').addEventListener('click', newConversation);
   $('ask').addEventListener('submit', ask);
   const conversations = await loadConversations();

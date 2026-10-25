@@ -169,13 +169,47 @@ class AdvocateCoreTests(AdvocateFixture):
         self.assertEqual([e for e in answer['basis'] if e['kind'] == 'assignment'], [])
         self.assertNotIn('potwierdza', json.dumps(answer, ensure_ascii=False))
 
-    def test_owner_cannot_open_a_recipient_conversation_unless_set(self):
-        conversation, _ = self.ask(self.recipient, 'umowa')
+    def test_owner_visibility_is_fixed_per_conversation(self):
+        old, _ = self.ask(self.recipient, 'umowa')
         with db.session() as conn, self.assertRaises(authz.Denied):
-            advocate.conversation_history(conn, self.owner, conversation)
+            advocate.conversation_history(conn, self.owner, old)
         with db.session() as conn:
-            authz.set_setting(conn, 'conversation.owner_visibility', 'full', actor='owner')
-            self.assertEqual(len(advocate.conversation_history(conn, self.owner, conversation)), 1)
+            with self.assertRaises(authz.SettingWidensAccess):
+                authz.set_setting(conn, 'conversation.owner_visibility', 'full', actor='owner')
+            authz.set_setting(conn, 'conversation.owner_visibility', 'full', actor='owner', confirm_widening=True)
+            # The earlier conversation keeps the mode its recipient saw: still private.
+            with self.assertRaises(authz.Denied):
+                advocate.conversation_history(conn, self.owner, old)
+        new, _ = self.ask(self.recipient, 'umowa')
+        with db.session() as conn:
+            self.assertEqual(len(advocate.conversation_history(conn, self.owner, new)), 1)
+
+    def test_metadata_only_and_opt_in_visibility(self):
+        with db.session() as conn:
+            authz.set_setting(conn, 'conversation.owner_visibility', 'metadata_only', confirm_widening=True)
+        meta, _ = self.ask(self.recipient, 'umowa')
+        with db.session() as conn:
+            row = conn.execute('SELECT id FROM conversations WHERE uid=?', (meta,)).fetchone()
+            self.assertTrue(authz.visible(conn, self.owner, 'conversation', row['id'], 'read_metadata'))
+            turn = conn.execute('SELECT id FROM advocate_turns WHERE conversation_id=?', (row['id'],)).fetchone()
+            self.assertFalse(authz.visible(conn, self.owner, 'advocate_turn', turn['id'], 'read_text'))
+            authz.set_setting(conn, 'conversation.owner_visibility', 'opt_in_by_recipient', confirm_widening=True)
+        opt, _ = self.ask(self.recipient, 'umowa')
+        with db.session() as conn:
+            with self.assertRaises(authz.Denied):
+                advocate.conversation_history(conn, self.owner, opt)
+            advocate.share_with_owner(conn, self.recipient, opt, True)
+            self.assertEqual(len(advocate.conversation_history(conn, self.owner, opt)), 1)
+            advocate.share_with_owner(conn, self.recipient, opt, False)
+            with self.assertRaises(authz.Denied):
+                advocate.conversation_history(conn, self.owner, opt)
+            with self.assertRaises(authz.Denied):
+                advocate.share_with_owner(conn, self.owner, opt, True)  # only the recipient decides
+        with db.session() as conn:
+            authz.set_setting(conn, 'conversation.owner_visibility', 'custom:anything', confirm_widening=True)
+        custom, _ = self.ask(self.recipient, 'umowa')
+        with db.session() as conn, self.assertRaises(authz.Denied):
+            advocate.conversation_history(conn, self.owner, custom)
 
     def test_verifier_removes_foreign_citations_and_never_upgrades(self):
         basis = [{'ref': 'p1', 'object': ['artifact', self.shared], 'text': 'x'}]

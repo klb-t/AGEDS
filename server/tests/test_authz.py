@@ -358,11 +358,28 @@ class ScenarioTests(unittest.TestCase):
         self.assertFalse(authz.visible(self.db, self.recipient, 'case', self.case_b, 'read_metadata'))
 
     def test_setting_changes_are_audited_with_previous_value(self):
-        change = authz.set_setting(self.db, 'legacy_scope_policy', f'treat_as_case:{self.case_a}', actor='owner')
+        with self.assertRaises(authz.SettingWidensAccess) as refused:
+            authz.set_setting(self.db, 'legacy_scope_policy', f'treat_as_case:{self.case_a}', actor='owner')
+        gained = refused.exception.change['effective_access_diff']
+        self.assertEqual([(d['kind'], d['capability']) for d in gained if d['principal_uid'] == self.recipient_uid()],
+                         [('annotation', 'read_metadata'), ('annotation', 'read_text')])
+        self.assertEqual(authz.ContentGate(self.db, self.recipient).list('annotation'), [])  # not applied
+        change = authz.set_setting(self.db, 'legacy_scope_policy', f'treat_as_case:{self.case_a}', actor='owner',
+                                   confirm_widening=True)
         self.assertEqual(change['from'], 'owner_only')
+        self.assertTrue(change['widens'])
         self.assertEqual(len(authz.ContentGate(self.db, self.recipient).list('annotation')), 1)
         row = self.db.execute("SELECT details_json FROM audit_log WHERE action='authz_setting' ORDER BY id DESC").fetchone()
         self.assertEqual(json.loads(row[0])['from'], 'owner_only')
+        self.assertTrue(json.loads(row[0])['effective_access_diff'])
+        narrowing = authz.set_setting(self.db, 'legacy_scope_policy', 'owner_only', actor='owner')
+        self.assertFalse(narrowing['widens'])
+        preview = authz.set_setting(self.db, 'legacy_scope_policy', f'treat_as_case:{self.case_a}', preview=True)
+        self.assertTrue(preview['widens'] and not preview['applied'])
+        self.assertEqual(authz.get_setting(self.db, 'legacy_scope_policy'), 'owner_only')
+
+    def recipient_uid(self):
+        return self.db.execute('SELECT uid FROM principals WHERE id=?', (self.recipient,)).fetchone()[0]
 
     def test_assignment_with_own_visibility_scope(self):
         private = authz.create_scope(self.db, 'case', {'case_id': self.case_b})

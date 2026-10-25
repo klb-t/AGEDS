@@ -458,6 +458,23 @@ widoczne dla każdego principala, który czyta wszystkie wejścia, i tylko wtedy
 włączonym dostawcy. Przeglądarka w trybie modelu: `server/tests/browser/advocate_model.cjs` z deterministycznym
 transportem testowym w fixture (bez sieci), 4 scenariusze.
 
+**Stan P9 (2026-10-25):** wykonane. `authz.SETTINGS` (rejestr: presety, porządek od najwęższego, `access`),
+`set_setting(..., confirm_widening, preview)` liczy `effective_access_diff` (dla każdego aktywnego principala i rodzaju
+obiektu: zyskane/utracone ID) i odmawia poszerzenia bez potwierdzenia (`SettingWidensAccess` z różnicą); zastosowana
+zmiana trafia do audytu z różnicą. Ustawienia: `fragment.open_policy` (`fragment_only`, `context_window:N` przez
+`authz.fragment_context` — tylko sąsiednie segmenty, nie cały tekst, `whole_artifact_version`, `whole_document`;
+`predicate:*` i nieznane = jak `fragment_only`), `conversation.owner_visibility` zapisywany **w rozmowie przy jej
+rozpoczęciu** (późniejsza zmiana nie otwiera starych rozmów; `metadata_only` = tylko wiersz rozmowy,
+`opt_in_by_recipient` = odbiorca udostępnia przełącznikiem, `custom:*` = jak `none`), `count_disclosure` w eksporcie
+zakresowym (`none`, `bucketed` 0/1-9/10-99/100+, `exact`), `shared_source.cross_case_hint` (`own_cases_only` nazywa tylko
+widoczne sprawy), `scope.growth_policy` per pakiet (`frozen`, `notify_only`/`propose_to_owner` = lista `package_growth`
+dla właściciela, zatwierdzenie snapshotem, `auto_include_by_rule:<rodzaj>` = nowe obiekty tego rodzaju na żywo),
+delegacja `invite` (`authz.delegate`, `POST /api/delegations`: podzbiór własnych zdolności, ten sam zakres, nie dłużej
+niż rodzic, kończy się z rodzicem; `max_delegation_depth` brak = 1, `null` = bez limitu). Rzecznik sięga do fragmentu
+udostępnionego osobno (`fragment_quote`). CLI `authz-setting --preview/--confirm`, `authz-mode --confirm`,
+`authz-package-growth`. Testy `test_settings_matrix.py` (S12, S13: każda wartość, w tym nieznane) i HTTP delegacji.
+Granica: `predicate:*` nie jest interpretowany (zachowany w danych, działa jak najwęższa wartość).
+
 Równoległość: P4 i P5 mogą iść równolegle po P3 (inne pliki); reszta sekwencyjnie. Każdy pakiet: krótki brief
 (pliki, decyzje, stan), commit pośredni po każdym kawałku, bez zależności od kontekstu sesji.
 

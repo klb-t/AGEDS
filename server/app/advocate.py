@@ -155,6 +155,26 @@ def retrieve(gate: AdvocateGate, question: str) -> list[dict]:
                               'event_type': event['event_type'], 'ts_start': event['ts_start'],
                               'direction': event['direction'], 'text': quote[:PASSAGE_WINDOW * 2],
                               'text_sha256': _sha(quote[:PASSAGE_WINDOW * 2])})
+    # Fragments shared on their own (fragment.open_policy) are reachable even when their text is not.
+    for fragment in gate.list('fragment', 'read_text'):
+        if len(basis) >= MAX_PASSAGES:
+            break
+        if gate.allows('derived_text', fragment['derived_text_id'], 'read_text') if fragment['derived_text_id'] else False:
+            continue  # already searchable as text
+        context = authz.fragment_context(gate.db, gate.principal_id, fragment['id'], gate=gate)
+        if not context or not context['quote']:
+            continue
+        around = ' '.join(item['text'].strip() for item in context['context'])
+        if not _matches(context['quote'] + ' ' + around, terms):
+            continue
+        entry = {'kind': 'fragment_quote', 'object': ['fragment', fragment['id']], 'text': context['quote'].strip(),
+                 'text_sha256': _sha(context['quote'].strip()), 'derived_text_id': context['derived_text_id'],
+                 'note': 'fragment shared on its own; the rest of the document is not shared'}
+        if 'start_ms' in context:
+            entry.update(start_ms=context['start_ms'], end_ms=context['end_ms'])
+        if context['context']:
+            entry['context'] = around
+        basis.append(entry)
     # Case-scoped meanings of the cited material, labelled as interpretation.
     for artifact_id in artifacts_seen:
         for assignment in gate.list('assignment', 'read_text',
@@ -166,6 +186,18 @@ def retrieve(gate: AdvocateGate, question: str) -> list[dict]:
                               'status': assignment['status'], 'text': assignment['meaning_text'],
                               'text_sha256': _sha(assignment['meaning_text']),
                               'note': 'interpretation recorded in a case, not source text'})
+    if authz.get_setting(gate.db, 'shared_source.cross_case_hint', 'never') == 'own_cases_only':
+        # Name only cases this principal can open; others are never hinted at.
+        for entry in basis:
+            if 'artifact' not in entry:
+                continue
+            cases = {a['case_id'] for a in gate.list('assignment', 'read_metadata',
+                     where='WHERE target_kind=? AND target_id=? AND withdrawn_at IS NULL',
+                     params=('artifact', entry['artifact']['id']))}
+            names = sorted(gate.get('case', c, 'read_metadata')['name'] for c in cases
+                           if authz.ContentGate.allows(gate, 'case', c, 'read_metadata'))
+            if len(names) > 1:
+                entry['also_in_cases'] = names
     for number, entry in enumerate(basis, 1):
         entry['ref'] = f'p{number}'
     return basis
@@ -366,3 +398,18 @@ def visible_summaries(db: sqlite3.Connection, principal_id: int) -> list[dict]:
                        'basis': content['basis'], 'created_at': row['created_at'],
                        'model': json.loads(row['transformation_json']).get('model')})
     return result
+
+
+def share_with_owner(db: sqlite3.Connection, principal_id: int, conversation_uid: str, shared: bool) -> dict:
+    """opt_in_by_recipient: only the conversation's own principal may open or close it to the owner."""
+    row = db.execute('SELECT * FROM conversations WHERE uid=?', (conversation_uid,)).fetchone()
+    if row is None or row['principal_id'] != principal_id:
+        raise authz.Denied('conversation', conversation_uid, 'share', exists=row is not None)
+    settings = json.loads(row['settings_json'] or '{}')
+    if settings.get('owner_visibility') != 'opt_in_by_recipient':
+        raise AdvocateError('this conversation was not started with opt-in visibility')
+    settings['shared_with_owner'] = bool(shared)
+    db.execute('UPDATE conversations SET settings_json=? WHERE id=?', (_json(settings), row['id']))
+    authz._audit(db, 'conversation_shared' if shared else 'conversation_unshared', 'conversation', row['id'],
+                 {'uid': conversation_uid}, None)
+    return {'conversation_uid': conversation_uid, 'shared_with_owner': bool(shared)}

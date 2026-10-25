@@ -72,13 +72,108 @@ def get_setting(db: sqlite3.Connection, key: str, default=None):
     return default if row is None else json.loads(row['value_json'])
 
 
-def set_setting(db: sqlite3.Connection, key: str, value, *, actor: str | None = None) -> dict:
-    """Record every change with its previous value; a widening is never silent."""
+# Open settings. `order` lists preset values from narrowest to widest disclosure;
+# `access` marks settings whose change can alter which objects a principal sees,
+# checked by an explicit before/after diff. Values outside the presets are kept.
+SETTINGS = {
+    'legacy_scope_policy': {'presets': ['owner_only', 'treat_as_case:<case id>', 'explicit_map'], 'access': True},
+    'legacy_scope_map': {'presets': ['{"<kind>:<id>": <case id>}'], 'access': True},
+    'fragment.open_policy': {'presets': ['fragment_only', 'context_window:<N>', 'whole_artifact_version',
+                                         'whole_document', 'predicate:<text>'], 'access': True,
+                             'order': ['fragment_only', 'whole_artifact_version', 'whole_document']},
+    'denial.reveal_existence': {'order': ['never', 'category_only', 'always']},
+    'count_disclosure': {'order': ['none', 'bucketed', 'exact']},
+    'shared_source.cross_case_hint': {'order': ['never', 'own_cases_only']},
+    'conversation.owner_visibility': {'order': ['none', 'metadata_only', 'opt_in_by_recipient', 'full'],
+                                      'note': 'applies to conversations started afterwards; each keeps its own'},
+    'auth.mode': {'order': ['tokens', 'external', 'legacy_open']},
+    'advocate.log_prompt_content': {'order': [False, True]},
+}
+DIFF_KINDS = ('case', 'artifact', 'derived_text', 'evidence_anchor', 'fragment', 'assignment', 'event',
+              'link', 'annotation', 'source_observation', 'conversation', 'advocate_turn')
+
+
+class SettingWidensAccess(PermissionError):
+    """A change would widen access or disclosure; it needs explicit confirmation."""
+
+    def __init__(self, change: dict):
+        super().__init__(f"setting {change['key']} widens access; confirm to apply")
+        self.change = change
+
+
+def _visible_snapshot(db: sqlite3.Connection) -> dict:
+    result = {}
+    for principal in db.execute("SELECT id, uid FROM principals WHERE status='active' ORDER BY id").fetchall():
+        for capability in ('read_metadata', 'read_text'):
+            cover = coverage(db, principal['id'], capability)
+            for kind in DIFF_KINDS:
+                for row in db.execute(f'SELECT id FROM {KIND_TABLES[kind]} ORDER BY id').fetchall():
+                    if visible(db, principal['id'], kind, row['id'], capability, _coverage=cover):
+                        result.setdefault((principal['uid'], capability, kind), set()).add(row['id'])
+    return result
+
+
+def effective_access_diff(before: dict, after: dict) -> list[dict]:
+    changes = []
+    for key in sorted(set(before) | set(after)):
+        gained = sorted(after.get(key, set()) - before.get(key, set()))
+        lost = sorted(before.get(key, set()) - after.get(key, set()))
+        if gained or lost:
+            principal, capability, kind = key
+            changes.append({'principal_uid': principal, 'capability': capability, 'kind': kind,
+                            'gained': gained, 'lost': lost})
+    return changes
+
+
+def _rank(order: list, value) -> int | None:
+    for index, preset in enumerate(order):
+        if value == preset:
+            return index
+    return None
+
+
+def set_setting(db: sqlite3.Connection, key: str, value, *, actor: str | None = None,
+                confirm_widening: bool = False, preview: bool = False) -> dict:
+    """Record every change with its previous value and its effect on access.
+
+    A change that gives anyone access to more objects, or moves a disclosure
+    setting to a wider preset, is refused unless confirmed; the diff is
+    returned and, when applied, written to the audit log. preview=True
+    computes the same report without applying.
+    """
     previous = get_setting(db, key)
-    db.execute('''INSERT INTO authz_settings(key,value_json,updated_at) VALUES(?,?,?)
-                  ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json, updated_at=excluded.updated_at''',
-               (key, _json(value), utc_now()))
-    change = {'key': key, 'from': previous, 'to': value}
+    spec = SETTINGS.get(key, {})
+    before = _visible_snapshot(db) if spec.get('access') else None
+    db.execute('SAVEPOINT setting_change')
+    try:
+        db.execute('''INSERT INTO authz_settings(key,value_json,updated_at) VALUES(?,?,?)
+                      ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json, updated_at=excluded.updated_at''',
+                   (key, _json(value), utc_now()))
+        diff = effective_access_diff(before, _visible_snapshot(db)) if before is not None else []
+    except Exception:
+        db.execute('ROLLBACK TO setting_change')
+        db.execute('RELEASE setting_change')
+        raise
+    widening = any(item['gained'] for item in diff)
+    if 'order' in spec:
+        old_rank, new_rank = _rank(spec['order'], previous), _rank(spec['order'], value)
+        if new_rank is None or (old_rank is not None and new_rank > old_rank) or (old_rank is None and new_rank > 0):
+            widening = True if value != previous else widening
+    warnings = []
+    known = spec.get('presets', spec.get('order'))
+    if known is not None and value not in known and not any(
+            isinstance(p, str) and '<' in p and isinstance(value, str) and value.startswith(p.split('<')[0]) for p in known):
+        warnings.append({'code': 'value_not_in_presets', 'value': value})
+    change = {'key': key, 'from': previous, 'to': value, 'widens': widening,
+              'effective_access_diff': diff, 'warnings': warnings, 'applied': False}
+    if preview or (widening and not confirm_widening):
+        db.execute('ROLLBACK TO setting_change')
+        db.execute('RELEASE setting_change')
+        if preview:
+            return change
+        raise SettingWidensAccess(change)
+    db.execute('RELEASE setting_change')
+    change['applied'] = True
     _audit(db, 'authz_setting', 'authz_setting', None, change, actor)
     return change
 
@@ -127,6 +222,73 @@ def revoke_grant(db: sqlite3.Connection, grant_id: int, *, revoked_by: str) -> N
     _audit(db, 'grant_revoked', 'grant', grant_id, {'uid': row['uid']}, revoked_by)
 
 
+def delegate(db: sqlite3.Connection, granter_id: int, scope_id: int, grantee_id: int, capabilities, *,
+             valid_to: str | None = None) -> dict:
+    """Pass on part of one's own grant (capability 'invite'), within its delegation depth.
+
+    The delegated grant never exceeds its parent: same scope, a subset of its
+    capabilities, no later expiry, and it stops when the parent is revoked or
+    expires. max_delegation_depth comes from the parent's conditions; absent
+    means 1 (preset), explicit null means unlimited.
+    """
+    moment = datetime.now(timezone.utc)
+    wanted = sorted(set(capabilities))
+    for row in db.execute('SELECT * FROM grants WHERE principal_id=? AND scope_id=? ORDER BY id', (granter_id, scope_id)).fetchall():
+        held = set(json.loads(row['capabilities_json']))
+        if not _active(row, moment, db) or 'invite' not in held or not set(wanted) <= held:
+            continue
+        conditions = json.loads(row['conditions_json'] or '{}')
+        depth = json.loads(row['metadata_json'] or '{}').get('delegation_depth', 0)
+        limit = conditions.get('max_delegation_depth', 1)
+        if limit is not None and depth + 1 > limit:
+            continue
+        if valid_to is not None and row['valid_to'] is not None and _time(valid_to) > _time(row['valid_to']):
+            valid_to = row['valid_to']
+        granter_uid = db.execute('SELECT uid FROM principals WHERE id=?', (granter_id,)).fetchone()['uid']
+        return grant(db, grantee_id, scope_id, wanted, granted_by=granter_uid,
+                     valid_to=valid_to if valid_to is not None else row['valid_to'],
+                     conditions={'max_delegation_depth': limit},
+                     metadata={'delegated_from': row['uid'], 'delegation_depth': depth + 1})
+    raise Denied('scope', scope_id, 'invite', exists=True)
+
+
+def fragment_context(db: sqlite3.Connection, principal_id: int, fragment_id: int, *,
+                     capability: str = 'read_text', gate: 'ContentGate | None' = None) -> dict | None:
+    """The readable content of a fragment under fragment.open_policy, or None if not visible.
+
+    fragment_only and wider: the pinned quote; context_window:N additionally
+    the N segments before and after the quoted segments of that text version.
+    """
+    allowed = gate.allows('fragment', fragment_id, capability) if gate is not None else \
+        visible(db, principal_id, 'fragment', fragment_id, capability)
+    if not allowed:
+        return None
+    fragment = _row(db, 'fragment', fragment_id)
+    result = {'fragment_id': fragment_id, 'kind': fragment['kind'], 'selector': json.loads(fragment['selector_json']),
+              'quote': None, 'context': [], 'derived_text_id': fragment['derived_text_id']}
+    anchor = _row(db, 'evidence_anchor', fragment['anchor_id']) if fragment['anchor_id'] is not None else None
+    if anchor is not None:
+        result.update(quote=anchor['quote_text'], start_ms=anchor['start_ms'], end_ms=anchor['end_ms'],
+                      quote_sha256=anchor['quote_sha256'])
+    policy = get_setting(db, 'fragment.open_policy', 'fragment_only')
+    if isinstance(policy, str) and policy.startswith('context_window:') and anchor is not None:
+        try:
+            width = max(0, int(policy.split(':', 1)[1]))
+        except ValueError:
+            width = 0
+        selector = json.loads(anchor['selector_json'])
+        indices = selector.get('indices') if selector.get('kind') == 'segments' else \
+            sorted({ref['segment_index'] for ref in selector.get('word_refs', [])})
+        text = _row(db, 'derived_text', anchor['derived_text_id'])
+        segments = json.loads(text['segments_json'] or '[]')
+        if indices:
+            low, high = max(0, min(indices) - width), min(len(segments) - 1, max(indices) + width)
+            result['context'] = [{'segment_index': i, 'text': segments[i].get('text', ''),
+                                  'start': segments[i].get('start'), 'end': segments[i].get('end')}
+                                 for i in range(low, high + 1)]
+    return result
+
+
 def bootstrap_owner(db: sqlite3.Connection, display_name: str, *, actor: str | None = None) -> dict:
     """Create the installation owner as a principal with an ordinary, revocable grant."""
     from .assignments import create_principal
@@ -173,6 +335,25 @@ def _legacy_home(db, kind: str, object_id: int) -> tuple:
     return LEGACY
 
 
+def _private(conversation, level: str) -> tuple:
+    """A conversation keeps the owner-visibility mode shown to its recipient when it started."""
+    settings = json.loads(conversation['settings_json'] or '{}')
+    mode = settings.get('owner_visibility', 'none')
+    if mode == 'opt_in_by_recipient':
+        mode = 'full' if settings.get('shared_with_owner') is True else 'none'
+    return ('private', conversation['principal_id'], level, mode if isinstance(mode, str) else 'none')
+
+
+def _open_policy(db) -> str:
+    """fragment.open_policy: what a fragment assignment opens beyond the fragment.
+
+    context_window:N opens neighbouring segments only through fragment_context();
+    predicate:* and unknown values are kept and open nothing beyond the fragment.
+    """
+    value = get_setting(db, 'fragment.open_policy', 'fragment_only')
+    return value if value in ('whole_artifact_version', 'whole_document') else 'fragment_only'
+
+
 def _inputs(raw: str) -> tuple:
     refs = tuple(sorted((kind, object_id) for kind, object_id in json.loads(raw)))
     return ('require_inputs', refs)
@@ -210,12 +391,21 @@ def homes(db: sqlite3.Connection, kind: str, object_id) -> set:
         for observation in db.execute('SELECT DISTINCT source_id FROM source_observations WHERE artifact_id=?', (object_id,)):
             provenance |= _source_case(db, observation['source_id'])
         found = provenance | _assigned_cases(db, 'artifact', object_id)
+        if _open_policy(db) == 'whole_document':
+            for fragment in db.execute('SELECT id FROM fragments WHERE artifact_id=?', (object_id,)).fetchall():
+                found |= _assigned_cases(db, 'fragment', fragment['id'])
         return own | (found or {_legacy_home(db, kind, object_id)})
     if kind == 'source_observation':
         return own | (_source_case(db, row['source_id']) or {_legacy_home(db, kind, object_id)})
     if kind in ('derived_text', 'processing_run', 'job'):
         base = _contained(homes(db, 'artifact', row['artifact_id'])) if row['artifact_id'] is not None else {_legacy_home(db, kind, object_id)}
-        return own | base | (_assigned_cases(db, kind, object_id) if kind == 'derived_text' else set())
+        extra = set()
+        if kind == 'derived_text':
+            extra = _assigned_cases(db, kind, object_id)
+            if _open_policy(db) == 'whole_artifact_version':
+                for fragment in db.execute('SELECT id FROM fragments WHERE derived_text_id=?', (object_id,)).fetchall():
+                    extra |= _assigned_cases(db, 'fragment', fragment['id'])
+        return own | base | extra
     if kind == 'evidence_anchor':
         base = _contained(homes(db, 'derived_text', row['derived_text_id']))
         for fragment in db.execute('SELECT id FROM fragments WHERE anchor_id=?', (object_id,)):
@@ -237,14 +427,14 @@ def homes(db: sqlite3.Connection, kind: str, object_id) -> set:
         return own | ({('case', row['case_id'])} if row['case_id'] is not None else {_legacy_home(db, kind, object_id)})
     if kind == 'conversation':
         # No object home: an installation or set grant must not open a private conversation.
-        return {('private', row['principal_id'])}
+        return {_private(row, 'meta')}
     if kind == 'advocate_turn':
-        owner = db.execute('SELECT principal_id FROM conversations WHERE id=?', (row['conversation_id'],)).fetchone()
-        return {('private', owner['principal_id'])}
+        conversation = db.execute('SELECT * FROM conversations WHERE id=?', (row['conversation_id'],)).fetchone()
+        return {_private(conversation, 'content')}
     if kind == 'advocate_answer':
-        turn = db.execute('''SELECT c.principal_id FROM advocate_turns t JOIN conversations c ON c.id=t.conversation_id
-                             WHERE t.id=?''', (row['turn_id'],)).fetchone()
-        return {('private', turn['principal_id']), _inputs(row['derived_scope_json'])}
+        conversation = db.execute('''SELECT c.* FROM advocate_turns t JOIN conversations c ON c.id=t.conversation_id
+                                     WHERE t.id=?''', (row['turn_id'],)).fetchone()
+        return {_private(conversation, 'content'), _inputs(row['derived_scope_json'])}
     if kind == 'derived_state':
         # Shareable with whoever can read every input, and only then.
         return own | {('anyone',), _inputs(row['input_refs_json'])}
@@ -266,14 +456,16 @@ class Coverage:
     objects: set = field(default_factory=set)
     frozen: set = field(default_factory=set)
     principal_id: int | None = None
-    conversations_visible: bool = False
     scopes: set = field(default_factory=set)
 
     def covers(self, home: tuple) -> bool:
         tag = home[0]
         if tag == 'private':
-            # Installation scope does not open another principal's conversation.
-            return home[1] == self.principal_id or self.conversations_visible
+            # Installation scope opens another principal's conversation only as its own mode allows.
+            if home[1] == self.principal_id:
+                return True
+            level, mode = home[2], home[3]
+            return self.installation and (mode == 'full' or (mode == 'metadata_only' and level == 'meta'))
         if tag == 'anyone':
             return True
         if self.installation:
@@ -294,7 +486,7 @@ class Coverage:
 
     def key(self) -> str:
         value = [self.installation, self.legacy, sorted(self.cases), sorted(map(list, self.objects)),
-                 sorted(map(list, self.frozen)), sorted(self.scopes), self.principal_id, self.conversations_visible]
+                 sorted(map(list, self.frozen)), sorted(self.scopes), self.principal_id]
         return hashlib.sha256(_json(value).encode()).hexdigest()
 
 
@@ -326,7 +518,17 @@ def data_generation(db: sqlite3.Connection) -> str:
     return hashlib.sha256(_json(parts).encode()).hexdigest()
 
 
-def _active(grant_row, at: datetime) -> bool:
+def _active(grant_row, at: datetime, db: sqlite3.Connection | None = None, _depth: int = 0) -> bool:
+    if not _active_own(grant_row, at):
+        return False
+    parent = json.loads(grant_row['metadata_json'] or '{}').get('delegated_from')
+    if parent is None or db is None:
+        return True
+    row = db.execute('SELECT * FROM grants WHERE uid=?', (parent,)).fetchone()
+    return row is not None and _depth < 16 and _active(row, at, db, _depth + 1)
+
+
+def _active_own(grant_row, at: datetime) -> bool:
     if grant_row['revoked_at'] is not None and _time(grant_row['revoked_at']) <= at:
         return False
     if grant_row['valid_from'] is not None and _time(grant_row['valid_from']) > at:
@@ -388,12 +590,10 @@ def coverage(db: sqlite3.Connection, principal_id: int | None, capability: str, 
     moment = _time(at) if at else datetime.now(timezone.utc)
     for row in db.execute('''SELECT g.*, s.kind AS scope_kind, s.spec_json FROM grants g
                              JOIN scopes s ON s.id=g.scope_id WHERE g.principal_id=? ORDER BY g.id''', (principal_id,)):
-        if capability not in json.loads(row['capabilities_json']) or not _active(row, moment):
+        if capability not in json.loads(row['capabilities_json']) or not _active(row, moment, db):
             continue
         apply_scope(db, row['scope_id'], row['scope_kind'], json.loads(row['spec_json']), result)
         # Unknown kinds are kept in data and cover nothing.
-    if result.installation and get_setting(db, 'conversation.owner_visibility', 'none') == 'full':
-        result.conversations_visible = True
     return result
 
 
@@ -419,6 +619,20 @@ def add_package_coverage(db: sqlite3.Connection, package_id: int, into: Coverage
         # Snapshot items reach recipients only through frozen snapshots below;
         # any other mode is kept in data and covers nothing.
     item_coverage(db, live, into)
+    metadata = json.loads(db.execute('SELECT metadata_json FROM packages WHERE id=?', (package_id,)).fetchone()['metadata_json'] or '{}')
+    policy = metadata.get('growth_policy', 'frozen')
+    if isinstance(policy, str) and policy.startswith('auto_include_by_rule:'):
+        rule_kind = policy.split(':', 1)[1]
+        snapshot_items = []
+        for item in db.execute('SELECT * FROM package_items WHERE package_id=? AND withdrawn_at IS NULL', (package_id,)):
+            if json.loads(item['include_json']).get('mode', package['mode']) == 'snapshot':
+                snapshot_items.append((item['item_kind'], item['item_id']))
+        reach = item_coverage(db, snapshot_items, Coverage())
+        table = KIND_TABLES.get(rule_kind)
+        if table is not None:
+            for row in db.execute(f'SELECT id FROM {table} ORDER BY id').fetchall():
+                if any(reach.covers(h) for h in homes(db, rule_kind, row['id']) if h[0] not in ('require_inputs', 'private', 'anyone')):
+                    into.frozen.add((rule_kind, row['id']))
     # Only the latest snapshot counts; withdrawals write a narrower one.
     snapshot = db.execute('SELECT objects_json FROM package_snapshots WHERE package_id=? ORDER BY id DESC LIMIT 1',
                           (package_id,)).fetchone()

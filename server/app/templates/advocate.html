@@ -15,6 +15,7 @@
   <div class="layout">
     <aside class="panel"><h2>Rozmowy</h2><button id="new">Nowa rozmowa</button><ul id="conversations"></ul></aside>
     <div class="panel">
+      <label id="share-row" class="meta" hidden><input type="checkbox" id="share" style="width:auto"> Udostępnij tę rozmowę właścicielowi materiału</label>
       <div id="turns" aria-live="polite"></div>
       <form id="ask"><label for="question">Pytanie</label><textarea id="question" maxlength="4000" required></textarea><button id="send">Zapytaj</button></form>
       <p id="status" role="status"></p>

@@ -22,9 +22,14 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      # compileSdk 37 is not guaranteed on hosted runners; install it with accepted licences.
-      - uses: android-actions/setup-android@v3
-      - run: sdkmanager --install "platforms;android-37" "platform-tools"
+      # Hosted runners ship an SDK at $ANDROID_HOME; compileSdk 37 may need installing and
+      # may carry the SDK preview licence, so accept licences explicitly first.
+      - name: Install Android SDK platform 37
+        run: |
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" --install "platforms;android-37" "platform-tools"
+          ls "$ANDROID_HOME/platforms"
       - uses: gradle/actions/setup-gradle@v4
       # The pinned wrapper (gradle-wrapper.properties) is the build's Gradle version.
       - run: ./gradlew :androidApp:assembleDebug :androidApp:testDebugUnitTest :core:desktopTest --stacktrace

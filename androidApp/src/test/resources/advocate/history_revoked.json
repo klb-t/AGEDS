@@ -1,0 +1,17 @@
+{
+ "conversation_uid": "5215cd7eaaab4468a65302f96a76caa2",
+ "turns": [
+  {
+   "turn_uid": "84642d2acdae4ddf8da971f5bad03980",
+   "question": "Kiedy podpisano umowę najmu?",
+   "created_at": "2026-10-25 17:27:11",
+   "answers": [
+    {
+     "answer_uid": "83b0fbb8a20e429680702b164b0f3adb",
+     "unavailable": true,
+     "reason": "material_no_longer_available"
+    }
+   ]
+  }
+ ]
+}

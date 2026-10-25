@@ -1,0 +1,15 @@
+{
+ "answer_uid": "83b0fbb8a20e429680702b164b0f3adb",
+ "basis_sha256": "920e428466afa36af8e5d9ac160d070b207ade730d54fc61e5797a15b825dac3",
+ "entries": [
+  {
+   "ref": "p1",
+   "unavailable": true
+  },
+  {
+   "ref": "p2",
+   "unavailable": true
+  }
+ ],
+ "note": "quoted text is stored derived text (ASR, OCR, import); not verified truth or authorship"
+}

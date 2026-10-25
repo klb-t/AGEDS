@@ -1,0 +1,64 @@
+{
+ "turn_uid": "84642d2acdae4ddf8da971f5bad03980",
+ "answer_uid": "83b0fbb8a20e429680702b164b0f3adb",
+ "mode": "retrieval_only",
+ "claims": [
+  {
+   "text": "Umowa najmu została podpisana piątego marca.",
+   "status": "quoted_material",
+   "citations": [
+    "p1"
+   ]
+  },
+  {
+   "text": "potwierdza datę",
+   "status": "claim",
+   "citations": [
+    "p2"
+   ]
+  }
+ ],
+ "basis": [
+  {
+   "kind": "transcript_segment",
+   "object": [
+    "derived_text",
+    1
+   ],
+   "artifact": {
+    "id": 1,
+    "uid": "4b39068e5cf96e879a4b73624ad268aa",
+    "sha256": "15bf07663820098b5015d2e56aa2fc0881f770a314e438a1b502bc1289904233",
+    "name": "rozmowa.wav"
+   },
+   "derived_text_id": 1,
+   "text_kind": "transcript",
+   "model": "synthetic",
+   "segment_index": 0,
+   "start_ms": 500,
+   "end_ms": 2000,
+   "text": "Umowa najmu została podpisana piątego marca.",
+   "text_sha256": "8fb67f9d7328980e56fff855b831675eb29759d46300889df783ee376d6e9a93",
+   "ref": "p1"
+  },
+  {
+   "kind": "assignment",
+   "object": [
+    "assignment",
+    1
+   ],
+   "artifact_id": 1,
+   "author_kind": "human",
+   "status": "unknown",
+   "text": "potwierdza datę",
+   "text_sha256": "500a849a2165762d81e8a3f478a54a2f555d4dce2427ec91566564ffe961fd7b",
+   "note": "interpretation recorded in a case, not source text",
+   "ref": "p2"
+  }
+ ],
+ "verification": {
+  "removed_citations": [],
+  "warnings": [],
+  "statuses_are_labels_not_probabilities": true
+ }
+}

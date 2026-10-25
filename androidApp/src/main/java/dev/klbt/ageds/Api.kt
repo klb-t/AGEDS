@@ -10,6 +10,7 @@ import io.ktor.client.call.*
 import io.ktor.client.engine.okhttp.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.ClientRequestException
+import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.statement.HttpResponse
 import io.ktor.client.request.*
 import io.ktor.client.request.forms.*
@@ -20,12 +21,14 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-class EvidenceApi(baseUrl: String) {
+/** The token is captured at construction; a new account means a new client. */
+class EvidenceApi(baseUrl: String, private val token: String? = ClientCredentials.token) {
     private var baseUrl: String = baseUrl.trimEnd('/')
     private val json = Json { ignoreUnknownKeys = true; explicitNulls = false }
     private val client = HttpClient(OkHttp) {
         expectSuccess = true
         install(ContentNegotiation) { json(json) }
+        defaultRequest { token?.let { header(ClientCredentials.HEADER, it) } }
     }
 
     fun setBaseUrl(value: String) { baseUrl = value.trimEnd('/') }
@@ -117,6 +120,22 @@ class EvidenceApi(baseUrl: String) {
             }
         ).body()
     }
+
+    // --- Evidence advocate: every answer comes from the server's gated basis.
+    suspend fun advocateStatus(): AdvocateStatus = client.get("$baseUrl/api/advocate/status").body()
+    suspend fun advocateConversations(): List<AdvocateConversation> = client.get("$baseUrl/api/advocate/conversations").body()
+    suspend fun advocateStart(title: String? = null): AdvocateConversation =
+        client.post("$baseUrl/api/advocate/conversations") {
+            contentType(ContentType.Application.Json); setBody(AdvocateNewConversation(title))
+        }.body()
+    suspend fun advocateAsk(conversationUid: String, question: String): AdvocateAnswer =
+        client.post("$baseUrl/api/advocate/conversations/${conversationUid.encodeURLPathPart()}/turns") {
+            contentType(ContentType.Application.Json); setBody(AdvocateQuestion(question))
+        }.body()
+    suspend fun advocateHistory(conversationUid: String): AdvocateHistory =
+        client.get("$baseUrl/api/advocate/conversations/${conversationUid.encodeURLPathPart()}").body()
+    suspend fun advocateBasis(answerUid: String): AdvocateBasis =
+        client.get("$baseUrl/api/advocate/answers/${answerUid.encodeURLPathPart()}/basis").body()
 
     private fun queryName(resolver: ContentResolver, uri: Uri): String? {
         resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->

@@ -1,0 +1,8 @@
+{
+ "principal": "adwokat (syntetyczny)",
+ "auth_mode": "tokens",
+ "can_chat": true,
+ "provider": null,
+ "voice": null,
+ "owner_visibility": "none"
+}

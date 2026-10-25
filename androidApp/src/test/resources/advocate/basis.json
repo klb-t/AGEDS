@@ -1,0 +1,43 @@
+{
+ "answer_uid": "83b0fbb8a20e429680702b164b0f3adb",
+ "basis_sha256": "920e428466afa36af8e5d9ac160d070b207ade730d54fc61e5797a15b825dac3",
+ "entries": [
+  {
+   "artifact": {
+    "id": 1,
+    "name": "rozmowa.wav",
+    "sha256": "15bf07663820098b5015d2e56aa2fc0881f770a314e438a1b502bc1289904233",
+    "uid": "4b39068e5cf96e879a4b73624ad268aa"
+   },
+   "derived_text_id": 1,
+   "end_ms": 2000,
+   "kind": "transcript_segment",
+   "model": "synthetic",
+   "object": [
+    "derived_text",
+    1
+   ],
+   "ref": "p1",
+   "segment_index": 0,
+   "start_ms": 500,
+   "text": "Umowa najmu została podpisana piątego marca.",
+   "text_kind": "transcript",
+   "text_sha256": "8fb67f9d7328980e56fff855b831675eb29759d46300889df783ee376d6e9a93"
+  },
+  {
+   "artifact_id": 1,
+   "author_kind": "human",
+   "kind": "assignment",
+   "note": "interpretation recorded in a case, not source text",
+   "object": [
+    "assignment",
+    1
+   ],
+   "ref": "p2",
+   "status": "unknown",
+   "text": "potwierdza datę",
+   "text_sha256": "500a849a2165762d81e8a3f478a54a2f555d4dce2427ec91566564ffe961fd7b"
+  }
+ ],
+ "note": "quoted text is stored derived text (ASR, OCR, import); not verified truth or authorship"
+}

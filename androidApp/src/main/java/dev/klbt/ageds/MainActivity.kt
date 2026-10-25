@@ -41,9 +41,17 @@ data class UploadTarget(val serverUrl: String, val uri: String)
 data class UploadOutcome(val artifactId: Long? = null, val jobId: Long? = null, val error: String? = null)
 
 class EvidenceVm(application: Application) : AndroidViewModel(application) {
-    val citations = CitationWorkspace(viewModelScope)
+    val citations = CitationWorkspace(viewModelScope, audio = RangePlaybackController { AndroidRangeAudio(application) })
     private val prefs = application.getSharedPreferences("ageds-evidence", Application.MODE_PRIVATE)
     val serverUrl = mutableStateOf(prefs.getString("serverUrl", null) ?: "http://10.0.2.2:8080")
+    /** App-private storage; the token is a credential and is never logged or shown again in full. */
+    val token = mutableStateOf(prefs.getString("accessToken", null) ?: "")
+    val advocate = AdvocateState()
+    val showAdvocate = mutableStateOf(false)
+    private val session = AccountSession(object : KeyValueStore {
+        override fun get(key: String) = prefs.getString(key, null)
+        override fun put(key: String, value: String?) { prefs.edit().putString(key, value).apply() }
+    }) { clearAccountState() }
     val items = mutableStateListOf<ArtifactSummary>()
     val pending = mutableStateListOf<PendingRecording>()
     val pendingSelected = mutableStateMapOf<String, Boolean>()
@@ -54,6 +62,7 @@ class EvidenceVm(application: Application) : AndroidViewModel(application) {
     val message = mutableStateOf<String?>(null)
     val selected = mutableStateOf<ArtifactSummary?>(null)
     private var apiUrl: String? = null
+    private var apiToken: String? = null
     private var cachedApi: EvidenceApi? = null
     private var loadedSelectionId: String? = null
 
@@ -62,13 +71,53 @@ class EvidenceVm(application: Application) : AndroidViewModel(application) {
         val parsed = URI(url)
         require(parsed.scheme in listOf("https", "http") && !parsed.host.isNullOrBlank()) { "Podaj pełny adres serwera HTTP lub HTTPS" }
         prefs.edit().putString("serverUrl", url).apply()
-        if (apiUrl != url) {
+        val currentToken = token.value.trim().takeIf { it.isNotEmpty() }
+        if (apiUrl != url || apiToken != currentToken || cachedApi == null) {
+            session.activate(url, currentToken)
             cachedApi?.close()
-            cachedApi = EvidenceApi(url)
+            cachedApi = EvidenceApi(url, currentToken)
             apiUrl = url
+            apiToken = currentToken
         }
         return requireNotNull(cachedApi)
     }
+
+    /** Everything read from the server with the previous account. Local SAF scans are device data and stay. */
+    private fun clearAccountState() {
+        citations.clear()
+        items.clear()
+        selected.value = null
+        advocate.clear()
+    }
+
+    fun unauthorized() {
+        session.onUnauthorized()
+        cachedApi?.close(); cachedApi = null; apiUrl = null
+        error.value = "Token jest nieprawidłowy albo został cofnięty. Dane tego konta usunięto z pamięci aplikacji."
+    }
+
+    fun changeToken(value: String) {
+        if (value == token.value) return
+        token.value = value
+        prefs.edit().putString("accessToken", value.trim().takeIf { it.isNotEmpty() }).apply()
+        clearAccountState()
+        cachedApi?.close(); cachedApi = null; apiUrl = null
+    }
+
+    /** An invalid server address is reported, never thrown into the UI coroutine. */
+    private suspend fun withApi(block: suspend (EvidenceApi) -> Unit) {
+        val server = try { api() } catch (t: Exception) {
+            if (t is CancellationException) throw t
+            advocate.error.value = t.message ?: t.toString()
+            return
+        }
+        block(server)
+    }
+
+    suspend fun loadAdvocate() = withApi { advocate.load(it, ::unauthorized) }
+    suspend fun askAdvocate(question: String) = withApi { advocate.ask(it, question, ::unauthorized) }
+    suspend fun openConversation(uid: String) = withApi { advocate.openGuarded(it, uid, ::unauthorized) }
+    suspend fun cite(answer: AdvocateAnswer, ref: String) = withApi { advocate.cite(it, answer, ref, ::unauthorized) }
 
     override fun onCleared() {
         citations.clear()
@@ -124,7 +173,8 @@ class EvidenceVm(application: Application) : AndroidViewModel(application) {
         try { fetchArtifacts(api()); error.value = null }
         catch (t: Throwable) {
             if (t is CancellationException) throw t
-            error.value = "Serwer: ${t.message}"
+            if ((t as? io.ktor.client.plugins.ClientRequestException)?.response?.status?.value == 401) unauthorized()
+            else error.value = "Serwer: ${t.message}"
         } finally { busy.value = false }
     }
 
@@ -139,10 +189,8 @@ class EvidenceVm(application: Application) : AndroidViewModel(application) {
 
     fun changeServerUrl(value: String) {
         if (value == serverUrl.value) return
-        citations.clear()
+        clearAccountState()
         serverUrl.value = value
-        items.clear()
-        selected.value = null
         message.value = null
     }
 
@@ -223,6 +271,10 @@ fun EvidenceApp(selectionId: String? = null, vm: EvidenceVm = viewModel()) {
 
     Scaffold(topBar = {
         TopAppBar(title = { Text("AGEDS · Transkrypcje") }, actions = {
+            TextButton(onClick = {
+                vm.showAdvocate.value = !vm.showAdvocate.value
+                if (vm.showAdvocate.value) scope.launch { vm.loadAdvocate() }
+            }) { Text(if (vm.showAdvocate.value) "Materiał" else "Rzecznik") }
             TextButton(onClick = { picker.launch(arrayOf("audio/*", "video/*")) }, enabled = !vm.busy.value) { Text("Wybierz pliki") }
             TextButton(onClick = { scope.launch { vm.refresh() } }, enabled = !vm.busy.value) { Text("Odśwież") }
         })
@@ -236,12 +288,26 @@ fun EvidenceApp(selectionId: String? = null, vm: EvidenceVm = viewModel()) {
                 enabled = !vm.busy.value,
                 modifier = Modifier.fillMaxWidth()
             )
+            OutlinedTextField(
+                value = vm.token.value,
+                onValueChange = vm::changeToken,
+                label = { Text("Token dostępu (puste = serwer bez kont)") },
+                singleLine = true,
+                enabled = !vm.busy.value,
+                visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth()
+            )
             vm.error.value?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             vm.message.value?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             vm.progress.value?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
             if (vm.busy.value) LinearProgressIndicator(Modifier.fillMaxWidth())
             val selected = vm.selected.value
-            if (selected == null) {
+            if (vm.showAdvocate.value) {
+                AdvocatePane(vm.advocate, onAsk = { q -> scope.launch { vm.askAdvocate(q) } },
+                             onOpen = { uid -> scope.launch { vm.openConversation(uid) } },
+                             onCite = { answer, ref -> scope.launch { vm.cite(answer, ref) } },
+                             modifier = Modifier.weight(1f))
+            } else if (selected == null) {
                 if (vm.pending.isNotEmpty()) PendingPane(vm) { scope.launch { vm.uploadAndQueue(activity) } }
                 ArtifactList(vm.items, Modifier.weight(1f)) { scope.launch { vm.open(it) } }
             } else CitationPane(selected, vm.citations, onBack = vm::closeArtifact)

@@ -442,6 +442,16 @@ do zapisu zgody na zakres instalacji; zapis wykonuje właściciel poleceniem CLI
 `test_providers.py` (atrapa nagrywająca): bez zgody/przy złej zgodzie/przekroczonym budżecie nic nie jest wysyłane;
 prompt zawiera tylko materiał po bramce (kanarki), historia ponownie autoryzowana, koszt i błędy księgowane.
 
+**Stan P10 (2026-10-25):** wykonane (tekst; głos i awatar to P12, nadal PLANOWANE). Strona `/advocate`
+(`templates/advocate.html`, `static/advocate.mjs`, `static/advocate.css`): logowanie tokenem → cookie `ageds_token`
+(HttpOnly, SameSite=Strict, Secure za https), lista rozmów, pytanie, twierdzenia z etykietą słowną, cytaty rozwijane do
+przypiętej podstawy (rodzaj, plik, zakres czasu, model tekstu, SHA-256, wersja tekstu), odsłuch zakresu tylko przy
+`read_bytes`, informacja o widoczności rozmowy dla właściciela i o tym, czy model jest włączony. `GET /api/advocate/status`.
+Trasy publiczne (bez odczytu danych) to zamknięta lista `/advocate`, `/advocate/login`, `/advocate/logout` (test). Dane ze
+źródła wyłącznie przez `textContent`. Odbiór w prawdziwym Chromium: `server/tests/browser/advocate.cjs` (7 scenariuszy:
+logowanie, zły token, pytanie, cytat, odsłuch kończy się na końcu zakresu, historia po przeładowaniu, brak kanarka, brak
+wykonania znaczników ze źródła, wylogowanie) na syntetycznym WAV i transkrypcji; dawny zestaw przeglądarki 24/24.
+
 Równoległość: P4 i P5 mogą iść równolegle po P3 (inne pliki); reszta sekwencyjnie. Każdy pakiet: krótki brief
 (pliki, decyzje, stan), commit pośredni po każdym kawałku, bez zależności od kontekstu sesji.
 

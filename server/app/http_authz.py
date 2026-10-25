@@ -97,6 +97,13 @@ def _mark(dependency, description: str):
     return dependency
 
 
+def public():
+    """Pages that read no stored data (the advocate shell and its login form)."""
+    def guard(request: Request) -> None:
+        return None
+    return Depends(_mark(guard, 'public'))
+
+
 def authenticated():
     """Any known principal; for routes that read no stored data."""
     def guard(request: Request) -> Access:

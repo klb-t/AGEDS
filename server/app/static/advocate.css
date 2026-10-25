@@ -1,0 +1,8 @@
+.advocate .layout{display:grid;grid-template-columns:260px 1fr;gap:1rem}.advocate ul{list-style:none;padding:0;margin:.5rem 0}.advocate li button{background:#0d1117;border-color:#30363d;font-weight:400;text-align:left}.advocate li button[aria-current=true]{border-color:#58a6ff}
+.notices p{margin:.3rem 0}.warn{color:#d29922}.turn{border-bottom:1px solid #21262d;padding:.8rem 0}.question{font-weight:700;margin-bottom:.4rem}.claim{margin:.45rem 0;line-height:1.55}
+.label{display:inline-block;font-size:.72rem;padding:.05rem .45rem;border-radius:999px;border:1px solid #30363d;margin-right:.4rem;color:#8b949e;white-space:nowrap}
+.label.proven{border-color:#2ea043;color:#3fb950}.label.quoted_material{border-color:#1f6feb;color:#79c0ff}.label.hypothesis,.label.claim{border-color:#9e6a03;color:#d29922}.label.unknown,.label.claim_without_basis{border-color:#da3633;color:#f85149}
+.cite{width:auto;display:inline;padding:.05rem .4rem;margin:0 .15rem;font-size:.75rem;background:#0d1117;border-color:#1f6feb;color:#79c0ff;font-weight:600}
+.basis{background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:.6rem;margin:.4rem 0;font-size:.88rem}.basis blockquote{margin:.3rem 0;padding-left:.6rem;border-left:3px solid #1f6feb;white-space:pre-wrap}
+.basis .play{width:auto;padding:.3rem .7rem;font-size:.8rem}.meta{color:#8b949e;font-size:.78rem}
+@media(max-width:900px){.advocate .layout{grid-template-columns:1fr}}

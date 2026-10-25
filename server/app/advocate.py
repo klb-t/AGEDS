@@ -279,6 +279,7 @@ def conversation_history(db: sqlite3.Connection, principal_id: int, conversation
             if readable:
                 item['answers'].append({'answer_uid': answer['uid'], 'mode': answer['mode'],
                                         'claims': json.loads(answer['claims_json']),
+                                        'verification': json.loads(answer['verification_json']),
                                         'basis_sha256': answer['basis_sha256'], 'created_at': answer['created_at']})
             else:
                 item['answers'].append({'answer_uid': answer['uid'], 'unavailable': True,

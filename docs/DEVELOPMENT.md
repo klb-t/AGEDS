@@ -79,3 +79,14 @@ Do not configure an inert metadata archive as the live `EW_DB_PATH`. It is a sep
 ## Documentation layout
 
 Active contracts stay in `docs/`. New acceptance evidence belongs in `docs/validation/`; historical snapshots stay in `docs/archive/` with their original contents. The archive manifest maps prior paths and records hashes, including initial failures and blocked execution. [CHANGELOG.md](../CHANGELOG.md) describes functional increments; [HANDOFF.md](../HANDOFF.md) describes the current actionable state.
+
+
+## Advocate browser acceptance
+
+`server/tests/browser/advocate.cjs` starts `server.tests.browser_advocate_fixture` (synthetic WAV and transcript,
+temporary SQLite, `auth.mode=tokens`) and drives `/advocate` in real Chromium: login, question, citation basis,
+range playback, history and hidden-material canaries. Run it like the acceptance runner above:
+
+```bash
+NODE_PATH=/path/to/browser-tools/node_modules PYTHON=/path/to/AGEDS/.venv/bin/python node server/tests/browser/advocate.cjs
+```

@@ -1,0 +1,26 @@
+<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rzecznik materiału dowodowego</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/advocate.css"></head><body>
+<header><div><h1>Rzecznik materiału dowodowego</h1><p id="who">Odpowiedzi wyłącznie z udostępnionego materiału, z cytatami do sprawdzenia.</p></div>
+<form id="logout" method="post" action="/advocate/logout" hidden><button>Wyloguj</button></form></header>
+<main class="advocate">
+<section id="login" class="panel" hidden>
+  <h2>Logowanie</h2>
+  <p>Wklej token dostępu otrzymany od właściciela materiału.</p>
+  {% if error %}<p role="alert" class="warn">Token jest nieprawidłowy albo został cofnięty.</p>{% endif %}
+  <form method="post" action="/advocate/login"><input name="token" type="password" autocomplete="off" required aria-label="Token dostępu"><button>Zaloguj</button></form>
+</section>
+<section id="denied" class="panel" hidden><h2>Brak dostępu do rzecznika</h2><p>To konto nie ma uprawnienia do rozmowy z rzecznikiem. Skontaktuj się z właścicielem materiału.</p></section>
+<section id="chat" hidden>
+  <div class="panel notices" id="notices"></div>
+  <div class="layout">
+    <aside class="panel"><h2>Rozmowy</h2><button id="new">Nowa rozmowa</button><ul id="conversations"></ul></aside>
+    <div class="panel">
+      <div id="turns" aria-live="polite"></div>
+      <form id="ask"><label for="question">Pytanie</label><textarea id="question" maxlength="4000" required></textarea><button id="send">Zapytaj</button></form>
+      <p id="status" role="status"></p>
+    </div>
+  </div>
+  <audio id="player" preload="none" hidden></audio>
+</section>
+</main>
+<script type="module" src="/static/advocate.mjs"></script></body></html>

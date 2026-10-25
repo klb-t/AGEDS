@@ -35,6 +35,10 @@ class StaticGateTests(unittest.TestCase):
             with self.subTest(path=route.path, methods=sorted(route.methods)):
                 self.assertEqual(len(guards(route)), 1, guards(route))
 
+    def test_public_routes_are_an_explicit_list(self):
+        public = sorted(r.path for r in main.app.routes if isinstance(r, APIRoute) and guards(r) == ['public'])
+        self.assertEqual(public, ['/advocate', '/advocate/login', '/advocate/logout'])
+
     def test_object_routes_are_not_left_unscoped(self):
         for route in main.app.routes:
             if isinstance(route, APIRoute) and '{artifact_id}' in route.path:
@@ -106,12 +110,17 @@ class HttpAuthzTests(unittest.TestCase):
         for route in main.app.routes:
             if not isinstance(route, APIRoute):
                 continue
+            public = guards(route) == ['public']
             for method in route.methods:
                 for headers in ({}, self.as_('nope'), self.as_(self.owner_token + 'x'), {'Authorization': 'Bearer x.y'}):
                     with self.subTest(path=route.path, method=method, headers=headers):
-                        response = self.client.request(method, concrete(route.path, self.shared), headers=headers)
-                        self.assertEqual(response.status_code, 401, response.text)
+                        response = self.client.request(method, concrete(route.path, self.shared), headers=headers,
+                                                       follow_redirects=False)
+                        if not public:
+                            self.assertEqual(response.status_code, 401, response.text)
                         self.assertNotIn(HIDDEN, response.text)
+                        self.assertNotIn('set-cookie', {k.lower() for k in response.headers} if response.status_code != 303
+                                         or 'error' in response.headers.get('location', '') else set())
 
     def test_owner_keeps_full_access_through_an_ordinary_grant(self):
         self.tokens_mode()
@@ -227,6 +236,19 @@ class HttpAuthzTests(unittest.TestCase):
             self.assertNotIn(secret, json.dumps([dict(r) for r in conn.execute('SELECT * FROM audit_log')]))
             auth.revoke_token(conn, method_uid, actor='owner')
         self.assertEqual(self.client.get('/api/artifacts', headers=self.as_(self.recipient_token)).status_code, 401)
+
+    def test_advocate_login_sets_a_strict_http_only_cookie(self):
+        self.tokens_mode()
+        bad = self.client.post('/advocate/login', data={'token': 'nope'}, follow_redirects=False)
+        self.assertEqual((bad.status_code, bad.headers['location']), (303, '/advocate?error=token'))
+        self.assertNotIn('set-cookie', bad.headers)
+        good = self.client.post('/advocate/login', data={'token': self.recipient_token}, follow_redirects=False,
+                                headers={'X-Forwarded-Proto': 'https'})
+        cookie = good.headers['set-cookie']
+        for flag in ('HttpOnly', 'SameSite=strict', 'Secure', 'ageds_token='):
+            self.assertIn(flag.lower(), cookie.lower())
+        out = self.client.post('/advocate/logout', follow_redirects=False)
+        self.assertIn('ageds_token=""', out.headers['set-cookie'])
 
     def test_unknown_auth_mode_admits_nobody(self):
         with db.session() as conn:

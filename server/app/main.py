@@ -19,7 +19,7 @@ from .search import SearchQueryError, SearchWorkLimitError, scoped_search_page, 
 from .read_pages import PageInputError, PageNotFound, PageStoredError, PageLimitError, read_page
 from .verified_media import MediaUnavailable, MediaIntegrityError, MediaLimitError, verified_media_response
 from .transcription import queue_all_audio, queue_transcription, word_timing_capabilities
-from .http_authz import Access, artifact as artifact_guard, auth_headers, authenticated, installation, scoped
+from .http_authz import Access, TOKEN_COOKIE, artifact as artifact_guard, auth_headers, authenticated, installation, public, scoped
 
 app=FastAPI(title='AGEDS Evidence Workbench',version='0.2.0')
 app.middleware('http')(auth_headers)
@@ -564,3 +564,43 @@ def api_advocate_basis(answer_uid: str, access: Access = scoped('chat_with_advoc
     with session() as db:
         principal = _advocate_principal(db, access)
         return _advocate_call(lambda: answer_basis(db, principal, answer_uid))
+
+
+@app.get('/api/advocate/status')
+def api_advocate_status(access: Access = scoped('chat_with_advocate')):
+    """What the recipient needs to know before asking: provider, owner visibility, own name."""
+    from .authz import get_setting
+    from .providers import configured_provider
+    from .advocate import AdvocateGate
+    with session() as db:
+        principal = _advocate_principal(db, access)
+        provider = configured_provider(db, principal)
+        name = db.execute('SELECT display_name FROM principals WHERE id=?', (principal,)).fetchone()['display_name']
+        return {'principal': name, 'auth_mode': access.mode,
+                'can_chat': AdvocateGate(db, principal).can_chat(),
+                'provider': None if provider is None else {'name': provider.name, 'model': provider.config['model']},
+                'owner_visibility': get_setting(db, 'conversation.owner_visibility', 'none')}
+
+@app.get('/advocate', response_class=HTMLResponse, dependencies=[public()])
+def advocate_page(request: Request, error: str = ''):
+    return templates.TemplateResponse(request, 'advocate.html', {'error': error[:200]})
+
+@app.post('/advocate/login', dependencies=[public()])
+def advocate_login(request: Request, token: str = Form(..., max_length=512)):
+    from fastapi.responses import RedirectResponse
+    from .auth import principal_for_token
+    with closing(connect(read_only=True)) as db:
+        valid = principal_for_token(db, token.strip()) is not None
+    if not valid:
+        return RedirectResponse('/advocate?error=token', status_code=303)
+    response = RedirectResponse('/advocate', status_code=303)
+    secure = request.url.scheme == 'https' or request.headers.get('x-forwarded-proto') == 'https'
+    response.set_cookie(TOKEN_COOKIE, token.strip(), httponly=True, samesite='strict', secure=secure, max_age=30 * 86400)
+    return response
+
+@app.post('/advocate/logout', dependencies=[public()])
+def advocate_logout():
+    from fastapi.responses import RedirectResponse
+    response = RedirectResponse('/advocate', status_code=303)
+    response.delete_cookie(TOKEN_COOKIE)
+    return response

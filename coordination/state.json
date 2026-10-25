@@ -323,6 +323,35 @@
         "real_vertex_call": "not_executed"
       },
       "blocked_on": "Real Vertex call was denied by the session permission check; needs the session owner's approval."
+    },
+    {
+      "id": "AGEDS-TASK-20261025-P10",
+      "owner": "rzecznik_p10",
+      "status": "done",
+      "scope": [
+        "server/app/main.py",
+        "server/app/http_authz.py",
+        "server/app/advocate.py",
+        "server/app/templates/advocate.html",
+        "server/app/static/advocate.mjs",
+        "server/app/static/advocate.css",
+        "server/tests/browser/advocate.cjs",
+        "server/tests/browser_advocate_fixture.py",
+        "server/tests/test_http_authz.py",
+        "docs/DEVELOPMENT.md"
+      ],
+      "based_on_commit": "1632e54",
+      "acceptance": [
+        "Real Chromium: login, ask, citation basis, range playback, history, canaries, logout."
+      ],
+      "results": {
+        "backend_tests": 506,
+        "js_tests": 85,
+        "browser_advocate": "7/7",
+        "browser_legacy": "24/24",
+        "data": "synthetic",
+        "model_in_browser_run": "none (retrieval_only)"
+      }
     }
   ],
   "remaining_boundaries": [

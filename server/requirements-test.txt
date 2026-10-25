@@ -2,3 +2,4 @@
 -r requirements-scanner.txt
 pytest
 httpx
+hypothesis

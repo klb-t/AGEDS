@@ -357,6 +357,16 @@ niezmienne (trigger), status i `withdrawn_at` zmienialne z audytem bez treści `
 `export_metadata_package` v1 ani archiwum (stały zestaw `TABLES`); nowe kolumny tak. Rozszerzenie paczki to osobna
 wersja schematu (P5). Brak tras HTTP — celowo, do P3.
 
+**Stan P2 (2026-10-25):** wykonane. `server/app/authz.py` (`homes`, `coverage`, `visible`, `ContentGate`,
+`bootstrap_owner`, `set_setting` z audytem poprzedniej wartości), migracja v3 (`scopes`, `grants`,
+`capability_registry`, `authz_settings`, `auth_methods`). Rodzaje zakresu: `installation`, `case`, `owned_cases`,
+`set`, `legacy_unscoped`; inny rodzaj zostaje w danych i nic nie pokrywa. Granty niezmienne poza jednym cofnięciem
+(trigger), zakresy niezmienne. Testy `server/tests/test_authz.py`: P1 (kanarki + porównanie z niezależną wyrocznią),
+P2 (monotoniczność), P3 (nieinterferencja) po 150 losowych konfiguracji hypothesis każda, oraz S4 i scenariusze
+okien czasu/cofnięcia/nieznanych zdolności. Pięć celowych mutacji `authz.py` wykrytych przez testy. **Granica:**
+`ContentGate.list` filtruje w Pythonie po pobraniu wierszy (poprawność, nie wydajność); wyszukiwanie FTS jeszcze
+globalne (P4); adnotacje, tagi i audyt są bez autora/zakresu, więc zawsze idą przez `legacy_scope_policy`.
+
 Równoległość: P4 i P5 mogą iść równolegle po P3 (inne pliki); reszta sekwencyjnie. Każdy pakiet: krótki brief
 (pliki, decyzje, stan), commit pośredni po każdym kawałku, bez zależności od kontekstu sesji.
 

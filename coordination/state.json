@@ -161,6 +161,31 @@
         "http_routes": "none_until_P3",
         "package_gap": "new tables not in metadata-package v1"
       }
+    },
+    {
+      "id": "AGEDS-TASK-20261025-P2",
+      "owner": "rzecznik_p2",
+      "status": "done",
+      "scope": [
+        "server/app/db.py",
+        "server/app/authz.py",
+        "server/tests/test_authz.py",
+        "server/requirements-test.txt",
+        "docs/design/RZECZNIK_MODEL_2026-10-25.md"
+      ],
+      "based_on_commit": "97f6696",
+      "acceptance": [
+        "Property tests P1 (no canary leak, oracle parity), P2 (monotonic), P3 (non-interference) on synthetic in-memory data; S4; no regression."
+      ],
+      "results": {
+        "backend_tests": 454,
+        "backend_subtests": 600,
+        "js_tests": 85,
+        "verify_repository": "passed",
+        "property_examples_per_test": 150,
+        "mutations_detected": "5/5",
+        "data": "synthetic, generated in memory"
+      }
     }
   ],
   "remaining_boundaries": [

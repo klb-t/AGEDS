@@ -74,7 +74,7 @@ class LegacyMigrationTests(Fixture):
             self.assertIsNone(db.execute('SELECT uid FROM artifacts WHERE id=1').fetchone()[0])
             link = db.execute('SELECT case_id,author_principal_id,visibility_scope_id,status FROM links').fetchone()
             self.assertEqual(tuple(link), (None, None, None, None))
-            self.assertEqual([r[0] for r in db.execute('SELECT version FROM schema_migrations ORDER BY version')], [1, 2])
+            self.assertLessEqual({1, 2}, {r[0] for r in db.execute('SELECT version FROM schema_migrations')})
             uid = model.ensure_uid(db, 'artifacts', 1)
             self.assertEqual(model.ensure_uid(db, 'artifacts', 1), uid)
             self.assertEqual(db.execute("SELECT COUNT(*) FROM audit_log WHERE action='uid_assigned'").fetchone()[0], 1)

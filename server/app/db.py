@@ -406,6 +406,120 @@ CREATE TRIGGER IF NOT EXISTS assignments_identity_fixed
 '''
 
 
+# Authorization (package P2). A scope names what a grant covers; a grant gives a
+# principal an open set of capabilities on one scope. Default is deny; nothing
+# in code bypasses grants. A grant row is immutable except one revocation.
+AUTHZ_SCHEMA = r'''
+CREATE TABLE IF NOT EXISTS scopes (
+  id INTEGER PRIMARY KEY,
+  uid TEXT NOT NULL UNIQUE,
+  kind TEXT NOT NULL,
+  spec_json TEXT NOT NULL DEFAULT '{}',
+  metadata_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TRIGGER IF NOT EXISTS scopes_no_update
+  BEFORE UPDATE ON scopes BEGIN
+    SELECT RAISE(ABORT, 'scopes are immutable; create a new scope');
+  END;
+CREATE TRIGGER IF NOT EXISTS scopes_no_delete
+  BEFORE DELETE ON scopes BEGIN
+    SELECT RAISE(ABORT, 'scopes are immutable; revoke grants instead');
+  END;
+
+CREATE TABLE IF NOT EXISTS grants (
+  id INTEGER PRIMARY KEY,
+  uid TEXT NOT NULL UNIQUE,
+  principal_id INTEGER NOT NULL REFERENCES principals(id),
+  scope_id INTEGER NOT NULL REFERENCES scopes(id),
+  capabilities_json TEXT NOT NULL DEFAULT '[]',
+  granted_by TEXT NOT NULL DEFAULT 'system',
+  granted_at TEXT NOT NULL,
+  valid_from TEXT,
+  valid_to TEXT,
+  revoked_at TEXT,
+  revoked_by TEXT,
+  conditions_json TEXT NOT NULL DEFAULT '{}',
+  metadata_json TEXT NOT NULL DEFAULT '{}'
+);
+CREATE INDEX IF NOT EXISTS idx_grants_principal ON grants(principal_id, id);
+CREATE TRIGGER IF NOT EXISTS grants_revoke_only
+  BEFORE UPDATE ON grants
+  WHEN OLD.revoked_at IS NOT NULL OR NEW.revoked_at IS NULL
+    OR NEW.uid IS NOT OLD.uid OR NEW.principal_id IS NOT OLD.principal_id
+    OR NEW.scope_id IS NOT OLD.scope_id OR NEW.capabilities_json IS NOT OLD.capabilities_json
+    OR NEW.granted_by IS NOT OLD.granted_by OR NEW.granted_at IS NOT OLD.granted_at
+    OR NEW.valid_from IS NOT OLD.valid_from OR NEW.valid_to IS NOT OLD.valid_to
+    OR NEW.conditions_json IS NOT OLD.conditions_json OR NEW.metadata_json IS NOT OLD.metadata_json
+  BEGIN
+    SELECT RAISE(ABORT, 'grants change only by a single revocation');
+  END;
+CREATE TRIGGER IF NOT EXISTS grants_no_delete
+  BEFORE DELETE ON grants BEGIN
+    SELECT RAISE(ABORT, 'grants are kept; revoke instead');
+  END;
+
+-- Capabilities the code understands. A grant may hold other names; they are
+-- kept and grant nothing until registered.
+CREATE TABLE IF NOT EXISTS capability_registry (
+  name TEXT PRIMARY KEY,
+  description TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS authz_settings (
+  key TEXT PRIMARY KEY,
+  value_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS auth_methods (
+  id INTEGER PRIMARY KEY,
+  uid TEXT NOT NULL UNIQUE,
+  principal_id INTEGER NOT NULL REFERENCES principals(id),
+  kind TEXT NOT NULL DEFAULT 'token',
+  label TEXT,
+  secret_salt TEXT NOT NULL,
+  secret_hash TEXT NOT NULL,
+  kdf TEXT NOT NULL,
+  kdf_params_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  revoked_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_auth_methods_principal ON auth_methods(principal_id, id);
+'''
+
+# Presets, not a closed list; the registry is data.
+CAPABILITY_PRESETS = (
+    ('read_metadata', 'see rows describing an object'),
+    ('read_text', 'read derived text and quotes'),
+    ('read_bytes', 'download original bytes'),
+    ('cite', 'create citations'),
+    ('annotate', 'add annotations'),
+    ('propose', 'propose assignments or corrections'),
+    ('invite', 'grant own access to others'),
+    ('chat_with_advocate', 'talk to the evidence advocate'),
+    ('export', 'export what is visible'),
+    ('ingest', 'add material to the installation'),
+    ('process', 'queue processing of material'),
+    ('administer', 'manage principals, grants and settings'),
+)
+SETTING_PRESETS = (
+    ('legacy_scope_policy', '"owner_only"'),
+    ('denial.reveal_existence', '"never"'),
+    ('count_disclosure', '"none"'),
+    ('auth.mode', '"legacy_open"'),
+)
+
+
+def _migrate_authz(db: sqlite3.Connection) -> None:
+    _execute_script(db, AUTHZ_SCHEMA)
+    db.executemany('INSERT OR IGNORE INTO capability_registry(name,description) VALUES(?,?)', CAPABILITY_PRESETS)
+    db.executemany('INSERT OR IGNORE INTO authz_settings(key,value_json) VALUES(?,?)', SETTING_PRESETS)
+    if not db.execute('SELECT 1 FROM schema_migrations WHERE version=3').fetchone():
+        db.execute("INSERT INTO schema_migrations(version,name) VALUES(3,'authz_scopes_grants_tokens')")
+
+
 def _migrate_evidence_model(db: sqlite3.Connection) -> None:
     for table in ('cases', 'artifacts'):
         _add_column(db, table, 'uid', 'TEXT')
@@ -461,6 +575,7 @@ def migrate_db(db: sqlite3.Connection) -> None:
                      json.dumps(metadata, ensure_ascii=False)))
             db.execute("INSERT INTO schema_migrations(version,name) VALUES(1,'source_observations_and_processing_runs')")
         _migrate_evidence_model(db)
+        _migrate_authz(db)
         db.commit()
     except Exception:
         db.rollback()

@@ -137,6 +137,30 @@
         "docs/validation/BACKEND_COMPLETION_2026-10-02.json",
         "coordination/publication-20261002.json"
       ]
+    },
+    {
+      "id": "AGEDS-TASK-20261025-P1",
+      "owner": "rzecznik_p1",
+      "status": "done",
+      "scope": [
+        "server/app/db.py",
+        "server/app/assignments.py",
+        "server/tests/test_assignments_model.py",
+        "docs/design/RZECZNIK_MODEL_2026-10-25.md"
+      ],
+      "based_on_commit": "12cf1c6",
+      "acceptance": [
+        "Additive migration keeps legacy rows (P8 example); S1, S2 green; no regression in server/tests."
+      ],
+      "results": {
+        "backend_tests": 441,
+        "backend_subtests": 597,
+        "js_tests": 85,
+        "verify_repository": "passed",
+        "property_tests": "not_implemented",
+        "http_routes": "none_until_P3",
+        "package_gap": "new tables not in metadata-package v1"
+      }
     }
   ],
   "remaining_boundaries": [

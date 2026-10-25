@@ -283,18 +283,154 @@ def _add_column(db: sqlite3.Connection, table: str, name: str, definition: str) 
         db.execute(f'ALTER TABLE {table} ADD COLUMN {name} {definition}')
 
 
+def _execute_script(db: sqlite3.Connection, script: str) -> None:
+    statement = ''
+    for line in script.splitlines(keepends=True):
+        statement += line
+        if sqlite3.complete_statement(statement):
+            db.execute(statement)
+            statement = ''
+
+
+# Model for the evidence advocate (docs/design/RZECZNIK_MODEL_2026-10-25.md,
+# package P1). Meaning exists only in a case-scoped assignment; the source,
+# its versions and its citations are never rewritten by assignment changes.
+# Targets are polymorphic references without cascades toward the material.
+EVIDENCE_MODEL_SCHEMA = r'''
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cases_uid ON cases(uid) WHERE uid IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_artifacts_uid ON artifacts(uid) WHERE uid IS NOT NULL;
+-- Rows created before this migration keep uid NULL ("before the model");
+-- ensure_uid() assigns one on first use instead of a silent backfill.
+CREATE TRIGGER IF NOT EXISTS cases_assign_uid AFTER INSERT ON cases
+  WHEN NEW.uid IS NULL BEGIN
+    UPDATE cases SET uid=lower(hex(randomblob(16))) WHERE id=NEW.id;
+  END;
+CREATE TRIGGER IF NOT EXISTS artifacts_assign_uid AFTER INSERT ON artifacts
+  WHEN NEW.uid IS NULL BEGIN
+    UPDATE artifacts SET uid=lower(hex(randomblob(16))) WHERE id=NEW.id;
+  END;
+
+-- Roles are not account types: capabilities come from grants (package P2).
+CREATE TABLE IF NOT EXISTS principals (
+  id INTEGER PRIMARY KEY,
+  uid TEXT NOT NULL UNIQUE,
+  display_name TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'unknown',
+  status TEXT NOT NULL DEFAULT 'active',
+  metadata_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS fragments (
+  id INTEGER PRIMARY KEY,
+  uid TEXT NOT NULL UNIQUE,
+  artifact_id INTEGER NOT NULL REFERENCES artifacts(id),
+  derived_text_id INTEGER REFERENCES derived_text(id),
+  anchor_id INTEGER REFERENCES evidence_anchors(id),
+  kind TEXT NOT NULL,
+  selector_json TEXT NOT NULL DEFAULT '{}',
+  created_by_principal_id INTEGER REFERENCES principals(id),
+  metadata_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_fragments_artifact ON fragments(artifact_id, id);
+CREATE TRIGGER IF NOT EXISTS fragments_no_update
+  BEFORE UPDATE ON fragments BEGIN
+    SELECT RAISE(ABORT, 'fragments are append-only');
+  END;
+CREATE TRIGGER IF NOT EXISTS fragments_no_delete
+  BEFORE DELETE ON fragments BEGIN
+    SELECT RAISE(ABORT, 'fragments are append-only');
+  END;
+
+CREATE TABLE IF NOT EXISTS artifact_versions (
+  id INTEGER PRIMARY KEY,
+  artifact_id INTEGER NOT NULL REFERENCES artifacts(id),
+  prev_artifact_id INTEGER NOT NULL REFERENCES artifacts(id),
+  relation TEXT NOT NULL DEFAULT 'supersedes',
+  observed_at TEXT NOT NULL,
+  metadata_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CHECK(artifact_id <> prev_artifact_id)
+);
+CREATE INDEX IF NOT EXISTS idx_artifact_versions_artifact ON artifact_versions(artifact_id, id);
+CREATE INDEX IF NOT EXISTS idx_artifact_versions_prev ON artifact_versions(prev_artifact_id, id);
+CREATE TRIGGER IF NOT EXISTS artifact_versions_no_update
+  BEFORE UPDATE ON artifact_versions BEGIN
+    SELECT RAISE(ABORT, 'artifact versions are append-only');
+  END;
+CREATE TRIGGER IF NOT EXISTS artifact_versions_no_delete
+  BEFORE DELETE ON artifact_versions BEGIN
+    SELECT RAISE(ABORT, 'artifact versions are append-only');
+  END;
+
+-- Related cases are data. A relation never grants access (package P2).
+CREATE TABLE IF NOT EXISTS case_relations (
+  id INTEGER PRIMARY KEY,
+  case_a INTEGER NOT NULL REFERENCES cases(id),
+  case_b INTEGER NOT NULL REFERENCES cases(id),
+  relation TEXT NOT NULL,
+  metadata_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_case_relations_a ON case_relations(case_a, id);
+CREATE INDEX IF NOT EXISTS idx_case_relations_b ON case_relations(case_b, id);
+
+-- visibility_scope_id refers to scopes from package P2; NULL = this case.
+CREATE TABLE IF NOT EXISTS assignments (
+  id INTEGER PRIMARY KEY,
+  uid TEXT NOT NULL UNIQUE,
+  case_id INTEGER NOT NULL REFERENCES cases(id),
+  target_kind TEXT NOT NULL,
+  target_id INTEGER NOT NULL,
+  issue_ref_json TEXT NOT NULL DEFAULT 'null',
+  meaning_text TEXT,
+  rationale_text TEXT,
+  status TEXT NOT NULL DEFAULT 'unknown',
+  status_changed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  author_principal_id INTEGER REFERENCES principals(id),
+  author_kind TEXT NOT NULL DEFAULT 'unknown',
+  model_run_id INTEGER REFERENCES processing_runs(id),
+  visibility_scope_id INTEGER,
+  withdrawn_at TEXT,
+  metadata_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_assignments_case ON assignments(case_id, id);
+CREATE INDEX IF NOT EXISTS idx_assignments_target ON assignments(target_kind, target_id, id);
+CREATE TRIGGER IF NOT EXISTS assignments_identity_fixed
+  BEFORE UPDATE OF uid, case_id, target_kind, target_id, author_principal_id, author_kind, model_run_id, created_at
+  ON assignments BEGIN
+    SELECT RAISE(ABORT, 'assignment identity, target and authorship are fixed');
+  END;
+'''
+
+
+def _migrate_evidence_model(db: sqlite3.Connection) -> None:
+    for table in ('cases', 'artifacts'):
+        _add_column(db, table, 'uid', 'TEXT')
+    _add_column(db, 'cases', 'metadata_json', "TEXT NOT NULL DEFAULT '{}'")
+    _add_column(db, 'cases', 'owner_principal_id', 'INTEGER REFERENCES principals(id)')
+    # A reference without stored bytes is valid; stored_path may stay NULL.
+    _add_column(db, 'artifacts', 'external_ref_json', 'TEXT')
+    for name, definition in (
+        ('case_id', 'INTEGER REFERENCES cases(id)'),
+        ('author_principal_id', 'INTEGER REFERENCES principals(id)'),
+        ('visibility_scope_id', 'INTEGER'), ('status', 'TEXT'),
+    ):
+        _add_column(db, 'links', name, definition)
+    _execute_script(db, EVIDENCE_MODEL_SCHEMA)
+    if not db.execute('SELECT 1 FROM schema_migrations WHERE version=2').fetchone():
+        db.execute("INSERT INTO schema_migrations(version,name) VALUES(2,'evidence_model_assignments_fragments')")
+
+
 def migrate_db(db: sqlite3.Connection) -> None:
     """Add contracts without rebuilding evidence tables or rewriting old records."""
     # executescript commits an existing transaction; execute statements individually
     # so DDL, the marked legacy backfill and migration ledger roll back together.
     db.execute('BEGIN IMMEDIATE')
     try:
-        statement = ''
-        for line in ADDITIVE_SCHEMA.splitlines(keepends=True):
-            statement += line
-            if sqlite3.complete_statement(statement):
-                db.execute(statement)
-                statement = ''
+        _execute_script(db, ADDITIVE_SCHEMA)
         for name, definition in (
             ('lease_token', 'TEXT'), ('lease_expires_at', 'REAL'),
             ('heartbeat_at', 'TEXT'), ('worker_id', 'TEXT'),
@@ -324,6 +460,7 @@ def migrate_db(db: sqlite3.Connection) -> None:
                      artifact['source_created_at'], artifact['source_modified_at'],
                      json.dumps(metadata, ensure_ascii=False)))
             db.execute("INSERT INTO schema_migrations(version,name) VALUES(1,'source_observations_and_processing_runs')")
+        _migrate_evidence_model(db)
         db.commit()
     except Exception:
         db.rollback()

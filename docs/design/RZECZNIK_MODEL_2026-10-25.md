@@ -347,6 +347,16 @@ bez dotykania `server/data`; testy na danych syntetycznych.
 | **P11** | Android: konta, zakres, cache | token, czyszczenie cache przy zmianie konta/cofnięciu, ekran rozmowy tekstowej | testy JVM; oddzielnie zadeklarowany brak/obecność builda SAF (AGENTS.md) | P3, P10 |
 | **P12** | Głos, potem awatar | wejście/wyjście głosowe jako warstwa nad tym samym API; awatar jako osobny pakiet | te same bramki co tekst (głos nie omija `ContentGate`); awatar oznaczony jako **PLANOWANE** do chwili dostarczenia | P10 |
 
+**Stan P1 (2026-10-25, gałąź `claude/rzecznik-design`):** wykonane. Migracja addytywna w `server/app/db.py`
+(`EVIDENCE_MODEL_SCHEMA`, `schema_migrations` v2), operacje w `server/app/assignments.py`, testy
+`server/tests/test_assignments_model.py` (S1, S2, P8 przykładowo — bez testów własności hypothesis). Decyzje:
+wiersze sprzed migracji mają `uid NULL` i dostają uid przy pierwszym użyciu (`ensure_uid`, wpis audytu), nowe
+wiersze dostają uid triggerem; `fragments` i `artifact_versions` są append-only; cel, sprawa i autor przypisania są
+niezmienne (trigger), status i `withdrawn_at` zmienialne z audytem bez treści `meaning_text`. **Luka:** nowe tabele
+(`principals`, `assignments`, `fragments`, `artifact_versions`, `case_relations`) nie wchodzą do
+`export_metadata_package` v1 ani archiwum (stały zestaw `TABLES`); nowe kolumny tak. Rozszerzenie paczki to osobna
+wersja schematu (P5). Brak tras HTTP — celowo, do P3.
+
 Równoległość: P4 i P5 mogą iść równolegle po P3 (inne pliki); reszta sekwencyjnie. Każdy pakiet: krótki brief
 (pliki, decyzje, stan), commit pośredni po każdym kawałku, bez zależności od kontekstu sesji.
 

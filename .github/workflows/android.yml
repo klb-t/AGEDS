@@ -22,12 +22,24 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      # compileSdk 37 is not guaranteed on hosted runners; install it with accepted licences.
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager --install "platforms;android-37" "platform-tools"
       - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '9.7.0'
+      # The pinned wrapper (gradle-wrapper.properties) is the build's Gradle version.
       - run: ./gradlew :androidApp:assembleDebug :androidApp:testDebugUnitTest :core:desktopTest --stacktrace
       - uses: actions/upload-artifact@v4
         with:
           name: ageds-android-debug
           path: androidApp/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ageds-android-test-reports
+          path: |
+            androidApp/build/reports/tests/
+            androidApp/build/test-results/
+            core/build/reports/tests/
+            core/build/test-results/
+          if-no-files-found: ignore

@@ -20,6 +20,12 @@
       <p id="status" role="status"></p>
     </div>
   </div>
+  <section id="summaries" class="panel" hidden>
+    <h2>Streszczenia</h2>
+    <p class="meta">Streszczenie widzi tylko osoba, która ma dostęp do wszystkich jego fragmentów.</p>
+    <form id="summarize"><label for="topic">Temat</label><input id="topic" maxlength="4000" required><button id="summary-send">Streść</button></form>
+    <div id="summary-list"></div>
+  </section>
   <audio id="player" preload="none" hidden></audio>
 </section>
 </main>

@@ -50,6 +50,7 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
       const notices = await page.textContent('#notices');
       assert.match(notices, /Model językowy nie jest włączony/);
       assert.match(notices, /Właściciel materiału nie widzi treści tej rozmowy/);
+      assert.equal(await page.isHidden('#summaries'), true, 'summaries need a model and stay hidden without one');
       assert.match(await page.textContent('#who'), /adwokat \(syntetyczny\)/);
     });
     await test('a question returns labelled quotes with citations', async () => {

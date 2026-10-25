@@ -452,6 +452,12 @@ Trasy publiczne (bez odczytu danych) to zamknięta lista `/advocate`, `/advocate
 logowanie, zły token, pytanie, cytat, odsłuch kończy się na końcu zakresu, historia po przeładowaniu, brak kanarka, brak
 wykonania znaczników ze źródła, wylogowanie) na syntetycznym WAV i transkrypcji; dawny zestaw przeglądarki 24/24.
 
+**Streszczenia (2026-10-25):** `advocate.summarize` / `POST|GET /api/advocate/summaries`: wymaga dostawcy (bez modelu
+nie ma streszczenia, jest `ask` z fragmentami), zapisuje `derived_state(kind='advocate_summary')` z wejściami = `basis`;
+widoczne dla każdego principala, który czyta wszystkie wejścia, i tylko wtedy (S8). Sekcja na stronie tylko przy
+włączonym dostawcy. Przeglądarka w trybie modelu: `server/tests/browser/advocate_model.cjs` z deterministycznym
+transportem testowym w fixture (bez sieci), 4 scenariusze.
+
 Równoległość: P4 i P5 mogą iść równolegle po P3 (inne pliki); reszta sekwencyjnie. Każdy pakiet: krótki brief
 (pliki, decyzje, stan), commit pośredni po każdym kawałku, bez zależności od kontekstu sesji.
 

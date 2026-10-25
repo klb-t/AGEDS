@@ -324,3 +324,45 @@ def record_derived_state(db: sqlite3.Connection, principal_id: int, kind: str, c
                      (uid, kind, principal_id, _json(content), _json([list(r) for r in refs]),
                       _json(transformation or {}), provider_call_id))
     return {'id': int(cur.lastrowid), 'uid': uid}
+
+
+def summarize(db: sqlite3.Connection, principal_id: int, topic: str, *, provider) -> dict:
+    """A model summary of the gated passages about a topic, stored as a derived state.
+
+    It needs a provider: without a model there is no summary, only passages
+    (ask). The stored summary is visible to a principal only while every input
+    is readable for them (derived_scope), whoever created it.
+    """
+    if not isinstance(topic, str) or not topic.strip() or len(topic) > MAX_QUESTION_CHARS:
+        raise AdvocateError(f'topic must be 1..{MAX_QUESTION_CHARS} characters')
+    if provider is None:
+        raise AdvocateError('summaries need a configured model provider; ask returns the passages')
+    from .providers import ProviderUnavailable
+    gate = AdvocateGate(db, principal_id)
+    if not gate.can_chat():
+        raise authz.Denied('advocate', None, 'chat_with_advocate', exists=True)
+    basis = retrieve(gate, topic)
+    try:
+        claims, call_id = provider.answer(db, question=f'Streść, co udostępniony materiał mówi o: {topic}',
+                                          basis=basis, history=[], conversation_id=None)
+    except ProviderUnavailable as exc:
+        raise AdvocateError(f'summary not created: {str(exc)[:300]}') from exc
+    claims, verification = verify(claims, basis, gate)
+    scope = derived_scope(basis)
+    stored = record_derived_state(db, principal_id, 'advocate_summary',
+                                  {'topic': topic, 'claims': claims, 'basis': basis, 'verification': verification},
+                                  [tuple(item) for item in scope],
+                                  transformation={'provider': provider.name, 'model': provider.config['model']},
+                                  provider_call_id=call_id)
+    return {'uid': stored['uid'], 'topic': topic, 'claims': claims, 'basis': basis, 'verification': verification}
+
+
+def visible_summaries(db: sqlite3.Connection, principal_id: int) -> list[dict]:
+    gate = AdvocateGate(db, principal_id)
+    result = []
+    for row in gate.list('derived_state', 'read_text', where="WHERE kind='advocate_summary'"):
+        content = json.loads(row['content_json'])
+        result.append({'uid': row['uid'], 'topic': content['topic'], 'claims': content['claims'],
+                       'basis': content['basis'], 'created_at': row['created_at'],
+                       'model': json.loads(row['transformation_json']).get('model')})
+    return result

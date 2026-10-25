@@ -26,7 +26,7 @@ class Recorder:
         return response
 
 
-class ProviderTests(AdvocateFixture):
+class ProviderBase(AdvocateFixture):
     def setUp(self):
         super().setUp()
         with db.session() as conn:
@@ -51,6 +51,8 @@ class ProviderTests(AdvocateFixture):
         with db.session() as conn:
             return [dict(r) for r in conn.execute('SELECT * FROM provider_calls ORDER BY id')]
 
+
+class ProviderTests(ProviderBase):
     def test_nothing_is_enabled_by_default(self):
         with db.session() as conn:
             authz.set_setting(conn, 'advocate.provider', None)
@@ -160,3 +162,43 @@ class ProviderTests(AdvocateFixture):
         body = json.loads(recorder.requests[0])
         self.assertEqual(body['generationConfig']['responseMimeType'], 'application/json')
         self.assertIn('nie są zweryfikowaną prawdą', body['systemInstruction']['parts'][0]['text'])
+
+
+class SummaryTests(ProviderBase):
+    def summarize(self, principal, topic='umowa najmu', recorder=None):
+        with db.session() as conn:
+            provider = providers.configured_provider(conn, principal)
+            provider.transport = recorder or Recorder()
+            return advocate.summarize(conn, principal, topic, provider=provider)
+
+    def test_summary_needs_a_provider(self):
+        with db.session() as conn, self.assertRaises(advocate.AdvocateError):
+            advocate.summarize(conn, self.recipient, 'umowa', provider=None)
+
+    def test_s8_owner_summary_over_two_cases_is_hidden_from_a_single_case_recipient(self):
+        self.consent()
+        summary = self.summarize(self.owner, 'umowa najmu poufna')
+        self.assertTrue({e['artifact']['id'] for e in summary['basis'] if 'artifact' in e} >= {self.private_b})
+        with db.session() as conn:
+            self.assertEqual(advocate.visible_summaries(conn, self.recipient), [])
+            self.assertEqual(len(advocate.visible_summaries(conn, self.owner)), 1)
+            authz.grant(conn, self.recipient, authz.create_scope(conn, 'case', {'case_id': self.case_b}),
+                        ['read_text', 'chat_with_advocate'])
+            self.assertEqual(len(advocate.visible_summaries(conn, self.recipient)), 1)
+
+    def test_recipient_summary_is_shared_only_with_those_who_read_every_input(self):
+        self.consent()
+        self.summarize(self.recipient, 'termin płatności')
+        with db.session() as conn:
+            stranger = model.create_principal(conn, 'stranger')
+            authz.grant(conn, stranger, authz.create_scope(conn, 'case', {'case_id': self.case_b}), ['chat_with_advocate'])
+            self.assertEqual(advocate.visible_summaries(conn, stranger), [])
+            self.assertEqual(len(advocate.visible_summaries(conn, self.recipient)), 1)
+            self.assertNotIn(HIDDEN, json.dumps(advocate.visible_summaries(conn, self.recipient), ensure_ascii=False))
+
+    def test_failed_provider_creates_no_summary(self):
+        self.consent()
+        with self.assertRaises(advocate.AdvocateError):
+            self.summarize(self.recipient, recorder=Recorder(error='Vertex HTTP 500: synthetic'))
+        with db.session() as conn:
+            self.assertEqual(advocate.visible_summaries(conn, self.recipient), [])

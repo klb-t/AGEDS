@@ -604,3 +604,22 @@ def advocate_logout():
     response = RedirectResponse('/advocate', status_code=303)
     response.delete_cookie(TOKEN_COOKIE)
     return response
+
+
+class SummaryIn(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    topic: str = Field(min_length=1, max_length=4000)
+
+@app.post('/api/advocate/summaries')
+def api_advocate_summarize(body: SummaryIn, access: Access = scoped('chat_with_advocate')):
+    from .advocate import summarize
+    from .providers import configured_provider
+    with session() as db:
+        principal = _advocate_principal(db, access)
+        return _advocate_call(lambda: summarize(db, principal, body.topic, provider=configured_provider(db, principal)))
+
+@app.get('/api/advocate/summaries')
+def api_advocate_summaries(access: Access = scoped('chat_with_advocate')):
+    from .advocate import visible_summaries
+    with session() as db:
+        return visible_summaries(db, _advocate_principal(db, access))

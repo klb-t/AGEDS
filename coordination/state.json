@@ -371,6 +371,31 @@
         "backend_tests": 506,
         "data": "synthetic"
       }
+    },
+    {
+      "id": "AGEDS-TASK-20261025-SUM",
+      "owner": "rzecznik_summaries",
+      "status": "done",
+      "scope": [
+        "server/app/advocate.py",
+        "server/app/main.py",
+        "server/app/static/advocate.mjs",
+        "server/app/templates/advocate.html",
+        "server/tests/test_providers.py",
+        "server/tests/browser/advocate_model.cjs",
+        "server/tests/browser_advocate_fixture.py"
+      ],
+      "based_on_commit": "0a19a3f",
+      "acceptance": [
+        "S8 for model summaries; browser model mode with test transport."
+      ],
+      "results": {
+        "backend_tests": 510,
+        "browser_advocate": "7/7",
+        "browser_model_mode": "4/4",
+        "data": "synthetic",
+        "transport": "deterministic test transport, no network"
+      }
     }
   ],
   "remaining_boundaries": [

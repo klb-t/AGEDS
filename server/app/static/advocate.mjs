@@ -19,6 +19,7 @@ const $ = (id) => document.getElementById(id);
 const player = createRangePlayer($('player'));
 const basisCache = new Map();
 let current = null;
+let providerModel = null;
 
 function el(tag, text, className) {
   const node = document.createElement(tag);
@@ -98,7 +99,7 @@ function renderAnswer(answer) {
   }
   const mode = answer.mode === 'retrieval_only'
     ? 'Wyszukane fragmenty materiału (bez modelu językowego).'
-    : `Odpowiedź modelu (${answer.mode.replace('provider:', '')}) — sprawdź cytaty przed użyciem.`;
+    : `Odpowiedź modelu ${answer.model || providerModel || answer.mode.replace('provider:', '')} (Google Vertex) — sprawdź cytaty przed użyciem.`;
   box.append(el('div', mode, 'meta'));
   const verification = answer.verification || {};
   if (verification.provider_fallback) {
@@ -197,6 +198,30 @@ async function ask(event) {
   renderTurn(question, [result.body]);
 }
 
+async function loadSummaries() {
+  const result = await api('/api/advocate/summaries');
+  const list = $('summary-list');
+  list.replaceChildren();
+  for (const summary of result.body || []) {
+    const box = el('div', null, 'turn');
+    box.append(el('div', summary.topic, 'question'),
+      renderAnswer({mode: 'provider:vertex', model: summary.model, claims: summary.claims, basis: summary.basis, verification: {}}));
+    list.append(box);
+  }
+}
+
+async function summarize(event) {
+  event.preventDefault();
+  const topic = $('topic').value.trim();
+  if (!topic) return;
+  $('summary-send').disabled = true;
+  $('status').textContent = 'Tworzę streszczenie z udostępnionego materiału…';
+  const result = await api('/api/advocate/summaries', {method: 'POST', body: JSON.stringify({topic})});
+  $('summary-send').disabled = false;
+  $('status').textContent = result.status === 200 ? '' : `Nie utworzono streszczenia${result.body && result.body.detail ? `: ${result.body.detail}` : '.'}`;
+  if (result.status === 200) { $('topic').value = ''; await loadSummaries(); }
+}
+
 async function start() {
   const status = await api('/api/advocate/status');
   if (status.status === 401) { show('login'); return; }
@@ -219,6 +244,12 @@ async function start() {
     el('p', 'Etykiety opisują rodzaj twierdzenia, nie prawdopodobieństwo. Transkrypcje są wynikiem rozpoznawania mowy i mogą zawierać błędy.', 'meta'));
   if (status.headers.get('X-AGEDS-Auth-Mode') === 'legacy_open') {
     notices.append(el('p', 'Tryb bez kont: każdy, kto ma dostęp do tego adresu, działa jako właściciel.', 'warn'));
+  }
+  if (status.body.provider) {
+    providerModel = status.body.provider.model;
+    $('summaries').hidden = false;
+    $('summarize').addEventListener('submit', summarize);
+    await loadSummaries();
   }
   $('new').addEventListener('click', newConversation);
   $('ask').addEventListener('submit', ask);

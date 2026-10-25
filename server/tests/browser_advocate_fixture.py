@@ -45,6 +45,26 @@ def main():
                         ['read_metadata', 'read_text', 'read_bytes', 'chat_with_advocate'])
             token = auth.issue_token(conn, recipient)
             authz.set_setting(conn, 'auth.mode', 'tokens')
+            if os.environ.get('AGEDS_BROWSER_TEST_PROVIDER') == '1':
+                # Test-only transport: deterministic replies, never a network call.
+                from server.app import providers
+                authz.set_setting(conn, 'advocate.provider', {'type': 'vertex_gemini', 'project': 'synthetic-test'})
+                providers.record_consent(conn, 'vertex', authz.create_scope(conn, 'installation', {}),
+                                         granted_by='browser fixture', basis_text='synthetic browser test')
+                def transport(config, body):
+                    text = json.dumps({'claims': [{'text': 'Według transkrypcji umowę podpisano piątego marca.',
+                                                   'status': 'proven', 'citations': ['p1']},
+                                                  {'text': 'Materiał nie mówi, kto był obecny.', 'status': 'unknown',
+                                                   'citations': []}]}, ensure_ascii=False)
+                    return {'candidates': [{'content': {'parts': [{'text': text}]}}],
+                            'usageMetadata': {'promptTokenCount': 900, 'candidatesTokenCount': 60}}
+                original = providers.configured_provider
+                def configured(db_, principal):
+                    provider = original(db_, principal)
+                    if provider is not None:
+                        provider.transport = transport
+                    return provider
+                providers.configured_provider = configured
         print(json.dumps({'token': token, 'hidden': HIDDEN}), flush=True)
         from server.app.main import app
         uvicorn.run(app, host='127.0.0.1', port=int(os.environ['AGEDS_BROWSER_PORT']), log_level='warning')

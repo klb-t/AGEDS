@@ -520,6 +520,55 @@ def _migrate_authz(db: sqlite3.Connection) -> None:
         db.execute("INSERT INTO schema_migrations(version,name) VALUES(3,'authz_scopes_grants_tokens')")
 
 
+# Packages (P5): a set of references and ranges, never a copy of bytes. Sharing
+# a package is a grant on a scope of kind 'package'. A snapshot freezes the
+# exact object versions reachable through the package at that moment.
+PACKAGE_SCHEMA = r'''
+CREATE TABLE IF NOT EXISTS packages (
+  id INTEGER PRIMARY KEY,
+  uid TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  owner_principal_id INTEGER REFERENCES principals(id),
+  mode TEXT NOT NULL DEFAULT 'snapshot',
+  metadata_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS package_items (
+  id INTEGER PRIMARY KEY,
+  package_id INTEGER NOT NULL REFERENCES packages(id),
+  item_kind TEXT NOT NULL,
+  item_id INTEGER NOT NULL,
+  selector_json TEXT NOT NULL DEFAULT '{}',
+  include_json TEXT NOT NULL DEFAULT '{}',
+  added_at TEXT NOT NULL,
+  withdrawn_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_package_items_package ON package_items(package_id, id);
+CREATE TABLE IF NOT EXISTS package_snapshots (
+  id INTEGER PRIMARY KEY,
+  package_id INTEGER NOT NULL REFERENCES packages(id),
+  taken_at TEXT NOT NULL,
+  objects_json TEXT NOT NULL,
+  objects_sha256 TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_package_snapshots_package ON package_snapshots(package_id, id);
+CREATE TRIGGER IF NOT EXISTS package_snapshots_no_update
+  BEFORE UPDATE ON package_snapshots BEGIN
+    SELECT RAISE(ABORT, 'package snapshots are append-only');
+  END;
+CREATE TRIGGER IF NOT EXISTS package_snapshots_no_delete
+  BEFORE DELETE ON package_snapshots BEGIN
+    SELECT RAISE(ABORT, 'package snapshots are append-only');
+  END;
+'''
+
+
+def _migrate_packages(db: sqlite3.Connection) -> None:
+    _execute_script(db, PACKAGE_SCHEMA)
+    if not db.execute('SELECT 1 FROM schema_migrations WHERE version=4').fetchone():
+        db.execute("INSERT INTO schema_migrations(version,name) VALUES(4,'scoped_packages_and_snapshots')")
+
+
 def _migrate_evidence_model(db: sqlite3.Connection) -> None:
     for table in ('cases', 'artifacts'):
         _add_column(db, table, 'uid', 'TEXT')
@@ -576,6 +625,7 @@ def migrate_db(db: sqlite3.Connection) -> None:
             db.execute("INSERT INTO schema_migrations(version,name) VALUES(1,'source_observations_and_processing_runs')")
         _migrate_evidence_model(db)
         _migrate_authz(db)
+        _migrate_packages(db)
         db.commit()
     except Exception:
         db.rollback()

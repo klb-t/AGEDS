@@ -235,6 +235,29 @@
         "property_examples": 40,
         "mutation_post_filter_detected": true
       }
+    },
+    {
+      "id": "AGEDS-TASK-20261025-P5",
+      "owner": "rzecznik_p5",
+      "status": "done",
+      "scope": [
+        "server/app/db.py",
+        "server/app/authz.py",
+        "server/app/sharing.py",
+        "server/app/main.py",
+        "server/app/cli.py",
+        "server/tests/test_sharing.py",
+        "server/tests/test_http_authz.py"
+      ],
+      "based_on_commit": "325ea8c",
+      "acceptance": [
+        "S10, S11, P6, P9: snapshot freezes versions, live follows, withdrawal narrows, scoped export validates without hidden rows."
+      ],
+      "results": {
+        "backend_tests": 481,
+        "data": "synthetic",
+        "mutations_detected": "3/3"
+      }
     }
   ],
   "remaining_boundaries": [

@@ -80,6 +80,21 @@ def _parser() -> argparse.ArgumentParser:
     revoke.add_argument("--grant-uid", required=True)
     mode = commands.add_parser("authz-mode", help="set auth.mode (legacy_open or tokens)")
     mode.add_argument("mode")
+    package = commands.add_parser("authz-package-create", help="create a package (references, never byte copies)")
+    package.add_argument("--name", required=True)
+    package.add_argument("--mode", default="snapshot")
+    package_add = commands.add_parser("authz-package-add", help="add a case, artifact, fragment ... to a package")
+    package_add.add_argument("--package-uid", required=True)
+    package_add.add_argument("--kind", required=True)
+    package_add.add_argument("--id", required=True, type=_positive_integer)
+    package_add.add_argument("--mode")
+    package_snapshot = commands.add_parser("authz-package-snapshot", help="freeze what the package reaches now (audited; may widen)")
+    package_snapshot.add_argument("--package-uid", required=True)
+    package_grant = commands.add_parser("authz-package-grant", help="grant capabilities on a package to a principal")
+    package_grant.add_argument("--package-uid", required=True)
+    package_grant.add_argument("--principal-uid", required=True)
+    package_grant.add_argument("--capability", action="append", required=True)
+    package_grant.add_argument("--valid-to")
     commands.add_parser("authz-show", help="list principals, grants and settings without secrets")
     return parser
 
@@ -114,6 +129,26 @@ def _authz_command(args) -> dict:
             scope = authz.create_scope(db, "case", {"case_id": args.case_id}, actor="cli")
             result = authz.grant(db, principal_id(args.principal_uid), scope, args.capability,
                                  granted_by="cli", valid_to=args.valid_to)
+            return {"grant_uid": result["uid"], "warnings": result["warnings"]}
+        def package_id(uid):
+            row = db.execute("SELECT id FROM packages WHERE uid=?", (uid,)).fetchone()
+            if row is None:
+                raise ValueError("package does not exist")
+            return row["id"]
+        if args.command == "authz-package-create":
+            from .sharing import create_package
+            result = create_package(db, args.name, mode=args.mode, actor="cli")
+            return {"package_uid": result["uid"], "warnings": result["warnings"]}
+        if args.command == "authz-package-add":
+            from .sharing import add_item
+            return {"item_id": add_item(db, package_id(args.package_uid), args.kind, args.id, mode=args.mode, actor="cli")}
+        if args.command == "authz-package-snapshot":
+            from .sharing import snapshot_package
+            return snapshot_package(db, package_id(args.package_uid), actor="cli")
+        if args.command == "authz-package-grant":
+            from .sharing import package_scope
+            result = authz.grant(db, principal_id(args.principal_uid), package_scope(db, package_id(args.package_uid)),
+                                 args.capability, granted_by="cli", valid_to=args.valid_to)
             return {"grant_uid": result["uid"], "warnings": result["warnings"]}
         if args.command == "authz-revoke":
             row = db.execute("SELECT id FROM grants WHERE uid=?", (args.grant_uid,)).fetchone()

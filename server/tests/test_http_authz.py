@@ -151,6 +151,20 @@ class HttpAuthzTests(unittest.TestCase):
         owner = self.client.get('/api/search', params={'q': 'CANARY'}, headers=self.as_(self.owner_token)).json()
         self.assertTrue(owner)
 
+    def test_scoped_export_route(self):
+        self.assertEqual(self.client.get('/api/export/scoped').status_code, 409)
+        self.tokens_mode()
+        headers = self.as_(self.recipient_token)
+        self.assertEqual(self.client.get('/api/export/scoped', headers=headers).json()['tables']['artifacts'], [])
+        with db.session() as conn:
+            scope = authz.create_scope(conn, 'case', {'case_id': self.case_a})
+            authz.grant(conn, self.recipient, scope, ['export'])
+        package = self.client.get('/api/export/scoped', headers=headers).json()
+        self.assertEqual([r['id'] for r in package['tables']['artifacts']], [self.shared])
+        self.assertNotIn(HIDDEN, json.dumps(package))
+        from server.app.packages import validate_metadata_package
+        self.assertTrue(validate_metadata_package(package)['valid'])
+
     def test_hidden_and_missing_are_indistinguishable_by_default(self):
         self.tokens_mode()
         headers = self.as_(self.recipient_token)
@@ -269,6 +283,14 @@ class CliTests(unittest.TestCase):
         self.assertNotIn(owner['token'].split('.')[1], json.dumps(shown))
         with db.session() as conn:
             self.assertEqual(auth.principal_for_token(conn, owner['token']), owner['principal_id'])
+        code, package = self.run_cli('authz-package-create', '--name', 'dla adwokata')
+        self.assertEqual(code, 0)
+        self.assertEqual(self.run_cli('authz-package-add', '--package-uid', package['package_uid'], '--kind', 'case', '--id', '1')[0], 0)
+        code, frozen = self.run_cli('authz-package-snapshot', '--package-uid', package['package_uid'])
+        self.assertEqual((code, frozen['objects']), (0, 1))
+        code, shared = self.run_cli('authz-package-grant', '--package-uid', package['package_uid'],
+                                    '--principal-uid', recipient['principal_uid'], '--capability', 'read_text')
+        self.assertEqual(code, 0)
 
 
 if __name__ == '__main__':

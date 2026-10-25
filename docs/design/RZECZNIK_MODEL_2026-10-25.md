@@ -392,6 +392,17 @@ wyszukiwanie w instalacji zawierającej tylko widoczne dokumenty (z rankingiem i
 dokumentów z tymi samymi słowami nic nie zmienia (hypothesis, 40 przykładów); mutacja „globalny indeks + filtr po
 wynikach” wykryta.
 
+**Stan P5 (2026-10-25):** wykonane. Migracja v4 (`packages`, `package_items`, `package_snapshots` append-only),
+`server/app/sharing.py`, zakres `package` w `authz.coverage`, trasa `GET /api/export/scoped`, CLI `authz-package-*`.
+Decyzje: liczy się tylko najnowszy snapshot; jawne `authz-package-snapshot` może poszerzyć (audyt), a wycofanie
+elementu zapisuje nowy snapshot = poprzedni ∩ nadal osiągalne (tylko zawęża). Dom obiektu rozdzielony na `object`
+(sam obiekt) i `container` (obiekt zawierający): zamrożony artefakt nie obejmuje późniejszych wersji tekstu ani
+cytatów, grant `set`/element `live` obejmuje. Eksport zakresowy ma schemat `ageds.metadata-package/v1`, przechodzi
+`validate_metadata_package`; referencje do ukrytych wierszy są zerowane i wypisane w `redacted_references` (bez
+wartości), `stored_path` i tokeny lease też (`installation_internal`); audyt i tagi pominięte, liczności nie
+ujawniane. Grupa niezależności = `sha256`, inaczej `uid`. Testy `test_sharing.py` (S10, S11, P6 hypothesis, P9);
+trzy celowe mutacje wykryte.
+
 Równoległość: P4 i P5 mogą iść równolegle po P3 (inne pliki); reszta sekwencyjnie. Każdy pakiet: krótki brief
 (pliki, decyzje, stan), commit pośredni po każdym kawałku, bez zależności od kontekstu sesji.
 

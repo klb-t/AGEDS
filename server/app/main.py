@@ -214,6 +214,15 @@ def export_manifest():
     from .packages import export_metadata_package
     return JSONResponse(export_metadata_package())
 
+@app.get('/api/export/scoped')
+def api_scoped_export(access:Access=scoped('export')):
+    """Metadata this principal may export; references outside the scope are nulled and listed."""
+    from .sharing import export_scope_package
+    if access.open:
+        raise HTTPException(409, 'scoped export needs auth.mode=tokens; use /export/manifest.json for the whole installation')
+    with closing(connect(read_only=True)) as db:
+        return JSONResponse(export_scope_package(db, access.principal_id))
+
 @app.post('/api/packages/validate',dependencies=[authenticated()])
 def api_validate_package(package: dict):
     from .packages import validate_metadata_package

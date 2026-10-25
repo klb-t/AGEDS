@@ -178,8 +178,18 @@ def _source_case(db, source_id) -> set:
     return {('case', row['case_id'])} if row else set()
 
 
+def _contained(parent_homes: set) -> set:
+    """Homes inherited from a containing object: its own identity becomes a container home."""
+    return {('container',) + h[1:] if h[0] == 'object' else h for h in parent_homes}
+
+
 def homes(db: sqlite3.Connection, kind: str, object_id) -> set:
-    """Contexts through which an existing object can be reached; empty if absent."""
+    """Contexts through which an existing object can be reached; empty if absent.
+
+    ('object', k, i) is the object itself; ('container', k, i) is an object that
+    contains it (a text version inside its artifact). A frozen snapshot covers
+    only the former, so later versions inside a frozen artifact stay outside.
+    """
     row = _row(db, kind, object_id)
     if row is None:
         return set()
@@ -197,22 +207,19 @@ def homes(db: sqlite3.Connection, kind: str, object_id) -> set:
     if kind == 'source_observation':
         return own | (_source_case(db, row['source_id']) or {_legacy_home(db, kind, object_id)})
     if kind in ('derived_text', 'processing_run', 'job'):
-        base = homes(db, 'artifact', row['artifact_id']) if row['artifact_id'] is not None else {_legacy_home(db, kind, object_id)}
-        base = {h for h in base if h[0] != 'object'} | ({('object', 'artifact', row['artifact_id'])} if row['artifact_id'] is not None else set())
+        base = _contained(homes(db, 'artifact', row['artifact_id'])) if row['artifact_id'] is not None else {_legacy_home(db, kind, object_id)}
         return own | base | (_assigned_cases(db, kind, object_id) if kind == 'derived_text' else set())
     if kind == 'evidence_anchor':
-        base = set(homes(db, 'derived_text', row['derived_text_id']))
+        base = _contained(homes(db, 'derived_text', row['derived_text_id']))
         for fragment in db.execute('SELECT id FROM fragments WHERE anchor_id=?', (object_id,)):
             base |= _assigned_cases(db, 'fragment', fragment['id'])
         return own | base | _assigned_cases(db, kind, object_id)
     if kind == 'fragment':
-        base = {h for h in homes(db, 'artifact', row['artifact_id']) if h[:2] != ('object', 'artifact')}
-        return own | base | {('object', 'artifact', row['artifact_id'])} | _assigned_cases(db, kind, object_id)
+        return own | _contained(homes(db, 'artifact', row['artifact_id'])) | _assigned_cases(db, kind, object_id)
     if kind == 'event':
         base = _source_case(db, row['source_id'])
         if row['artifact_id'] is not None:
-            base |= {h for h in homes(db, 'artifact', row['artifact_id']) if h[0] != 'object'}
-            base |= {('object', 'artifact', row['artifact_id'])}
+            base |= _contained(homes(db, 'artifact', row['artifact_id']))
         return own | (base | _assigned_cases(db, kind, object_id) or {_legacy_home(db, kind, object_id)})
     if kind == 'assignment':
         # A withdrawn assignment stays part of its case's history.
@@ -237,6 +244,7 @@ class Coverage:
     legacy: bool = False
     cases: set = field(default_factory=set)
     objects: set = field(default_factory=set)
+    frozen: set = field(default_factory=set)
     scopes: set = field(default_factory=set)
 
     def covers(self, home: tuple) -> bool:
@@ -246,6 +254,8 @@ class Coverage:
         if tag == 'case':
             return home[1] in self.cases
         if tag == 'object':
+            return (home[1], home[2]) in self.objects or (home[1], home[2]) in self.frozen
+        if tag == 'container':
             return (home[1], home[2]) in self.objects
         if tag == 'scope':
             return home[1] in self.scopes
@@ -256,7 +266,8 @@ class Coverage:
         return False
 
     def key(self) -> str:
-        value = [self.installation, self.legacy, sorted(self.cases), sorted(map(list, self.objects)), sorted(self.scopes)]
+        value = [self.installation, self.legacy, sorted(self.cases), sorted(map(list, self.objects)),
+                 sorted(map(list, self.frozen)), sorted(self.scopes)]
         return hashlib.sha256(_json(value).encode()).hexdigest()
 
 
@@ -300,12 +311,43 @@ def coverage(db: sqlite3.Connection, principal_id: int | None, capability: str, 
         elif kind == 'owned_cases' and type(spec.get('owner_principal_id')) is int:
             result.cases |= {r['id'] for r in db.execute('SELECT id FROM cases WHERE owner_principal_id=?',
                                                          (spec['owner_principal_id'],))}
+        elif kind == 'package' and type(spec.get('package_id')) is int:
+            add_package_coverage(db, spec['package_id'], result)
         elif kind == 'set':
             for item in spec.get('items', []) if isinstance(spec.get('items'), list) else []:
                 if isinstance(item, dict) and isinstance(item.get('kind'), str) and type(item.get('id')) is int:
                     result.objects.add((item['kind'], item['id']))
         # Unknown kinds are kept in data and cover nothing.
     return result
+
+
+def item_coverage(db: sqlite3.Connection, items, into: Coverage) -> Coverage:
+    """Live meaning of package items: a case item covers that case, others the object."""
+    for kind, object_id in items:
+        if kind == 'case':
+            into.cases.add(object_id)
+        else:
+            into.objects.add((kind, object_id))
+    return into
+
+
+def add_package_coverage(db: sqlite3.Connection, package_id: int, into: Coverage) -> None:
+    package = db.execute('SELECT mode FROM packages WHERE id=?', (package_id,)).fetchone()
+    if package is None:
+        return
+    live = []
+    for item in db.execute('SELECT * FROM package_items WHERE package_id=? AND withdrawn_at IS NULL', (package_id,)):
+        mode = json.loads(item['include_json']).get('mode', package['mode'])
+        if mode == 'live':
+            live.append((item['item_kind'], item['item_id']))
+        # Snapshot items reach recipients only through frozen snapshots below;
+        # any other mode is kept in data and covers nothing.
+    item_coverage(db, live, into)
+    # Only the latest snapshot counts; withdrawals write a narrower one.
+    snapshot = db.execute('SELECT objects_json FROM package_snapshots WHERE package_id=? ORDER BY id DESC LIMIT 1',
+                          (package_id,)).fetchone()
+    if snapshot is not None:
+        into.frozen |= {(kind, object_id) for kind, object_id in json.loads(snapshot['objects_json'])}
 
 
 def visible(db: sqlite3.Connection, principal_id: int | None, kind: str, object_id, capability: str,

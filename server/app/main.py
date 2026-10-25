@@ -18,8 +18,10 @@ from .search import SearchQueryError, SearchWorkLimitError, search_page
 from .read_pages import PageInputError, PageNotFound, PageStoredError, PageLimitError, read_page
 from .verified_media import MediaUnavailable, MediaIntegrityError, MediaLimitError, verified_media_response
 from .transcription import queue_all_audio, queue_transcription, word_timing_capabilities
+from .http_authz import Access, artifact as artifact_guard, auth_headers, authenticated, installation, scoped
 
 app=FastAPI(title='AGEDS Evidence Workbench',version='0.2.0')
+app.middleware('http')(auth_headers)
 app.mount('/static',StaticFiles(directory=Path(__file__).parent/'static'),name='static')
 templates=Jinja2Templates(directory=Path(__file__).parent/'templates')
 MAX_SQL_INTEGER = 2**63 - 1
@@ -93,7 +95,7 @@ def dashboard_counts():
         return {k:db.execute(sql).fetchone()[0] for k,sql in {
             'artifacts':'SELECT count(*) FROM artifacts','events':'SELECT count(*) FROM events','transcripts':"SELECT count(*) FROM derived_text WHERE kind='transcript'",'annotations':'SELECT count(*) FROM annotations','queued':"SELECT count(*) FROM jobs WHERE status='queued'",'failed':"SELECT count(*) FROM jobs WHERE status='failed'"}.items()}
 
-@app.get('/',response_class=HTMLResponse)
+@app.get('/',response_class=HTMLResponse,dependencies=[installation('read_metadata')])
 def home(request:Request,q:str='',kind:str=''):
     with session() as db:
         recent=[dict(r) for r in db.execute("SELECT id,original_name,mime_type,size_bytes,sha256,created_at FROM artifacts ORDER BY id DESC LIMIT 30")]
@@ -112,7 +114,7 @@ def home(request:Request,q:str='',kind:str=''):
         'results':page['results'],'q':q,'search_error':search_error,
         'search_has_more':page['has_more'],'search_limit':page['limit']}, status_code=search_status)
 
-@app.post('/upload')
+@app.post('/upload',dependencies=[installation('ingest')])
 async def upload(file:UploadFile=File(...),source_label:str=Form('Manual upload')):
     suffix=Path(file.filename or '').suffix
     with tempfile.NamedTemporaryFile(delete=False,suffix=suffix) as tmp:
@@ -123,21 +125,21 @@ async def upload(file:UploadFile=File(...),source_label:str=Form('Manual upload'
         return {'ok':True,'artifact_id':aid}
     finally:p.unlink(missing_ok=True)
 
-@app.post('/import/sms-backup')
+@app.post('/import/sms-backup',dependencies=[installation('ingest')])
 async def import_sms(file:UploadFile=File(...)):
     with tempfile.NamedTemporaryFile(delete=False,suffix='.xml') as tmp:
         shutil.copyfileobj(file.file,tmp); p=Path(tmp.name)
     try:return import_sms_backup(p,source_locator=f'upload:sms-backup:{file.filename}',original_name=file.filename)
     finally:p.unlink(missing_ok=True)
 
-@app.post('/import/whatsapp')
+@app.post('/import/whatsapp',dependencies=[installation('ingest')])
 async def import_wa(file:UploadFile=File(...),chat_label:str=Form('')):
     with tempfile.NamedTemporaryFile(delete=False,suffix='.txt') as tmp:
         shutil.copyfileobj(file.file,tmp); p=Path(tmp.name)
     try:return import_whatsapp_txt(p,chat_label or None,source_locator=f'upload:whatsapp:{file.filename}',original_name=file.filename)
     finally:p.unlink(missing_ok=True)
 
-@app.get('/artifact/{artifact_id}',response_class=HTMLResponse)
+@app.get('/artifact/{artifact_id}',response_class=HTMLResponse,dependencies=[installation('read_metadata')])
 def artifact(request:Request,artifact_id:SqlPathId):
     with session() as db:
         art=db.execute("SELECT a.*,s.kind source_kind,s.label source_label FROM artifacts a LEFT JOIN sources s ON s.id=a.source_id WHERE a.id=?",(artifact_id,)).fetchone()
@@ -154,7 +156,7 @@ def artifact(request:Request,artifact_id:SqlPathId):
         'citation_page':citation_page,'annotation_page':annotation_page})
 
 
-@app.post('/artifact/{artifact_id}/annotate')
+@app.post('/artifact/{artifact_id}/annotate',dependencies=[installation('annotate')])
 def annotate(artifact_id:SqlPathId,body:str=Form(...),label:str=Form(''),kind:str=Form('note'),start_ms:int|None=Form(None,ge=0,le=MAX_SQL_INTEGER),end_ms:int|None=Form(None,ge=0,le=MAX_SQL_INTEGER),derived_text_id:str|None=Form(None)):
     try:
         version = int(derived_text_id) if derived_text_id and derived_text_id.strip() else None
@@ -164,13 +166,13 @@ def annotate(artifact_id:SqlPathId,body:str=Form(...),label:str=Form(''),kind:st
     result = _save_annotation(artifact_id, annotation)
     return {'ok':True,'annotation_id':result['id']}
 
-@app.post('/artifact/{artifact_id}/transcribe')
+@app.post('/artifact/{artifact_id}/transcribe',dependencies=[installation('process')])
 def transcribe(artifact_id:SqlPathId): return api_queue_transcription(artifact_id, None)
 
-@app.post('/transcribe/all')
+@app.post('/transcribe/all',dependencies=[installation('process')])
 def transcribe_all(): return {'queued_artifacts':queue_all_audio()}
 
-@app.get('/api/search')
+@app.get('/api/search',dependencies=[installation('read_text')])
 def api_search(q:str):
     try:
         page = search_page(q, 200)
@@ -184,7 +186,7 @@ def api_search(q:str):
         'X-AGEDS-Search-Complete': str(page['complete']).lower(),
     })
 
-@app.get('/api/timeline')
+@app.get('/api/timeline',dependencies=[installation('read_metadata')])
 def timeline(limit:int=Query(500,ge=1,le=10000),phone:str|None=None,event_type:str|None=None):
     clauses=[];args=[]
     if phone:clauses.append('phone_or_address=?');args.append(phone)
@@ -193,7 +195,7 @@ def timeline(limit:int=Query(500,ge=1,le=10000),phone:str|None=None,event_type:s
     with session() as db:
         return [dict(r) for r in db.execute(f"SELECT * FROM events{where} ORDER BY COALESCE(ts_start,created_at) DESC LIMIT ?",(*args,limit))]
 
-@app.get('/export/events.csv')
+@app.get('/export/events.csv',dependencies=[installation('export')])
 def export_events_csv():
     with session() as db: rows=[dict(r) for r in db.execute("SELECT * FROM events ORDER BY ts_start")]
     buf=io.StringIO();
@@ -201,12 +203,12 @@ def export_events_csv():
         w=csv.DictWriter(buf,fieldnames=rows[0].keys());w.writeheader();w.writerows(rows)
     return StreamingResponse(iter([buf.getvalue()]),media_type='text/csv',headers={'Content-Disposition':'attachment; filename=events.csv'})
 
-@app.get('/export/manifest.json')
+@app.get('/export/manifest.json',dependencies=[installation('export')])
 def export_manifest():
     from .packages import export_metadata_package
     return JSONResponse(export_metadata_package())
 
-@app.post('/api/packages/validate')
+@app.post('/api/packages/validate',dependencies=[authenticated()])
 def api_validate_package(package: dict):
     from .packages import validate_metadata_package
     return validate_metadata_package(package)
@@ -237,8 +239,10 @@ class ScanIn(BaseModel):
     relativePath: str = ''
 
 @app.get('/api/artifacts')
-def api_artifacts(limit:int=Query(500,ge=1,le=10000)):
+def api_artifacts(limit:int=Query(500,ge=1,le=10000),access:Access=scoped('read_metadata')):
     with session() as db:
+        gate = access.gate(db)
+        everything = gate is None or gate.installation('read_metadata')
         rows=db.execute("""
             SELECT a.id,a.original_name,a.mime_type,a.size_bytes,a.sha256,a.created_at,a.source_locator,
               CASE
@@ -254,10 +258,15 @@ def api_artifacts(limit:int=Query(500,ge=1,le=10000)):
             FROM artifacts a
             WHERE a.mime_type LIKE 'audio/%' OR a.mime_type LIKE 'video/%'
             ORDER BY COALESCE(queued_priority,-1) DESC,a.id DESC LIMIT ?
-        """,(limit,)).fetchall()
+        """,(limit if everything else -1,)).fetchall()
+        if not everything:
+            # Filter before the limit so hidden rows cannot shorten or reorder a page.
+            rows=[r for r in rows if gate.allows('artifact',r['id'],'read_metadata')][:limit]
         out=[]
         for r in rows:
             d=dict(r)
+            if gate is not None and not gate.allows('artifact',d['id'],'read_text'):
+                d['transcript_preview']=None
             out.append({
                 'id':d['id'],'originalName':d['original_name'],'mimeType':d['mime_type'],'sizeBytes':d['size_bytes'],
                 'sha256':d['sha256'],'createdAt':d['created_at'],'sourceLocator':d['source_locator'],
@@ -266,7 +275,7 @@ def api_artifacts(limit:int=Query(500,ge=1,le=10000)):
             })
         return out
 
-@app.post('/api/artifacts/upload')
+@app.post('/api/artifacts/upload',dependencies=[installation('ingest')])
 async def api_upload_artifact(file:UploadFile=File(...),source_label:str=Form('AGEDS client'),source_locator:str|None=Form(None),metadata_json:str=Form('{}')):
     client_metadata = _json_object(metadata_json)
     suffix=Path(file.filename or '').suffix
@@ -282,7 +291,7 @@ async def api_upload_artifact(file:UploadFile=File(...),source_label:str=Form('A
         return {'ok':True,'artifact_id':aid,'sha256':sha}
     finally:p.unlink(missing_ok=True)
 
-@app.post('/api/artifacts/{artifact_id}/transcribe')
+@app.post('/api/artifacts/{artifact_id}/transcribe',dependencies=[installation('process')])
 def api_queue_transcription(artifact_id:SqlPathId,priority:int|None=Query(None,ge=-MAX_SQL_INTEGER,le=MAX_SQL_INTEGER)):
     with session() as db:
         if not db.execute('SELECT 1 FROM artifacts WHERE id=?',(artifact_id,)).fetchone():
@@ -292,7 +301,7 @@ def api_queue_transcription(artifact_id:SqlPathId,priority:int|None=Query(None,g
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 
-@app.get('/api/artifacts/{artifact_id}/transcript')
+@app.get('/api/artifacts/{artifact_id}/transcript',dependencies=[artifact_guard('read_text')])
 def api_transcript(artifact_id:SqlPathId,derived_text_id:int|None=Query(None,ge=1,le=MAX_SQL_INTEGER)):
     with session() as db:
         if derived_text_id is None:
@@ -336,35 +345,38 @@ def _read_page_http(artifact_id, kind, *, limit=50, before_id=None, snapshot_max
     except (OSError, sqlite3.Error) as exc:
         raise HTTPException(503, 'Evidence database is unavailable for read-only listing.') from exc
 
-@app.get('/api/artifacts/{artifact_id}/transcripts/page')
+@app.get('/api/artifacts/{artifact_id}/transcripts/page',dependencies=[artifact_guard('read_text')])
 def api_transcript_page(artifact_id:SqlPathId, limit:int=Query(50,ge=1,le=100),
                         before_id:int|None=Query(None,ge=1,le=MAX_SQL_INTEGER),
                         snapshot_max_id:int|None=Query(None,ge=0,le=MAX_SQL_INTEGER)):
     return _read_page_http(artifact_id,'transcripts',limit=limit,before_id=before_id,snapshot_max_id=snapshot_max_id)
 
-@app.get('/api/artifacts/{artifact_id}/citations/page')
+@app.get('/api/artifacts/{artifact_id}/citations/page',dependencies=[artifact_guard('read_text')])
 def api_citation_page(artifact_id:SqlPathId, limit:int=Query(50,ge=1,le=100),
                       before_id:int|None=Query(None,ge=1,le=MAX_SQL_INTEGER),
                       snapshot_max_id:int|None=Query(None,ge=0,le=MAX_SQL_INTEGER)):
     return _read_page_http(artifact_id,'citations',limit=limit,before_id=before_id,snapshot_max_id=snapshot_max_id)
 
-@app.get('/api/artifacts/{artifact_id}/annotations/page')
+@app.get('/api/artifacts/{artifact_id}/annotations/page',dependencies=[installation('read_metadata')])
 def api_annotation_page(artifact_id:SqlPathId, limit:int=Query(50,ge=1,le=100),
                         before_id:int|None=Query(None,ge=1,le=MAX_SQL_INTEGER),
                         snapshot_max_id:int|None=Query(None,ge=0,le=MAX_SQL_INTEGER)):
     return _read_page_http(artifact_id,'annotations',limit=limit,before_id=before_id,snapshot_max_id=snapshot_max_id)
 
-@app.get('/api/artifacts/{artifact_id}/transcripts')
+@app.get('/api/artifacts/{artifact_id}/transcripts',dependencies=[artifact_guard('read_metadata')])
 def api_transcript_versions(artifact_id:SqlPathId):
     with session() as db:
         return [dict(r) for r in db.execute("SELECT id,artifact_id,run_id,model,language,created_at FROM derived_text WHERE artifact_id=? AND kind='transcript' ORDER BY id DESC",(artifact_id,))]
 
 @app.get('/api/artifacts/{artifact_id}/source-observations')
-def api_source_observations(artifact_id:SqlPathId):
+def api_source_observations(artifact_id:SqlPathId,access:Access=artifact_guard('read_metadata')):
     with session() as db:
-        return [dict(r) for r in db.execute('SELECT * FROM source_observations WHERE artifact_id=? ORDER BY id',(artifact_id,))]
+        rows = [dict(r) for r in db.execute('SELECT * FROM source_observations WHERE artifact_id=? ORDER BY id',(artifact_id,))]
+        gate = access.gate(db)
+        # An acquisition belongs to its source's case, not to every case the material is assigned to.
+        return rows if gate is None else [r for r in rows if gate.allows('source_observation', r['id'], 'read_metadata')]
 
-@app.api_route('/api/artifacts/{artifact_id}/content', methods=['GET', 'HEAD'])
+@app.api_route('/api/artifacts/{artifact_id}/content', methods=['GET', 'HEAD'], dependencies=[artifact_guard('read_bytes')])
 def api_artifact_content(request:Request, artifact_id:SqlPathId):
     with session() as db:
         row = db.execute('SELECT * FROM artifacts WHERE id=?',(artifact_id,)).fetchone()
@@ -388,7 +400,11 @@ def api_artifact_content(request:Request, artifact_id:SqlPathId):
         raise HTTPException(409, 'Stored content is unavailable or failed byte identity verification.') from exc
 
 @app.post('/api/artifacts/{artifact_id}/citations')
-def api_citation_create(artifact_id:SqlPathId,a:CitationIn):
+def api_citation_create(artifact_id:SqlPathId,a:CitationIn,access:Access=artifact_guard('cite')):
+    if not access.open:
+        with session() as db:
+            if not access.gate(db).allows('artifact', artifact_id, 'read_text'):
+                raise HTTPException(403, 'citing requires read_text')
     try:
         return create_citation(artifact_id,a.derivedTextId,a.segmentIndices,
                               word_refs=[ref.model_dump() for ref in a.wordRefs] if a.wordRefs is not None else None,
@@ -396,12 +412,12 @@ def api_citation_create(artifact_id:SqlPathId,a:CitationIn):
     except ValueError as exc:
         raise HTTPException(422,str(exc)) from exc
 
-@app.get('/api/artifacts/{artifact_id}/citations')
+@app.get('/api/artifacts/{artifact_id}/citations',dependencies=[artifact_guard('read_text')])
 def api_citations(artifact_id:SqlPathId):
     with session() as db:
         return [anchor_payload(r) for r in db.execute('SELECT * FROM evidence_anchors WHERE artifact_id=? ORDER BY id',(artifact_id,))]
 
-@app.get('/api/artifacts/{artifact_id}/citations/{anchor_id}/packet')
+@app.get('/api/artifacts/{artifact_id}/citations/{anchor_id}/packet',dependencies=[installation('export')])
 def api_citation_packet(artifact_id: SqlPathId, anchor_id: SqlPathId):
     from .exchange import (PacketLimitError, PacketNotFound, canonical_packet_bytes,
                            export_citation_packet)
@@ -421,11 +437,11 @@ def api_citation_packet(artifact_id: SqlPathId, anchor_id: SqlPathId):
         'Cache-Control': 'no-store',
     })
 
-@app.get('/api/source-roots')
+@app.get('/api/source-roots',dependencies=[installation('ingest')])
 def api_source_roots():
     return [{'id':i,'label':root.name} for i,root in enumerate(settings.scan_roots)]
 
-@app.post('/api/source-scans')
+@app.post('/api/source-scans',dependencies=[installation('ingest')])
 def api_source_scan(scan: ScanIn):
     from .scanner import scan_sources
     if not settings.scan_roots:
@@ -446,7 +462,7 @@ def api_source_scan(scan: ScanIn):
     except ValueError as exc:
         raise HTTPException(422,str(exc)) from exc
 
-@app.get('/api/jobs/{job_id}')
+@app.get('/api/jobs/{job_id}',dependencies=[installation('process')])
 def api_job(job_id:SqlPathId):
     with session() as db:
         job = db.execute('SELECT id,kind,artifact_id,status,priority,attempts,error,created_at,started_at,finished_at FROM jobs WHERE id=?',(job_id,)).fetchone()
@@ -456,12 +472,12 @@ def api_job(job_id:SqlPathId):
         result['runs'] = [dict(r) for r in db.execute('SELECT id,status,started_at,finished_at,model,tool,tool_version,error FROM processing_runs WHERE job_id=? ORDER BY id',(job_id,))]
         return result
 
-@app.get('/api/artifacts/{artifact_id}/annotations')
+@app.get('/api/artifacts/{artifact_id}/annotations',dependencies=[installation('read_metadata')])
 def api_annotations(artifact_id:SqlPathId):
     with session() as db:
         rows=db.execute("SELECT * FROM annotations WHERE artifact_id=? ORDER BY id DESC",(artifact_id,)).fetchall()
         return [_annotation_payload(r) for r in rows]
 
-@app.post('/api/artifacts/{artifact_id}/annotations')
+@app.post('/api/artifacts/{artifact_id}/annotations',dependencies=[installation('annotate')])
 def api_annotation_create(artifact_id:SqlPathId,a:AnnotationIn):
     return _save_annotation(artifact_id,a)

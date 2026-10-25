@@ -61,8 +61,12 @@ These snapshots can contain old paths, expired claims and superseded next steps.
 - Synthetic English ASR does not validate Polish speech quality or word
   alignment. Keep the uncorrected recognition result and use a separate consented
   corpus for a quality experiment.
-- API authentication is not implemented; operate the current service on a
-  trusted/private network. Hash agreement is not authorship, truth or custody.
+- API authentication exists (2026-10-25, packages P2/P3 of
+  `docs/design/RZECZNIK_MODEL_2026-10-25.md`) but the default `auth.mode` is still
+  `legacy_open`: everyone reaching the port sees everything. Switch with
+  `python -m server.app.cli authz-owner-init --name ...` then `authz-mode tokens`.
+  Recipient search, scoped exports and the advocate remain future packages.
+  Hash agreement is not authorship, truth or custody.
 - The inert archive has no source media, live restore, job replay or signature.
 - On-device JNI is an unconnected prototype, not a functioning ASR provider.
 - Full five-layer legal analysis, Live Explainer, signed custody and partner

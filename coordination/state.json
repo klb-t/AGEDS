@@ -186,13 +186,42 @@
         "mutations_detected": "5/5",
         "data": "synthetic, generated in memory"
       }
+    },
+    {
+      "id": "AGEDS-TASK-20261025-P3",
+      "owner": "rzecznik_p3",
+      "status": "done",
+      "scope": [
+        "server/app/auth.py",
+        "server/app/http_authz.py",
+        "server/app/main.py",
+        "server/app/cli.py",
+        "server/tests/test_http_authz.py",
+        "HANDOFF.md",
+        "docs/design/RZECZNIK_MODEL_2026-10-25.md"
+      ],
+      "based_on_commit": "c185a16",
+      "acceptance": [
+        "Every route has one guard (static test); tokens mode 401 without token on every route; no canary through any GET route; S14 regression in legacy_open."
+      ],
+      "results": {
+        "backend_tests": 469,
+        "backend_subtests": 828,
+        "js_tests": 85,
+        "browser_cases": "24/24 before and after",
+        "verify_repository": "passed",
+        "mutations_detected": "5/5",
+        "data": "synthetic",
+        "default_auth_mode": "legacy_open",
+        "deployed_to_vm": false
+      }
     }
   ],
   "remaining_boundaries": [
     "Android SAF device/provider execution: no connected device or emulator.",
     "Polish speech quality/acoustic alignment unmeasured.",
     "No live restore, signed custody, source media export or connected ecosystem adapters.",
-    "No API authentication.",
+    "API token authentication implemented (P3) but default auth.mode is legacy_open; recipient search/exports pending P4/P5.",
     "Public Git history retains preexisting case-specific identifiers; current-tree cleanup is not history erasure."
   ]
 }

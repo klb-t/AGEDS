@@ -367,6 +367,21 @@ okien czasu/cofnięcia/nieznanych zdolności. Pięć celowych mutacji `authz.py`
 `ContentGate.list` filtruje w Pythonie po pobraniu wierszy (poprawność, nie wydajność); wyszukiwanie FTS jeszcze
 globalne (P4); adnotacje, tagi i audyt są bez autora/zakresu, więc zawsze idą przez `legacy_scope_policy`.
 
+**Stan P3 (2026-10-25):** wykonane. `server/app/auth.py` (tokeny `<uid>.<sekret>`, sól + SHA-256, parametry w
+danych, pokazywane raz), `server/app/http_authz.py` (dokładnie jeden strażnik na trasę: `installation:<zdolność>`,
+`artifact:<zdolność>`, `scoped:<zdolność>` z filtrem przez `ContentGate`, `authenticated`), CLI `authz-*`.
+`auth.mode=legacy_open` pozostaje domyślne (nagłówek `X-AGEDS-Auth-Mode`, ostrzeżenie
+`X-AGEDS-Auth-Warning: recipient_grants_unenforced`, gdy istnieją granty odbiorców); nieznany tryb nikogo nie
+wpuszcza; `authz-mode tokens` odmawia bez tokenu właściciela. Token: nagłówek `X-AGEDS-Token` (zgodny z basic auth
+proxy na VM), `Authorization: Bearer` albo cookie `ageds_token`. W trybie `tokens` odbiorca bez zakresu instalacji
+**nie ma** (403): wyszukiwania (do P4), eksportów i paczki cytatu (do P5 — paczka zawiera źródło i pozyskania),
+osi czasu, stron HTML, adnotacji (bez autora) ani zapisów poza cytatem (`cite` + `read_text`). Ma: listę materiałów
+(filtr przed limitem), transkrypcje, cytaty, wersje, pozyskania z własnej sprawy, bajty tylko z `read_bytes`.
+Odmowa dla ukrytego i nieistniejącego obiektu jest bajtowo identyczna przy `denial.reveal_existence=never`. Testy
+`server/tests/test_http_authz.py`: statyczny (każda trasa ma jednego strażnika), 401 na każdej trasie dla braku/złego
+tokenu, kanarki przez wszystkie trasy GET, cofnięcie grantu i tokenu, S4 przez HTTP; pięć celowych mutacji wykrytych.
+S14: wszystkie wcześniejsze testy bez zmian w `legacy_open`; przeglądarka 24/24 przed i po zmianie.
+
 Równoległość: P4 i P5 mogą iść równolegle po P3 (inne pliki); reszta sekwencyjnie. Każdy pakiet: krótki brief
 (pliki, decyzje, stan), commit pośredni po każdym kawałku, bez zależności od kontekstu sesji.
 

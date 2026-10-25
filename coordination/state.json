@@ -300,6 +300,29 @@
         "data": "synthetic",
         "property_sequences": 60
       }
+    },
+    {
+      "id": "AGEDS-TASK-20261025-P8",
+      "owner": "rzecznik_p8",
+      "status": "blocked",
+      "scope": [
+        "server/app/providers.py",
+        "server/app/advocate.py",
+        "server/app/authz.py",
+        "server/app/db.py",
+        "server/tests/test_providers.py"
+      ],
+      "based_on_commit": "de97c26",
+      "acceptance": [
+        "Fake-transport contract: only gated material, consent per input, budget before sending; one real Vertex call on synthetic data."
+      ],
+      "results": {
+        "backend_tests": 504,
+        "data": "synthetic",
+        "fake_transport": "passed",
+        "real_vertex_call": "not_executed"
+      },
+      "blocked_on": "Real Vertex call was denied by the session permission check; needs the session owner's approval."
     }
   ],
   "remaining_boundaries": [

@@ -336,6 +336,46 @@ def _active(grant_row, at: datetime) -> bool:
     return _time(grant_row['granted_at']) <= at
 
 
+def apply_scope(db: sqlite3.Connection, scope_id: int, kind: str, spec: dict, result: Coverage) -> Coverage:
+    """Add what one scope covers; unknown kinds are kept in data and cover nothing."""
+    result.scopes.add(scope_id)
+    if kind == 'installation':
+        result.installation = True
+    elif kind == 'legacy_unscoped':
+        result.legacy = True
+    elif kind == 'case' and type(spec.get('case_id')) is int:
+        result.cases.add(spec['case_id'])
+    elif kind == 'case' and isinstance(spec.get('case_uid'), str):
+        case = db.execute('SELECT id FROM cases WHERE uid=?', (spec['case_uid'],)).fetchone()
+        if case:
+            result.cases.add(case['id'])
+    elif kind == 'owned_cases' and type(spec.get('owner_principal_id')) is int:
+        result.cases |= {r['id'] for r in db.execute('SELECT id FROM cases WHERE owner_principal_id=?',
+                                                     (spec['owner_principal_id'],))}
+    elif kind == 'package' and type(spec.get('package_id')) is int:
+        add_package_coverage(db, spec['package_id'], result)
+    elif kind == 'set':
+        for item in spec.get('items', []) if isinstance(spec.get('items'), list) else []:
+            if isinstance(item, dict) and isinstance(item.get('kind'), str) and type(item.get('id')) is int:
+                result.objects.add((item['kind'], item['id']))
+    return result
+
+
+def scope_coverage(db: sqlite3.Connection, scope_ids) -> Coverage:
+    """What a set of scopes covers, independent of any principal (e.g. provider consent)."""
+    result = Coverage()
+    for scope_id in scope_ids:
+        row = db.execute('SELECT kind,spec_json FROM scopes WHERE id=?', (scope_id,)).fetchone()
+        if row is not None:
+            apply_scope(db, scope_id, row['kind'], json.loads(row['spec_json']), result)
+    return result
+
+
+def covered_by(db: sqlite3.Connection, cover: Coverage, kind: str, object_id) -> bool:
+    found = homes(db, kind, object_id)
+    return bool(found) and any(cover.covers(h) for h in found if h[0] not in ('require_inputs', 'private', 'anyone'))
+
+
 def coverage(db: sqlite3.Connection, principal_id: int | None, capability: str, at: str | None = None) -> Coverage:
     result = Coverage(principal_id=principal_id)
     if principal_id is None:
@@ -350,28 +390,7 @@ def coverage(db: sqlite3.Connection, principal_id: int | None, capability: str, 
                              JOIN scopes s ON s.id=g.scope_id WHERE g.principal_id=? ORDER BY g.id''', (principal_id,)):
         if capability not in json.loads(row['capabilities_json']) or not _active(row, moment):
             continue
-        result.scopes.add(row['scope_id'])
-        spec = json.loads(row['spec_json'])
-        kind = row['scope_kind']
-        if kind == 'installation':
-            result.installation = True
-        elif kind == 'legacy_unscoped':
-            result.legacy = True
-        elif kind == 'case' and type(spec.get('case_id')) is int:
-            result.cases.add(spec['case_id'])
-        elif kind == 'case' and isinstance(spec.get('case_uid'), str):
-            case = db.execute('SELECT id FROM cases WHERE uid=?', (spec['case_uid'],)).fetchone()
-            if case:
-                result.cases.add(case['id'])
-        elif kind == 'owned_cases' and type(spec.get('owner_principal_id')) is int:
-            result.cases |= {r['id'] for r in db.execute('SELECT id FROM cases WHERE owner_principal_id=?',
-                                                         (spec['owner_principal_id'],))}
-        elif kind == 'package' and type(spec.get('package_id')) is int:
-            add_package_coverage(db, spec['package_id'], result)
-        elif kind == 'set':
-            for item in spec.get('items', []) if isinstance(spec.get('items'), list) else []:
-                if isinstance(item, dict) and isinstance(item.get('kind'), str) and type(item.get('id')) is int:
-                    result.objects.add((item['kind'], item['id']))
+        apply_scope(db, row['scope_id'], row['scope_kind'], json.loads(row['spec_json']), result)
         # Unknown kinds are kept in data and cover nothing.
     if result.installation and get_setting(db, 'conversation.owner_visibility', 'none') == 'full':
         result.conversations_visible = True

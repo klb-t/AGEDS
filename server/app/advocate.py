@@ -238,17 +238,23 @@ def ask(db: sqlite3.Connection, principal_id: int, conversation_uid: str, questi
     turn = db.execute('INSERT INTO advocate_turns(uid,conversation_id,question,retrieval_json) VALUES(?,?,?,?)',
                       (turn_uid, conversation['id'], question,
                        _json({'terms': query_terms(question), 'passages': len(basis)}))).lastrowid
-    provider_call_id = None
-    if provider is None:
+    provider_call_id, mode, fallback, claims = None, None, None, []
+    if provider is not None:
+        from .providers import ProviderUnavailable
+        history = conversation_history(db, principal_id, conversation_uid, for_prompt=True)
+        try:
+            claims, provider_call_id = provider.answer(db, question=question, basis=basis, history=history,
+                                                       conversation_id=conversation['id'])
+            mode = f'provider:{provider.name}'
+        except ProviderUnavailable as exc:
+            fallback = str(exc)[:300]
+    if mode is None:
         mode = 'retrieval_only'
         claims = [{'text': entry['text'], 'status': 'quoted_material' if entry['kind'] != 'assignment' else 'claim',
                    'citations': [entry['ref']]} for entry in basis]
-    else:
-        mode = f'provider:{provider.name}'
-        history = conversation_history(db, principal_id, conversation_uid, for_prompt=True)
-        claims, provider_call_id = provider.answer(db, question=question, basis=basis, history=history,
-                                                   conversation_id=conversation['id'])
     claims, verification = verify(claims, basis, gate)
+    if fallback:
+        verification['provider_fallback'] = fallback
     scope = derived_scope(basis)
     answer_uid = new_uid()
     db.execute('''INSERT INTO advocate_answers(uid,turn_id,mode,claims_json,basis_json,derived_scope_json,

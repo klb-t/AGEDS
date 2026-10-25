@@ -617,17 +617,54 @@ CREATE TABLE IF NOT EXISTS derived_states (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 '''
-APPEND_ONLY_ADVOCATE = ('advocate_turns', 'advocate_answers', 'derived_states')
+CREATE_PROVIDER_SCHEMA = r'''
+CREATE TABLE IF NOT EXISTS provider_consents (
+  id INTEGER PRIMARY KEY,
+  uid TEXT NOT NULL UNIQUE,
+  provider_name TEXT NOT NULL,
+  scope_id INTEGER NOT NULL REFERENCES scopes(id),
+  granted_by TEXT NOT NULL,
+  basis_text TEXT NOT NULL,
+  data_policy_json TEXT NOT NULL DEFAULT '{}',
+  granted_at TEXT NOT NULL,
+  revoked_at TEXT
+);
+CREATE TABLE IF NOT EXISTS provider_calls (
+  id INTEGER PRIMARY KEY,
+  uid TEXT NOT NULL UNIQUE,
+  provider_name TEXT NOT NULL,
+  model TEXT NOT NULL,
+  principal_id INTEGER REFERENCES principals(id),
+  purpose TEXT NOT NULL,
+  prompt_sha256 TEXT NOT NULL,
+  input_refs_json TEXT NOT NULL,
+  prompt_content TEXT,
+  status TEXT NOT NULL,
+  error TEXT,
+  input_tokens INTEGER,
+  output_tokens INTEGER,
+  cached_tokens INTEGER,
+  cost_eur REAL,
+  cost_basis_json TEXT NOT NULL DEFAULT '{}',
+  started_at TEXT NOT NULL,
+  finished_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_provider_calls_started ON provider_calls(started_at);
+'''
+APPEND_ONLY_ADVOCATE = ('advocate_turns', 'advocate_answers', 'derived_states', 'provider_calls')
 
 
 def _migrate_advocate(db: sqlite3.Connection) -> None:
     _execute_script(db, ADVOCATE_SCHEMA)
+    _execute_script(db, CREATE_PROVIDER_SCHEMA)
     for table in APPEND_ONLY_ADVOCATE:
         for event in ('UPDATE', 'DELETE'):
             db.execute(f"""CREATE TRIGGER IF NOT EXISTS {table}_no_{event.lower()} BEFORE {event} ON {table}
                 BEGIN SELECT RAISE(ABORT, '{table} are append-only'); END""")
     if not db.execute('SELECT 1 FROM schema_migrations WHERE version=5').fetchone():
         db.execute("INSERT INTO schema_migrations(version,name) VALUES(5,'advocate_conversations_answers_derived_states')")
+    if not db.execute('SELECT 1 FROM schema_migrations WHERE version=6').fetchone():
+        db.execute("INSERT INTO schema_migrations(version,name) VALUES(6,'provider_consents_and_calls')")
 
 
 def _migrate_evidence_model(db: sqlite3.Connection) -> None:

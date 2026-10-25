@@ -427,6 +427,21 @@ bez cache po każdej z losowych operacji, hypothesis 60 ciągów), cache użyty 
 wykryta; usunięcie principala lub cofnięć z klucza jest maskowane redundancją `Coverage.key` (świadoma obrona w głąb).
 Pomiar (syntetyczny korpus): 8000 dokumentów, pierwsze zapytanie 0,4–1,2 s.
 
+**Stan P8 (2026-10-25):** kod i testy na atrapie wykonane; **prawdziwe wywołanie Vertex NIE zostało jeszcze
+wykonane** (próba w sesji zablokowana przez kontrolę uprawnień; czeka na zgodę właściciela sesji). `server/app/providers.py`:
+dostawca = ustawienie `advocate.provider` (preset Vertex `gemini-3.5-flash`, `global`, projekt z metadata servera,
+token z metadata servera albo `gcloud`), domyślnie brak → `retrieval_only`. Wysłanie wymaga: zapisanej, niecofniętej
+zgody (`provider_consents`, zakres) pokrywającej **każde** wejście `basis` (inaczej powrót do `retrieval_only` z powodem),
+oraz zmieszczenia się w `advocate.daily_budget_eur` (preset 1,0) wraz z najgorszym przypadkiem wywołania. Prompt =
+instrukcja systemowa + przefiltrowane fragmenty + ponownie autoryzowana historia (odpowiedzi z niedostępnym materiałem
+nie wracają). Wynik w JSON wg `responseSchema`, potem weryfikator z P6. `provider_calls` (append-only): hash promptu,
+referencje wejść, tokeny, koszt (cena z danych; brak raportu zużycia → najgorszy przypadek, nigdy zero), treść tylko
+przy `advocate.log_prompt_content=true`. Ceny presetu: 1,50 / 9,00 USD za 1M tokenów wejścia/wyjścia — z zewnętrznych
+agregatorów, niezweryfikowane u Google; `eur_per_usd` 1,0 zawyża koszt. Zgoda R100 (właściciel, 2026-10-25) uprawnia
+do zapisu zgody na zakres instalacji; zapis wykonuje właściciel poleceniem CLI (niżej), nie kod domyślnie. Testy
+`test_providers.py` (atrapa nagrywająca): bez zgody/przy złej zgodzie/przekroczonym budżecie nic nie jest wysyłane;
+prompt zawiera tylko materiał po bramce (kanarki), historia ponownie autoryzowana, koszt i błędy księgowane.
+
 Równoległość: P4 i P5 mogą iść równolegle po P3 (inne pliki); reszta sekwencyjnie. Każdy pakiet: krótki brief
 (pliki, decyzje, stan), commit pośredni po każdym kawałku, bez zależności od kontekstu sesji.
 

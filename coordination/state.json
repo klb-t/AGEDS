@@ -352,6 +352,25 @@
         "data": "synthetic",
         "model_in_browser_run": "none (retrieval_only)"
       }
+    },
+    {
+      "id": "AGEDS-TASK-20261025-OPS1",
+      "owner": "rzecznik_ops",
+      "status": "done",
+      "scope": [
+        "server/app/cli.py",
+        "server/app/templates/index.html",
+        "docs/ADVOCATE.md",
+        "server/tests/test_http_authz.py"
+      ],
+      "based_on_commit": "3e02164",
+      "acceptance": [
+        "CLI advocate-provider/consent/budget/spend tested; operator guide."
+      ],
+      "results": {
+        "backend_tests": 506,
+        "data": "synthetic"
+      }
     }
   ],
   "remaining_boundaries": [

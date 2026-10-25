@@ -313,6 +313,16 @@ class CliTests(unittest.TestCase):
         code, shared = self.run_cli('authz-package-grant', '--package-uid', package['package_uid'],
                                     '--principal-uid', recipient['principal_uid'], '--capability', 'read_text')
         self.assertEqual(code, 0)
+        self.assertEqual(self.run_cli('advocate-provider', 'vertex', '--model', 'gemini-3.5-flash')[0], 0)
+        code, consent = self.run_cli('advocate-consent', '--scope', 'installation', '--basis', 'synthetic test')
+        self.assertEqual(code, 0)
+        self.assertEqual(self.run_cli('advocate-budget', '0.5')[0], 0)
+        code, spend = self.run_cli('advocate-spend')
+        self.assertEqual((spend['spent_today_eur'], spend['daily_budget_eur'], len(spend['consents'])), (0.0, 0.5, 1))
+        self.assertEqual(spend['provider']['model'], 'gemini-3.5-flash')
+        self.assertNotEqual(self.run_cli('advocate-consent', '--scope', 'everything', '--basis', 'x')[0], 0)
+        self.assertEqual(self.run_cli('advocate-consent-revoke', '--uid', consent['consent_uid'])[0], 0)
+        self.assertEqual(self.run_cli('advocate-provider', 'off')[0], 0)
 
 
 if __name__ == '__main__':

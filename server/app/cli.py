@@ -95,8 +95,64 @@ def _parser() -> argparse.ArgumentParser:
     package_grant.add_argument("--principal-uid", required=True)
     package_grant.add_argument("--capability", action="append", required=True)
     package_grant.add_argument("--valid-to")
+    provider = commands.add_parser("advocate-provider", help="configure the advocate model provider, or 'off'")
+    provider.add_argument("state", choices=("vertex", "off"))
+    provider.add_argument("--model")
+    provider.add_argument("--location")
+    provider.add_argument("--project")
+    consent = commands.add_parser("advocate-consent", help="record the owner's consent to send a scope's material to a provider")
+    consent.add_argument("--provider", default="vertex")
+    consent.add_argument("--scope", required=True, help="'installation' or 'case:<id>'")
+    consent.add_argument("--basis", required=True, help="where the consent was given, e.g. 'R100 owner 2026-10-25'")
+    consent_revoke = commands.add_parser("advocate-consent-revoke", help="revoke a provider consent")
+    consent_revoke.add_argument("--uid", required=True)
+    budget = commands.add_parser("advocate-budget", help="set the daily provider budget in EUR")
+    budget.add_argument("eur", type=float)
+    commands.add_parser("advocate-spend", help="today's provider spend and recent calls (no prompt content)")
     commands.add_parser("authz-show", help="list principals, grants and settings without secrets")
     return parser
+
+
+def _advocate_command(args) -> dict:
+    from . import authz, providers
+    from .db import init_db, session
+    init_db()
+    with session() as db:
+        if args.command == "advocate-provider":
+            if args.state == "off":
+                return authz.set_setting(db, "advocate.provider", None, actor="cli")
+            config = {"type": "vertex_gemini", "name": "vertex"}
+            for key in ("model", "location", "project"):
+                if getattr(args, key):
+                    config[key] = getattr(args, key)
+            return authz.set_setting(db, "advocate.provider", config, actor="cli")
+        if args.command == "advocate-consent":
+            if args.scope == "installation":
+                scope = authz.create_scope(db, "installation", {}, actor="cli")
+            elif args.scope.startswith("case:"):
+                case_id = int(args.scope.split(":", 1)[1])
+                if not db.execute("SELECT 1 FROM cases WHERE id=?", (case_id,)).fetchone():
+                    raise ValueError("case does not exist")
+                scope = authz.create_scope(db, "case", {"case_id": case_id}, actor="cli")
+            else:
+                raise ValueError("scope must be 'installation' or 'case:<id>'")
+            uid = providers.record_consent(db, args.provider, scope, granted_by="cli", basis_text=args.basis,
+                                           data_policy={"public": False, "training": False, "provider_cache": "enabled"})
+            return {"consent_uid": uid, "scope": args.scope}
+        if args.command == "advocate-consent-revoke":
+            providers.revoke_consent(db, args.uid, actor="cli")
+            return {"revoked": args.uid}
+        if args.command == "advocate-budget":
+            if args.eur < 0:
+                raise ValueError("budget must not be negative")
+            return authz.set_setting(db, "advocate.daily_budget_eur", args.eur, actor="cli")
+        return {"spent_today_eur": providers.spent_today_eur(db),
+                "daily_budget_eur": authz.get_setting(db, "advocate.daily_budget_eur", 1.0),
+                "provider": authz.get_setting(db, "advocate.provider"),
+                "consents": [dict(r) for r in db.execute(
+                    "SELECT uid,provider_name,scope_id,basis_text,granted_at,revoked_at FROM provider_consents ORDER BY id")],
+                "recent_calls": [dict(r) for r in db.execute(
+                    "SELECT model,status,error,input_tokens,output_tokens,cost_eur,started_at FROM provider_calls ORDER BY id DESC LIMIT 20")]}
 
 
 def _authz_command(args) -> dict:
@@ -210,6 +266,9 @@ def _write_new_bytes(payload: bytes, output: Path, *, max_bytes: int):
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     try:
+        if args.command.startswith("advocate-"):
+            _emit({"command": args.command, **_advocate_command(args)})
+            return 0
         if args.command.startswith("authz-"):
             _emit({"command": args.command, **_authz_command(args)})
             return 0

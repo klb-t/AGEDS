@@ -115,6 +115,9 @@ def _parser() -> argparse.ArgumentParser:
     consent.add_argument("--basis", required=True, help="where the consent was given, e.g. 'R100 owner 2026-10-25'")
     consent_revoke = commands.add_parser("advocate-consent-revoke", help="revoke a provider consent")
     consent_revoke.add_argument("--uid", required=True)
+    voice = commands.add_parser("advocate-voice", help="enable speech in/out (needs the text provider)")
+    voice.add_argument("state", choices=("on", "off"))
+    voice.add_argument("--tts-voice")
     budget = commands.add_parser("advocate-budget", help="set the daily provider budget in EUR")
     budget.add_argument("eur", type=float)
     commands.add_parser("advocate-spend", help="today's provider spend and recent calls (no prompt content)")
@@ -135,6 +138,11 @@ def _advocate_command(args) -> dict:
                 if getattr(args, key):
                     config[key] = getattr(args, key)
             return authz.set_setting(db, "advocate.provider", config, actor="cli")
+        if args.command == "advocate-voice":
+            if args.state == "off":
+                return authz.set_setting(db, "advocate.voice", None, actor="cli")
+            config = {"enabled": True, **({"tts_voice": args.tts_voice} if args.tts_voice else {})}
+            return authz.set_setting(db, "advocate.voice", config, actor="cli")
         if args.command == "advocate-consent":
             if args.scope == "installation":
                 scope = authz.create_scope(db, "installation", {}, actor="cli")

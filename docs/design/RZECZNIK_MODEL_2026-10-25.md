@@ -475,6 +475,17 @@ udostępnionego osobno (`fragment_quote`). CLI `authz-setting --preview/--confir
 `authz-package-growth`. Testy `test_settings_matrix.py` (S12, S13: każda wartość, w tym nieznane) i HTTP delegacji.
 Granica: `predicate:*` nie jest interpretowany (zachowany w danych, działa jak najwęższa wartość).
 
+**Stan P12 (2026-10-25):** głos wykonany na atrapach transportu; **awatar nadal PLANOWANE**. `providers.VoiceProvider`:
+wejście = nagranie pytania do Gemini na Vertex (jak `tools/cloud/transcribe.sh`) **tylko z wyraźną zgodą mówiącego
+na to nagranie** (to jego dane, nie materiał właściciela), rozpoznany tekst wraca do pola pytania do sprawdzenia, nigdy
+nie jest wysyłany automatycznie; wyjście = Cloud Text-to-Speech odpowiedzi, którą rozmówca może czytać, przy zgodzie
+dostawcy na wszystkie wejścia odpowiedzi i w tym samym budżecie dziennym. `provider_calls` z celem `speech_to_text` /
+`text_to_speech` (hash nagrania/tekstu, bez treści). Trasy `POST /api/advocate/voice/transcribe`,
+`GET /api/advocate/answers/{uid}/speech`, CLI `advocate-voice`. Domyślnie wyłączone. Testy `test_voice.py`;
+przeglądarka (sztuczny mikrofon Chromium) w `advocate_model.cjs`: zgoda wymagana, tekst w polu pytania, odczyt
+odpowiedzi. Prawdziwe wywołania STT/TTS nie zostały wykonane; cena TTS (16 USD / 1M znaków) niezweryfikowana; API
+Text-to-Speech musi być włączone w projekcie.
+
 Równoległość: P4 i P5 mogą iść równolegle po P3 (inne pliki); reszta sekwencyjnie. Każdy pakiet: krótki brief
 (pliki, decyzje, stan), commit pośredni po każdym kawałku, bez zależności od kontekstu sesji.
 

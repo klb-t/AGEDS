@@ -425,6 +425,35 @@
         "data": "synthetic",
         "gap": "predicate:* kept but not interpreted"
       }
+    },
+    {
+      "id": "AGEDS-TASK-20261025-P12",
+      "owner": "rzecznik_p12",
+      "status": "done",
+      "scope": [
+        "server/app/providers.py",
+        "server/app/main.py",
+        "server/app/cli.py",
+        "server/app/static/advocate.mjs",
+        "server/app/templates/advocate.html",
+        "server/tests/test_voice.py",
+        "server/tests/browser/advocate_model.cjs",
+        "server/tests/browser_advocate_fixture.py",
+        "docs/ADVOCATE.md"
+      ],
+      "based_on_commit": "2444695",
+      "acceptance": [
+        "Speaker consent before STT; TTS under gate + provider consent + budget; browser fake microphone."
+      ],
+      "results": {
+        "backend_tests": 527,
+        "browser_advocate": "7/7",
+        "browser_model_and_voice": "6/6",
+        "browser_legacy": "24/24",
+        "data": "synthetic",
+        "real_stt_tts_calls": "not_executed",
+        "avatar": "planned, not implemented"
+      }
     }
   ],
   "remaining_boundaries": [

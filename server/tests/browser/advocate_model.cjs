@@ -21,7 +21,7 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
     });
     const base = `http://127.0.0.1:${port}`;
     for (let i = 0; i < 100; i++) {try {if ((await fetch(`${base}/advocate`)).ok) break;} catch {} await delay(50);}
-    browser = await chromium.launch({headless: true, executablePath: process.env.AGEDS_BROWSER_EXECUTABLE || undefined, args: ['--no-sandbox']});
+    browser = await chromium.launch({headless: true, executablePath: process.env.AGEDS_BROWSER_EXECUTABLE || undefined, args: ['--no-sandbox', '--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required']});
     const page = await (await browser.newContext()).newPage();
     const errors = []; page.on('pageerror', e => errors.push(e.message));
     async function test(name, fn) {await fn(); console.log(`PASS ${name}`);}
@@ -51,6 +51,23 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
       await page.waitForSelector('#summary-list .claim');
       assert.match(await page.textContent('#summary-list'), /umowa najmu/);
       if (process.env.AGEDS_BROWSER_SCREENSHOT) await page.screenshot({path: process.env.AGEDS_BROWSER_SCREENSHOT, fullPage: true});
+    });
+    await test('a spoken question needs consent and lands in the question box for review', async () => {
+      assert.equal(await page.isDisabled('#record'), true);
+      await page.check('#voice-consent');
+      await page.click('#record');
+      await delay(1200);
+      await page.click('#record');
+      await page.waitForFunction(() => document.getElementById('question').value.length > 0, null, {timeout: 15000});
+      assert.equal(await page.inputValue('#question'), 'Kiedy minął termin płatności?');
+      assert.match(await page.textContent('#status'), /Sprawdź rozpoznany tekst/);
+    });
+    await test('an answer can be read aloud', async () => {
+      const [response] = await Promise.all([
+        page.waitForResponse(r => r.url().includes('/speech')),
+        page.click('.answer .play >> nth=0')]);
+      assert.equal(response.status(), 200);
+      assert.equal(response.headers()['content-type'], 'audio/mpeg');
     });
     await test('no hidden material anywhere', async () => {
       assert.equal((await page.content()).includes(fixture.hidden), false);

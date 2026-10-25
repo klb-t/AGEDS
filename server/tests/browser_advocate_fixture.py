@@ -65,6 +65,19 @@ def main():
                         provider.transport = transport
                     return provider
                 providers.configured_provider = configured
+                authz.set_setting(conn, 'advocate.voice', {'enabled': True})
+                import base64
+                wav = base64.b64encode(path.read_bytes()[:16044]).decode()
+                def stt(config, body):
+                    return {'candidates': [{'content': {'parts': [{'text': 'Kiedy minął termin płatności?'}]}}],
+                            'usageMetadata': {'promptTokenCount': 200, 'candidatesTokenCount': 8}}
+                original_voice = providers.configured_voice
+                def configured_voice(db_, principal):
+                    voice = original_voice(db_, principal)
+                    if voice is not None:
+                        voice.stt, voice.tts = stt, (lambda config, body: {'audioContent': wav})
+                    return voice
+                providers.configured_voice = configured_voice
         print(json.dumps({'token': token, 'hidden': HIDDEN}), flush=True)
         from server.app.main import app
         uvicorn.run(app, host='127.0.0.1', port=int(os.environ['AGEDS_BROWSER_PORT']), log_level='warning')

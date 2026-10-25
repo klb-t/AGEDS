@@ -2,7 +2,7 @@
 
 Status 2026-10-25 (branch `claude/rzecznik-design`): text conversation works in `retrieval_only` mode and is
 accepted on synthetic data (backend, real Chromium). The Vertex provider path is tested against a recording fake
-transport only; **no real Vertex call has been made yet**. Voice and avatar are not implemented.
+transport only; **no real Vertex or Text-to-Speech call has been made yet**. The avatar is not implemented.
 
 ## Share a package with a recipient
 
@@ -39,6 +39,18 @@ A prompt is sent only when a consent covers every passage of the turn and the da
 case fits the budget; otherwise the answer falls back to quoted passages and says why. Price presets
 (1.50 / 9.00 USD per 1M input/output tokens) come from third-party aggregators and are unverified with Google;
 `eur_per_usd` 1.0 overstates cost. Correct them in the `advocate.provider` setting.
+
+## Voice (optional)
+
+```bash
+python -m server.app.cli advocate-voice on            # needs advocate-provider; preset TTS voice pl-PL-Wavenet-B
+```
+
+A spoken question is sent to Vertex (Gemini) only after the speaker ticks the consent box for that recording; the
+recognised text lands in the question box for review and is never sent as a question automatically. Reading an
+answer aloud (Cloud Text-to-Speech, `texttospeech.googleapis.com`, which must be enabled in the project) uses the
+same gate and provider consent as the text answer and the same daily budget. The TTS price preset (16 USD per 1M
+characters) is unverified. An avatar is not implemented.
 
 ## Limits to tell the recipient
 

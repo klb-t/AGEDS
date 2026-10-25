@@ -623,6 +623,7 @@ def api_advocate_status(access: Access = scoped('chat_with_advocate')):
         return {'principal': name, 'auth_mode': access.mode,
                 'can_chat': AdvocateGate(db, principal).can_chat(),
                 'provider': None if provider is None else {'name': provider.name, 'model': provider.config['model']},
+                'voice': _voice_status(db, principal),
                 'owner_visibility': get_setting(db, 'conversation.owner_visibility', 'none')}
 
 @app.get('/advocate', response_class=HTMLResponse, dependencies=[public()])
@@ -667,3 +668,45 @@ def api_advocate_summaries(access: Access = scoped('chat_with_advocate')):
     from .advocate import visible_summaries
     with session() as db:
         return visible_summaries(db, _advocate_principal(db, access))
+
+
+def _voice_status(db, principal):
+    from .providers import configured_voice
+    voice = configured_voice(db, principal)
+    return None if voice is None else {'stt_model': voice.config['stt_model'], 'tts_voice': voice.config['tts_voice']}
+
+@app.post('/api/advocate/voice/transcribe')
+async def api_advocate_transcribe(file: UploadFile = File(...), speaker_consent: str = Form(''),
+                                  access: Access = scoped('chat_with_advocate')):
+    """The speaker's recording to text, sent only with the speaker's consent; the text is returned for review."""
+    from .providers import ProviderUnavailable, configured_voice
+    from .advocate import AdvocateGate
+    audio = await file.read(10 * 1024 * 1024 + 1)
+    with session() as db:
+        principal = _advocate_principal(db, access)
+        if not AdvocateGate(db, principal).can_chat():
+            raise HTTPException(404, 'not available')
+        voice = configured_voice(db, principal)
+        if voice is None:
+            raise HTTPException(409, 'voice is not enabled')
+        try:
+            return voice.transcribe(db, audio, file.content_type or '', speaker_consent=speaker_consent == 'yes')
+        except ProviderUnavailable as exc:
+            raise HTTPException(422, str(exc)[:300]) from exc
+
+@app.get('/api/advocate/answers/{answer_uid}/speech')
+def api_advocate_speech(answer_uid: str, access: Access = scoped('chat_with_advocate')):
+    from .authz import Denied
+    from .providers import ProviderUnavailable, configured_voice
+    with session() as db:
+        principal = _advocate_principal(db, access)
+        voice = configured_voice(db, principal)
+        if voice is None:
+            raise HTTPException(409, 'voice is not enabled')
+        try:
+            audio = voice.synthesize(db, answer_uid)
+        except Denied as exc:
+            raise HTTPException(404, 'not available') from exc
+        except ProviderUnavailable as exc:
+            raise HTTPException(409, str(exc)[:300]) from exc
+    return Response(content=audio, media_type='audio/mpeg', headers={'Cache-Control': 'no-store'})

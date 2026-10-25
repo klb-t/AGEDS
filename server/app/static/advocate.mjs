@@ -20,6 +20,7 @@ const player = createRangePlayer($('player'));
 const basisCache = new Map();
 let current = null;
 let providerModel = null;
+let voiceEnabled = false;
 const conversationSettings = new Map();
 
 function el(tag, text, className) {
@@ -108,6 +109,27 @@ function renderAnswer(answer) {
   }
   if (verification.removed_citations && verification.removed_citations.length) {
     box.append(el('div', `Usunięto ${verification.removed_citations.length} odwołań spoza udostępnionego materiału.`, 'meta warn'));
+  }
+  if (voiceEnabled && answer.answer_uid && answer.claims.length) {
+    const listen = el('button', 'Odsłuchaj odpowiedź', 'play');
+    listen.type = 'button';
+    listen.addEventListener('click', async () => {
+      listen.disabled = true;
+      $('status').textContent = 'Przygotowuję nagranie odpowiedzi…';
+      const response = await fetch(`/api/advocate/answers/${encodeURIComponent(answer.answer_uid)}/speech`, {credentials: 'same-origin'});
+      listen.disabled = false;
+      if (!response.ok) {
+        let detail = ''; try { detail = (await response.json()).detail || ''; } catch {}
+        $('status').textContent = `Nie udało się odczytać odpowiedzi${detail ? `: ${detail}` : '.'}`;
+        return;
+      }
+      const audio = $('player');
+      player.stop();
+      audio.src = URL.createObjectURL(await response.blob());
+      $('status').textContent = '';
+      try { await audio.play(); } catch (error) { $('status').textContent = error.message; }
+    });
+    box.append(listen);
   }
   if (!answer.claims.length) {
     box.append(el('p', 'Nie znaleziono pasujących fragmentów w udostępnionym materiale. Spróbuj innych słów.'));
@@ -227,6 +249,40 @@ async function summarize(event) {
   if (result.status === 200) { $('topic').value = ''; await loadSummaries(); }
 }
 
+function setupVoice() {
+  $('voice').hidden = false;
+  const record = $('record');
+  $('voice-consent').addEventListener('change', () => { record.disabled = !$('voice-consent').checked; });
+  let recorder = null, chunks = [];
+  record.addEventListener('click', async () => {
+    if (recorder && recorder.state === 'recording') { recorder.stop(); return; }
+    let stream;
+    try { stream = await navigator.mediaDevices.getUserMedia({audio: true}); }
+    catch { $('status').textContent = 'Brak dostępu do mikrofonu.'; return; }
+    recorder = new MediaRecorder(stream);
+    chunks = [];
+    recorder.addEventListener('dataavailable', (event) => chunks.push(event.data));
+    recorder.addEventListener('stop', async () => {
+      for (const track of stream.getTracks()) track.stop();
+      record.textContent = 'Nagraj pytanie';
+      $('status').textContent = 'Rozpoznaję nagranie…';
+      const form = new FormData();
+      const type = recorder.mimeType || 'audio/webm';
+      form.append('file', new Blob(chunks, {type}), 'pytanie.webm');
+      form.append('speaker_consent', $('voice-consent').checked ? 'yes' : '');
+      const response = await fetch('/api/advocate/voice/transcribe', {method: 'POST', body: form, credentials: 'same-origin'});
+      let body = null; try { body = await response.json(); } catch {}
+      if (!response.ok) { $('status').textContent = `Nie rozpoznano nagrania${body && body.detail ? `: ${body.detail}` : '.'}`; return; }
+      $('question').value = body.text;
+      $('status').textContent = 'Sprawdź rozpoznany tekst i kliknij „Zapytaj”.';
+    });
+    recorder.start();
+    record.textContent = 'Zakończ nagrywanie';
+    $('status').textContent = 'Nagrywam… (maks. 60 s)';
+    setTimeout(() => { if (recorder && recorder.state === 'recording') recorder.stop(); }, 60000);
+  });
+}
+
 async function start() {
   const status = await api('/api/advocate/status');
   if (status.status === 401) { show('login'); return; }
@@ -251,6 +307,10 @@ async function start() {
     el('p', 'Etykiety opisują rodzaj twierdzenia, nie prawdopodobieństwo. Transkrypcje są wynikiem rozpoznawania mowy i mogą zawierać błędy.', 'meta'));
   if (status.headers.get('X-AGEDS-Auth-Mode') === 'legacy_open') {
     notices.append(el('p', 'Tryb bez kont: każdy, kto ma dostęp do tego adresu, działa jako właściciel.', 'warn'));
+  }
+  if (status.body.voice) {
+    voiceEnabled = true;
+    setupVoice();
   }
   if (status.body.provider) {
     providerModel = status.body.provider.model;

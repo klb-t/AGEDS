@@ -18,6 +18,11 @@
       <label id="share-row" class="meta" hidden><input type="checkbox" id="share" style="width:auto"> Udostępnij tę rozmowę właścicielowi materiału</label>
       <div id="turns" aria-live="polite"></div>
       <form id="ask"><label for="question">Pytanie</label><textarea id="question" maxlength="4000" required></textarea><button id="send">Zapytaj</button></form>
+      <div id="voice" hidden>
+        <label class="meta"><input type="checkbox" id="voice-consent" style="width:auto"> Zgadzam się na wysłanie nagrania mojego pytania do Google Vertex w celu rozpoznania mowy.</label>
+        <button type="button" id="record" disabled>Nagraj pytanie</button>
+        <p class="meta">Rozpoznany tekst trafi do pola pytania — sprawdź go przed wysłaniem.</p>
+      </div>
       <p id="status" role="status"></p>
     </div>
   </div>

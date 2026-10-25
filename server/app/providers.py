@@ -242,3 +242,136 @@ def configured_provider(db: sqlite3.Connection, principal_id: int):
         return None
     merged = {**VERTEX_PRESET, **config}
     return VertexProvider(merged, principal_id)
+
+
+# ---------------------------------------------------------------- voice (package P12)
+
+VOICE_PRESET = {
+    'stt_model': 'gemini-3.5-flash', 'location': 'global', 'tts_voice': 'pl-PL-Wavenet-B', 'tts_language': 'pl-PL',
+    'tts_price_usd_per_million_chars': 16.0, 'max_audio_bytes': 10 * 1024 * 1024, 'max_tts_chars': 4000,
+    'stt_worst_case_tokens': 8000,
+    'tts_price_source': 'Google Cloud TTS WaveNet list price as remembered; unverified, 2026-10-25',
+}
+STT_PROMPT = ('Przepisz dosłownie to nagranie pytania, w języku nagrania. Zwróć wyłącznie tekst pytania, '
+              'bez komentarzy. Niezrozumiałe fragmenty oznacz [niezrozumiałe].')
+AUDIO_TYPES = ('audio/webm', 'audio/ogg', 'audio/wav', 'audio/mpeg', 'audio/mp4')
+
+
+def tts_transport(config: dict, body: dict) -> dict:
+    request = urllib.request.Request('https://texttospeech.googleapis.com/v1/text:synthesize',
+                                     data=json.dumps(body).encode(), method='POST', headers={
+        'Authorization': f'Bearer {_access_token()}', 'Content-Type': 'application/json',
+        'x-goog-user-project': _project(config)})
+    try:
+        with urllib.request.urlopen(request, timeout=config.get('timeout_seconds', 120)) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as exc:
+        raise ProviderUnavailable(f'TTS HTTP {exc.code}: {exc.read()[:300].decode("utf-8", "replace")}') from exc
+    except (OSError, urllib.error.URLError, ValueError) as exc:
+        raise ProviderUnavailable(f'TTS call failed: {type(exc).__name__}') from exc
+
+
+def _book(db, provider: str, model: str, principal_id: int, purpose: str, raw: str, refs, status: str,
+          error, usage: dict, cost: float, basis: dict, started: str) -> int:
+    cur = db.execute('''INSERT INTO provider_calls(uid,provider_name,model,principal_id,purpose,prompt_sha256,
+        input_refs_json,prompt_content,status,error,input_tokens,output_tokens,cached_tokens,cost_eur,
+        cost_basis_json,started_at,finished_at) VALUES(?,?,?,?,?,?,?,NULL,?,?,?,?,?,?,?,?,?)''',
+        (new_uid(), provider, model, principal_id, purpose, hashlib.sha256(raw.encode()).hexdigest(),
+         json.dumps([list(r) for r in refs]), status, error, usage.get('promptTokenCount'),
+         usage.get('candidatesTokenCount'), usage.get('cachedContentTokenCount'), cost, json.dumps(basis), started, _now()))
+    return int(cur.lastrowid)
+
+
+@dataclass
+class VoiceProvider:
+    """Speech in and out for the advocate; the same gate, consent and budget as text."""
+    config: dict
+    principal_id: int
+    stt: object = vertex_transport
+    tts: object = tts_transport
+
+    def _budget(self, db, worst: float) -> None:
+        budget = authz.get_setting(db, 'advocate.daily_budget_eur', 1.0)
+        if spent_today_eur(db) + worst > budget:
+            raise ProviderUnavailable(f'daily budget {budget} EUR would be exceeded')
+
+    def transcribe(self, db: sqlite3.Connection, audio: bytes, mime: str, *, speaker_consent: bool) -> dict:
+        """The speaker's own recording; sent only with the speaker's explicit consent for this request."""
+        if speaker_consent is not True:
+            raise ProviderUnavailable('the speaker did not agree to send the recording for recognition')
+        base_mime = mime.split(';')[0].strip().lower()
+        if base_mime not in AUDIO_TYPES or not audio or len(audio) > self.config['max_audio_bytes']:
+            raise ProviderUnavailable('unsupported or oversized recording')
+        stt_config = {**self.config, 'model': self.config['stt_model']}
+        worst = _cost(stt_config, self.config['stt_worst_case_tokens'], 1000)
+        self._budget(db, worst)
+        import base64
+        body = {'contents': [{'role': 'user', 'parts': [
+            {'inlineData': {'mimeType': base_mime, 'data': base64.b64encode(audio).decode()}}, {'text': STT_PROMPT}]}],
+            'generationConfig': {'temperature': 0.0, 'maxOutputTokens': 1000}}
+        started, status, error, usage, text = _now(), 'ok', None, {}, ''
+        try:
+            response = self.stt(stt_config, body)
+            usage = response.get('usageMetadata', {})
+            text = ''.join(p.get('text', '') for p in response['candidates'][0]['content']['parts']).strip()
+        except ProviderUnavailable as exc:
+            status, error = 'error', str(exc)
+        except (KeyError, IndexError, TypeError) as exc:
+            status, error = 'error', f'unexpected response shape: {type(exc).__name__}'
+        known = 'promptTokenCount' in usage and 'candidatesTokenCount' in usage
+        cost = _cost(stt_config, usage['promptTokenCount'], usage['candidatesTokenCount']) if known else (
+            0.0 if status == 'error' and error.startswith(NOT_SENT) else worst)
+        call = _book(db, self.config['name'], stt_config['model'], self.principal_id, 'speech_to_text',
+                     hashlib.sha256(audio).hexdigest(), [], status, error, usage, cost,
+                     {'usage_reported': known, 'speaker_consent': True, 'audio_bytes': len(audio)}, started)
+        if status == 'error':
+            raise ProviderUnavailable(error)
+        return {'text': text, 'provider_call': call, 'note': 'machine transcription of your question; check it before asking'}
+
+    def synthesize(self, db: sqlite3.Connection, answer_uid: str) -> bytes:
+        """Read an answer aloud; only an answer this principal may read, with consent for every input."""
+        row = db.execute('SELECT * FROM advocate_answers WHERE uid=?', (answer_uid,)).fetchone()
+        if row is None or not authz.visible(db, self.principal_id, 'advocate_answer', row['id'], 'read_text'):
+            raise authz.Denied('advocate_answer', answer_uid, 'read_text', exists=row is not None)
+        from .advocate import AdvocateGate
+        gate = AdvocateGate(db, self.principal_id)
+        scope = json.loads(row['derived_scope_json'])
+        if not all(gate.allows(kind, object_id, 'read_text') for kind, object_id in scope):
+            raise authz.Denied('advocate_answer', answer_uid, 'read_text', exists=True)
+        consent = consent_coverage(db, self.config['name'])
+        if not all(authz.covered_by(db, consent, kind, object_id) for kind, object_id in scope):
+            raise ProviderUnavailable('no provider consent covers this material')
+        text = ' '.join(claim['text'] for claim in json.loads(row['claims_json']))[:self.config['max_tts_chars']]
+        if not text.strip():
+            raise ProviderUnavailable('the answer has no text to read')
+        price = self.config['tts_price_usd_per_million_chars']
+        cost = len(text) * price / 1_000_000 * self.config['eur_per_usd']
+        self._budget(db, cost)
+        body = {'input': {'text': text}, 'voice': {'languageCode': self.config['tts_language'],
+                                                   'name': self.config['tts_voice']},
+                'audioConfig': {'audioEncoding': 'MP3'}}
+        started, status, error, audio = _now(), 'ok', None, b''
+        try:
+            import base64
+            audio = base64.b64decode(self.tts(self.config, body)['audioContent'])
+        except ProviderUnavailable as exc:
+            status, error = 'error', str(exc)
+        except (KeyError, TypeError, ValueError) as exc:
+            status, error = 'error', f'unexpected response shape: {type(exc).__name__}'
+        _book(db, 'google_tts', self.config['tts_voice'], self.principal_id, 'text_to_speech', text,
+              sorted(tuple(item) for item in scope), status, error, {},
+              0.0 if status == 'error' and error.startswith(NOT_SENT) else cost,
+              {'characters': len(text), 'price_usd_per_million_chars': price, 'source': self.config['tts_price_source']},
+              started)
+        if status == 'error':
+            raise ProviderUnavailable(error)
+        return audio
+
+
+def configured_voice(db: sqlite3.Connection, principal_id: int):
+    """Voice needs a configured text provider and its own setting; nothing is enabled by default."""
+    voice = authz.get_setting(db, 'advocate.voice')
+    text = configured_provider(db, principal_id)
+    if not isinstance(voice, dict) or voice.get('enabled') is not True or text is None:
+        return None
+    return VoiceProvider({**text.config, **VOICE_PRESET, **voice}, principal_id)

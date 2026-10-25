@@ -340,6 +340,8 @@ class CliTests(unittest.TestCase):
         self.assertEqual(spend['provider']['model'], 'gemini-3.5-flash')
         self.assertNotEqual(self.run_cli('advocate-consent', '--scope', 'everything', '--basis', 'x')[0], 0)
         self.assertEqual(self.run_cli('advocate-consent-revoke', '--uid', consent['consent_uid'])[0], 0)
+        self.assertEqual(self.run_cli('advocate-voice', 'on', '--tts-voice', 'pl-PL-Wavenet-A')[0], 0)
+        self.assertEqual(self.run_cli('advocate-voice', 'off')[0], 0)
         self.assertEqual(self.run_cli('advocate-provider', 'off')[0], 0)
 
 

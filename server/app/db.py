@@ -569,6 +569,67 @@ def _migrate_packages(db: sqlite3.Connection) -> None:
         db.execute("INSERT INTO schema_migrations(version,name) VALUES(4,'scoped_packages_and_snapshots')")
 
 
+# Advocate (P6). A conversation belongs to one principal. Turns and answers are
+# append-only; an answer stores its basis as references with version hashes and
+# its derived scope (all inputs). Reading it again re-authorizes every input.
+ADVOCATE_SCHEMA = r'''
+CREATE TABLE IF NOT EXISTS conversations (
+  id INTEGER PRIMARY KEY,
+  uid TEXT NOT NULL UNIQUE,
+  principal_id INTEGER NOT NULL REFERENCES principals(id),
+  title TEXT,
+  settings_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_conversations_principal ON conversations(principal_id, id);
+CREATE TABLE IF NOT EXISTS advocate_turns (
+  id INTEGER PRIMARY KEY,
+  uid TEXT NOT NULL UNIQUE,
+  conversation_id INTEGER NOT NULL REFERENCES conversations(id),
+  question TEXT NOT NULL,
+  retrieval_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_turns_conversation ON advocate_turns(conversation_id, id);
+CREATE TABLE IF NOT EXISTS advocate_answers (
+  id INTEGER PRIMARY KEY,
+  uid TEXT NOT NULL UNIQUE,
+  turn_id INTEGER NOT NULL REFERENCES advocate_turns(id),
+  mode TEXT NOT NULL,
+  claims_json TEXT NOT NULL,
+  basis_json TEXT NOT NULL,
+  derived_scope_json TEXT NOT NULL,
+  basis_sha256 TEXT NOT NULL,
+  verification_json TEXT NOT NULL DEFAULT '{}',
+  provider_call_id INTEGER,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_answers_turn ON advocate_answers(turn_id, id);
+CREATE TABLE IF NOT EXISTS derived_states (
+  id INTEGER PRIMARY KEY,
+  uid TEXT NOT NULL UNIQUE,
+  kind TEXT NOT NULL,
+  created_by_principal_id INTEGER REFERENCES principals(id),
+  content_json TEXT NOT NULL,
+  input_refs_json TEXT NOT NULL,
+  transformation_json TEXT NOT NULL DEFAULT '{}',
+  provider_call_id INTEGER,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+'''
+APPEND_ONLY_ADVOCATE = ('advocate_turns', 'advocate_answers', 'derived_states')
+
+
+def _migrate_advocate(db: sqlite3.Connection) -> None:
+    _execute_script(db, ADVOCATE_SCHEMA)
+    for table in APPEND_ONLY_ADVOCATE:
+        for event in ('UPDATE', 'DELETE'):
+            db.execute(f"""CREATE TRIGGER IF NOT EXISTS {table}_no_{event.lower()} BEFORE {event} ON {table}
+                BEGIN SELECT RAISE(ABORT, '{table} are append-only'); END""")
+    if not db.execute('SELECT 1 FROM schema_migrations WHERE version=5').fetchone():
+        db.execute("INSERT INTO schema_migrations(version,name) VALUES(5,'advocate_conversations_answers_derived_states')")
+
+
 def _migrate_evidence_model(db: sqlite3.Connection) -> None:
     for table in ('cases', 'artifacts'):
         _add_column(db, table, 'uid', 'TEXT')
@@ -626,6 +687,7 @@ def migrate_db(db: sqlite3.Connection) -> None:
         _migrate_evidence_model(db)
         _migrate_authz(db)
         _migrate_packages(db)
+        _migrate_advocate(db)
         db.commit()
     except Exception:
         db.rollback()

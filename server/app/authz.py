@@ -30,6 +30,8 @@ KIND_TABLES = {
     'link': 'links', 'tag': 'tags', 'case_relation': 'case_relations',
     'processing_run': 'processing_runs', 'job': 'jobs', 'audit_log': 'audit_log',
     'principal': 'principals', 'artifact_version': 'artifact_versions',
+    'conversation': 'conversations', 'advocate_turn': 'advocate_turns',
+    'advocate_answer': 'advocate_answers', 'derived_state': 'derived_states',
 }
 INSTALLATION = ('installation',)
 LEGACY = ('legacy',)
@@ -171,6 +173,11 @@ def _legacy_home(db, kind: str, object_id: int) -> tuple:
     return LEGACY
 
 
+def _inputs(raw: str) -> tuple:
+    refs = tuple(sorted((kind, object_id) for kind, object_id in json.loads(raw)))
+    return ('require_inputs', refs)
+
+
 def _source_case(db, source_id) -> set:
     if source_id is None:
         return set()
@@ -228,6 +235,19 @@ def homes(db: sqlite3.Connection, kind: str, object_id) -> set:
         return own | {('case', row['case_id'])}
     if kind == 'link':
         return own | ({('case', row['case_id'])} if row['case_id'] is not None else {_legacy_home(db, kind, object_id)})
+    if kind == 'conversation':
+        # No object home: an installation or set grant must not open a private conversation.
+        return {('private', row['principal_id'])}
+    if kind == 'advocate_turn':
+        owner = db.execute('SELECT principal_id FROM conversations WHERE id=?', (row['conversation_id'],)).fetchone()
+        return {('private', owner['principal_id'])}
+    if kind == 'advocate_answer':
+        turn = db.execute('''SELECT c.principal_id FROM advocate_turns t JOIN conversations c ON c.id=t.conversation_id
+                             WHERE t.id=?''', (row['turn_id'],)).fetchone()
+        return {('private', turn['principal_id']), _inputs(row['derived_scope_json'])}
+    if kind == 'derived_state':
+        # Shareable with whoever can read every input, and only then.
+        return own | {('anyone',), _inputs(row['input_refs_json'])}
     if kind == 'case_relation':
         # Both cases must be visible; represented by an all-of marker.
         return own | {('all_cases', row['case_a'], row['case_b'])}
@@ -245,12 +265,19 @@ class Coverage:
     cases: set = field(default_factory=set)
     objects: set = field(default_factory=set)
     frozen: set = field(default_factory=set)
+    principal_id: int | None = None
+    conversations_visible: bool = False
     scopes: set = field(default_factory=set)
 
     def covers(self, home: tuple) -> bool:
+        tag = home[0]
+        if tag == 'private':
+            # Installation scope does not open another principal's conversation.
+            return home[1] == self.principal_id or self.conversations_visible
+        if tag == 'anyone':
+            return True
         if self.installation:
             return True
-        tag = home[0]
         if tag == 'case':
             return home[1] in self.cases
         if tag == 'object':
@@ -282,7 +309,7 @@ def _active(grant_row, at: datetime) -> bool:
 
 
 def coverage(db: sqlite3.Connection, principal_id: int | None, capability: str, at: str | None = None) -> Coverage:
-    result = Coverage()
+    result = Coverage(principal_id=principal_id)
     if principal_id is None:
         return result
     principal = db.execute('SELECT status FROM principals WHERE id=?', (principal_id,)).fetchone()
@@ -318,6 +345,8 @@ def coverage(db: sqlite3.Connection, principal_id: int | None, capability: str, 
                 if isinstance(item, dict) and isinstance(item.get('kind'), str) and type(item.get('id')) is int:
                     result.objects.add((item['kind'], item['id']))
         # Unknown kinds are kept in data and cover nothing.
+    if result.installation and get_setting(db, 'conversation.owner_visibility', 'none') == 'full':
+        result.conversations_visible = True
     return result
 
 
@@ -351,12 +380,23 @@ def add_package_coverage(db: sqlite3.Connection, package_id: int, into: Coverage
 
 
 def visible(db: sqlite3.Connection, principal_id: int | None, kind: str, object_id, capability: str,
-            at: str | None = None, *, _coverage: Coverage | None = None) -> bool:
+            at: str | None = None, *, _coverage: Coverage | None = None, _depth: int = 0) -> bool:
     found = homes(db, kind, object_id)
     if not found:
         return False
     cover = _coverage if _coverage is not None else coverage(db, principal_id, capability, at)
-    return any(cover.covers(home) for home in found)
+    required = [home for home in found if home[0] == 'require_inputs']
+    if not any(cover.covers(home) for home in found if home[0] != 'require_inputs'):
+        return False
+    if not required:
+        return True
+    if _depth >= 8:
+        return False
+    # derived_scope: a derived state is visible only when every input is readable.
+    text_cover = coverage(db, principal_id, 'read_text', at)
+    return all(visible(db, principal_id, input_kind, input_id, 'read_text', at,
+                       _coverage=text_cover, _depth=_depth + 1)
+               for home in required for input_kind, input_id in home[1])
 
 
 class ContentGate:

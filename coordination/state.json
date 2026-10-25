@@ -258,6 +258,29 @@
         "data": "synthetic",
         "mutations_detected": "3/3"
       }
+    },
+    {
+      "id": "AGEDS-TASK-20261025-P6",
+      "owner": "rzecznik_p6",
+      "status": "done",
+      "scope": [
+        "server/app/db.py",
+        "server/app/authz.py",
+        "server/app/advocate.py",
+        "server/app/providers.py",
+        "server/app/main.py",
+        "server/tests/test_advocate.py"
+      ],
+      "based_on_commit": "e628e07",
+      "acceptance": [
+        "S3, S4, S6, S7, S8, S15; verifier; static gate test; HTTP end-to-end in tokens mode."
+      ],
+      "results": {
+        "backend_tests": 492,
+        "data": "synthetic",
+        "mutations_detected": "4/4",
+        "network_calls": 0
+      }
     }
   ],
   "remaining_boundaries": [

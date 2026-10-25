@@ -403,6 +403,20 @@ wartości), `stored_path` i tokeny lease też (`installation_internal`); audyt i
 ujawniane. Grupa niezależności = `sha256`, inaczej `uid`. Testy `test_sharing.py` (S10, S11, P6 hypothesis, P9);
 trzy celowe mutacje wykryte.
 
+**Stan P6 (2026-10-25):** wykonane. Migracja v5 (`conversations`, `advocate_turns`, `advocate_answers`,
+`derived_states`; trzy ostatnie append-only), `server/app/advocate.py`, trasy `/api/advocate/*`. `AdvocateGate` =
+przecięcie `read_text` i `chat_with_advocate`. Pobieranie: zapytanie z pytania (OR prefiksów słów ≥3 znaków, prefiks
+skrócony o 3 znaki dla fleksji) → `scoped_search_page` → segmenty transkrypcji zawierające słowa (albo okno tekstu),
+zdarzenia, a dla cytowanego materiału jego przypisania w widocznych sprawach (oznaczone jako interpretacja). Każdy
+wpis `basis` przypina `artifact.sha256`, `derived_text_id`, segment i `text_sha256`. Odpowiedź = lista twierdzeń z
+etykietą statusu (`quoted_material`, `proven`, `claim`, `hypothesis`, `unknown`, `claim_without_basis`; etykiety, nie
+prawdopodobieństwa) i cytatami do `basis`; weryfikator usuwa cytaty spoza `basis` lub już niewidoczne, nie podnosi
+statusu, `proven` bez cytatu → `claim_without_basis`. Rozmowa ma dom `private` (zakres instalacji jej nie otwiera;
+`conversation.owner_visibility=full` otwiera, preset `none`). Odpowiedź i `derived_state` wymagają widoczności
+wszystkich wejść (`require_inputs`). Bez dostawcy: `retrieval_only` (bez generowania). Testy `test_advocate.py`:
+S3, S4, S6, S7, S8, S15 (blokada gniazd), weryfikator, statyczny (moduł nie czyta tabel treści), HTTP end-to-end; 4
+celowe mutacje wykryte. Granica: dopasowanie słów jest leksykalne (bez lematyzacji i embeddingów).
+
 Równoległość: P4 i P5 mogą iść równolegle po P3 (inne pliki); reszta sekwencyjnie. Każdy pakiet: krótki brief
 (pliki, decyzje, stan), commit pośredni po każdym kawałku, bez zależności od kontekstu sesji.
 

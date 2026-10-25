@@ -496,3 +496,71 @@ def api_annotations(artifact_id:SqlPathId):
 @app.post('/api/artifacts/{artifact_id}/annotations',dependencies=[installation('annotate')])
 def api_annotation_create(artifact_id:SqlPathId,a:AnnotationIn):
     return _save_annotation(artifact_id,a)
+
+
+# --- Evidence advocate (P6+) -------------------------------------------------
+class ConversationIn(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    title: str | None = Field(default=None, max_length=200)
+
+class QuestionIn(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    question: str = Field(min_length=1, max_length=4000)
+
+def _advocate_principal(db, access: Access) -> int:
+    if not access.open:
+        return access.principal_id
+    from .authz import get_setting
+    owner = get_setting(db, 'installation.owner_principal_uid')
+    row = db.execute('SELECT id FROM principals WHERE uid=?', (owner,)).fetchone() if owner else None
+    if row is None:
+        raise HTTPException(409, 'the advocate needs an installation owner: run authz-owner-init')
+    return row['id']
+
+def _advocate_call(fn):
+    from .advocate import AdvocateError
+    from .authz import Denied
+    try:
+        return fn()
+    except Denied as exc:
+        raise HTTPException(404, 'not available') from exc
+    except AdvocateError as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+@app.post('/api/advocate/conversations')
+def api_advocate_start(body: ConversationIn, access: Access = scoped('chat_with_advocate')):
+    from .advocate import start_conversation
+    with session() as db:
+        principal = _advocate_principal(db, access)
+        return _advocate_call(lambda: start_conversation(db, principal, title=body.title))
+
+@app.get('/api/advocate/conversations')
+def api_advocate_conversations(access: Access = scoped('chat_with_advocate')):
+    with session() as db:
+        principal = _advocate_principal(db, access)
+        return [dict(r) for r in db.execute(
+            'SELECT uid,title,settings_json,created_at FROM conversations WHERE principal_id=? ORDER BY id DESC', (principal,))]
+
+@app.post('/api/advocate/conversations/{conversation_uid}/turns')
+def api_advocate_ask(conversation_uid: str, body: QuestionIn, access: Access = scoped('chat_with_advocate')):
+    from .advocate import ask
+    from .providers import configured_provider
+    with session() as db:
+        principal = _advocate_principal(db, access)
+        return _advocate_call(lambda: ask(db, principal, conversation_uid, body.question,
+                                          provider=configured_provider(db, principal)))
+
+@app.get('/api/advocate/conversations/{conversation_uid}')
+def api_advocate_history(conversation_uid: str, access: Access = scoped('chat_with_advocate')):
+    from .advocate import conversation_history
+    with session() as db:
+        principal = _advocate_principal(db, access)
+        return _advocate_call(lambda: {'conversation_uid': conversation_uid,
+                                       'turns': conversation_history(db, principal, conversation_uid)})
+
+@app.get('/api/advocate/answers/{answer_uid}/basis')
+def api_advocate_basis(answer_uid: str, access: Access = scoped('chat_with_advocate')):
+    from .advocate import answer_basis
+    with session() as db:
+        principal = _advocate_principal(db, access)
+        return _advocate_call(lambda: answer_basis(db, principal, answer_uid))

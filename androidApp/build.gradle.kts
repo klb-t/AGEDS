@@ -25,6 +25,9 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test:runner:1.7.0")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    // androidx.compose.ui publishes same-version constraints; the app's resolved Compose UI version wins.
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4:1.7.0")
+    debugImplementation("androidx.compose.ui:ui-test-manifest:1.7.0")
     implementation(project(":core"))
     implementation("androidx.activity:activity-compose:1.12.1")
     implementation("androidx.compose.material3:material3:1.4.0")

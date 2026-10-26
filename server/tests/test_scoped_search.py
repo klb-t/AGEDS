@@ -57,7 +57,7 @@ class ScopedSearchTests(unittest.TestCase):
         with db.session() as conn:
             principal = model.create_principal(conn, 'recipient')
             scope = authz.create_scope(conn, 'case', {'case_id': visible_case})
-            authz.grant(conn, principal, scope, ['read_text'])
+            authz.grant(conn, principal, scope, ['read_text', 'read_metadata'])
         return principal
 
     def run_scoped(self, principal, q, limit):

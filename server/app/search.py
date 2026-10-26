@@ -188,7 +188,13 @@ def _scan_visible_documents(db, gate) -> list:
     rows = []
     for row in db.execute('SELECT rowid,object_kind,object_id,title,content FROM search_fts ORDER BY rowid'):
         if row['object_kind'] in SEARCH_KINDS and gate.allows(row['object_kind'], int(row['object_id']), 'read_text'):
-            rows.append(tuple(row))
+            title = row['title']
+            if row['object_kind'] == 'derived_text':
+                # The indexed title names the artifact file; show it only if the artifact is visible.
+                text = gate.db.execute('SELECT artifact_id, kind FROM derived_text WHERE id=?', (int(row['object_id']),)).fetchone()
+                if text is None or not gate.allows('artifact', text['artifact_id'], 'read_metadata'):
+                    title = text['kind'] if text is not None else ''
+            rows.append((row['rowid'], row['object_kind'], row['object_id'], title, row['content']))
             if len(rows) > MAX_SCOPED_DOCUMENTS:
                 raise SearchWorkLimitError('visible index exceeds the scoped search budget')
     return rows

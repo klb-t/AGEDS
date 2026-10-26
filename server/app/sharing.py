@@ -70,7 +70,8 @@ def set_growth_policy(db: sqlite3.Connection, package_id: int, policy: str, *, a
     previous = metadata.get('growth_policy', 'frozen')
     metadata['growth_policy'] = policy
     db.execute('UPDATE packages SET metadata_json=? WHERE id=?', (_json(metadata), package_id))
-    known = policy in GROWTH_POLICIES[:3] or policy.startswith('auto_include_by_rule:')
+    known = policy in GROWTH_POLICIES[:3] or (policy.startswith('auto_include_by_rule:')
+                                              and policy.split(':', 1)[1] in FREEZE_KINDS)
     authz._audit(db, 'package_growth_policy', 'package', package_id, {'from': previous, 'to': policy}, actor)
     return {'from': previous, 'to': policy, 'warnings': [] if known else [{'code': 'value_not_in_presets', 'value': policy}]}
 

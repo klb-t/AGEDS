@@ -63,6 +63,23 @@ answer aloud (Cloud Text-to-Speech, `texttospeech.googleapis.com`, which must be
 same gate and provider consent as the text answer and the same daily budget. The TTS price preset (16 USD per 1M
 characters) is unverified. An avatar is not implemented.
 
+## Security defaults after the independent review (2026-10-26)
+
+- Every artifact route authorizes each returned text version and citation; a frozen snapshot never reaches later versions.
+- An assignment opens material only in `assignment.opening_statuses` (seed `unknown`, `human_reviewed`): an AI proposal
+  or a rejection records a meaning but opens nothing until a person accepts it.
+- `Host` must be loopback, `EW_ALLOWED_HOSTS` or `http.allowed_hosts` (`deploy_vm.sh --public-host`); state-changing
+  requests from another site (`Sec-Fetch-Site`, `Origin`) are refused in every mode. `docker-compose.yml` publishes
+  loopback only.
+- `metadata_only` owner visibility shows that a turn exists, never the question; earlier answers re-enter a prompt
+  only while provider consent covers their inputs.
+- Export needs `export` and `read_metadata`; text columns need `read_text` too and are otherwise nulled and listed.
+- Summaries are private to their creator (`summary.sharing`, preset `creator_only`).
+- A blanket `treat_as_case` mapping leaves annotations, audit, principals and tags owner-only
+  (`legacy_scope_policy.excluded_kinds`).
+- Browser login issues a separate session secret valid `auth.session_hours` (preset 12); logout revokes it. API
+  tokens may get `--expires-days`.
+
 ## Limits to tell the recipient
 
 - Retrieval is lexical (word prefixes over stored text). It finds no synonyms and no meaning without matching words.

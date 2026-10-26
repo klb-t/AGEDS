@@ -514,6 +514,7 @@ SETTING_PRESETS = (
 
 def _migrate_authz(db: sqlite3.Connection) -> None:
     _execute_script(db, AUTHZ_SCHEMA)
+    _add_column(db, 'auth_methods', 'expires_at', 'TEXT')
     db.executemany('INSERT OR IGNORE INTO capability_registry(name,description) VALUES(?,?)', CAPABILITY_PRESETS)
     db.executemany('INSERT OR IGNORE INTO authz_settings(key,value_json) VALUES(?,?)', SETTING_PRESETS)
     # Predicate vocabulary seed: data from the start, extensible without code (see authz).

@@ -110,7 +110,8 @@ def oracle(world, grants, policy, legacy_map):
         if policy == 'owner_only':
             return legacy
         if policy.startswith('treat_as_case:'):
-            return int(policy.split(':')[1]) in cases
+            # Annotations, audit, principals and tags are excluded from blanket mapping by default.
+            return legacy if kind in authz.LEGACY_EXCLUDED_SEED else int(policy.split(':')[1]) in cases
         mapped = legacy_map.get(f'{kind}:{number}')
         return mapped in cases if mapped is not None else legacy
 
@@ -358,6 +359,11 @@ class ScenarioTests(unittest.TestCase):
         self.assertFalse(authz.visible(self.db, self.recipient, 'case', self.case_b, 'read_metadata'))
 
     def test_setting_changes_are_audited_with_previous_value(self):
+        # A blanket mapping leaves owner notes alone unless they are removed from the exclusion list.
+        authz.set_setting(self.db, 'legacy_scope_policy', f'treat_as_case:{self.case_a}', actor='owner')
+        self.assertEqual(authz.ContentGate(self.db, self.recipient).list('annotation'), [])
+        authz.set_setting(self.db, 'legacy_scope_policy', 'owner_only', actor='owner')
+        authz.set_setting(self.db, 'legacy_scope_policy.excluded_kinds', ['audit_log', 'principal', 'tag'], actor='owner')
         with self.assertRaises(authz.SettingWidensAccess) as refused:
             authz.set_setting(self.db, 'legacy_scope_policy', f'treat_as_case:{self.case_a}', actor='owner')
         gained = refused.exception.change['effective_access_diff']

@@ -78,6 +78,7 @@ def get_setting(db: sqlite3.Connection, key: str, default=None):
 SETTINGS = {
     'legacy_scope_policy': {'presets': ['owner_only', 'treat_as_case:<case id>', 'explicit_map'], 'access': True},
     'legacy_scope_map': {'presets': ['{"<kind>:<id>": <case id>}'], 'access': True},
+    'legacy_scope_policy.excluded_kinds': {'access': True},
     'fragment.open_policy': {'presets': ['fragment_only', 'context_window:<N>', 'whole_artifact_version',
                                          'whole_document', 'predicate:<text>'], 'access': True,
                              'order': ['fragment_only', 'whole_artifact_version', 'whole_document']},
@@ -360,9 +361,17 @@ def _assigned_cases(db, kind: str, object_id: int) -> set:
     return {_assignment_home(row) for row in _opening(db, rows)}
 
 
+LEGACY_EXCLUDED_SEED = ['annotation', 'audit_log', 'principal', 'tag']
+
+
 def _legacy_home(db, kind: str, object_id: int) -> tuple:
     policy = get_setting(db, 'legacy_scope_policy', 'owner_only')
+    excluded = get_setting(db, 'legacy_scope_policy.excluded_kinds', LEGACY_EXCLUDED_SEED)
     if isinstance(policy, str) and policy.startswith('treat_as_case:'):
+        # A blanket mapping never spreads the owner's notes, the audit log or accounts
+        # unless the owner removes them from this list; explicit_map is per object.
+        if isinstance(excluded, list) and kind in excluded:
+            return LEGACY
         try:
             return ('case', int(policy.split(':', 1)[1]))
         except ValueError:
@@ -827,7 +836,8 @@ def add_package_coverage(db: sqlite3.Connection, package_id: int, into: Coverage
             if json.loads(item['include_json']).get('mode', package['mode']) == 'snapshot':
                 snapshot_items.append((item['item_kind'], item['item_id']))
         reach = item_coverage(db, snapshot_items, Coverage())
-        table = KIND_TABLES.get(rule_kind)
+        from .sharing import FREEZE_KINDS
+        table = KIND_TABLES.get(rule_kind) if rule_kind in FREEZE_KINDS else None
         if table is not None:
             for row in db.execute(f'SELECT id FROM {table} ORDER BY id').fetchall():
                 if any(reach.covers(h) for h in homes(db, rule_kind, row['id']) if h[0] not in ('require_inputs', 'private', 'anyone')):

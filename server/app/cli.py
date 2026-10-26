@@ -69,6 +69,7 @@ def _parser() -> argparse.ArgumentParser:
     token = commands.add_parser("authz-token-issue", help="issue a token for a principal; printed once")
     token.add_argument("--principal-uid", required=True)
     token.add_argument("--label")
+    token.add_argument("--expires-days", type=_positive_integer, help="optional lifetime; without it the token lasts until revoked")
     token_revoke = commands.add_parser("authz-token-revoke", help="revoke one token")
     token_revoke.add_argument("--method-uid", required=True)
     grant = commands.add_parser("authz-grant", help="grant capabilities on one case to a principal")
@@ -193,8 +194,12 @@ def _authz_command(args) -> dict:
             pid = create_principal(db, args.name, kind=args.kind, actor="cli")
             return {"principal_id": pid, "principal_uid": db.execute("SELECT uid FROM principals WHERE id=?", (pid,)).fetchone()["uid"]}
         if args.command == "authz-token-issue":
-            return {"token": auth.issue_token(db, principal_id(args.principal_uid), label=args.label, actor="cli"),
-                    "token_shown_once": True}
+            expires = None
+            if args.expires_days:
+                from datetime import datetime, timedelta, timezone
+                expires = (datetime.now(timezone.utc) + timedelta(days=args.expires_days)).isoformat()
+            return {"token": auth.issue_token(db, principal_id(args.principal_uid), label=args.label, actor="cli",
+                                              expires_at=expires), "token_shown_once": True, "expires_at": expires}
         if args.command == "authz-token-revoke":
             auth.revoke_token(db, args.method_uid, actor="cli")
             return {"revoked": args.method_uid}

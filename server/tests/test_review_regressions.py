@@ -271,5 +271,71 @@ class R7HostAndOrigin(Base):
         self.assertEqual(cli.status_code, 200)
 
 
+class R8SearchTitleOfHiddenArtifact(Base):
+    def test_title_does_not_name_an_invisible_artifact(self):
+        self.grant_case(self.rec, self.case_a, ['read_metadata', 'read_text'])
+        with db.session() as conn:
+            text_b = conn.execute('SELECT id FROM derived_text WHERE artifact_id=?', (self.art_b,)).fetchone()[0]
+            model.assign(conn, case_id=self.case_a, target_kind='derived_text', target_id=text_b)
+            self.assertFalse(authz.visible(conn, self.rec, 'artifact', self.art_b, 'read_metadata'))
+        hits = self.client.get('/api/search', params={'q': 'najmu'}, headers=self.h(self.rec_token)).json()
+        titles = {h['title'] for h in hits}
+        self.assertIn('transcript', titles)
+        self.assertNotIn('b.wav', ' '.join(titles))
+
+
+class R9LegacyAndGrowthSpread(Base):
+    def test_blanket_mapping_keeps_owner_notes_and_audit_private(self):
+        self.grant_case(self.rec, self.case_a, ['read_metadata', 'read_text', 'export'])
+        with db.session() as conn:
+            conn.execute("INSERT INTO annotations(artifact_id,body) VALUES(?,?)", (self.art_b, f'{CANARY}-note'))
+            authz.set_setting(conn, 'legacy_scope_policy', f'treat_as_case:{self.case_a}', confirm_widening=True)
+            gate = authz.ContentGate(conn, self.rec)
+            self.assertEqual(gate.list('annotation'), [])
+            self.assertEqual(gate.list('audit_log'), [])
+            self.assertEqual(gate.list('principal'), [])
+        export = self.client.get('/api/export/scoped', headers=self.h(self.rec_token)).text
+        self.assertNotIn(f'{CANARY}-note', export)
+
+    def test_auto_include_accepts_only_freezable_kinds(self):
+        with db.session() as conn:
+            package = sharing.create_package(conn, 'p')
+            sharing.add_item(conn, package['id'], 'case', self.case_a)
+            sharing.snapshot_package(conn, package['id'])
+            authz.grant(conn, self.rec, package['scope_id'], ['read_metadata'])
+            change = sharing.set_growth_policy(conn, package['id'], 'auto_include_by_rule:audit_log')
+            self.assertEqual(change['warnings'][0]['code'], 'value_not_in_presets')
+            self.assertEqual(authz.ContentGate(conn, self.rec).list('audit_log'), [])
+
+
+class R10BrowserSessions(Base):
+    def test_cookie_is_a_separate_expiring_session_revoked_on_logout(self):
+        login = self.client.post('/advocate/login', data={'token': self.rec_token}, follow_redirects=False)
+        cookie = login.cookies.get('ageds_token') or login.headers['set-cookie'].split('ageds_token=')[1].split(';')[0].strip('"')
+        self.assertNotEqual(cookie, self.rec_token)
+        self.assertIn('Max-Age=43200', login.headers['set-cookie'])
+        self.assertEqual(self.client.get('/api/artifacts', headers=self.h(cookie)).status_code, 200)
+        self.client.cookies.set('ageds_token', cookie)
+        self.client.post('/advocate/logout', follow_redirects=False)
+        self.client.cookies.clear()
+        self.assertEqual(self.client.get('/api/artifacts', headers=self.h(cookie)).status_code, 401)
+        self.assertEqual(self.client.get('/api/artifacts', headers=self.h(self.rec_token)).status_code, 200)
+
+    def test_expired_sessions_and_tokens_are_refused(self):
+        with db.session() as conn:
+            stale = auth.issue_token(conn, self.rec, kind='session', expires_at='2000-01-01T00:00:00+00:00')
+            old = auth.issue_token(conn, self.rec, expires_at='2000-01-01T00:00:00+00:00')
+            fresh = auth.issue_token(conn, self.rec, expires_at='2999-01-01T00:00:00+00:00')
+        for token, status in ((stale, 401), (old, 401), (fresh, 200)):
+            with self.subTest(status=status):
+                self.assertEqual(self.client.get('/api/artifacts', headers=self.h(token)).status_code, status)
+
+    def test_logout_never_revokes_an_api_token(self):
+        self.client.cookies.set('ageds_token', self.rec_token)
+        self.client.post('/advocate/logout', follow_redirects=False)
+        self.client.cookies.clear()
+        self.assertEqual(self.client.get('/api/artifacts', headers=self.h(self.rec_token)).status_code, 200)
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=1)

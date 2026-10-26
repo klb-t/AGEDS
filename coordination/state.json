@@ -524,6 +524,26 @@
         "applied": false,
         "needs": "sudo on the VM; owner approval"
       }
+    },
+    {
+      "id": "AGEDS-TASK-20261026-REVIEW-FIX",
+      "owner": "rzecznik_security",
+      "status": "done",
+      "scope": [
+        "server/app/{authz,main,read_pages,http_authz,advocate,providers,sharing,search,auth,cli,db}.py",
+        "docker-compose.yml",
+        "scripts/deploy_vm.sh",
+        "server/tests/test_review_regressions.py"
+      ],
+      "based_on_commit": "7152be2",
+      "acceptance": [
+        "All 10 findings of the independent review fixed; each reproduction is a regression test asserting the fix."
+      ],
+      "results": {
+        "review": "independent Opus review from the coordinator session, 10 findings, 7 reproduced",
+        "regression_tests": 18,
+        "data": "synthetic"
+      }
     }
   ],
   "remaining_boundaries": [

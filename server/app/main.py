@@ -672,19 +672,24 @@ def advocate_page(request: Request, error: str = ''):
 @app.post('/advocate/login', dependencies=[public()])
 def advocate_login(request: Request, token: str = Form(..., max_length=512)):
     from fastapi.responses import RedirectResponse
-    from .auth import principal_for_token
-    with closing(connect(read_only=True)) as db:
-        valid = principal_for_token(db, token.strip()) is not None
-    if not valid:
-        return RedirectResponse('/advocate?error=token', status_code=303)
+    from .auth import principal_for_token, start_session
+    with session() as db:
+        principal = principal_for_token(db, token.strip())
+        if principal is None:
+            return RedirectResponse('/advocate?error=token', status_code=303)
+        # The cookie holds a separate, expiring session secret, not the API token itself.
+        session_token, max_age = start_session(db, principal)
     response = RedirectResponse('/advocate', status_code=303)
     secure = request.url.scheme == 'https' or request.headers.get('x-forwarded-proto') == 'https'
-    response.set_cookie(TOKEN_COOKIE, token.strip(), httponly=True, samesite='strict', secure=secure, max_age=30 * 86400)
+    response.set_cookie(TOKEN_COOKIE, session_token, httponly=True, samesite='strict', secure=secure, max_age=max_age)
     return response
 
 @app.post('/advocate/logout', dependencies=[public()])
-def advocate_logout():
+def advocate_logout(request: Request):
     from fastapi.responses import RedirectResponse
+    from .auth import end_session
+    with session() as db:
+        end_session(db, request.cookies.get(TOKEN_COOKIE))
     response = RedirectResponse('/advocate', status_code=303)
     response.delete_cookie(TOKEN_COOKIE)
     return response

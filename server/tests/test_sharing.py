@@ -154,8 +154,14 @@ class ScopedExportTests(unittest.TestCase):
             model.assign(conn, case_id=case_b, target_kind='artifact', target_id=shared, meaning_text=hidden)
             recipient = model.create_principal(conn, 'advocate')
             scope = authz.create_scope(conn, 'case', {'case_id': case_a})
-            authz.grant(conn, recipient, scope, ['export'])
+            authz.grant(conn, recipient, scope, ['export', 'read_metadata', 'read_text'])
             package = sharing.export_scope_package(conn, recipient)
+            metadata_only = model.create_principal(conn, 'metadata reader')
+            authz.grant(conn, metadata_only, authz.create_scope(conn, 'case', {'case_id': case_a}), ['export', 'read_metadata'])
+            without_text = sharing.export_scope_package(conn, metadata_only)
+            export_only = model.create_principal(conn, 'export only')
+            authz.grant(conn, export_only, authz.create_scope(conn, 'case', {'case_id': case_a}), ['export'])
+            nothing = sharing.export_scope_package(conn, export_only)
         result = validate_metadata_package(package)
         self.assertTrue(result['valid'], result['errors'])
         exported = {name: {r['id'] for r in rows} for name, rows in package['tables'].items() if name != 'schema_migrations'}
@@ -169,6 +175,14 @@ class ScopedExportTests(unittest.TestCase):
         self.assertIn({'table': 'artifacts', 'id': shared, 'field': 'source_id', 'reason': 'outside_scope'},
                       package['redacted_references'])
         self.assertFalse(package['scope']['counts_disclosed'])
+        # Export without read_text: rows and identities, no text and no citations; still a valid package.
+        self.assertTrue(validate_metadata_package(without_text)['valid'], validate_metadata_package(without_text)['errors'])
+        self.assertEqual(len(without_text['tables']['artifacts']), 2)
+        self.assertTrue(all(r['text'] is None and r['segments_json'] is None for r in without_text['tables']['derived_text']))
+        self.assertEqual(without_text['tables']['evidence_anchors'], [])
+        self.assertIn('capability', {r['reason'] for r in without_text['redacted_references']})
+        self.assertNotIn('jawne', json.dumps(without_text['tables']['derived_text'], ensure_ascii=False))  # labels are metadata
+        self.assertEqual(nothing['tables']['artifacts'], [])  # export alone does not even reveal metadata
 
 
 if __name__ == '__main__':

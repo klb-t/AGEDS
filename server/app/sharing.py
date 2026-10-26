@@ -38,6 +38,9 @@ REFERENCE_TARGETS = {'case_id': 'cases', 'source_id': 'sources', 'parent_artifac
 INTERNAL_FIELDS = {'artifacts': ('stored_path',), 'jobs': ('lease_token', 'worker_id'),
                    'processing_runs': ('lease_token',)}
 TABLE_KINDS = {table: kind for kind, table in authz.KIND_TABLES.items()}
+# Exporting is a separate capability from reading text: without read_text on a row these
+# columns are nulled and listed. A citation is its quote, so it needs read_text itself.
+TEXT_COLUMNS = {'derived_text': ('text', 'segments_json'), 'events': ('body', 'subject'), 'annotations': ('body',)}
 
 
 def _json(value) -> str:
@@ -203,9 +206,23 @@ def export_scope_package(db: sqlite3.Connection, principal_id: int, *, capabilit
             tables[name] = []  # join tables of tags: tags have no scope before the model
         else:
             tables[name] = [dict(r) for r in db.execute(f'SELECT * FROM {name} ORDER BY {order}')
-                            if gate.allows(kind, r['id'], capability)]
-    exported = {name: {row['id'] for row in rows} for name, rows in tables.items() if name != 'schema_migrations'}
+                            if gate.allows(kind, r['id'], capability) and gate.allows(kind, r['id'], 'read_metadata')]
     redacted = []
+    text_withheld = set()
+    for name, columns in TEXT_COLUMNS.items():
+        kind = TABLE_KINDS[name]
+        for row in tables[name]:
+            if not gate.allows(kind, row['id'], 'read_text'):
+                for column in columns:
+                    if row.get(column) is not None:
+                        row[column] = None
+                        redacted.append({'table': name, 'id': row['id'], 'field': column, 'reason': 'capability'})
+                if name == 'derived_text':
+                    text_withheld.add(row['id'])
+    tables['evidence_anchors'] = [row for row in tables['evidence_anchors']
+                                  if gate.allows('evidence_anchor', row['id'], 'read_text')
+                                  and row['derived_text_id'] not in text_withheld]
+    exported = {name: {row['id'] for row in rows} for name, rows in tables.items() if name != 'schema_migrations'}
     for name, rows in tables.items():
         for row in rows:
             for field in REFERENCES.get(name, ()):
@@ -244,7 +261,8 @@ def export_scope_package(db: sqlite3.Connection, principal_id: int, *, capabilit
         'scope': {'kind': 'principal_export', 'principal_uid': db.execute(
             'SELECT uid FROM principals WHERE id=?', (principal_id,)).fetchone()['uid'],
             'capability': capability, 'coverage_key': gate.coverage(capability).key(),
-            'omitted_categories': ['audit_log', 'tags', 'annotations_without_scope', 'tables_after_metadata_package_v1'],
+            'omitted_categories': ['audit_log', 'tags', 'annotations_without_scope', 'tables_after_metadata_package_v1',
+                                   'text_without_read_text', 'citations_without_read_text'],
             'counts_disclosed': omitted_counts is not None, 'count_disclosure': disclosure},
         'redacted_references': redacted,
     }

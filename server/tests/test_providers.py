@@ -175,8 +175,21 @@ class SummaryTests(ProviderBase):
         with db.session() as conn, self.assertRaises(advocate.AdvocateError):
             advocate.summarize(conn, self.recipient, 'umowa', provider=None)
 
+    def test_summaries_are_private_to_their_creator_by_default(self):
+        self.consent()
+        self.summarize(self.owner, 'umowa najmu poufna')
+        with db.session() as conn:
+            authz.grant(conn, self.recipient, authz.create_scope(conn, 'case', {'case_id': self.case_b}),
+                        ['read_text', 'chat_with_advocate'])
+            self.assertEqual(advocate.visible_summaries(conn, self.recipient), [])
+            self.assertEqual(len(advocate.visible_summaries(conn, self.owner)), 1)
+            with self.assertRaises(authz.SettingWidensAccess):
+                authz.set_setting(conn, 'summary.sharing', 'inputs_readers')
+
     def test_s8_owner_summary_over_two_cases_is_hidden_from_a_single_case_recipient(self):
         self.consent()
+        with db.session() as conn:
+            authz.set_setting(conn, 'summary.sharing', 'inputs_readers', confirm_widening=True)
         summary = self.summarize(self.owner, 'umowa najmu poufna')
         self.assertTrue({e['artifact']['id'] for e in summary['basis'] if 'artifact' in e} >= {self.private_b})
         with db.session() as conn:

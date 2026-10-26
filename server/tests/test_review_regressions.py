@@ -115,7 +115,6 @@ class R1FrozenSnapshotLater(Base):
 
 
 class R2MetadataOnlyLeaksQuestions(Base):
-    @unittest.expectedFailure  # review finding still open (group 2)
     def test_owner_reads_questions_under_metadata_only(self):
         self.grant_case(self.rec, self.case_a, ['read_metadata', 'read_text', 'chat_with_advocate'])
         with db.session() as conn:
@@ -130,8 +129,31 @@ class R2MetadataOnlyLeaksQuestions(Base):
         self.assertNotIn(f'{CANARY}-question', r.text)
 
 
+class R2EveryOwnerVisibilityMode(Base):
+    def test_question_canary_follows_the_mode_fixed_at_start(self):
+        self.grant_case(self.rec, self.case_a, ['read_metadata', 'read_text', 'chat_with_advocate'])
+        expected = {'none': 404, 'metadata_only': 'withheld', 'full': 'shown', 'opt_in_by_recipient': 404, 'custom:x': 404}
+        for mode, outcome in expected.items():
+            with self.subTest(mode=mode):
+                with db.session() as conn:
+                    authz.set_setting(conn, 'conversation.owner_visibility', mode, confirm_widening=True)
+                conv = self.client.post('/api/advocate/conversations', json={}, headers=self.h(self.rec_token)).json()['uid']
+                self.client.post(f'/api/advocate/conversations/{conv}/turns', json={'question': f'najmu {CANARY}-{mode}'},
+                                 headers=self.h(self.rec_token))
+                r = self.client.get(f'/api/advocate/conversations/{conv}', headers=self.h(self.owner_token))
+                if outcome == 404:
+                    self.assertEqual(r.status_code, 404)
+                elif outcome == 'withheld':
+                    turn = r.json()['turns'][0]
+                    self.assertEqual((turn['question'], turn['content_withheld'], turn['answer_count']), (None, True, 1))
+                    self.assertNotIn(CANARY, r.text)
+                else:
+                    self.assertIn(f'{CANARY}-{mode}', r.text)
+                own = self.client.get(f'/api/advocate/conversations/{conv}', headers=self.h(self.rec_token))
+                self.assertIn(f'{CANARY}-{mode}', own.text)  # the recipient always reads their own
+
+
 class R3ExportWithoutReadText(Base):
-    @unittest.expectedFailure  # review finding still open (group 2)
     def test_export_capability_alone_returns_text(self):
         self.grant_case(self.rec, self.case_b, ['export'])
         r = self.client.get('/api/export/scoped', headers=self.h(self.rec_token))
@@ -169,7 +191,6 @@ class R4RejectedAssignmentOpens(Base):
 
 
 class R5ConsentRevocationHistory(Base):
-    @unittest.expectedFailure  # review finding still open (group 2)
     def test_history_resent_after_consent_revoked(self):
         self.grant_case(self.rec, self.case_a, ['read_metadata', 'read_text', 'chat_with_advocate'])
         self.grant_case(self.rec, self.case_b, ['read_metadata', 'read_text', 'chat_with_advocate'])
@@ -191,10 +212,13 @@ class R5ConsentRevocationHistory(Base):
         print('\nR5 requests:', len(rec.requests), '| second mode:', ans['mode'],
               '| case-B canary in 2nd prompt after consent revoked:', CANARY in rec.requests[-1])
         self.assertNotIn(CANARY, rec.requests[-1])
+        with db.session() as conn:
+            refs = json.loads(conn.execute('SELECT input_refs_json FROM provider_calls ORDER BY id DESC LIMIT 1').fetchone()[0])
+            first_refs = json.loads(conn.execute('SELECT input_refs_json FROM provider_calls ORDER BY id LIMIT 1').fetchone()[0])
+        self.assertTrue(all(ref not in refs for ref in first_refs if ref[0] == 'derived_text'))
 
 
 class R6SummaryTopicCrossPrincipal(Base):
-    @unittest.expectedFailure  # review finding still open (group 2)
     def test_summary_topic_visible_to_other_principals(self):
         with db.session() as conn:
             rec2 = model.create_principal(conn, 'recipient2')

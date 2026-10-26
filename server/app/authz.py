@@ -84,6 +84,8 @@ SETTINGS = {
     'denial.reveal_existence': {'order': ['never', 'category_only', 'always']},
     'count_disclosure': {'order': ['none', 'bucketed', 'exact']},
     'shared_source.cross_case_hint': {'order': ['never', 'own_cases_only']},
+    'summary.sharing': {'order': ['creator_only', 'inputs_readers'],
+                        'note': 'applies to summaries created afterwards; each keeps its own'},
     'conversation.owner_visibility': {'order': ['none', 'metadata_only', 'opt_in_by_recipient', 'full'],
                                       'note': 'applies to conversations started afterwards; each keeps its own'},
     'auth.mode': {'order': ['tokens', 'external', 'legacy_open']},
@@ -626,6 +628,13 @@ def homes(db: sqlite3.Connection, kind: str, object_id) -> set:
                                      WHERE t.id=?''', (row['turn_id'],)).fetchone()
         return {_private(conversation, 'content'), _inputs(row['derived_scope_json'])}
     if kind == 'derived_state':
+        transformation = json.loads(row['transformation_json'] or '{}')
+        if row['kind'] == 'advocate_summary' and transformation.get('sharing', 'creator_only') != 'inputs_readers':
+            # The topic is the creator's own query: private like a conversation, under the
+            # owner-visibility mode fixed when it was created. Older rows default to private.
+            mode = transformation.get('owner_visibility', 'none')
+            return {('private', row['created_by_principal_id'], 'content', mode if isinstance(mode, str) else 'none'),
+                    _inputs(row['input_refs_json'])}
         # Shareable with whoever can read every input, and only then.
         return own | {('anyone',), _inputs(row['input_refs_json'])}
     if kind == 'case_relation':

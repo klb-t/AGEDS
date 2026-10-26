@@ -195,6 +195,15 @@ class VertexProvider:
                 raise ProviderUnavailable('no provider consent covers this material')
         if not basis:
             raise ProviderUnavailable('no readable passages match the question')
+        # Earlier answers re-enter the prompt only while consent covers every input they quoted.
+        consented_history, history_refs = [], set()
+        for turn in history:
+            answers = [a for a in turn['answers'] if not a.get('unavailable')]
+            scope = [tuple(item) for a in answers for item in a.get('derived_scope', [])]
+            if answers and all(authz.covered_by(db, consent, kind, object_id) for kind, object_id in scope):
+                consented_history.append(turn)
+                history_refs |= set(scope)
+        history = consented_history
         body = self.build_request(question, basis, history)
         raw = json.dumps(body, ensure_ascii=False, sort_keys=True)
         worst = _cost(self.config, len(raw) / self.config['chars_per_token'], self.config['max_output_tokens'])
@@ -202,7 +211,7 @@ class VertexProvider:
         if spent_today_eur(db) + worst > budget:
             raise ProviderUnavailable(f'daily budget {budget} EUR would be exceeded')
         started = _now()
-        refs = sorted({tuple(e['object']) for e in basis})
+        refs = sorted({tuple(e['object']) for e in basis} | history_refs)
         log_content = authz.get_setting(db, 'advocate.log_prompt_content', False) is True
         status, error, usage, claims = 'ok', None, {}, None
         try:

@@ -304,6 +304,12 @@ def conversation_history(db: sqlite3.Connection, principal_id: int, conversation
     conversation = _conversation(db, gate, conversation_uid)
     turns = []
     for turn in db.execute('SELECT * FROM advocate_turns WHERE conversation_id=? ORDER BY id', (conversation['id'],)):
+        if not authz.ContentGate.allows(gate, 'advocate_turn', turn['id'], 'read_text'):
+            # metadata_only: the turn exists and when, never what was asked or answered.
+            count = db.execute('SELECT count(*) FROM advocate_answers WHERE turn_id=?', (turn['id'],)).fetchone()[0]
+            turns.append({'turn_uid': turn['uid'], 'created_at': turn['created_at'], 'question': None,
+                          'content_withheld': True, 'answer_count': count, 'answers': []})
+            continue
         item = {'turn_uid': turn['uid'], 'question': turn['question'], 'created_at': turn['created_at'], 'answers': []}
         for answer in db.execute('SELECT * FROM advocate_answers WHERE turn_id=? ORDER BY id', (turn['id'],)):
             readable = authz.visible(db, principal_id, 'advocate_answer', answer['id'], 'read_text') and all(
@@ -313,6 +319,9 @@ def conversation_history(db: sqlite3.Connection, principal_id: int, conversation
                                         'claims': json.loads(answer['claims_json']),
                                         'verification': json.loads(answer['verification_json']),
                                         'basis_sha256': answer['basis_sha256'], 'created_at': answer['created_at']})
+                if for_prompt:
+                    # The provider re-checks consent for exactly these inputs before resending them.
+                    item['answers'][-1]['derived_scope'] = json.loads(answer['derived_scope_json'])
             else:
                 item['answers'].append({'answer_uid': answer['uid'], 'unavailable': True,
                                         'reason': 'material_no_longer_available'})
@@ -384,7 +393,9 @@ def summarize(db: sqlite3.Connection, principal_id: int, topic: str, *, provider
     stored = record_derived_state(db, principal_id, 'advocate_summary',
                                   {'topic': topic, 'claims': claims, 'basis': basis, 'verification': verification},
                                   [tuple(item) for item in scope],
-                                  transformation={'provider': provider.name, 'model': provider.config['model']},
+                                  transformation={'provider': provider.name, 'model': provider.config['model'],
+                                                  'sharing': authz.get_setting(db, 'summary.sharing', 'creator_only'),
+                                                  'owner_visibility': authz.get_setting(db, 'conversation.owner_visibility', 'none')},
                                   provider_call_id=call_id)
     return {'uid': stored['uid'], 'topic': topic, 'claims': claims, 'basis': basis, 'verification': verification}
 
@@ -394,8 +405,10 @@ def visible_summaries(db: sqlite3.Connection, principal_id: int) -> list[dict]:
     result = []
     for row in gate.list('derived_state', 'read_text', where="WHERE kind='advocate_summary'"):
         content = json.loads(row['content_json'])
+        # Cross-case hints were computed from the creator's view; never pass them on.
+        basis = [{k: v for k, v in entry.items() if k != 'also_in_cases'} for entry in content['basis']]
         result.append({'uid': row['uid'], 'topic': content['topic'], 'claims': content['claims'],
-                       'basis': content['basis'], 'created_at': row['created_at'],
+                       'basis': basis, 'created_at': row['created_at'], 'own': row['created_by_principal_id'] == principal_id,
                        'model': json.loads(row['transformation_json']).get('model')})
     return result
 

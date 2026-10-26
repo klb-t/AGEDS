@@ -43,7 +43,7 @@ class VoiceTests(AdvocateFixture):
 
     def calls(self, purpose):
         with db.session() as conn:
-            return [dict(r) for r in conn.execute('SELECT * FROM provider_calls WHERE purpose=?', (purpose,))]
+            return [dict(r) for r in conn.execute("SELECT * FROM provider_calls WHERE purpose=? AND status<>'reserved'", (purpose,))]
 
     def answer(self, principal=None, question='umowa najmu'):
         principal = principal or self.recipient
@@ -83,7 +83,7 @@ class VoiceTests(AdvocateFixture):
         self.assertNotIn(HIDDEN, ''.join(self.fake.tts_requests))
         self.assertIn('Umowa najmu', self.fake.tts_requests[0])
         call = self.calls('text_to_speech')[0]
-        self.assertGreater(call['cost_eur'], 0)
+        self.assertGreater(json.loads(call['cost_basis_json'])['actual_eur'], 0)
         with db.session() as conn:
             stranger = model.create_principal(conn, 'obcy')
             authz.grant(conn, stranger, authz.create_scope(conn, 'case', {'case_id': self.case_b}), ['chat_with_advocate'])

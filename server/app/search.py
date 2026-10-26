@@ -154,7 +154,8 @@ def _cache_key(db, gate):
     """Per principal, per effective coverage and per data generation; never shared."""
     from .authz import data_generation
     import os
-    covers = tuple(gate.coverage(capability).key() for capability in ('read_text', 'chat_with_advocate'))
+    # read_metadata decides whether a title may name its artifact, so it is part of the key.
+    covers = tuple(gate.coverage(capability).key() for capability in ('read_text', 'chat_with_advocate', 'read_metadata'))
     path = next((row[2] for row in db.execute('PRAGMA database_list') if row[1] == 'main'), '') or ''
     try:
         identity = (path, os.stat(path).st_ino, os.stat(path).st_dev)

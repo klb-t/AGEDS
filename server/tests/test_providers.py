@@ -49,8 +49,13 @@ class ProviderBase(AdvocateFixture):
             return advocate.ask(conn, principal, conversation, question, provider=provider)
 
     def calls(self):
+        """Settlement rows; each call also has a 'reserved' row booked before any I/O."""
         with db.session() as conn:
-            return [dict(r) for r in conn.execute('SELECT * FROM provider_calls ORDER BY id')]
+            return [dict(r) for r in conn.execute("SELECT * FROM provider_calls WHERE status<>'reserved' ORDER BY id")]
+
+    def spent(self):
+        with db.session() as conn:
+            return providers.spent_today_eur(conn)
 
 
 class ProviderTests(ProviderBase):
@@ -100,7 +105,9 @@ class ProviderTests(ProviderBase):
         call = self.calls()[-1]
         self.assertIsNone(call['prompt_content'])
         self.assertEqual((call['input_tokens'], call['output_tokens'], call['status']), (1200, 150, 'ok'))
-        self.assertAlmostEqual(call['cost_eur'], (1200 * 1.5 + 150 * 9.0) / 1e6)
+        self.assertAlmostEqual(json.loads(call['cost_basis_json'])['actual_eur'], (1200 * 1.5 + 150 * 9.0) / 1e6)
+        with db.session() as conn:  # reservation + settlement = actual, per account
+            self.assertAlmostEqual(providers.spent_today_eur(conn, self.recipient), (1200 * 1.5 + 150 * 9.0) / 1e6)
 
     def test_history_in_prompt_is_reauthorized(self):
         self.consent()
@@ -134,10 +141,12 @@ class ProviderTests(ProviderBase):
         failed = self.ask_with(Recorder(error='Vertex HTTP 500: synthetic'))
         never_sent = self.ask_with(Recorder(error='no Google credentials (metadata server or gcloud)'))
         calls = self.calls()
-        self.assertGreater(calls[0]['cost_eur'], 0)
+        actual = [json.loads(c['cost_basis_json'])['actual_eur'] for c in calls]
+        self.assertGreater(actual[0], 0)
         self.assertEqual(json.loads(calls[0]['cost_basis_json'])['usage_reported'], False)
-        self.assertEqual((calls[1]['status'], calls[1]['cost_eur'] > 0), ('error', True))
-        self.assertEqual(calls[2]['cost_eur'], 0.0)
+        self.assertEqual((calls[1]['status'], actual[1] > 0), ('error', True))
+        self.assertEqual(actual[2], 0.0)
+        self.assertAlmostEqual(self.spent(), sum(actual))
         self.assertEqual(failed['mode'], 'retrieval_only')
         self.assertIn('HTTP 500', failed['verification']['provider_fallback'])
         self.assertEqual(never_sent['mode'], 'retrieval_only')

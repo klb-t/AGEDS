@@ -75,10 +75,6 @@ class N2ExportMetadataCarriesBody(Base):
         r = self.client.get('/api/export/scoped', headers=self.h(self.rec_token))
         payload = r.json()
         events = payload['tables']['events']
-        print('\nN2 export status', r.status_code, '| events exported:', len(events),
-              '| body nulled:', all(e['body'] is None for e in events),
-              '| canary in events.metadata_json:', any(f'{CANARY}-sms-body' in (e['metadata_json'] or '') for e in events),
-              '| canary in artifacts/search title etc:', f'{CANARY}-sms-body' in json.dumps(payload['tables']['artifacts']))
         self.assertTrue(events)
         self.assertTrue(all(e['body'] is None for e in events))
         self.assertFalse(any(f'{CANARY}-sms-body' in (e['metadata_json'] or '') for e in events))
@@ -158,7 +154,6 @@ class N4AskHoldsWriteLock(Base):
             p = providers.configured_provider(conn, self.rec); p.transport = slow
             advocate.ask(conn, self.rec, conv, 'jawna', provider=p)
         t.join()
-        print('\nN4 concurrent writer during provider call:', result)
         self.assertEqual(result['writer'], 'ok')
 
 
@@ -264,6 +259,122 @@ class N7InjectedProvenClaim(Base):
             conv = advocate.start_conversation(conn, self.rec)['uid']
             p = providers.configured_provider(conn, self.rec); p.transport = obedient
             ans = advocate.ask(conn, self.rec, conv, 'jawna', provider=p)
-        print('\nN7 stored claim:', ans['claims'][0]['status'], ans['claims'][0]['citations'],
-              '| removed:', ans['verification']['removed_citations'])
         self.assertEqual(ans['claims'][0]['status'], 'claim')
+
+
+class N8RangeRequestsDoNotRehash(Base):
+    def test_second_open_reuses_verified_digests_and_tampering_is_still_caught(self):
+        from server.app import verified_media
+        verified_media._verified_chunks.clear()
+        with db.session() as conn:
+            row = conn.execute('SELECT stored_path, sha256, size_bytes FROM artifacts WHERE id=?', (self.art_a,)).fetchone()
+        reads = []
+        original = verified_media.VerifiedMedia._read_exact
+        def counting(media, offset, size):
+            reads.append(size)
+            return original(media, offset, size)
+        verified_media.VerifiedMedia._read_exact = counting
+        try:
+            first = verified_media.VerifiedMedia(row['stored_path'], row['sha256'], row['size_bytes'], store_root=self.settings.store_dir)
+            after_first = len(reads)
+            second = verified_media.VerifiedMedia(row['stored_path'], row['sha256'], row['size_bytes'], store_root=self.settings.store_dir)
+            self.assertEqual(len(reads), after_first)  # no full re-read
+            self.assertEqual(second.read_chunk(0), first.read_chunk(0))
+        finally:
+            verified_media.VerifiedMedia._read_exact = original
+            first.close(); second.close()
+        # Same size and restored times, different bytes: the served chunk check still refuses it.
+        import os
+        path = Path(row['stored_path'])
+        info = os.stat(path)
+        os.chmod(path, 0o644)
+        path.write_bytes(b'X' * info.st_size)
+        os.utime(path, ns=(info.st_atime_ns, info.st_mtime_ns))
+        try:
+            media = verified_media.VerifiedMedia(row['stored_path'], row['sha256'], row['size_bytes'], store_root=self.settings.store_dir)
+            with self.assertRaises(verified_media.MediaIntegrityError):
+                media.read_chunk(0)
+            media.close()
+        except verified_media.MediaIntegrityError:
+            pass  # ctime changed, so the full check ran again and refused it: also correct
+
+
+class N9MetadataResidue(Base):
+    def test_snapshot_recipient_does_not_see_later_processing(self):
+        from server.app import sharing
+        with db.session() as conn:
+            package = sharing.create_package(conn, 'p')
+            sharing.add_item(conn, package['id'], 'artifact', self.art_a)
+            sharing.snapshot_package(conn, package['id'])
+            authz.grant(conn, self.rec, package['scope_id'], ['read_metadata', 'read_text'])
+            conn.execute("INSERT INTO jobs(kind, artifact_id, status, priority) VALUES('transcribe', ?, 'running', 99)", (self.art_a,))
+        listed = self.client.get('/api/artifacts', headers=self.h(self.rec_token)).json()
+        row = next(r for r in listed if r['id'] == self.art_a)
+        self.assertEqual((row['transcriptStatus'], row['queuedPriority']), ('done', None))
+        owner = next(r for r in self.client.get('/api/artifacts', headers=self.h(self.owner_token)).json() if r['id'] == self.art_a)
+        self.assertEqual(owner['transcriptStatus'], 'running')
+
+    def test_conversation_title_follows_content_visibility(self):
+        self.grant_case(self.rec, self.case_a, ['read_metadata', 'read_text', 'chat_with_advocate'])
+        for mode, shown in (('metadata_only', False), ('full', True)):
+            with self.subTest(mode=mode):
+                with db.session() as conn:
+                    authz.set_setting(conn, 'conversation.owner_visibility', mode, confirm_widening=True)
+                self.client.post('/api/advocate/conversations', json={'title': f'{CANARY}-{mode}'}, headers=self.h(self.rec_token))
+                listed = self.client.get('/api/advocate/conversations?others=true', headers=self.h(self.owner_token)).text
+                self.assertEqual(f'{CANARY}-{mode}' in listed, shown)
+
+    def test_search_cache_key_covers_read_metadata(self):
+        from server.app import search
+        with db.session() as conn:
+            gate = authz.ContentGate(conn, self.rec)
+            key = search._cache_key(conn, gate)
+        self.assertEqual(len(key[3]), 3)
+
+
+class N10BudgetReservation(Base):
+    def setUp(self):
+        super().setUp()
+        self.grant_case(self.rec, self.case_a, ['read_metadata', 'read_text', 'chat_with_advocate'])
+        with db.session() as conn:
+            authz.set_setting(conn, 'advocate.provider', {'type': 'vertex_gemini', 'project': 'synthetic'})
+            providers.record_consent(conn, 'vertex', authz.create_scope(conn, 'installation', {}), granted_by='owner', basis_text='t')
+
+    def test_concurrent_calls_cannot_overshoot_the_budget(self):
+        with db.session() as conn:
+            p = providers.configured_provider(conn, self.rec)
+            body = p.build_request('jawna', [{'ref': 'p1', 'kind': 'transcript_segment', 'object': ['derived_text', 1],
+                                               'text': 'umowa najmu jawna'}], [])
+            raw = json.dumps(body, ensure_ascii=False, sort_keys=True)
+            worst = providers._cost(p.config, len(raw) / p.config['chars_per_token'], p.config['max_output_tokens'])
+            authz.set_setting(conn, 'advocate.daily_budget_eur', worst * 1.5)  # room for exactly one call
+        sent, results = [], []
+        gate = threading.Event()
+        def slow(config, body):
+            sent.append(1)
+            gate.wait(3)
+            return Recorder()(config, body)
+        def worker():
+            with db.session() as conn:
+                conv = advocate.start_conversation(conn, self.rec)['uid']
+                conn.commit()
+                prov = providers.configured_provider(conn, self.rec); prov.transport = slow
+                results.append(advocate.ask(conn, self.rec, conv, 'jawna', provider=prov)['mode'])
+        threads = [threading.Thread(target=worker) for _ in range(4)]
+        for t in threads: t.start()
+        time.sleep(1.5); gate.set()
+        for t in threads: t.join()
+        self.assertEqual(len(sent), 1)
+        self.assertEqual(sorted(results).count('provider:vertex'), 1)
+        with db.session() as conn:
+            self.assertLessEqual(providers.spent_today_eur(conn), worst * 1.5)
+
+    def test_per_principal_budget(self):
+        with db.session() as conn:
+            authz.set_setting(conn, 'advocate.daily_budget_per_principal_eur', 0.0)
+            conv = advocate.start_conversation(conn, self.rec)['uid']
+            conn.commit()
+            p = providers.configured_provider(conn, self.rec); p.transport = Recorder()
+            answer = advocate.ask(conn, self.rec, conv, 'jawna', provider=p)
+        self.assertEqual(answer['mode'], 'retrieval_only')
+        self.assertIn('for this account', answer['verification']['provider_fallback'])

@@ -124,8 +124,6 @@ class R2MetadataOnlyLeaksQuestions(Base):
                          headers=self.h(self.rec_token))
         listed = self.client.get('/api/advocate/conversations?others=true', headers=self.h(self.owner_token)).json()
         r = self.client.get(f'/api/advocate/conversations/{conv}', headers=self.h(self.owner_token))
-        print('\nR2 owner lists:', [c['uid'] == conv for c in listed], '| history status', r.status_code,
-              '| question visible to owner:', f'{CANARY}-question' in r.text)
         self.assertNotIn(f'{CANARY}-question', r.text)
 
 
@@ -158,8 +156,6 @@ class R3ExportWithoutReadText(Base):
         self.grant_case(self.rec, self.case_b, ['export'])
         r = self.client.get('/api/export/scoped', headers=self.h(self.rec_token))
         t = self.client.get(f'/api/artifacts/{self.art_b}/transcript', headers=self.h(self.rec_token))
-        print('\nR3 export status', r.status_code, '| canary in export:', CANARY in r.text,
-              '| transcript route (read_text) status:', t.status_code)
         self.assertNotIn(CANARY, r.text)
 
 
@@ -209,8 +205,6 @@ class R5ConsentRevocationHistory(Base):
             providers.revoke_consent(conn, consents[self.case_b], actor='owner')
             p = providers.configured_provider(conn, self.rec); p.transport = rec
             ans = advocate.ask(conn, self.rec, conv, 'jawna', provider=p)  # matches only case A text
-        print('\nR5 requests:', len(rec.requests), '| second mode:', ans['mode'],
-              '| case-B canary in 2nd prompt after consent revoked:', CANARY in rec.requests[-1])
         self.assertNotIn(CANARY, rec.requests[-1])
         with db.session() as conn:
             refs = json.loads(conn.execute('SELECT input_refs_json FROM provider_calls ORDER BY id DESC LIMIT 1').fetchone()[0])
@@ -233,8 +227,6 @@ class R6SummaryTopicCrossPrincipal(Base):
             advocate.summarize(conn, self.rec, f'jawna {CANARY}-private-strategy', provider=prov)
         r2 = self.client.get('/api/advocate/summaries', headers=self.h(tok2))
         ro = self.client.get('/api/advocate/summaries', headers=self.h(self.owner_token))
-        print('\nR6 owner_visibility default none; topic visible to recipient2:', f'{CANARY}-private-strategy' in r2.text,
-              '| to owner:', f'{CANARY}-private-strategy' in ro.text)
         self.assertNotIn(f'{CANARY}-private-strategy', r2.text)
         self.assertNotIn(f'{CANARY}-private-strategy', ro.text)
 

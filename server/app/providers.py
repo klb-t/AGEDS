@@ -91,10 +91,45 @@ def consent_coverage(db: sqlite3.Connection, provider_name: str) -> authz.Covera
     return authz.scope_coverage(db, scopes)
 
 
-def spent_today_eur(db: sqlite3.Connection) -> float:
+def spent_today_eur(db: sqlite3.Connection, principal_id: int | None = None) -> float:
+    """Booked plus reserved spend of the UTC day (reservations are settled by later rows)."""
     day = datetime.now(timezone.utc).date().isoformat()
-    row = db.execute('SELECT COALESCE(SUM(cost_eur),0) FROM provider_calls WHERE substr(started_at,1,10)=?', (day,)).fetchone()
-    return float(row[0])
+    sql = 'SELECT COALESCE(SUM(cost_eur),0) FROM provider_calls WHERE substr(started_at,1,10)=?'
+    params = [day]
+    if principal_id is not None:
+        sql += ' AND principal_id=?'
+        params.append(principal_id)
+    return float(db.execute(sql, params).fetchone()[0])
+
+
+def reserve(db: sqlite3.Connection, principal_id: int, worst: float, *, provider: str, model: str,
+            purpose: str, digest_source: str, refs) -> dict:
+    """Check the budgets and book the worst case before any network call, atomically.
+
+    The check and the reservation share one IMMEDIATE transaction, so concurrent calls
+    cannot each pass the same remaining budget. The reservation is committed before
+    I/O; settle() later books the difference to the actual cost.
+    """
+    db.commit()
+    db.execute('BEGIN IMMEDIATE')
+    try:
+        budget = authz.get_setting(db, 'advocate.daily_budget_eur', 1.0)
+        if spent_today_eur(db) + worst > budget:
+            raise ProviderUnavailable(f'daily budget {budget} EUR would be exceeded')
+        own = authz.get_setting(db, 'advocate.daily_budget_per_principal_eur', None)
+        if isinstance(own, (int, float)) and spent_today_eur(db, principal_id) + worst > own:
+            raise ProviderUnavailable(f'daily budget {own} EUR for this account would be exceeded')
+        started = _now()
+        uid = new_uid()
+        db.execute('''INSERT INTO provider_calls(uid,provider_name,model,principal_id,purpose,prompt_sha256,
+            input_refs_json,status,cost_eur,cost_basis_json,started_at) VALUES(?,?,?,?,?,?,?,'reserved',?,?,?)''',
+            (uid, provider, model, principal_id, purpose, hashlib.sha256(digest_source.encode()).hexdigest(),
+             json.dumps([list(r) for r in refs]), worst, json.dumps({'worst_case_eur': worst}), started))
+        db.commit()
+    except BaseException:
+        db.rollback()
+        raise
+    return {'uid': uid, 'started': started, 'worst': worst}
 
 
 def _cost(config: dict, input_tokens: float, output_tokens: float) -> float:
@@ -213,11 +248,10 @@ class VertexProvider:
         body = self.build_request(question, basis, history)
         raw = json.dumps(body, ensure_ascii=False, sort_keys=True)
         worst = _cost(self.config, len(raw) / self.config['chars_per_token'], self.config['max_output_tokens'])
-        budget = authz.get_setting(db, 'advocate.daily_budget_eur', 1.0)
-        if spent_today_eur(db) + worst > budget:
-            raise ProviderUnavailable(f'daily budget {budget} EUR would be exceeded')
-        started = _now()
         refs = sorted({tuple(e['object']) for e in basis} | history_refs)
+        reservation = reserve(db, self.principal_id, worst, provider=self.name, model=self.config['model'],
+                              purpose='advocate_answer', digest_source=raw, refs=refs)
+        started = reservation['started']
         log_content = authz.get_setting(db, 'advocate.log_prompt_content', False) is True
         status, error, usage, claims = 'ok', None, {}, None
         try:
@@ -236,18 +270,15 @@ class VertexProvider:
         never_sent = status == 'error' and error.startswith(NOT_SENT)
         cost = (_cost(self.config, usage['promptTokenCount'], usage['candidatesTokenCount']) if known
                 else 0.0 if never_sent else worst)
-        cur = db.execute('''INSERT INTO provider_calls(uid,provider_name,model,principal_id,purpose,prompt_sha256,
-            input_refs_json,prompt_content,status,error,input_tokens,output_tokens,cached_tokens,cost_eur,
-            cost_basis_json,started_at,finished_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
-            (new_uid(), self.name, self.config['model'], self.principal_id, 'advocate_answer',
-             hashlib.sha256(raw.encode()).hexdigest(), json.dumps([list(r) for r in refs]),
-             raw if log_content else None, status, error, usage.get('promptTokenCount'),
-             usage.get('candidatesTokenCount'), usage.get('cachedContentTokenCount'), cost,
-             json.dumps({'usage_reported': known, 'price': self.config['price_usd_per_million'],
-                         'eur_per_usd': self.config['eur_per_usd'], 'worst_case_eur': worst}), started, _now()))
+        call = _book(db, self.name, self.config['model'], self.principal_id, 'advocate_answer', raw, refs, status,
+                     error, usage, cost - worst,
+                     {'usage_reported': known, 'price': self.config['price_usd_per_million'],
+                      'eur_per_usd': self.config['eur_per_usd'], 'worst_case_eur': worst, 'actual_eur': cost,
+                      'settles_reservation': reservation['uid']}, started,
+                     prompt_content=raw if log_content else None)
         if status == 'error':
             raise ProviderUnavailable(error)
-        return claims, int(cur.lastrowid)
+        return claims, call
 
 
 def configured_provider(db: sqlite3.Connection, principal_id: int):
@@ -287,12 +318,13 @@ def tts_transport(config: dict, body: dict) -> dict:
 
 
 def _book(db, provider: str, model: str, principal_id: int, purpose: str, raw: str, refs, status: str,
-          error, usage: dict, cost: float, basis: dict, started: str) -> int:
+          error, usage: dict, cost: float, basis: dict, started: str, *, prompt_content: str | None = None) -> int:
+    """Settlement row: cost is the difference to the reservation, so the day's sum is the actual spend."""
     cur = db.execute('''INSERT INTO provider_calls(uid,provider_name,model,principal_id,purpose,prompt_sha256,
         input_refs_json,prompt_content,status,error,input_tokens,output_tokens,cached_tokens,cost_eur,
-        cost_basis_json,started_at,finished_at) VALUES(?,?,?,?,?,?,?,NULL,?,?,?,?,?,?,?,?,?)''',
+        cost_basis_json,started_at,finished_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
         (new_uid(), provider, model, principal_id, purpose, hashlib.sha256(raw.encode()).hexdigest(),
-         json.dumps([list(r) for r in refs]), status, error, usage.get('promptTokenCount'),
+         json.dumps([list(r) for r in refs]), prompt_content, status, error, usage.get('promptTokenCount'),
          usage.get('candidatesTokenCount'), usage.get('cachedContentTokenCount'), cost, json.dumps(basis), started, _now()))
     return int(cur.lastrowid)
 
@@ -305,11 +337,6 @@ class VoiceProvider:
     stt: object = vertex_transport
     tts: object = tts_transport
 
-    def _budget(self, db, worst: float) -> None:
-        budget = authz.get_setting(db, 'advocate.daily_budget_eur', 1.0)
-        if spent_today_eur(db) + worst > budget:
-            raise ProviderUnavailable(f'daily budget {budget} EUR would be exceeded')
-
     def transcribe(self, db: sqlite3.Connection, audio: bytes, mime: str, *, speaker_consent: bool) -> dict:
         """The speaker's own recording; sent only with the speaker's explicit consent for this request."""
         if speaker_consent is not True:
@@ -319,12 +346,13 @@ class VoiceProvider:
             raise ProviderUnavailable('unsupported or oversized recording')
         stt_config = {**self.config, 'model': self.config['stt_model']}
         worst = _cost(stt_config, self.config['stt_worst_case_tokens'], 1000)
-        self._budget(db, worst)
+        reservation = reserve(db, self.principal_id, worst, provider=self.config['name'], model=stt_config['model'],
+                              purpose='speech_to_text', digest_source=hashlib.sha256(audio).hexdigest(), refs=[])
         import base64
         body = {'contents': [{'role': 'user', 'parts': [
             {'inlineData': {'mimeType': base_mime, 'data': base64.b64encode(audio).decode()}}, {'text': STT_PROMPT}]}],
             'generationConfig': {'temperature': 0.0, 'maxOutputTokens': 1000}}
-        started, status, error, usage, text = _now(), 'ok', None, {}, ''
+        started, status, error, usage, text = reservation['started'], 'ok', None, {}, ''
         try:
             response = self.stt(stt_config, body)
             usage = response.get('usageMetadata', {})
@@ -337,8 +365,9 @@ class VoiceProvider:
         cost = _cost(stt_config, usage['promptTokenCount'], usage['candidatesTokenCount']) if known else (
             0.0 if status == 'error' and error.startswith(NOT_SENT) else worst)
         call = _book(db, self.config['name'], stt_config['model'], self.principal_id, 'speech_to_text',
-                     hashlib.sha256(audio).hexdigest(), [], status, error, usage, cost,
-                     {'usage_reported': known, 'speaker_consent': True, 'audio_bytes': len(audio)}, started)
+                     hashlib.sha256(audio).hexdigest(), [], status, error, usage, cost - worst,
+                     {'usage_reported': known, 'speaker_consent': True, 'audio_bytes': len(audio), 'actual_eur': cost,
+                      'settles_reservation': reservation['uid']}, started)
         if status == 'error':
             raise ProviderUnavailable(error)
         return {'text': text, 'provider_call': call, 'note': 'machine transcription of your question; check it before asking'}
@@ -361,11 +390,13 @@ class VoiceProvider:
             raise ProviderUnavailable('the answer has no text to read')
         price = self.config['tts_price_usd_per_million_chars']
         cost = len(text) * price / 1_000_000 * self.config['eur_per_usd']
-        self._budget(db, cost)
+        refs = sorted(tuple(item) for item in scope)
+        reservation = reserve(db, self.principal_id, cost, provider='google_tts', model=self.config['tts_voice'],
+                              purpose='text_to_speech', digest_source=text, refs=refs)
         body = {'input': {'text': text}, 'voice': {'languageCode': self.config['tts_language'],
                                                    'name': self.config['tts_voice']},
                 'audioConfig': {'audioEncoding': 'MP3'}}
-        started, status, error, audio = _now(), 'ok', None, b''
+        started, status, error, audio = reservation['started'], 'ok', None, b''
         try:
             import base64
             audio = base64.b64decode(self.tts(self.config, body)['audioContent'])
@@ -373,11 +404,11 @@ class VoiceProvider:
             status, error = 'error', str(exc)
         except (KeyError, TypeError, ValueError) as exc:
             status, error = 'error', f'unexpected response shape: {type(exc).__name__}'
-        _book(db, 'google_tts', self.config['tts_voice'], self.principal_id, 'text_to_speech', text,
-              sorted(tuple(item) for item in scope), status, error, {},
-              0.0 if status == 'error' and error.startswith(NOT_SENT) else cost,
-              {'characters': len(text), 'price_usd_per_million_chars': price, 'source': self.config['tts_price_source']},
-              started)
+        actual = 0.0 if status == 'error' and error.startswith(NOT_SENT) else cost
+        _book(db, 'google_tts', self.config['tts_voice'], self.principal_id, 'text_to_speech', text, refs, status, error,
+              {}, actual - cost,
+              {'characters': len(text), 'price_usd_per_million_chars': price, 'source': self.config['tts_price_source'],
+               'actual_eur': actual, 'settles_reservation': reservation['uid']}, started)
         if status == 'error':
             raise ProviderUnavailable(error)
         return audio

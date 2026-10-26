@@ -81,6 +81,20 @@ characters) is unverified. An avatar is not implemented.
 - Browser login issues a separate session secret valid `auth.session_hours` (preset 12); logout revokes it. API
   tokens may get `--expires-days`.
 
+## After the second review pass (2026-10-26)
+
+- Browser sessions are bound to their API token: they end with it, never outlive it and cannot start new sessions.
+- `legacy_open` serves only clients in `http.legacy_open_clients` (seed: loopback; the deploy script adds the docker
+  bridge for the host-side proxy). Any remote client needs `auth.mode=tokens`.
+- Only a conversation's own principal may ask in it; turns record who asked.
+- Export without `read_text` keeps an allow-list of metadata columns; everything else is nulled and listed.
+- A model's `proven` must quote the cited passage verbatim (`advocate.proven_policy`, preset
+  `require_verbatim_quote`); passages are marked as data in the prompt; the page shows the cited passage under a claim.
+- No database transaction is held across a provider call; the worst case is reserved before the call
+  (`advocate.daily_budget_eur`, optional `advocate.daily_budget_per_principal_eur`) and settled after it.
+- Assignments without a status from non-human authors are `ai_proposed` and open nothing.
+- Verified media digests are cached per file identity; every served chunk is still checked.
+
 ## Limits to tell the recipient
 
 - Retrieval is lexical (word prefixes over stored text). It finds no synonyms and no meaning without matching words.

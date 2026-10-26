@@ -288,8 +288,14 @@ def api_artifacts(limit:int=Query(500,ge=1,le=10000),access:Access=scoped('read_
                 latest = visible_texts[0] if visible_texts else None
                 d['transcript_language'] = latest['language'] if latest else None
                 d['transcript_preview'] = latest['preview'] if latest and gate.allows('derived_text', latest['id'], 'read_text') else None
-                if d['transcript_status'] == 'done' and not visible_texts:
-                    d['transcript_status'] = 'none'
+                # Processing state only from jobs this reader may see (a frozen snapshot hides later runs).
+                jobs = [j for j in db.execute("SELECT id,status,priority FROM jobs WHERE artifact_id=? AND kind='transcribe' ORDER BY id DESC",(d['id'],))
+                        if gate.allows('job', j['id'], 'read_metadata')]
+                statuses = {j['status'] for j in jobs}
+                d['transcript_status'] = ('running' if 'running' in statuses else 'queued' if 'queued' in statuses
+                                          else 'failed' if jobs and jobs[0]['status'] == 'failed'
+                                          else 'done' if visible_texts else 'none')
+                d['queued_priority'] = jobs[0]['priority'] if jobs else None
             out.append({
                 'id':d['id'],'originalName':d['original_name'],'mimeType':d['mime_type'],'sizeBytes':d['size_bytes'],
                 'sha256':d['sha256'],'createdAt':d['created_at'],'sourceLocator':d['source_locator'],
@@ -583,8 +589,15 @@ def api_advocate_conversations(others: bool = False, access: Access = scoped('ch
             return [dict(r) for r in db.execute(
                 'SELECT uid,title,settings_json,created_at FROM conversations WHERE principal_id=? ORDER BY id DESC', (principal,))]
         gate = ContentGate(db, principal)
-        return [{'uid': r['uid'], 'title': r['title'], 'settings_json': r['settings_json'], 'created_at': r['created_at']}
-                for r in gate.list('conversation', 'read_metadata', where='WHERE principal_id<>?', params=(principal,))]
+        rows = gate.list('conversation', 'read_metadata', where='WHERE principal_id<>?', params=(principal,))
+        # A title is the recipient's own words: shown only where the content itself may be read.
+        return [{'uid': r['uid'], 'created_at': r['created_at'], 'settings_json': r['settings_json'],
+                 'title': r['title'] if authz_visible(db, principal, r) else None} for r in rows]
+
+def authz_visible(db, principal, conversation_row) -> bool:
+    from .authz import _private
+    from .authz import coverage as _coverage
+    return _coverage(db, principal, 'read_text').covers(_private(conversation_row, 'content'))
 
 class ShareIn(BaseModel):
     model_config = ConfigDict(extra='forbid')

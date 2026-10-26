@@ -69,6 +69,13 @@ def _open(path, store_root=None):
         os.close(directory)
 
 
+# Full-file verification is costly; its per-chunk digests are kept per file identity
+# (device, inode, size, mtime, ctime) and recorded SHA-256. Any change to the file
+# changes the key and forces a new full check; served chunks are always re-hashed.
+VERIFIED_CACHE_ENTRIES = 64
+_verified_chunks: dict = {}
+
+
 class VerifiedMedia:
     """One retained descriptor and compact SHA256 digests for bounded chunks."""
     def __init__(self, path, expected_sha256, expected_size, *, store_root=None):
@@ -90,6 +97,11 @@ class VerifiedMedia:
                 raise MediaUnavailable('stored content is not a regular file')
             if info.st_size != self.size:
                 raise MediaIntegrityError('stored content byte count differs')
+            key = (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns, expected_sha256)
+            cached = _verified_chunks.get(key)
+            if cached is not None:
+                self.chunk_digests = bytearray(cached)
+                return
             digest = hashlib.sha256()
             for offset in range(0, self.size, self.chunk_size):
                 chunk = self._read_exact(offset, min(self.chunk_size, self.size - offset))
@@ -97,6 +109,9 @@ class VerifiedMedia:
                 self.chunk_digests.extend(hashlib.sha256(chunk).digest())
             if os.fstat(self.fd).st_size != self.size or digest.hexdigest() != expected_sha256:
                 raise MediaIntegrityError('stored content failed SHA256 verification')
+            if len(_verified_chunks) >= VERIFIED_CACHE_ENTRIES:
+                _verified_chunks.pop(next(iter(_verified_chunks)))
+            _verified_chunks[key] = bytes(self.chunk_digests)
         except OSError:
             self.close()
             raise MediaUnavailable('stored content is unavailable') from None

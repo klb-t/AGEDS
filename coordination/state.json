@@ -544,6 +544,27 @@
         "regression_tests": 18,
         "data": "synthetic"
       }
+    },
+    {
+      "id": "AGEDS-TASK-20261026-REVIEW2-FIX",
+      "owner": "rzecznik_security",
+      "status": "done",
+      "scope": [
+        "server/app/{auth,http_authz,advocate,providers,sharing,search,assignments,verified_media,main,db}.py",
+        "server/docker-compose.yml",
+        "scripts/deploy_vm.sh",
+        "server/tests/{conftest,test_review2_regressions}.py"
+      ],
+      "based_on_commit": "702fe78",
+      "acceptance": [
+        "Second review: N1-N10 fixed, residuals of 3/6/10 closed; reproductions are regression tests."
+      ],
+      "results": {
+        "review": "second independent pass from the coordinator session: 10 new findings, 8 reproduced",
+        "regression_tests_second_pass": 19,
+        "backend_tests": 576,
+        "data": "synthetic"
+      }
     }
   ],
   "remaining_boundaries": [

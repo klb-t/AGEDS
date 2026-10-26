@@ -19,10 +19,11 @@ from .search import SearchQueryError, SearchWorkLimitError, scoped_search_page, 
 from .read_pages import PageInputError, PageNotFound, PageStoredError, PageLimitError, read_page
 from .verified_media import MediaUnavailable, MediaIntegrityError, MediaLimitError, verified_media_response
 from .transcription import queue_all_audio, queue_transcription, word_timing_capabilities
-from .http_authz import Access, TOKEN_COOKIE, artifact as artifact_guard, auth_headers, authenticated, installation, public, scoped
+from .http_authz import Access, TOKEN_COOKIE, artifact as artifact_guard, auth_headers, authenticated, host_and_origin, installation, public, scoped
 
 app=FastAPI(title='AGEDS Evidence Workbench',version='0.2.0')
 app.middleware('http')(auth_headers)
+app.middleware('http')(host_and_origin)
 app.mount('/static',StaticFiles(directory=Path(__file__).parent/'static'),name='static')
 templates=Jinja2Templates(directory=Path(__file__).parent/'templates')
 MAX_SQL_INTEGER = 2**63 - 1
@@ -280,8 +281,15 @@ def api_artifacts(limit:int=Query(500,ge=1,le=10000),access:Access=scoped('read_
         out=[]
         for r in rows:
             d=dict(r)
-            if gate is not None and not gate.allows('artifact',d['id'],'read_text'):
-                d['transcript_preview']=None
+            if not everything:
+                # Status, language and preview come only from text versions this reader may see.
+                visible_texts = [t for t in db.execute("SELECT id,language,substr(text,1,400) AS preview FROM derived_text WHERE artifact_id=? AND kind='transcript' ORDER BY id DESC",(d['id'],))
+                                 if gate.allows('derived_text', t['id'], 'read_metadata')]
+                latest = visible_texts[0] if visible_texts else None
+                d['transcript_language'] = latest['language'] if latest else None
+                d['transcript_preview'] = latest['preview'] if latest and gate.allows('derived_text', latest['id'], 'read_text') else None
+                if d['transcript_status'] == 'done' and not visible_texts:
+                    d['transcript_status'] = 'none'
             out.append({
                 'id':d['id'],'originalName':d['original_name'],'mimeType':d['mime_type'],'sizeBytes':d['size_bytes'],
                 'sha256':d['sha256'],'createdAt':d['created_at'],'sourceLocator':d['source_locator'],
@@ -316,13 +324,26 @@ def api_queue_transcription(artifact_id:SqlPathId,priority:int|None=Query(None,g
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
 
-@app.get('/api/artifacts/{artifact_id}/transcript',dependencies=[artifact_guard('read_text')])
-def api_transcript(artifact_id:SqlPathId,derived_text_id:int|None=Query(None,ge=1,le=MAX_SQL_INTEGER)):
+def _row_filter(db, access: Access, kind: str, capability: str):
+    """None when everything is readable (legacy_open or installation scope), else a per-row check."""
+    gate = access.gate(db)
+    if gate is None or gate.installation(capability):
+        return None
+    return lambda object_id: gate.allows(kind, object_id, capability)
+
+@app.get('/api/artifacts/{artifact_id}/transcript')
+def api_transcript(artifact_id:SqlPathId,derived_text_id:int|None=Query(None,ge=1,le=MAX_SQL_INTEGER),
+                   access:Access=artifact_guard('read_text')):
     with session() as db:
+        allow = _row_filter(db, access, 'derived_text', 'read_text')
         if derived_text_id is None:
-            r=db.execute("SELECT * FROM derived_text WHERE artifact_id=? AND kind='transcript' ORDER BY id DESC LIMIT 1",(artifact_id,)).fetchone()
+            # The latest version this reader may see, not the latest version overall.
+            r = next((row for row in db.execute("SELECT * FROM derived_text WHERE artifact_id=? AND kind='transcript' ORDER BY id DESC",(artifact_id,))
+                      if allow is None or allow(row['id'])), None)
         else:
             r=db.execute("SELECT * FROM derived_text WHERE artifact_id=? AND id=? AND kind='transcript'",(artifact_id,derived_text_id)).fetchone()
+            if r is not None and allow is not None and not allow(r['id']):
+                r = None
         if not r: raise HTTPException(404,'transcript not ready')
         run = db.execute('SELECT * FROM processing_runs WHERE id=?',(r['run_id'],)).fetchone() if r['run_id'] else None
         run_payload = dict(run) if run else None
@@ -346,9 +367,17 @@ def api_transcript(artifact_id:SqlPathId,derived_text_id:int|None=Query(None,ge=
             raise HTTPException(409, 'Stored transcript has malformed or nonfinite JSON; original values remain preserved in metadata export.') from exc
 
 
-def _read_page_http(artifact_id, kind, *, limit=50, before_id=None, snapshot_max_id=None):
+PAGE_KINDS = {'transcripts': ('derived_text', 'read_text'), 'citations': ('evidence_anchor', 'read_text'),
+              'annotations': ('annotation', 'read_metadata')}
+
+def _read_page_http(artifact_id, kind, *, limit=50, before_id=None, snapshot_max_id=None, access=None):
     try:
-        return read_page(artifact_id, kind, limit=limit, before_id=before_id, snapshot_max_id=snapshot_max_id)
+        if access is None or access.open:
+            return read_page(artifact_id, kind, limit=limit, before_id=before_id, snapshot_max_id=snapshot_max_id)
+        object_kind, capability = PAGE_KINDS[kind]
+        with closing(connect(read_only=True)) as db:
+            return read_page(artifact_id, kind, limit=limit, before_id=before_id, snapshot_max_id=snapshot_max_id,
+                             allow=_row_filter(db, access, object_kind, capability))
     except PageInputError as exc:
         raise HTTPException(422, str(exc)) from exc
     except PageNotFound as exc:
@@ -360,17 +389,19 @@ def _read_page_http(artifact_id, kind, *, limit=50, before_id=None, snapshot_max
     except (OSError, sqlite3.Error) as exc:
         raise HTTPException(503, 'Evidence database is unavailable for read-only listing.') from exc
 
-@app.get('/api/artifacts/{artifact_id}/transcripts/page',dependencies=[artifact_guard('read_text')])
+@app.get('/api/artifacts/{artifact_id}/transcripts/page')
 def api_transcript_page(artifact_id:SqlPathId, limit:int=Query(50,ge=1,le=100),
                         before_id:int|None=Query(None,ge=1,le=MAX_SQL_INTEGER),
-                        snapshot_max_id:int|None=Query(None,ge=0,le=MAX_SQL_INTEGER)):
-    return _read_page_http(artifact_id,'transcripts',limit=limit,before_id=before_id,snapshot_max_id=snapshot_max_id)
+                        snapshot_max_id:int|None=Query(None,ge=0,le=MAX_SQL_INTEGER),
+                        access:Access=artifact_guard('read_text')):
+    return _read_page_http(artifact_id,'transcripts',limit=limit,before_id=before_id,snapshot_max_id=snapshot_max_id,access=access)
 
-@app.get('/api/artifacts/{artifact_id}/citations/page',dependencies=[artifact_guard('read_text')])
+@app.get('/api/artifacts/{artifact_id}/citations/page')
 def api_citation_page(artifact_id:SqlPathId, limit:int=Query(50,ge=1,le=100),
                       before_id:int|None=Query(None,ge=1,le=MAX_SQL_INTEGER),
-                      snapshot_max_id:int|None=Query(None,ge=0,le=MAX_SQL_INTEGER)):
-    return _read_page_http(artifact_id,'citations',limit=limit,before_id=before_id,snapshot_max_id=snapshot_max_id)
+                      snapshot_max_id:int|None=Query(None,ge=0,le=MAX_SQL_INTEGER),
+                      access:Access=artifact_guard('read_text')):
+    return _read_page_http(artifact_id,'citations',limit=limit,before_id=before_id,snapshot_max_id=snapshot_max_id,access=access)
 
 @app.get('/api/artifacts/{artifact_id}/annotations/page',dependencies=[installation('read_metadata')])
 def api_annotation_page(artifact_id:SqlPathId, limit:int=Query(50,ge=1,le=100),
@@ -378,10 +409,12 @@ def api_annotation_page(artifact_id:SqlPathId, limit:int=Query(50,ge=1,le=100),
                         snapshot_max_id:int|None=Query(None,ge=0,le=MAX_SQL_INTEGER)):
     return _read_page_http(artifact_id,'annotations',limit=limit,before_id=before_id,snapshot_max_id=snapshot_max_id)
 
-@app.get('/api/artifacts/{artifact_id}/transcripts',dependencies=[artifact_guard('read_metadata')])
-def api_transcript_versions(artifact_id:SqlPathId):
+@app.get('/api/artifacts/{artifact_id}/transcripts')
+def api_transcript_versions(artifact_id:SqlPathId,access:Access=artifact_guard('read_metadata')):
     with session() as db:
-        return [dict(r) for r in db.execute("SELECT id,artifact_id,run_id,model,language,created_at FROM derived_text WHERE artifact_id=? AND kind='transcript' ORDER BY id DESC",(artifact_id,))]
+        allow = _row_filter(db, access, 'derived_text', 'read_metadata')
+        return [dict(r) for r in db.execute("SELECT id,artifact_id,run_id,model,language,created_at FROM derived_text WHERE artifact_id=? AND kind='transcript' ORDER BY id DESC",(artifact_id,))
+                if allow is None or allow(r['id'])]
 
 @app.get('/api/artifacts/{artifact_id}/source-observations')
 def api_source_observations(artifact_id:SqlPathId,access:Access=artifact_guard('read_metadata')):
@@ -418,8 +451,12 @@ def api_artifact_content(request:Request, artifact_id:SqlPathId):
 def api_citation_create(artifact_id:SqlPathId,a:CitationIn,access:Access=artifact_guard('cite')):
     if not access.open:
         with session() as db:
-            if not access.gate(db).allows('artifact', artifact_id, 'read_text'):
+            gate = access.gate(db)
+            if not gate.allows('artifact', artifact_id, 'read_text'):
                 raise HTTPException(403, 'citing requires read_text')
+            # The quote comes from this text version: it must be readable itself.
+            if not gate.allows('derived_text', a.derivedTextId, 'read_text'):
+                raise HTTPException(404, 'not available')
     try:
         return create_citation(artifact_id,a.derivedTextId,a.segmentIndices,
                               word_refs=[ref.model_dump() for ref in a.wordRefs] if a.wordRefs is not None else None,
@@ -427,10 +464,12 @@ def api_citation_create(artifact_id:SqlPathId,a:CitationIn,access:Access=artifac
     except ValueError as exc:
         raise HTTPException(422,str(exc)) from exc
 
-@app.get('/api/artifacts/{artifact_id}/citations',dependencies=[artifact_guard('read_text')])
-def api_citations(artifact_id:SqlPathId):
+@app.get('/api/artifacts/{artifact_id}/citations')
+def api_citations(artifact_id:SqlPathId,access:Access=artifact_guard('read_text')):
     with session() as db:
-        return [anchor_payload(r) for r in db.execute('SELECT * FROM evidence_anchors WHERE artifact_id=? ORDER BY id',(artifact_id,))]
+        allow = _row_filter(db, access, 'evidence_anchor', 'read_text')
+        return [anchor_payload(r) for r in db.execute('SELECT * FROM evidence_anchors WHERE artifact_id=? ORDER BY id',(artifact_id,))
+                if allow is None or allow(r['id'])]
 
 @app.get('/api/artifacts/{artifact_id}/citations/{anchor_id}/packet',dependencies=[installation('export')])
 def api_citation_packet(artifact_id: SqlPathId, anchor_id: SqlPathId):

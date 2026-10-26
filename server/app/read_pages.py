@@ -119,7 +119,7 @@ def _project(kind, row):
     return result
 
 
-def read_page(artifact_id, kind, *, limit=50, before_id=None, snapshot_max_id=None):
+def read_page(artifact_id, kind, *, limit=50, before_id=None, snapshot_max_id=None, allow=None):
     """Return a bounded page in one read transaction without migrating/writing.
 
     Cursor bounds are not ownership/authentication tokens. Every query filters
@@ -153,9 +153,15 @@ def read_page(artifact_id, kind, *, limit=50, before_id=None, snapshot_max_id=No
             raise PageNotFound('artifact not found')
         table, columns, extra = MODELS[kind]
         if snapshot_max_id is None:
-            maximum = db.execute(f'SELECT id FROM {table} WHERE artifact_id=?{extra} ORDER BY id DESC LIMIT 1',
-                                 (artifact_id,)).fetchone()
-            snapshot_max_id = maximum[0] if maximum else 0
+            if allow is None:
+                maximum = db.execute(f'SELECT id FROM {table} WHERE artifact_id=?{extra} ORDER BY id DESC LIMIT 1',
+                                     (artifact_id,)).fetchone()
+                snapshot_max_id = maximum[0] if maximum else 0
+            else:
+                # The snapshot bound comes from rows this reader may see; hidden rows reveal nothing.
+                snapshot_max_id = next((row[0] for row in db.execute(
+                    f'SELECT id FROM {table} WHERE artifact_id=?{extra} ORDER BY id DESC', (artifact_id,))
+                    if allow(row[0])), 0)
             if not _integer(snapshot_max_id, zero=True):
                 raise PageStoredError('stored maximum identity is invalid')
         where = f'artifact_id=?{extra} AND id<=?'
@@ -165,8 +171,18 @@ def read_page(artifact_id, kind, *, limit=50, before_id=None, snapshot_max_id=No
             params.append(before_id)
         # Fetch only bounded scalar IDs and byte counts before any large TEXT.
         lengths = '+'.join(f'coalesce(length(cast("{name}" as blob)),0)' for name in columns)
-        candidates = db.execute(f'SELECT id,({lengths}) AS row_bytes FROM {table} WHERE {where} ORDER BY id DESC LIMIT ?',
-                                (*params, limit + 1)).fetchall()
+        if allow is None:
+            candidates = db.execute(f'SELECT id,({lengths}) AS row_bytes FROM {table} WHERE {where} ORDER BY id DESC LIMIT ?',
+                                    (*params, limit + 1)).fetchall()
+        else:
+            # Filter before the limit so hidden rows can neither shorten a page nor set hasMore.
+            candidates = []
+            for candidate in db.execute(f'SELECT id,({lengths}) AS row_bytes FROM {table} WHERE {where} ORDER BY id DESC',
+                                        params):
+                if allow(candidate['id']):
+                    candidates.append(candidate)
+                    if len(candidates) > limit:
+                        break
         items = []
         page = {'artifactId': artifact_id, 'items': items, 'nextBeforeId': None,
                 'snapshotMaxId': snapshot_max_id, 'hasMore': False, 'limit': limit}

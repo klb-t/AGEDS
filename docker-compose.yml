@@ -1,7 +1,8 @@
 services:
   api:
     build: ./server
-    ports: ["8080:8080"]
+    # Loopback only; expose through an authenticating proxy, never directly.
+    ports: ["127.0.0.1:8080:8080"]
     volumes:
       - ./server/data:/app/data
   worker:

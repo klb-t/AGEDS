@@ -522,6 +522,9 @@ def _migrate_authz(db: sqlite3.Connection) -> None:
         ('predicate.fields', json.dumps(PREDICATE_FIELDS_SEED, sort_keys=True)),
         ('predicate.operators', json.dumps(PREDICATE_OPERATORS_SEED)),
         ('predicate.max_depth', json.dumps(PREDICATE_MAX_DEPTH_SEED))])
+    from .authz import OPENING_STATUSES_SEED
+    db.execute('INSERT OR IGNORE INTO authz_settings(key,value_json) VALUES(?,?)',
+               ('assignment.opening_statuses', json.dumps(OPENING_STATUSES_SEED)))
     if not db.execute('SELECT 1 FROM schema_migrations WHERE version=3').fetchone():
         db.execute("INSERT INTO schema_migrations(version,name) VALUES(3,'authz_scopes_grants_tokens')")
 

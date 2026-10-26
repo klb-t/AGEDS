@@ -185,7 +185,9 @@ def _authz_command(args) -> dict:
         if args.command == "authz-owner-init":
             result = authz.bootstrap_owner(db, args.name, actor="cli")
             return {**result, "token": auth.issue_token(db, result["principal_id"], label="owner", actor="cli"),
-                    "token_shown_once": True}
+                    "token_shown_once": True,
+                    "next_step": "auth.mode is still legacy_open (everyone reaching the port acts as owner); "
+                                 "run authz-mode tokens when recipients get access"}
         if args.command == "authz-principal-add":
             from .assignments import create_principal
             pid = create_principal(db, args.name, kind=args.kind, actor="cli")

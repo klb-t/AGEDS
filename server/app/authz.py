@@ -89,6 +89,7 @@ SETTINGS = {
     'auth.mode': {'order': ['tokens', 'external', 'legacy_open']},
     'advocate.log_prompt_content': {'order': [False, True]},
     # A wider vocabulary or depth can make an existing predicate match more: diffed like access settings.
+    'assignment.opening_statuses': {'access': True},
     'predicate.fields': {'access': True}, 'predicate.operators': {'access': True}, 'predicate.max_depth': {'access': True},
 }
 DIFF_KINDS = ('case', 'artifact', 'derived_text', 'evidence_anchor', 'fragment', 'assignment', 'event',
@@ -332,12 +333,29 @@ def _row(db, kind: str, object_id) -> sqlite3.Row | None:
     return db.execute(f'SELECT * FROM {table} WHERE id=?', (object_id,)).fetchone()
 
 
+OPENING_STATUSES_SEED = ['unknown', 'human_reviewed']
+
+
+def opening_statuses(db) -> list:
+    """Assignment statuses that open their target to the assignment's case (setting, seeded).
+
+    An AI proposal, a rejection or any status outside this list records a meaning in
+    the case but opens nothing: proposing a relation is not access until accepted.
+    """
+    value = get_setting(db, 'assignment.opening_statuses', OPENING_STATUSES_SEED)
+    return [status for status in value if isinstance(status, str) and status != 'withdrawn'] \
+        if isinstance(value, list) else []
+
+
+def _opening(db, rows) -> list:
+    allowed = set(opening_statuses(db))
+    return [row for row in rows if row['status'] in allowed]
+
+
 def _assigned_cases(db, kind: str, object_id: int) -> set:
-    return {('case', row['case_id']) for row in db.execute(
-        'SELECT case_id FROM assignments WHERE target_kind=? AND target_id=? AND withdrawn_at IS NULL '
-        'AND visibility_scope_id IS NULL', (kind, object_id))} | {('scope', row['visibility_scope_id']) for row in db.execute(
-        'SELECT visibility_scope_id FROM assignments WHERE target_kind=? AND target_id=? AND withdrawn_at IS NULL '
-        'AND visibility_scope_id IS NOT NULL', (kind, object_id))}
+    rows = db.execute('SELECT * FROM assignments WHERE target_kind=? AND target_id=? AND withdrawn_at IS NULL',
+                      (kind, object_id)).fetchall()
+    return {_assignment_home(row) for row in _opening(db, rows)}
 
 
 def _legacy_home(db, kind: str, object_id: int) -> tuple:
@@ -516,8 +534,8 @@ def _assignment_home(assignment) -> tuple:
 
 
 def _fragment_assignments(db, fragment_id: int) -> list:
-    return db.execute("SELECT * FROM assignments WHERE target_kind='fragment' AND target_id=? AND withdrawn_at IS NULL",
-                      (fragment_id,)).fetchall()
+    return _opening(db, db.execute("SELECT * FROM assignments WHERE target_kind='fragment' AND target_id=? AND withdrawn_at IS NULL",
+                                   (fragment_id,)).fetchall())
 
 
 def _fragment_openings(db, column: str, value: int, level: str) -> set:

@@ -155,3 +155,58 @@ async def auth_headers(request: Request, call_next):
         if state[1]:
             response.headers['X-AGEDS-Auth-Warning'] = state[1]
     return response
+
+
+# --- Host and origin checks (every mode) -------------------------------------
+# DNS rebinding: a page whose name resolves to this server must not read it, so the Host
+# header must name a configured host. CSRF: a state-changing request from another site
+# is refused (Sec-Fetch-Site, else Origin vs Host). Clients without these headers (CLI,
+# Android, curl) are not browsers on another site and pass.
+import os
+from urllib.parse import urlsplit
+from fastapi.responses import JSONResponse
+
+DEFAULT_ALLOWED_HOSTS = ('127.0.0.1', 'localhost', '::1', 'testserver')
+UNSAFE_METHODS = {'POST', 'PUT', 'PATCH', 'DELETE'}
+
+
+def _host_name(value: str) -> str:
+    value = value.strip().lower()
+    if value.startswith('['):
+        return value[1:value.find(']')] if ']' in value else value
+    return value.rsplit(':', 1)[0] if value.count(':') == 1 else value
+
+
+def allowed_hosts() -> set:
+    hosts = set(DEFAULT_ALLOWED_HOSTS)
+    hosts |= {h.strip().lower() for h in os.environ.get('EW_ALLOWED_HOSTS', '').split(',') if h.strip()}
+    try:
+        connection = database.connect(read_only=True)
+        try:
+            extra = get_setting(connection, 'http.allowed_hosts', [])
+        finally:
+            connection.close()
+        if isinstance(extra, list):
+            hosts |= {str(h).strip().lower() for h in extra if str(h).strip()}
+    except sqlite3.Error:
+        pass
+    return hosts
+
+
+async def host_and_origin(request: Request, call_next):
+    hosts = allowed_hosts()
+    host = _host_name(request.headers.get('host', ''))
+    if '*' not in hosts and host not in hosts:
+        return JSONResponse(status_code=400, content={'detail': 'host not allowed'})
+    if request.method in UNSAFE_METHODS:
+        fetch_site = request.headers.get('sec-fetch-site')
+        if fetch_site in ('cross-site', 'same-site'):
+            return JSONResponse(status_code=403, content={'detail': 'cross-site request refused'})
+        origin = request.headers.get('origin')
+        if origin and origin != 'null':
+            parts = urlsplit(origin)
+            if parts.netloc.lower() != request.headers.get('host', '').lower():
+                return JSONResponse(status_code=403, content={'detail': 'cross-origin request refused'})
+        elif origin == 'null':
+            return JSONResponse(status_code=403, content={'detail': 'opaque-origin request refused'})
+    return await call_next(request)

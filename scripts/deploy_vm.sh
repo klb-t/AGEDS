@@ -4,16 +4,17 @@
 # Needs sudo for docker and /var/lib/ageds. Stops the old api and worker before the backup (an old
 # loaded worker has no lease fencing from edited files), backs up SQLite with the online backup API
 # and the content store byte for byte, then builds, starts and checks. It never deletes a backup.
-#   scripts/deploy_vm.sh [--apply] [--skip-tests]
+#   scripts/deploy_vm.sh [--apply] [--skip-tests] [--public-host NAME] [--allow-public]
 set -euo pipefail
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 DATA="${AGEDS_DATA:-/var/lib/ageds}"
 BACKUPS="${AGEDS_BACKUPS:-/var/lib/ageds-backups}"
 PORT="${AGEDS_PORT:-8090}"
-APPLY=no TESTS=yes
-for arg in "$@"; do case "$arg" in
-  --apply) APPLY=yes;; --skip-tests) TESTS=no;;
-  -h|--help) sed -n '2,8p' "$0"; exit 0;; *) echo "unknown argument: $arg" >&2; exit 2;; esac; done
+PUBLIC_HOST="${AGEDS_PUBLIC_HOST:-}" APPLY=no TESTS=yes ALLOW_PUBLIC=no
+while [ $# -gt 0 ]; do case "$1" in
+  --apply) APPLY=yes; shift;; --skip-tests) TESTS=no; shift;; --allow-public) ALLOW_PUBLIC=yes; shift;;
+  --public-host) PUBLIC_HOST="$2"; shift 2;;
+  -h|--help) sed -n '2,8p' "$0"; exit 0;; *) echo "unknown argument: $1" >&2; exit 2;; esac; done
 cd "$REPO"
 COMMIT="$(git rev-parse HEAD)"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
@@ -29,6 +30,17 @@ echo "AGEDS deployment of $COMMIT ($([ "$APPLY" = yes ] && echo APPLY || echo 'd
 [ -f docker-compose.vm.yml ] || { echo "docker-compose.vm.yml missing: this is not the VM checkout" >&2; exit 1; }
 if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
   echo "tracked files have local changes; deploy only a committed revision" >&2; exit 1
+fi
+# Published ports must be loopback only (the proxy authenticates); legacy_open would otherwise
+# give anyone reaching the port the owner's view. --allow-public overrides after a conscious decision.
+if [ "$ALLOW_PUBLIC" = no ]; then
+  run sh -c "sudo docker compose -p ageds -f docker-compose.yml -f docker-compose.vm.yml config --format json | python3 -c '
+import json, sys
+config = json.load(sys.stdin)
+bad = [(name, p) for name, service in config.get(\"services\", {}).items() for p in service.get(\"ports\", [])
+       if p.get(\"host_ip\") not in (\"127.0.0.1\", \"::1\")]
+if bad: sys.exit(f\"published ports are not loopback-only: {bad}; use --allow-public to override\")
+print(\"ports loopback-only\")'"
 fi
 if [ "$TESTS" = yes ]; then
   run "$REPO/.venv/bin/python" -m pytest server/tests -q -x
@@ -54,9 +66,18 @@ echo "== 3. build and start $COMMIT (migrations are additive and run at startup)
 run "${COMPOSE[@]}" build api worker
 run "${COMPOSE[@]}" up -d api worker
 
+if [ -n "$PUBLIC_HOST" ]; then
+  echo "== 3b. allow the proxy's host name ($PUBLIC_HOST); other Host headers are refused (DNS rebinding)"
+  run "${COMPOSE[@]}" exec -T api python -m app.cli authz-setting --key http.allowed_hosts --value-json "[\"$PUBLIC_HOST\"]"
+else
+  echo "== 3b. no --public-host: only loopback host names are accepted; a proxy passing another Host gets 400"
+fi
+
 echo "== 4. checks"
 run sh -c "for i in \$(seq 1 60); do curl -sf http://127.0.0.1:$PORT/advocate > /dev/null && exit 0; sleep 2; done; exit 1"
 run sh -c "curl -s -o /dev/null -D - http://127.0.0.1:$PORT/api/artifacts | grep -i '^x-ageds-auth-mode:'"
+[ -n "$PUBLIC_HOST" ] && run sh -c "curl -sf -o /dev/null -H 'Host: $PUBLIC_HOST' http://127.0.0.1:$PORT/advocate"
+run sh -c "test \"\$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: rebinding.example' http://127.0.0.1:$PORT/advocate)\" = 400"
 run sh -c "curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:$PORT/api/advocate/status | grep -E '^(200|409)$'"
 run sudo python3 -c 'import sqlite3,sys
 db = sqlite3.connect("file:" + sys.argv[1] + "?mode=ro", uri=True)

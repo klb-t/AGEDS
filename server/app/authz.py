@@ -164,6 +164,10 @@ def set_setting(db: sqlite3.Connection, key: str, value, *, actor: str | None = 
     if known is not None and value not in known and not any(
             isinstance(p, str) and '<' in p and isinstance(value, str) and value.startswith(p.split('<')[0]) for p in known):
         warnings.append({'code': 'value_not_in_presets', 'value': value})
+    if key == 'fragment.open_policy' and isinstance(value, str) and value.startswith('predicate:'):
+        problems = validate_predicate(value.split(':', 1)[1])
+        if problems:
+            warnings.append({'code': 'predicate_invalid_opens_nothing_extra', 'errors': problems})
     change = {'key': key, 'from': previous, 'to': value, 'widens': widening,
               'effective_access_diff': diff, 'warnings': warnings, 'applied': False}
     if preview or (widening and not confirm_widening):
@@ -270,12 +274,24 @@ def fragment_context(db: sqlite3.Connection, principal_id: int, fragment_id: int
     if anchor is not None:
         result.update(quote=anchor['quote_text'], start_ms=anchor['start_ms'], end_ms=anchor['end_ms'],
                       quote_sha256=anchor['quote_sha256'])
-    policy = get_setting(db, 'fragment.open_policy', 'fragment_only')
-    if isinstance(policy, str) and policy.startswith('context_window:') and anchor is not None:
-        try:
-            width = max(0, int(policy.split(':', 1)[1]))
-        except ValueError:
-            width = 0
+    # The widest context among the assignments through which this principal sees the fragment.
+    width = None
+    cover = gate.coverage(capability) if gate is not None else coverage(db, principal_id, capability)
+    for assignment in _fragment_assignments(db, fragment_id):
+        policy = effective_open_policy(db, fragment, assignment)
+        if policy.startswith('context_window:') and cover.covers(_assignment_home(assignment)):
+            try:
+                width = max(width or 0, max(0, int(policy.split(':', 1)[1])))
+            except ValueError:
+                width = max(width or 0, 0)
+    if width is None:
+        policy = get_setting(db, 'fragment.open_policy', 'fragment_only')
+        if isinstance(policy, str) and policy.startswith('context_window:'):
+            try:
+                width = max(0, int(policy.split(':', 1)[1]))
+            except ValueError:
+                width = 0
+    if width is not None and anchor is not None:
         selector = json.loads(anchor['selector_json'])
         indices = selector.get('indices') if selector.get('kind') == 'segments' else \
             sorted({ref['segment_index'] for ref in selector.get('word_refs', [])})
@@ -344,14 +360,127 @@ def _private(conversation, level: str) -> tuple:
     return ('private', conversation['principal_id'], level, mode if isinstance(mode, str) else 'none')
 
 
-def _open_policy(db) -> str:
-    """fragment.open_policy: what a fragment assignment opens beyond the fragment.
+OPEN_LEVELS = ('fragment_only', 'whole_artifact_version', 'whole_document')
+PREDICATE_FIELDS = ('fragment.kind', 'fragment.id', 'assignment.status', 'assignment.author_kind',
+                    'assignment.case_id', 'assignment.issue', 'case.uid')
+MAX_PREDICATE_DEPTH = 16
 
-    context_window:N opens neighbouring segments only through fragment_context();
-    predicate:* and unknown values are kept and open nothing beyond the fragment.
+
+def _open_value(value) -> str | None:
+    if value in OPEN_LEVELS:
+        return value
+    if isinstance(value, str) and value.startswith('context_window:'):
+        return value
+    return None
+
+
+def validate_predicate(raw: str) -> list[str]:
+    """Errors in a 'predicate:<json>' open policy; an invalid predicate opens nothing extra."""
+    try:
+        spec = json.loads(raw)
+    except ValueError:
+        return ['predicate is not JSON']
+    if not isinstance(spec, dict) or 'when' not in spec or 'then' not in spec:
+        return ['predicate needs "when" and "then"']
+    errors = []
+    if _open_value(spec['then']) is None:
+        errors.append(f'unknown "then": {spec["then"]!r}')
+    if 'else' in spec and _open_value(spec['else']) is None:
+        errors.append(f'unknown "else": {spec["else"]!r}')
+
+    def check(node, depth):
+        if depth > MAX_PREDICATE_DEPTH:
+            errors.append('predicate nests too deeply')
+            return
+        if not isinstance(node, dict) or len([k for k in ('all', 'any', 'not', 'field') if k in node]) != 1:
+            errors.append(f'condition must have exactly one of all/any/not/field: {node!r}')
+            return
+        if 'all' in node or 'any' in node:
+            items = node.get('all', node.get('any'))
+            if not isinstance(items, list):
+                errors.append('all/any takes a list')
+                return
+            for item in items:
+                check(item, depth + 1)
+        elif 'not' in node:
+            check(node['not'], depth + 1)
+        else:
+            if node['field'] not in PREDICATE_FIELDS:
+                errors.append(f'unknown field {node["field"]!r}')
+            if len([k for k in ('eq', 'in', 'prefix') if k in node]) != 1:
+                errors.append(f'field condition needs exactly one of eq/in/prefix: {node!r}')
+    check(spec['when'], 0)
+    return errors
+
+
+def _evaluate(node, context: dict, depth: int = 0) -> bool:
+    """Closed grammar over data; nothing from a setting is ever executed."""
+    if depth > MAX_PREDICATE_DEPTH or not isinstance(node, dict):
+        return False
+    if 'all' in node:
+        return isinstance(node['all'], list) and all(_evaluate(n, context, depth + 1) for n in node['all'])
+    if 'any' in node:
+        return isinstance(node['any'], list) and any(_evaluate(n, context, depth + 1) for n in node['any'])
+    if 'not' in node:
+        return not _evaluate(node['not'], context, depth + 1)
+    if node.get('field') not in PREDICATE_FIELDS:
+        return False
+    value = context.get(node['field'])
+    if 'eq' in node:
+        return value == node['eq']
+    if 'in' in node:
+        return isinstance(node['in'], list) and value in node['in']
+    if 'prefix' in node:
+        return isinstance(value, str) and isinstance(node['prefix'], str) and value.startswith(node['prefix'])
+    return False
+
+
+def effective_open_policy(db, fragment, assignment) -> str:
+    """What one fragment assignment opens under fragment.open_policy.
+
+    predicate:{"when": <condition>, "then": <level>, "else": <level>} is evaluated per
+    (fragment, assignment), so a document opens only in the case whose assignment
+    matches. An invalid predicate or an unknown value opens nothing beyond the fragment.
     """
-    value = get_setting(db, 'fragment.open_policy', 'fragment_only')
-    return value if value in ('whole_artifact_version', 'whole_document') else 'fragment_only'
+    policy = get_setting(db, 'fragment.open_policy', 'fragment_only')
+    if not isinstance(policy, str):
+        return 'fragment_only'
+    if not policy.startswith('predicate:'):
+        return _open_value(policy) or 'fragment_only'
+    raw = policy.split(':', 1)[1]
+    if validate_predicate(raw):
+        return 'fragment_only'
+    spec = json.loads(raw)
+    case = db.execute('SELECT uid FROM cases WHERE id=?', (assignment['case_id'],)).fetchone()
+    issue = json.loads(assignment['issue_ref_json'] or 'null')
+    if isinstance(issue, dict):
+        issue = issue.get('issue')
+    context = {'fragment.kind': fragment['kind'], 'fragment.id': fragment['id'],
+               'assignment.status': assignment['status'], 'assignment.author_kind': assignment['author_kind'],
+               'assignment.case_id': assignment['case_id'], 'case.uid': case['uid'] if case else None,
+               'assignment.issue': issue if isinstance(issue, (str, int)) else None}
+    return spec['then'] if _evaluate(spec['when'], context) else spec.get('else', 'fragment_only')
+
+
+def _assignment_home(assignment) -> tuple:
+    if assignment['visibility_scope_id'] is not None:
+        return ('scope', assignment['visibility_scope_id'])
+    return ('case', assignment['case_id'])
+
+
+def _fragment_assignments(db, fragment_id: int) -> list:
+    return db.execute("SELECT * FROM assignments WHERE target_kind='fragment' AND target_id=? AND withdrawn_at IS NULL",
+                      (fragment_id,)).fetchall()
+
+
+def _fragment_openings(db, column: str, value: int, level: str) -> set:
+    """Homes of fragment assignments whose effective policy opens `level` (column is a fixed name)."""
+    found = set()
+    for fragment in db.execute(f'SELECT * FROM fragments WHERE {column}=?', (value,)).fetchall():
+        for assignment in _fragment_assignments(db, fragment['id']):
+            if effective_open_policy(db, fragment, assignment) == level:
+                found.add(_assignment_home(assignment))
+    return found
 
 
 def _inputs(raw: str) -> tuple:
@@ -391,9 +520,7 @@ def homes(db: sqlite3.Connection, kind: str, object_id) -> set:
         for observation in db.execute('SELECT DISTINCT source_id FROM source_observations WHERE artifact_id=?', (object_id,)):
             provenance |= _source_case(db, observation['source_id'])
         found = provenance | _assigned_cases(db, 'artifact', object_id)
-        if _open_policy(db) == 'whole_document':
-            for fragment in db.execute('SELECT id FROM fragments WHERE artifact_id=?', (object_id,)).fetchall():
-                found |= _assigned_cases(db, 'fragment', fragment['id'])
+        found |= _fragment_openings(db, 'artifact_id', object_id, 'whole_document')
         return own | (found or {_legacy_home(db, kind, object_id)})
     if kind == 'source_observation':
         return own | (_source_case(db, row['source_id']) or {_legacy_home(db, kind, object_id)})
@@ -402,9 +529,7 @@ def homes(db: sqlite3.Connection, kind: str, object_id) -> set:
         extra = set()
         if kind == 'derived_text':
             extra = _assigned_cases(db, kind, object_id)
-            if _open_policy(db) == 'whole_artifact_version':
-                for fragment in db.execute('SELECT id FROM fragments WHERE derived_text_id=?', (object_id,)).fetchall():
-                    extra |= _assigned_cases(db, 'fragment', fragment['id'])
+            extra |= _fragment_openings(db, 'derived_text_id', object_id, 'whole_artifact_version')
         return own | base | extra
     if kind == 'evidence_anchor':
         base = _contained(homes(db, 'derived_text', row['derived_text_id']))

@@ -473,7 +473,7 @@ delegacja `invite` (`authz.delegate`, `POST /api/delegations`: podzbiór własny
 niż rodzic, kończy się z rodzicem; `max_delegation_depth` brak = 1, `null` = bez limitu). Rzecznik sięga do fragmentu
 udostępnionego osobno (`fragment_quote`). CLI `authz-setting --preview/--confirm`, `authz-mode --confirm`,
 `authz-package-growth`. Testy `test_settings_matrix.py` (S12, S13: każda wartość, w tym nieznane) i HTTP delegacji.
-Granica: `predicate:*` nie jest interpretowany (zachowany w danych, działa jak najwęższa wartość).
+Granica zamknięta 2026-10-26: `predicate:<json>` jest interpretowany — zamknięta gramatyka danych (`all`/`any`/`not`, pole z `eq`/`in`/`prefix`; pola `fragment.kind`, `fragment.id`, `assignment.status`, `assignment.author_kind`, `assignment.case_id`, `assignment.issue`, `case.uid`; maks. głębokość 16), `{"when": …, "then": <poziom>, "else": <poziom>}` liczone **dla każdej pary fragment–przypisanie**, więc dokument otwiera się tylko w sprawie, której przypisanie spełnia warunek (`authz.effective_open_policy`). Nic z ustawienia nie jest wykonywane; niepoprawny predykat zostaje w danych, daje ostrzeżenie i działa jak `fragment_only`. Testy `PredicateTests` w `test_settings_matrix.py`. `custom:*` (widoczność rozmowy) i `auto_include_by_rule:<rodzaj>` pozostają bez języka predykatów.
 
 **Stan P12 (2026-10-25):** głos wykonany na atrapach transportu; **awatar nadal PLANOWANE**. `providers.VoiceProvider`:
 wejście = nagranie pytania do Gemini na Vertex (jak `tools/cloud/transcribe.sh`) **tylko z wyraźną zgodą mówiącego

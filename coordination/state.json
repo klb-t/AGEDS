@@ -423,7 +423,7 @@
         "browser_advocate": "7/7",
         "browser_model_mode": "4/4",
         "data": "synthetic",
-        "gap": "predicate:* kept but not interpreted"
+        "gap": "closed 2026-10-26: predicate:<json> interpreted (closed grammar); custom:* still uninterpreted"
       }
     },
     {

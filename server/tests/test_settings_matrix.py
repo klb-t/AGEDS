@@ -200,3 +200,73 @@ class DelegationTests(Base):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class PredicateTests(Base):
+    """fragment.open_policy=predicate:<json>: a closed grammar over data, evaluated per assignment."""
+
+    def setUp(self):
+        super().setUp()
+        self.case_c = self.db.execute("INSERT INTO cases(name) VALUES('sprawa C')").lastrowid
+        model.assign(self.db, case_id=self.case_c, target_kind='fragment', target_id=self.fragment,
+                     status='human_reviewed', author_kind='human', meaning_text='zweryfikowane')
+        self.reader_c = model.create_principal(self.db, 'odbiorca C')
+        authz.grant(self.db, self.reader_c, authz.create_scope(self.db, 'case', {'case_id': self.case_c}),
+                    ['read_metadata', 'read_text'])
+
+    def predicate(self, spec):
+        return self.set('fragment.open_policy', 'predicate:' + (spec if isinstance(spec, str) else json.dumps(spec)))
+
+    def test_opening_follows_the_matching_assignment_only(self):
+        self.predicate({'when': {'field': 'assignment.status', 'eq': 'human_reviewed'}, 'then': 'whole_document'})
+        self.assertTrue(self.sees('artifact', self.artifact, self.reader_c))
+        self.assertTrue(self.sees('derived_text', self.v2, self.reader_c))
+        self.assertFalse(self.sees('artifact', self.artifact))  # B's assignment is not reviewed
+        self.assertTrue(self.sees('fragment', self.fragment))
+
+    def test_else_branch_and_context_window(self):
+        self.predicate({'when': {'field': 'assignment.status', 'eq': 'human_reviewed'}, 'then': 'whole_artifact_version',
+                        'else': 'context_window:1'})
+        self.assertTrue(self.sees('derived_text', self.v1, self.reader_c))
+        self.assertFalse(self.sees('derived_text', self.v2, self.reader_c))
+        self.assertFalse(self.sees('derived_text', self.v1))
+        context = authz.fragment_context(self.db, self.recipient, self.fragment)
+        self.assertEqual([c['segment_index'] for c in context['context']], [1, 2, 3])
+
+    def test_case_kind_and_boolean_operators(self):
+        uid_b = self.db.execute('SELECT uid FROM cases WHERE id=?', (self.case_b,)).fetchone()[0]
+        self.predicate({'when': {'all': [{'field': 'case.uid', 'in': [uid_b]},
+                                         {'not': {'field': 'fragment.kind', 'eq': 'page_range'}}]},
+                        'then': 'whole_artifact_version'})
+        self.assertTrue(self.sees('derived_text', self.v1))
+        self.assertFalse(self.sees('derived_text', self.v1, self.reader_c))
+        self.predicate({'when': {'any': [{'field': 'assignment.author_kind', 'eq': 'ai'},
+                                         {'field': 'fragment.kind', 'prefix': 'cit'}]}, 'then': 'whole_document'})
+        self.assertTrue(self.sees('artifact', self.artifact))
+        self.assertTrue(self.sees('artifact', self.artifact, self.reader_c))
+
+    def test_invalid_predicates_open_nothing_and_warn(self):
+        deep = {'field': 'fragment.kind', 'eq': 'citation'}
+        for _ in range(20):
+            deep = {'not': {'not': deep}}
+        for spec in ('{broken', '[]', {'when': {'field': 'case.name', 'eq': 'x'}, 'then': 'whole_document'},
+                     {'when': {'field': 'fragment.kind', 'eq': 'citation'}, 'then': 'everything'},
+                     {'when': {'field': 'fragment.kind'}, 'then': 'whole_document'},
+                     {'when': deep, 'then': 'whole_document'},
+                     {'when': {'field': 'fragment.kind', 'eq': '__import__("os").system("x")'}, 'then': 'whole_document'}):
+            with self.subTest(spec=spec):
+                change = self.predicate(spec)
+                self.assertFalse(self.sees('artifact', self.artifact))
+                self.assertFalse(self.sees('artifact', self.artifact, self.reader_c))
+                if spec != {'when': {'field': 'fragment.kind', 'eq': '__import__("os").system("x")'}, 'then': 'whole_document'}:
+                    self.assertEqual(change['warnings'][-1]['code'], 'predicate_invalid_opens_nothing_extra')
+                self.set('fragment.open_policy', 'fragment_only')
+
+    def test_a_predicate_that_widens_needs_confirmation(self):
+        with self.assertRaises(authz.SettingWidensAccess) as refused:
+            authz.set_setting(self.db, 'fragment.open_policy', 'predicate:' + json.dumps(
+                {'when': {'field': 'assignment.status', 'eq': 'human_reviewed'}, 'then': 'whole_document'}))
+        gained = {(d['principal_uid'], d['kind']) for d in refused.exception.change['effective_access_diff'] if d['gained']}
+        reader_uid = self.db.execute('SELECT uid FROM principals WHERE id=?', (self.reader_c,)).fetchone()[0]
+        self.assertIn((reader_uid, 'artifact'), gained)
+        self.assertFalse(self.sees('artifact', self.artifact, self.reader_c))

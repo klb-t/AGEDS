@@ -515,6 +515,7 @@ SETTING_PRESETS = (
 def _migrate_authz(db: sqlite3.Connection) -> None:
     _execute_script(db, AUTHZ_SCHEMA)
     _add_column(db, 'auth_methods', 'expires_at', 'TEXT')
+    _add_column(db, 'auth_methods', 'parent_method_uid', 'TEXT')
     db.executemany('INSERT OR IGNORE INTO capability_registry(name,description) VALUES(?,?)', CAPABILITY_PRESETS)
     db.executemany('INSERT OR IGNORE INTO authz_settings(key,value_json) VALUES(?,?)', SETTING_PRESETS)
     # Predicate vocabulary seed: data from the start, extensible without code (see authz).
@@ -667,6 +668,7 @@ APPEND_ONLY_ADVOCATE = ('advocate_turns', 'advocate_answers', 'derived_states', 
 def _migrate_advocate(db: sqlite3.Connection) -> None:
     _execute_script(db, ADVOCATE_SCHEMA)
     _execute_script(db, CREATE_PROVIDER_SCHEMA)
+    _add_column(db, 'advocate_turns', 'asked_by_principal_id', 'INTEGER REFERENCES principals(id)')
     for table in APPEND_ONLY_ADVOCATE:
         for event in ('UPDATE', 'DELETE'):
             db.execute(f"""CREATE TRIGGER IF NOT EXISTS {table}_no_{event.lower()} BEFORE {event} ON {table}

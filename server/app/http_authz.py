@@ -68,6 +68,9 @@ def _resolve(request: Request) -> Access:
     with _read() as db:
         mode = get_setting(db, 'auth.mode', 'legacy_open')
         if mode == 'legacy_open':
+            # Without accounts every request acts as the owner: only local clients may do that.
+            if not _legacy_client_allowed(db, request):
+                raise HTTPException(403, 'legacy_open accepts only local clients; use auth.mode=tokens')
             warning = db.execute('''SELECT 1 FROM grants g JOIN scopes s ON s.id=g.scope_id
                                     WHERE g.revoked_at IS NULL AND s.kind<>'installation' LIMIT 1''').fetchone()
             request.state.ageds_auth = ('legacy_open', 'recipient_grants_unenforced' if warning else None)
@@ -80,6 +83,30 @@ def _resolve(request: Request) -> Access:
     if principal is None:
         raise HTTPException(401, 'authentication required')
     return Access('tokens', principal)
+
+
+LEGACY_OPEN_CLIENTS_SEED = ('127.0.0.0/8', '::1/128')
+
+
+def _legacy_client_allowed(db, request: Request) -> bool:
+    import ipaddress
+    import os
+    entries = list(LEGACY_OPEN_CLIENTS_SEED)
+    entries += [e.strip() for e in os.environ.get('EW_LEGACY_OPEN_CLIENTS', '').split(',') if e.strip()]
+    extra = get_setting(db, 'http.legacy_open_clients', [])
+    entries += [str(e) for e in extra] if isinstance(extra, list) else []
+    host = request.client.host if request.client else ''
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return host in entries  # a named test client must be listed literally
+    for entry in entries:
+        try:
+            if address in ipaddress.ip_network(entry, strict=False):
+                return True
+        except ValueError:
+            continue
+    return False
 
 
 def _deny(db, kind: str, object_id: int) -> HTTPException:
@@ -166,7 +193,7 @@ import os
 from urllib.parse import urlsplit
 from fastapi.responses import JSONResponse
 
-DEFAULT_ALLOWED_HOSTS = ('127.0.0.1', 'localhost', '::1', 'testserver')
+DEFAULT_ALLOWED_HOSTS = ('127.0.0.1', 'localhost', '::1')
 UNSAFE_METHODS = {'POST', 'PUT', 'PATCH', 'DELETE'}
 
 

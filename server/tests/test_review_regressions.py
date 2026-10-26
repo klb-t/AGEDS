@@ -313,7 +313,7 @@ class R10BrowserSessions(Base):
         login = self.client.post('/advocate/login', data={'token': self.rec_token}, follow_redirects=False)
         cookie = login.cookies.get('ageds_token') or login.headers['set-cookie'].split('ageds_token=')[1].split(';')[0].strip('"')
         self.assertNotEqual(cookie, self.rec_token)
-        self.assertIn('Max-Age=43200', login.headers['set-cookie'])
+        self.assertRegex(login.headers['set-cookie'], r'Max-Age=(4319\d|43200);')
         self.assertEqual(self.client.get('/api/artifacts', headers=self.h(cookie)).status_code, 200)
         self.client.cookies.set('ageds_token', cookie)
         self.client.post('/advocate/logout', follow_redirects=False)

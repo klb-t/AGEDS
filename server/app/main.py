@@ -675,13 +675,13 @@ def advocate_page(request: Request, error: str = ''):
 @app.post('/advocate/login', dependencies=[public()])
 def advocate_login(request: Request, token: str = Form(..., max_length=512)):
     from fastapi.responses import RedirectResponse
-    from .auth import principal_for_token, start_session
+    from .auth import start_session
     with session() as db:
-        principal = principal_for_token(db, token.strip())
-        if principal is None:
+        # Only an API token starts a session; the cookie holds a separate secret bound to it.
+        started = start_session(db, token.strip())
+        if started is None:
             return RedirectResponse('/advocate?error=token', status_code=303)
-        # The cookie holds a separate, expiring session secret, not the API token itself.
-        session_token, max_age = start_session(db, principal)
+        session_token, max_age = started
     response = RedirectResponse('/advocate', status_code=303)
     secure = request.url.scheme == 'https' or request.headers.get('x-forwarded-proto') == 'https'
     response.set_cookie(TOKEN_COOKIE, session_token, httponly=True, samesite='strict', secure=secure, max_age=max_age)

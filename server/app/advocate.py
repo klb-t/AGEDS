@@ -265,11 +265,17 @@ def ask(db: sqlite3.Connection, principal_id: int, conversation_uid: str, questi
     if not gate.can_chat():
         raise authz.Denied('advocate', None, 'chat_with_advocate', exists=True)
     conversation = _conversation(db, gate, conversation_uid)
+    if conversation['principal_id'] != principal_id:
+        # Seeing that a conversation exists (owner visibility) never allows writing into it.
+        raise authz.Denied('conversation', conversation_uid, 'write', exists=True)
     basis = retrieve(gate, question)
     turn_uid = new_uid()
-    turn = db.execute('INSERT INTO advocate_turns(uid,conversation_id,question,retrieval_json) VALUES(?,?,?,?)',
+    turn = db.execute('''INSERT INTO advocate_turns(uid,conversation_id,question,retrieval_json,asked_by_principal_id)
+                         VALUES(?,?,?,?,?)''',
                       (turn_uid, conversation['id'], question,
-                       _json({'terms': query_terms(question), 'passages': len(basis)}))).lastrowid
+                       _json({'terms': query_terms(question), 'passages': len(basis)}), principal_id)).lastrowid
+    authz._audit(db, 'advocate_turn', 'advocate_turn', turn, {'uid': turn_uid, 'conversation_uid': conversation_uid},
+                 db.execute('SELECT uid FROM principals WHERE id=?', (principal_id,)).fetchone()['uid'])
     provider_call_id, mode, fallback, claims = None, None, None, []
     if provider is not None:
         from .providers import ProviderUnavailable

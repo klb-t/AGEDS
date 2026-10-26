@@ -73,6 +73,10 @@ else
   echo "== 3b. no --public-host: only loopback host names are accepted; a proxy passing another Host gets 400"
 fi
 
+echo "== 3c. legacy_open accepts only local clients; the host-side proxy reaches the container from the docker bridge"
+run "${COMPOSE[@]}" exec -T api python -m app.cli authz-setting --key http.legacy_open_clients --value-json '["172.16.0.0/12"]'
+echo "   (any process on this VM can reach the published loopback port; switch to tokens: authz-mode tokens)"
+
 echo "== 4. checks"
 run sh -c "for i in \$(seq 1 60); do curl -sf http://127.0.0.1:$PORT/advocate > /dev/null && exit 0; sleep 2; done; exit 1"
 run sh -c "curl -s -o /dev/null -D - http://127.0.0.1:$PORT/api/artifacts | grep -i '^x-ageds-auth-mode:'"

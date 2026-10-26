@@ -481,6 +481,27 @@
         "device_tests_executed": 0,
         "data": "synthetic"
       }
+    },
+    {
+      "id": "AGEDS-TASK-20261026-P13-DESIGN",
+      "owner": "rzecznik_p13",
+      "status": "done",
+      "scope": [
+        "docs/design/RZECZNIK_AWATAR_P13_2026-10-26.md"
+      ],
+      "based_on_commit": "0326ca9",
+      "acceptance": [
+        "Design only: variants, settings, costs, uncanny valley, security, tests, packages, owner questions."
+      ],
+      "results": {
+        "implementation": "none",
+        "external_sources": [
+          "metahuman.com/license",
+          "Google TTS v1beta1 reference",
+          "TalkingHead repository description",
+          "one GPU vendor price page"
+        ]
+      }
     }
   ],
   "remaining_boundaries": [

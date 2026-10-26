@@ -70,7 +70,8 @@ characters) is unverified. An avatar is not implemented.
   or a rejection records a meaning but opens nothing until a person accepts it.
 - `Host` must be loopback, `EW_ALLOWED_HOSTS` or `http.allowed_hosts` (`deploy_vm.sh --public-host`); state-changing
   requests from another site (`Sec-Fetch-Site`, `Origin`) are refused in every mode. `docker-compose.yml` publishes
-  loopback only.
+  loopback only. An Android device on a LAN or the emulator (`10.0.2.2`) needs its server address in
+  `EW_ALLOWED_HOSTS`.
 - `metadata_only` owner visibility shows that a turn exists, never the question; earlier answers re-enter a prompt
   only while provider consent covers their inputs.
 - Export needs `export` and `read_metadata`; text columns need `read_text` too and are otherwise nulled and listed.

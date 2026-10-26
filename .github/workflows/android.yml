@@ -97,7 +97,8 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - name: Start synthetic advocate backend
         run: |
-          AGEDS_BROWSER_PORT=8090 nohup python -m server.tests.browser_advocate_fixture > fixture.out 2> fixture.err &
+          # The emulator reaches the host as 10.0.2.2; the Host allow-list must name it.
+          EW_ALLOWED_HOSTS=10.0.2.2 AGEDS_BROWSER_PORT=8090 nohup python -m server.tests.browser_advocate_fixture > fixture.out 2> fixture.err &
           for i in $(seq 1 90); do [ -s fixture.out ] && break; sleep 1; done
           token=$(head -1 fixture.out | python -c 'import json,sys; print(json.load(sys.stdin)["token"])')
           hidden=$(head -1 fixture.out | python -c 'import json,sys; print(json.load(sys.stdin)["hidden"])')

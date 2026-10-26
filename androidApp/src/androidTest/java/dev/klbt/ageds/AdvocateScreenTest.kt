@@ -1,6 +1,7 @@
 package dev.klbt.ageds
 
 import android.content.Context
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
@@ -23,6 +24,8 @@ class AdvocateScreenTest {
     private val server: String? = arguments.getString("agedsServer")
     private val token: String? = arguments.getString("agedsToken")
     private val hidden: String = arguments.getString("agedsHidden") ?: "CANARY"
+    /** Emulators without GPU acceleration are slow; the job may raise this. */
+    private val timeoutMs: Long = arguments.getString("agedsTimeoutMs")?.toLongOrNull() ?: 60_000
 
     @get:Rule val rule = createEmptyComposeRule()
 
@@ -36,8 +39,19 @@ class AdvocateScreenTest {
 
     @Before fun requireBackend() = assumeTrue("synthetic backend arguments missing", server != null && token != null)
 
-    private fun waitForText(text: String, timeoutMs: Long = 20_000) =
-        rule.waitUntil(timeoutMs) { rule.onAllNodesWithText(text, substring = true).fetchSemanticsNodes().isNotEmpty() }
+    private fun waitForText(text: String) {
+        try {
+            rule.waitUntil(timeoutMs) { rule.onAllNodesWithText(text, substring = true).fetchSemanticsNodes().isNotEmpty() }
+        } catch (error: Throwable) {
+            // The semantics tree goes to logcat (tag ADVOCATE_UI) for the CI artifact.
+            rule.onRoot(useUnmergedTree = true).printToLog("ADVOCATE_UI")
+            throw AssertionError("text not shown within $timeoutMs ms: $text", error)
+        }
+    }
+
+    /** A semantic click does not depend on the chip being fully inside the visible list area. */
+    private fun clickCitation(ref: String) =
+        rule.onAllNodesWithText(ref).onFirst().performSemanticsAction(SemanticsActions.OnClick)
 
     @Test fun askShowsLabelledQuotesAndThePinnedBasis() {
         launch(requireNotNull(token))
@@ -48,7 +62,7 @@ class AdvocateScreenTest {
         rule.onNodeWithText("Zapytaj").performClick()
         waitForText("cytat z zapisanego tekstu")
         waitForText("Umowa najmu została podpisana piątego marca")
-        rule.onAllNodesWithText("p1").onFirst().performClick()
+        clickCitation("p1")
         waitForText("transkrypcja nagrania")
         waitForText("SHA-256 materiału")
         rule.onAllNodesWithText(hidden, substring = true).assertCountEquals(0)

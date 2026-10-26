@@ -113,7 +113,7 @@ jobs:
           target: google_apis
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: ./gradlew :androidApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=dev.klbt.ageds.AdvocateScreenTest -Pandroid.testInstrumentationRunnerArguments.agedsServer=http://10.0.2.2:8090 -Pandroid.testInstrumentationRunnerArguments.agedsToken=$AGEDS_TOKEN -Pandroid.testInstrumentationRunnerArguments.agedsHidden=$AGEDS_HIDDEN --stacktrace
+          script: ./gradlew :androidApp:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=dev.klbt.ageds.AdvocateScreenTest -Pandroid.testInstrumentationRunnerArguments.agedsServer=http://10.0.2.2:8090 -Pandroid.testInstrumentationRunnerArguments.agedsToken=$AGEDS_TOKEN -Pandroid.testInstrumentationRunnerArguments.agedsHidden=$AGEDS_HIDDEN -Pandroid.testInstrumentationRunnerArguments.agedsTimeoutMs=90000 --stacktrace || { adb logcat -d > logcat.txt; exit 1; }
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -122,4 +122,5 @@ jobs:
             androidApp/build/reports/androidTests/
             androidApp/build/outputs/androidTest-results/
             fixture.err
+            logcat.txt
           if-no-files-found: ignore

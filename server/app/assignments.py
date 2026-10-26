@@ -15,6 +15,8 @@ import sqlite3
 import uuid
 
 # Preset values, not a closed list (package P9 moves them into settings).
+# Author kinds treated as a person when no status is given; anything else proposes.
+HUMAN_AUTHOR_KINDS = ('human', 'unknown', 'owner', 'import')
 STATUS_PRESETS = ('unknown', 'ai_proposed', 'human_reviewed', 'rejected', 'withdrawn')
 TARGET_TABLES = {
     'artifact': 'artifacts', 'fragment': 'fragments', 'derived_text': 'derived_text',
@@ -74,12 +76,24 @@ def create_principal(db: sqlite3.Connection, display_name: str, *, kind: str = '
 
 def assign(db: sqlite3.Connection, *, case_id: int, target_kind: str, target_id: int,
            meaning_text: str | None = None, rationale_text: str | None = None,
-           status: str = 'unknown', author_principal_id: int | None = None,
+           status: str | None = None, author_principal_id: int | None = None,
            author_kind: str = 'unknown', issue_ref=None, model_run_id: int | None = None,
            visibility_scope_id: int | None = None, metadata: dict | None = None,
            actor: str | None = None) -> dict:
-    """Record one meaning of a target in one case; several per target are allowed."""
+    """Record one meaning of a target in one case; several per target are allowed.
+
+    Without an explicit status, anything not authored by a person is an AI proposal
+    ('ai_proposed'), which opens nothing until a person accepts it.
+    """
     _require(db, 'cases', case_id, 'case')
+    if status is None:
+        author_principal_kind = None
+        if author_principal_id is not None:
+            row = db.execute('SELECT kind FROM principals WHERE id=?', (author_principal_id,)).fetchone()
+            author_principal_kind = row['kind'] if row else None
+        machine = (model_run_id is not None or author_kind not in HUMAN_AUTHOR_KINDS
+                   or author_principal_kind in ('agent', 'service', 'model'))
+        status = 'ai_proposed' if machine else 'unknown'
     warnings = []
     table = TARGET_TABLES.get(target_kind)
     if table is None:

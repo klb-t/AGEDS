@@ -90,6 +90,7 @@ SETTINGS = {
     'conversation.owner_visibility': {'order': ['none', 'metadata_only', 'opt_in_by_recipient', 'full'],
                                       'note': 'applies to conversations started afterwards; each keeps its own'},
     'auth.mode': {'order': ['tokens', 'external', 'legacy_open']},
+    'advocate.proven_policy': {'order': ['downgrade_all', 'require_verbatim_quote', 'accept_model']},
     'advocate.log_prompt_content': {'order': [False, True]},
     # A wider vocabulary or depth can make an existing predicate match more: diffed like access settings.
     'assignment.opening_statuses': {'access': True},

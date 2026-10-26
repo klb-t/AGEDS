@@ -212,8 +212,39 @@ def derived_scope(basis: list[dict]) -> list:
     return sorted([list(item) for item in inputs])
 
 
-def verify(claims, basis: list[dict], gate: AdvocateGate) -> tuple[list[dict], dict]:
-    """Keep only citations into the basis that are still readable; never upgrade a status."""
+QUOTED_SPAN = re.compile(r'„([^”]{8,})”|"([^"]{8,})"|«([^»]{8,})»')
+
+
+def _normal(text: str) -> str:
+    return ' '.join(_fold(text).split())
+
+
+def _proven_holds(claim_text: str, cited: list[dict], policy: str) -> bool:
+    """Deterministic check of a model's 'proven' (advocate.proven_policy).
+
+    require_verbatim_quote (preset): the claim quotes at least one span in quotation
+    marks and every quoted span occurs verbatim in a cited passage. downgrade_all: never.
+    accept_model: the model's label stands (an explicit, confirmed owner choice).
+    """
+    if policy == 'accept_model':
+        return True
+    if policy != 'require_verbatim_quote':
+        return False
+    spans = [next(g for g in match.groups() if g) for match in QUOTED_SPAN.finditer(claim_text)]
+    passages = [_normal(entry.get('text') or '') for entry in cited]
+    return bool(spans) and all(any(_normal(span) in passage for passage in passages) for span in spans)
+
+
+def verify(claims, basis: list[dict], gate: AdvocateGate, *, from_model: bool = True,
+           proven_policy: str | None = None) -> tuple[list[dict], dict]:
+    """Keep only citations into the basis that are still readable; never upgrade a status.
+
+    A model's own 'proven' or 'quoted_material' is not taken at its word: material may
+    contain instructions (prompt injection), so the label must survive a check against
+    the cited passages, or it becomes 'claim'.
+    """
+    if proven_policy is None:
+        proven_policy = authz.get_setting(gate.db, 'advocate.proven_policy', 'require_verbatim_quote')
     by_ref = {entry['ref']: entry for entry in basis}
     checked, removed, warnings = [], [], []
     for position, claim in enumerate(claims if isinstance(claims, list) else []):
@@ -233,6 +264,13 @@ def verify(claims, basis: list[dict], gate: AdvocateGate) -> tuple[list[dict], d
             warnings.append({'code': 'status_not_in_presets', 'position': position, 'status': status})
         if status in ('proven', 'quoted_material') and not valid:
             status = 'claim_without_basis'
+        elif from_model and status == 'proven' and not _proven_holds(claim['text'], [by_ref[r] for r in valid], proven_policy):
+            status = 'claim'
+            warnings.append({'code': 'proven_downgraded', 'position': position, 'policy': proven_policy})
+        elif from_model and status == 'quoted_material' and not any(
+                _normal(CITATION.sub('', claim['text'])) in _normal(by_ref[r].get('text') or '') for r in valid):
+            status = 'claim'
+            warnings.append({'code': 'quote_not_verbatim', 'position': position})
         checked.append({'text': CITATION.sub('', claim['text']).strip(), 'status': status, 'citations': valid})
     return checked, {'removed_citations': removed, 'warnings': warnings,
                      'statuses_are_labels_not_probabilities': True}
@@ -277,6 +315,9 @@ def ask(db: sqlite3.Connection, principal_id: int, conversation_uid: str, questi
     authz._audit(db, 'advocate_turn', 'advocate_turn', turn, {'uid': turn_uid, 'conversation_uid': conversation_uid},
                  db.execute('SELECT uid FROM principals WHERE id=?', (principal_id,)).fetchone()['uid'])
     provider_call_id, mode, fallback, claims = None, None, None, []
+    # Never hold the write lock across network I/O: the turn is durable before the
+    # provider is called, and the answer is written in its own transaction afterwards.
+    db.commit()
     if provider is not None:
         from .providers import ProviderUnavailable
         history = conversation_history(db, principal_id, conversation_uid, for_prompt=True)
@@ -290,7 +331,7 @@ def ask(db: sqlite3.Connection, principal_id: int, conversation_uid: str, questi
         mode = 'retrieval_only'
         claims = [{'text': entry['text'], 'status': 'quoted_material' if entry['kind'] != 'assignment' else 'claim',
                    'citations': [entry['ref']]} for entry in basis]
-    claims, verification = verify(claims, basis, gate)
+    claims, verification = verify(claims, basis, gate, from_model=mode != 'retrieval_only')
     if fallback:
         verification['provider_fallback'] = fallback
     scope = derived_scope(basis)

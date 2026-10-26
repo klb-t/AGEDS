@@ -212,17 +212,37 @@ class AdvocateCoreTests(AdvocateFixture):
             advocate.conversation_history(conn, self.owner, custom)
 
     def test_verifier_removes_foreign_citations_and_never_upgrades(self):
-        basis = [{'ref': 'p1', 'object': ['artifact', self.shared], 'text': 'x'}]
+        basis = [{'ref': 'p1', 'object': ['artifact', self.shared], 'text': 'Umowa najmu została podpisana w marcu.'}]
         claims = [{'text': 'A [cit:p1] [cit:p9]', 'status': 'proven', 'citations': ['p2']},
                   {'text': 'B', 'status': 'proven', 'citations': []},
-                  {'text': 'C', 'status': 'pewne_na_100', 'citations': ['p1']}, 'garbage']
+                  {'text': 'C', 'status': 'pewne_na_100', 'citations': ['p1']}, 'garbage',
+                  {'text': 'Podpisano: „umowa najmu została podpisana w marcu”.', 'status': 'proven', 'citations': ['p1']},
+                  {'text': 'Przyznał: „oskarżony przyznał się do winy”.', 'status': 'proven', 'citations': ['p1']}]
         with db.session() as conn:
             checked, report = advocate.verify(claims, basis, advocate.AdvocateGate(conn, self.recipient))
-        self.assertEqual(checked[0], {'text': 'A', 'status': 'proven', 'citations': ['p1']})
+        self.assertEqual(checked[0], {'text': 'A', 'status': 'claim', 'citations': ['p1']})  # no verbatim quote
         self.assertEqual(checked[1]['status'], 'claim_without_basis')
         self.assertEqual(checked[2]['status'], 'pewne_na_100')
+        self.assertEqual(checked[3]['status'], 'proven')  # quoted span occurs in p1 (case and diacritics folded)
+        self.assertEqual(checked[4]['status'], 'claim')  # quoted span is not in the cited passage
         self.assertEqual({r['ref'] for r in report['removed_citations']}, {'p2', 'p9'})
-        self.assertEqual({w['code'] for w in report['warnings']}, {'status_not_in_presets', 'malformed_claim'})
+        self.assertEqual({w['code'] for w in report['warnings']},
+                         {'status_not_in_presets', 'malformed_claim', 'proven_downgraded'})
+
+    def test_proven_policy_values(self):
+        basis = [{'ref': 'p1', 'object': ['artifact', self.shared], 'text': 'Termin płatności minął w kwietniu.'}]
+        quoted = {'text': 'Wynika: „termin płatności minął w kwietniu”', 'status': 'proven', 'citations': ['p1']}
+        bare = {'text': 'Termin minął.', 'status': 'proven', 'citations': ['p1']}
+        with db.session() as conn:
+            gate = advocate.AdvocateGate(conn, self.recipient)
+            results = {policy: [c['status'] for c in advocate.verify([quoted, bare], basis, gate, proven_policy=policy)[0]]
+                       for policy in ('require_verbatim_quote', 'downgrade_all', 'accept_model', 'whatever')}
+            system = advocate.verify([bare], basis, gate, from_model=False, proven_policy='downgrade_all')[0]
+        self.assertEqual(results, {'require_verbatim_quote': ['proven', 'claim'], 'downgrade_all': ['claim', 'claim'],
+                                   'accept_model': ['proven', 'proven'], 'whatever': ['claim', 'claim']})
+        self.assertEqual(system[0]['status'], 'proven')  # only model output is checked
+        with db.session() as conn, self.assertRaises(authz.SettingWidensAccess):
+            authz.set_setting(conn, 'advocate.proven_policy', 'accept_model')
 
 
 class StaticTests(unittest.TestCase):

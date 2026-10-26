@@ -156,6 +156,17 @@ function renderAnswer(answer) {
       line.append(button);
     }
     box.append(line, details);
+    if (answer.mode !== 'retrieval_only' && claim.citations.length) {
+      // A model's claim is shown with the passage it cites, so a reader compares them at once.
+      const first = claim.citations[0];
+      basisFor(answer).then(async (basis) => {
+        const entry = basis.find((item) => item.ref === first);
+        if (entry && !details.childElementCount) {
+          details.append(await renderBasisEntry(entry));
+          line.querySelector('.cite')?.setAttribute('aria-expanded', 'true');
+        }
+      });
+    }
   }
   return box;
 }

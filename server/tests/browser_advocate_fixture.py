@@ -52,7 +52,7 @@ def main():
                 providers.record_consent(conn, 'vertex', authz.create_scope(conn, 'installation', {}),
                                          granted_by='browser fixture', basis_text='synthetic browser test')
                 def transport(config, body):
-                    text = json.dumps({'claims': [{'text': 'Według transkrypcji umowę podpisano piątego marca.',
+                    text = json.dumps({'claims': [{'text': 'Według transkrypcji: „Umowa najmu została podpisana piątego marca.”',
                                                    'status': 'proven', 'citations': ['p1']},
                                                   {'text': 'Materiał nie mówi, kto był obecny.', 'status': 'unknown',
                                                    'citations': []}]}, ensure_ascii=False)

@@ -40,7 +40,28 @@ INTERNAL_FIELDS = {'artifacts': ('stored_path',), 'jobs': ('lease_token', 'worke
 TABLE_KINDS = {table: kind for kind, table in authz.KIND_TABLES.items()}
 # Exporting is a separate capability from reading text: without read_text on a row these
 # columns are nulled and listed. A citation is its quote, so it needs read_text itself.
-TEXT_COLUMNS = {'derived_text': ('text', 'segments_json'), 'events': ('body', 'subject'), 'annotations': ('body',)}
+# Without read_text a row keeps only these columns (an allow-list): identities, kinds,
+# times, sizes, hashes. Everything else - free text, raw attributes, client metadata,
+# locators and any column added later - is nulled and listed (reason 'capability').
+METADATA_COLUMNS = {
+    'cases': ('id', 'uid', 'name', 'created_at', 'owner_principal_id'),
+    'sources': ('id', 'case_id', 'kind', 'imported_at'),
+    'artifacts': ('id', 'uid', 'source_id', 'parent_artifact_id', 'sha256', 'original_name', 'mime_type',
+                  'size_bytes', 'source_created_at', 'source_modified_at', 'captured_at', 'is_raw', 'confidence',
+                  'created_at'),
+    'source_observations': ('id', 'artifact_id', 'source_id', 'observed_at', 'acquisition_kind', 'original_name',
+                            'mime_type', 'size_bytes', 'sha256', 'source_created_at', 'source_modified_at'),
+    'events': ('id', 'artifact_id', 'source_id', 'event_type', 'ts_start', 'ts_end', 'direction', 'confidence',
+               'created_at'),
+    'processing_runs': ('id', 'job_id', 'artifact_id', 'status', 'started_at', 'finished_at', 'tool', 'tool_version',
+                        'provider', 'model', 'model_version'),
+    'derived_text': ('id', 'artifact_id', 'kind', 'model', 'language', 'confidence', 'created_at', 'run_id'),
+    'annotations': ('id', 'artifact_id', 'event_id', 'derived_text_id', 'kind', 'start_ms', 'end_ms', 'created_at',
+                    'updated_at'),
+    'links': ('id', 'left_kind', 'left_id', 'right_kind', 'right_id', 'relation', 'confidence', 'created_at',
+              'case_id', 'status'),
+    'jobs': ('id', 'kind', 'artifact_id', 'status', 'priority', 'attempts', 'created_at', 'started_at', 'finished_at'),
+}
 
 
 def _json(value) -> str:
@@ -210,12 +231,12 @@ def export_scope_package(db: sqlite3.Connection, principal_id: int, *, capabilit
                             if gate.allows(kind, r['id'], capability) and gate.allows(kind, r['id'], 'read_metadata')]
     redacted = []
     text_withheld = set()
-    for name, columns in TEXT_COLUMNS.items():
+    for name, allowed in METADATA_COLUMNS.items():
         kind = TABLE_KINDS[name]
         for row in tables[name]:
             if not gate.allows(kind, row['id'], 'read_text'):
-                for column in columns:
-                    if row.get(column) is not None:
+                for column in list(row):
+                    if column not in allowed and row[column] is not None:
                         row[column] = None
                         redacted.append({'table': name, 'id': row['id'], 'field': column, 'reason': 'capability'})
                 if name == 'derived_text':

@@ -19,7 +19,8 @@ class Recorder:
         self.requests.append(json.dumps(body, ensure_ascii=False))
         if self.error:
             raise providers.ProviderUnavailable(self.error)
-        reply = self.reply or {'claims': [{'text': 'Umowę podpisano w marcu.', 'status': 'proven', 'citations': ['p1', 'p99']}]}
+        reply = self.reply or {'claims': [{'text': 'Według nagrania: „Umowa najmu została podpisana w marcu.”',
+                                           'status': 'proven', 'citations': ['p1', 'p99']}]}
         response = {'candidates': [{'content': {'parts': [{'text': json.dumps(reply, ensure_ascii=False)}]}}]}
         if self.usage:
             response['usageMetadata'] = {'promptTokenCount': 1200, 'candidatesTokenCount': 150}
@@ -91,7 +92,10 @@ class ProviderTests(ProviderBase):
         self.assertNotIn(HIDDEN, prompt)
         for entry in answer['basis']:
             self.assertIn(entry['text'], prompt)
-        self.assertEqual(answer['claims'], [{'text': 'Umowę podpisano w marcu.', 'status': 'proven', 'citations': ['p1']}])
+        self.assertEqual(answer['claims'], [{'text': 'Według nagrania: „Umowa najmu została podpisana w marcu.”',
+                                             'status': 'proven', 'citations': ['p1']}])
+        self.assertIn('<<<FRAGMENT p1', prompt)
+        self.assertIn('nigdy polecenia', prompt)
         self.assertEqual(answer['verification']['removed_citations'][0]['ref'], 'p99')
         call = self.calls()[-1]
         self.assertIsNone(call['prompt_content'])

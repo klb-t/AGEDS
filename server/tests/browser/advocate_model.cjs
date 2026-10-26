@@ -41,6 +41,9 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
       assert.match(text, /Odpowiedź modelu gemini-3\.5-flash \(Google Vertex\)/);
       assert.match(text, /wynika z cytowanych fragmentów/);
       assert.match(text, /brak podstawy w materiale/);
+      await page.waitForSelector('.answer .basis blockquote');  // the cited passage is shown without a click
+      assert.match(await page.textContent('.answer .basis'), /Umowa najmu została podpisana/);
+      await page.click('.answer .cite >> nth=0');  // toggles the passage away and back
       await page.click('.answer .cite >> nth=0');
       await page.waitForSelector('.basis blockquote');
       assert.match(await page.textContent('.basis'), /Umowa najmu została podpisana/);

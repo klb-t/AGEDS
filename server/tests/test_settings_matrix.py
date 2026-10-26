@@ -202,8 +202,7 @@ if __name__ == '__main__':
     unittest.main()
 
 
-class PredicateTests(Base):
-    """fragment.open_policy=predicate:<json>: a closed grammar over data, evaluated per assignment."""
+class PredicateBase(Base):
 
     def setUp(self):
         super().setUp()
@@ -216,6 +215,11 @@ class PredicateTests(Base):
 
     def predicate(self, spec):
         return self.set('fragment.open_policy', 'predicate:' + (spec if isinstance(spec, str) else json.dumps(spec)))
+
+
+
+class PredicateTests(PredicateBase):
+    """fragment.open_policy=predicate:<json>: data evaluated per assignment by a fixed interpreter."""
 
     def test_opening_follows_the_matching_assignment_only(self):
         self.predicate({'when': {'field': 'assignment.status', 'eq': 'human_reviewed'}, 'then': 'whole_document'})
@@ -270,3 +274,43 @@ class PredicateTests(Base):
         reader_uid = self.db.execute('SELECT uid FROM principals WHERE id=?', (self.reader_c,)).fetchone()[0]
         self.assertIn((reader_uid, 'artifact'), gained)
         self.assertFalse(self.sees('artifact', self.artifact, self.reader_c))
+
+
+class PredicateVocabularyTests(PredicateBase):
+    """The vocabulary is data seeded at migration; only the interpreter is fixed."""
+
+    def test_seed_is_stored_as_settings(self):
+        self.assertEqual(authz.get_setting(self.db, 'predicate.max_depth'), 16)
+        self.assertEqual(authz.get_setting(self.db, 'predicate.operators'), ['eq', 'in', 'prefix'])
+        self.assertIn('assignment.status', authz.get_setting(self.db, 'predicate.fields'))
+
+    def test_a_field_added_as_data_works_without_code(self):
+        fields = dict(authz.get_setting(self.db, 'predicate.fields'))
+        fields['assignment.meaning'] = {'row': 'assignment', 'column': 'meaning_text'}
+        self.set('predicate.fields', fields)
+        self.predicate({'when': {'field': 'assignment.meaning', 'eq': 'zweryfikowane'}, 'then': 'whole_document'})
+        self.assertTrue(self.sees('artifact', self.artifact, self.reader_c))
+        self.assertFalse(self.sees('artifact', self.artifact))
+
+    def test_disabling_an_operator_or_lowering_depth_narrows(self):
+        self.predicate({'when': {'field': 'fragment.kind', 'prefix': 'cit'}, 'then': 'whole_document'})
+        self.assertTrue(self.sees('artifact', self.artifact))
+        authz.set_setting(self.db, 'predicate.operators', ['eq', 'in'])
+        self.assertFalse(self.sees('artifact', self.artifact))
+        self.set('predicate.operators', ['eq', 'in', 'prefix'])
+        self.predicate({'when': {'not': {'not': {'field': 'fragment.kind', 'eq': 'citation'}}}, 'then': 'whole_document'})
+        self.assertTrue(self.sees('artifact', self.artifact))
+        authz.set_setting(self.db, 'predicate.max_depth', 1)
+        self.assertFalse(self.sees('artifact', self.artifact))
+
+    def test_unimplemented_operators_and_foreign_rows_are_ignored_and_reported(self):
+        self.set('predicate.operators', ['eq', 'regex'])
+        vocabulary = authz.predicate_vocabulary(self.db)
+        self.assertEqual((vocabulary['operators'], vocabulary['ignored_operators']), (['eq'], ['regex']))
+        fields = dict(authz.get_setting(self.db, 'predicate.fields'))
+        fields['principal.name'] = {'row': 'principal', 'column': 'display_name'}
+        self.set('predicate.fields', fields)
+        self.assertNotIn('principal.name', authz.predicate_vocabulary(self.db)['fields'])
+        change = self.predicate({'when': {'field': 'principal.name', 'eq': 'x'}, 'then': 'whole_document'})
+        self.assertEqual(change['warnings'][-1]['code'], 'predicate_invalid_opens_nothing_extra')
+        self.assertFalse(self.sees('artifact', self.artifact))

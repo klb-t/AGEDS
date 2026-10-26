@@ -88,6 +88,8 @@ SETTINGS = {
                                       'note': 'applies to conversations started afterwards; each keeps its own'},
     'auth.mode': {'order': ['tokens', 'external', 'legacy_open']},
     'advocate.log_prompt_content': {'order': [False, True]},
+    # A wider vocabulary or depth can make an existing predicate match more: diffed like access settings.
+    'predicate.fields': {'access': True}, 'predicate.operators': {'access': True}, 'predicate.max_depth': {'access': True},
 }
 DIFF_KINDS = ('case', 'artifact', 'derived_text', 'evidence_anchor', 'fragment', 'assignment', 'event',
               'link', 'annotation', 'source_observation', 'conversation', 'advocate_turn')
@@ -165,7 +167,7 @@ def set_setting(db: sqlite3.Connection, key: str, value, *, actor: str | None = 
             isinstance(p, str) and '<' in p and isinstance(value, str) and value.startswith(p.split('<')[0]) for p in known):
         warnings.append({'code': 'value_not_in_presets', 'value': value})
     if key == 'fragment.open_policy' and isinstance(value, str) and value.startswith('predicate:'):
-        problems = validate_predicate(value.split(':', 1)[1])
+        problems = validate_predicate(value.split(':', 1)[1], predicate_vocabulary(db))
         if problems:
             warnings.append({'code': 'predicate_invalid_opens_nothing_extra', 'errors': problems})
     change = {'key': key, 'from': previous, 'to': value, 'widens': widening,
@@ -361,9 +363,42 @@ def _private(conversation, level: str) -> tuple:
 
 
 OPEN_LEVELS = ('fragment_only', 'whole_artifact_version', 'whole_document')
-PREDICATE_FIELDS = ('fragment.kind', 'fragment.id', 'assignment.status', 'assignment.author_kind',
-                    'assignment.case_id', 'assignment.issue', 'case.uid')
-MAX_PREDICATE_DEPTH = 16
+# Predicate vocabulary is data (settings `predicate.fields`, `predicate.operators`,
+# `predicate.max_depth`); the values below are only the seed written at migration.
+# Closed on purpose (security, 2026-10-26): nothing from a setting is executed. A
+# field maps to a column of a row the interpreter already loads (fragment,
+# assignment, case), optionally one key of a JSON column; an operator is enabled by
+# data but must exist in OPERATORS, so a new operator needs code.
+PREDICATE_ROWS = ('fragment', 'assignment', 'case')
+PREDICATE_FIELDS_SEED = {
+    'fragment.kind': {'row': 'fragment', 'column': 'kind'},
+    'fragment.id': {'row': 'fragment', 'column': 'id'},
+    'assignment.status': {'row': 'assignment', 'column': 'status'},
+    'assignment.author_kind': {'row': 'assignment', 'column': 'author_kind'},
+    'assignment.case_id': {'row': 'assignment', 'column': 'case_id'},
+    'assignment.issue': {'row': 'assignment', 'column': 'issue_ref_json', 'json_key': 'issue'},
+    'case.uid': {'row': 'case', 'column': 'uid'},
+}
+OPERATORS = {
+    'eq': lambda value, operand: value == operand,
+    'in': lambda value, operand: isinstance(operand, list) and value in operand,
+    'prefix': lambda value, operand: isinstance(value, str) and isinstance(operand, str) and value.startswith(operand),
+}
+PREDICATE_OPERATORS_SEED = ['eq', 'in', 'prefix']
+PREDICATE_MAX_DEPTH_SEED = 16
+
+
+def predicate_vocabulary(db) -> dict:
+    fields = get_setting(db, 'predicate.fields', PREDICATE_FIELDS_SEED)
+    operators = get_setting(db, 'predicate.operators', PREDICATE_OPERATORS_SEED)
+    depth = get_setting(db, 'predicate.max_depth', PREDICATE_MAX_DEPTH_SEED)
+    return {
+        'fields': {name: spec for name, spec in (fields if isinstance(fields, dict) else {}).items()
+                   if isinstance(spec, dict) and spec.get('row') in PREDICATE_ROWS and isinstance(spec.get('column'), str)},
+        'operators': [op for op in (operators if isinstance(operators, list) else []) if op in OPERATORS],
+        'max_depth': depth if type(depth) is int and depth >= 0 else 0,
+        'ignored_operators': [op for op in (operators if isinstance(operators, list) else []) if op not in OPERATORS],
+    }
 
 
 def _open_value(value) -> str | None:
@@ -374,8 +409,11 @@ def _open_value(value) -> str | None:
     return None
 
 
-def validate_predicate(raw: str) -> list[str]:
+def validate_predicate(raw: str, vocabulary: dict | None = None) -> list[str]:
     """Errors in a 'predicate:<json>' open policy; an invalid predicate opens nothing extra."""
+    if vocabulary is None:
+        vocabulary = {'fields': PREDICATE_FIELDS_SEED, 'operators': PREDICATE_OPERATORS_SEED,
+                      'max_depth': PREDICATE_MAX_DEPTH_SEED, 'ignored_operators': []}
     try:
         spec = json.loads(raw)
     except ValueError:
@@ -387,10 +425,11 @@ def validate_predicate(raw: str) -> list[str]:
         errors.append(f'unknown "then": {spec["then"]!r}')
     if 'else' in spec and _open_value(spec['else']) is None:
         errors.append(f'unknown "else": {spec["else"]!r}')
+    operators = vocabulary['operators']
 
     def check(node, depth):
-        if depth > MAX_PREDICATE_DEPTH:
-            errors.append('predicate nests too deeply')
+        if depth > vocabulary['max_depth']:
+            errors.append(f'predicate nests deeper than predicate.max_depth={vocabulary["max_depth"]}')
             return
         if not isinstance(node, dict) or len([k for k in ('all', 'any', 'not', 'field') if k in node]) != 1:
             errors.append(f'condition must have exactly one of all/any/not/field: {node!r}')
@@ -405,33 +444,46 @@ def validate_predicate(raw: str) -> list[str]:
         elif 'not' in node:
             check(node['not'], depth + 1)
         else:
-            if node['field'] not in PREDICATE_FIELDS:
-                errors.append(f'unknown field {node["field"]!r}')
-            if len([k for k in ('eq', 'in', 'prefix') if k in node]) != 1:
-                errors.append(f'field condition needs exactly one of eq/in/prefix: {node!r}')
+            if node['field'] not in vocabulary['fields']:
+                errors.append(f'unknown field {node["field"]!r} (see predicate.fields)')
+            used = [k for k in OPERATORS if k in node]
+            if len(used) != 1 or used[0] not in operators:
+                errors.append(f'field condition needs exactly one enabled operator of {operators}: {node!r}')
     check(spec['when'], 0)
     return errors
 
 
-def _evaluate(node, context: dict, depth: int = 0) -> bool:
-    """Closed grammar over data; nothing from a setting is ever executed."""
-    if depth > MAX_PREDICATE_DEPTH or not isinstance(node, dict):
+def _field_value(spec: dict, rows: dict):
+    row = rows.get(spec['row'])
+    if row is None or spec['column'] not in row.keys():
+        return None
+    value = row[spec['column']]
+    if 'json_key' in spec:
+        try:
+            decoded = json.loads(value) if isinstance(value, str) else None
+        except ValueError:
+            return None
+        value = decoded.get(spec['json_key']) if isinstance(decoded, dict) else decoded
+    return value if isinstance(value, (str, int, float, bool)) or value is None else None
+
+
+def _evaluate(node, rows: dict, vocabulary: dict, depth: int = 0) -> bool:
+    """A fixed interpreter over data; nothing from a setting is ever executed."""
+    if depth > vocabulary['max_depth'] or not isinstance(node, dict):
         return False
     if 'all' in node:
-        return isinstance(node['all'], list) and all(_evaluate(n, context, depth + 1) for n in node['all'])
+        return isinstance(node['all'], list) and all(_evaluate(n, rows, vocabulary, depth + 1) for n in node['all'])
     if 'any' in node:
-        return isinstance(node['any'], list) and any(_evaluate(n, context, depth + 1) for n in node['any'])
+        return isinstance(node['any'], list) and any(_evaluate(n, rows, vocabulary, depth + 1) for n in node['any'])
     if 'not' in node:
-        return not _evaluate(node['not'], context, depth + 1)
-    if node.get('field') not in PREDICATE_FIELDS:
+        return not _evaluate(node['not'], rows, vocabulary, depth + 1)
+    spec = vocabulary['fields'].get(node.get('field'))
+    if spec is None:
         return False
-    value = context.get(node['field'])
-    if 'eq' in node:
-        return value == node['eq']
-    if 'in' in node:
-        return isinstance(node['in'], list) and value in node['in']
-    if 'prefix' in node:
-        return isinstance(value, str) and isinstance(node['prefix'], str) and value.startswith(node['prefix'])
+    value = _field_value(spec, rows)
+    for operator in vocabulary['operators']:
+        if operator in node:
+            return OPERATORS[operator](value, node[operator])
     return False
 
 
@@ -448,18 +500,13 @@ def effective_open_policy(db, fragment, assignment) -> str:
     if not policy.startswith('predicate:'):
         return _open_value(policy) or 'fragment_only'
     raw = policy.split(':', 1)[1]
-    if validate_predicate(raw):
+    vocabulary = predicate_vocabulary(db)
+    if validate_predicate(raw, vocabulary):
         return 'fragment_only'
     spec = json.loads(raw)
-    case = db.execute('SELECT uid FROM cases WHERE id=?', (assignment['case_id'],)).fetchone()
-    issue = json.loads(assignment['issue_ref_json'] or 'null')
-    if isinstance(issue, dict):
-        issue = issue.get('issue')
-    context = {'fragment.kind': fragment['kind'], 'fragment.id': fragment['id'],
-               'assignment.status': assignment['status'], 'assignment.author_kind': assignment['author_kind'],
-               'assignment.case_id': assignment['case_id'], 'case.uid': case['uid'] if case else None,
-               'assignment.issue': issue if isinstance(issue, (str, int)) else None}
-    return spec['then'] if _evaluate(spec['when'], context) else spec.get('else', 'fragment_only')
+    case = db.execute('SELECT * FROM cases WHERE id=?', (assignment['case_id'],)).fetchone()
+    rows = {'fragment': fragment, 'assignment': assignment, 'case': case}
+    return spec['then'] if _evaluate(spec['when'], rows, vocabulary) else spec.get('else', 'fragment_only')
 
 
 def _assignment_home(assignment) -> tuple:

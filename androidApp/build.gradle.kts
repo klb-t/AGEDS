@@ -40,5 +40,10 @@ dependencies {
     implementation("io.ktor:ktor-client-content-negotiation:3.6.0")
     implementation("io.ktor:ktor-serialization-kotlinx-json:3.6.0")
     implementation("io.ktor:ktor-client-logging:3.6.0")
+    constraints {
+        // Compose UI test/Espresso need 1.2.0; AGP pins test runtime to the app's versions
+        // (run 40364238271: strictly 1.1.0 vs 1.2.0), so the app moves to the compatible 1.2.0.
+        implementation("androidx.concurrent:concurrent-futures:1.2.0")
+    }
 }
 

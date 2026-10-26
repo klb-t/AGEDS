@@ -493,7 +493,7 @@ z serwera (lista, otwarty materiał, cytaty, rozmowy) przy zmianie serwera/token
 prawdziwych odpowiedziach serwera wygenerowanych z danych syntetycznych (`androidApp/src/test/resources/advocate`).
 Odbiór: ręczny workflow „Manual verification”, bieg GitHub Actions 40216681267 na `f0a2248` — `assembleDebug`,
 `testDebugUnitTest`, `core:desktopTest` i backend zielone (wynik przekazany przez sesję koordynatora; ta sesja nie ma
-narzędzi GitHuba, nie odczytała biegu sama). Brak testu na urządzeniu/emulatorze (instrumentacja i SAF nadal niewykonane).
+narzędzi GitHuba, nie odczytała biegu sama). Emulator (2026-10-26): job `android-emulator` (API 34 x86_64, syntetyczny backend `browser_advocate_fixture` w tym samym jobie) — `AdvocateScreenTest` 2/2 w biegu 40367327345 na `9f870b7` (wynik przekazany przez koordynatora); wcześniejsze biegi: 40364238271 konflikt `concurrent-futures`, 40365848675 1/2 (klik dotykowy w chip cytatu). Testy SAF (`SourceScannerProviderTest`) nadal nie były uruchomione na urządzeniu.
 
 Równoległość: P4 i P5 mogą iść równolegle po P3 (inne pliki); reszta sekwencyjnie. Każdy pakiet: krótki brief
 (pliki, decyzje, stan), commit pośredni po każdym kawałku, bez zależności od kontekstu sesji.

@@ -478,8 +478,12 @@
           "40215770798": "platforms;android-37 not found",
           "40215963800": "baseline green"
         },
-        "device_tests_executed": 0,
-        "data": "synthetic"
+        "device_tests_executed": 2,
+        "data": "synthetic",
+        "emulator_run": "https://github.com/klb-t/AGEDS/actions/runs/40367327345",
+        "emulator_commit": "9f870b7",
+        "device_tests_result": "2/2 AdvocateScreenTest on API 34 x86_64 emulator (reported by coordinator)",
+        "saf_device_tests_executed": 0
       }
     },
     {
@@ -501,6 +505,24 @@
           "TalkingHead repository description",
           "one GPU vendor price page"
         ]
+      }
+    },
+    {
+      "id": "AGEDS-TASK-20261026-DEPLOY-PLAN",
+      "owner": "rzecznik_ops",
+      "status": "ready",
+      "scope": [
+        "scripts/deploy_vm.sh",
+        "docs/ADVOCATE.md"
+      ],
+      "based_on_commit": "9f870b7",
+      "acceptance": [
+        "Dry run prints every step; apply only after the owner approves the Vertex smoke test and deployment."
+      ],
+      "results": {
+        "dry_run": "printed all steps",
+        "applied": false,
+        "needs": "sudo on the VM; owner approval"
       }
     }
   ],

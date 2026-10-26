@@ -4,6 +4,17 @@ Status 2026-10-25 (branch `claude/rzecznik-design`): text conversation works in 
 accepted on synthetic data (backend, real Chromium). The Vertex provider path is tested against a recording fake
 transport only; **no real Vertex or Text-to-Speech call has been made yet**. The avatar is not implemented.
 
+## Deployment on the VM
+
+`scripts/deploy_vm.sh` (dry run by default, `--apply` executes, needs sudo): stops api and worker, backs up
+SQLite with the online backup API and the content store with SHA-256 manifests to `/var/lib/ageds-backups/`,
+builds, starts, then checks `/advocate`, the auth-mode header, `/api/advocate/status` and migrations 1–6; it prints
+the rollback steps. Inside the container the CLI is `python -m app.cli` (not `server.app.cli`):
+
+```bash
+sudo docker compose -p ageds -f docker-compose.yml -f docker-compose.vm.yml exec api python -m app.cli authz-show
+```
+
 ## Share a package with a recipient
 
 Run with the same environment as the server (`EW_DB_PATH`, `EW_STORE_DIR`). Back up SQLite and the content store

@@ -344,6 +344,21 @@ class CliTests(unittest.TestCase):
         self.assertEqual(self.run_cli('advocate-voice', 'off')[0], 0)
         self.assertEqual(self.run_cli('advocate-provider', 'off')[0], 0)
 
+    def test_invitation_in_one_step_and_preview(self):
+        self.assertEqual(self.run_cli('authz-owner-init', '--name', 'owner')[0], 0)
+        code, invite = self.run_cli('authz-invite', '--name', 'Mecenas (syntetyczny)', '--case-id', '1',
+                                    '--base-url', 'https://ageds.example/', '--expires-days', '30')
+        self.assertEqual(code, 0)
+        self.assertEqual(invite['invitation_link'], f"https://ageds.example/advocate#t={invite['token']}")
+        self.assertIn('legacy_open', invite['warnings'][0])
+        self.assertEqual(invite['capabilities'], ['read_metadata', 'read_text', 'chat_with_advocate'])
+        code, preview = self.run_cli('authz-preview', '--principal-uid', invite['principal_uid'])
+        self.assertEqual((code, preview['cases'], preview['can_chat']), (0, ['Default case'], True))
+        self.assertNotEqual(self.run_cli('authz-invite', '--name', 'x', '--case-id', '999')[0], 0)
+        with db.session() as conn:
+            self.assertEqual(auth.principal_for_token(conn, invite['token']),
+                             conn.execute('SELECT id FROM principals WHERE uid=?', (invite['principal_uid'],)).fetchone()[0])
+
 
 if __name__ == '__main__':
     unittest.main()

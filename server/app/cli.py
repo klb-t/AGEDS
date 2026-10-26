@@ -122,6 +122,15 @@ def _parser() -> argparse.ArgumentParser:
     budget = commands.add_parser("advocate-budget", help="set the daily provider budget in EUR")
     budget.add_argument("eur", type=float)
     commands.add_parser("advocate-spend", help="today's provider spend and recent calls (no prompt content)")
+    invite = commands.add_parser("authz-invite", help="one step: account, package of cases, grant, token and invitation link")
+    invite.add_argument("--name", required=True, help="recipient's display name, e.g. the advocate")
+    invite.add_argument("--case-id", type=_positive_integer, action="append", required=True)
+    invite.add_argument("--mode", default="snapshot", help="snapshot (frozen now, preset) or live")
+    invite.add_argument("--read-bytes", action="store_true", help="also allow listening to recordings")
+    invite.add_argument("--expires-days", type=_positive_integer)
+    invite.add_argument("--base-url", default=os.environ.get("AGEDS_PUBLIC_URL", ""), help="e.g. https://ageds.example")
+    preview = commands.add_parser("authz-preview", help="what a principal can see now (names and counts, no text)")
+    preview.add_argument("--principal-uid", required=True)
     commands.add_parser("authz-show", help="list principals, grants and settings without secrets")
     return parser
 
@@ -230,6 +239,49 @@ def _authz_command(args) -> dict:
             result = authz.grant(db, principal_id(args.principal_uid), package_scope(db, package_id(args.package_uid)),
                                  args.capability, granted_by="cli", valid_to=args.valid_to)
             return {"grant_uid": result["uid"], "warnings": result["warnings"]}
+        if args.command == "authz-invite":
+            from datetime import datetime, timedelta, timezone
+            from .assignments import create_principal
+            from .sharing import add_item, create_package, snapshot_package
+            for case_id in args.case_id:
+                if not db.execute("SELECT 1 FROM cases WHERE id=?", (case_id,)).fetchone():
+                    raise ValueError(f"case {case_id} does not exist")
+            principal = create_principal(db, args.name, kind="human", actor="cli")
+            package = create_package(db, f"Pakiet dla: {args.name}", mode=args.mode, actor="cli")
+            for case_id in args.case_id:
+                add_item(db, package["id"], "case", case_id, actor="cli")
+            frozen = snapshot_package(db, package["id"], actor="cli") if args.mode == "snapshot" else None
+            capabilities = ["read_metadata", "read_text", "chat_with_advocate"] + (["read_bytes"] if args.read_bytes else [])
+            expires = ((datetime.now(timezone.utc) + timedelta(days=args.expires_days)).isoformat()
+                       if args.expires_days else None)
+            grant = authz.grant(db, principal, package["scope_id"], capabilities, granted_by="cli", valid_to=expires)
+            token = auth.issue_token(db, principal, label="invitation", actor="cli", expires_at=expires)
+            link = f"{args.base_url.rstrip('/')}/advocate#t={token}" if args.base_url else None
+            warnings = []
+            if authz.get_setting(db, "auth.mode", "legacy_open") != "tokens":
+                warnings.append("auth.mode is legacy_open: the grant is not enforced until authz-mode tokens")
+            if link is None:
+                warnings.append("no --base-url / AGEDS_PUBLIC_URL: send the token; the recipient pastes it at /advocate")
+            return {"principal_uid": db.execute("SELECT uid FROM principals WHERE id=?", (principal,)).fetchone()["uid"],
+                    "package_uid": package["uid"], "grant_uid": grant["uid"], "capabilities": capabilities,
+                    "snapshot_objects": frozen["objects"] if frozen else None, "expires_at": expires,
+                    "token": token, "invitation_link": link, "token_shown_once": True,
+                    "note": "the link is a credential: send it only to the recipient; revoke with authz-revoke / authz-token-revoke",
+                    "warnings": warnings}
+        if args.command == "authz-preview":
+            from .advocate import AdvocateGate
+            target = principal_id(args.principal_uid)
+            gate = authz.ContentGate(db, target)
+            cases = gate.list("case", "read_metadata")
+            artifacts = gate.list("artifact", "read_metadata")
+            texts = gate.list("derived_text", "read_text")
+            return {"cases": [c["name"] for c in cases],
+                    "artifacts": [{"name": a["original_name"],
+                                   "readable_text_versions": sum(1 for t in texts if t["artifact_id"] == a["id"]),
+                                   "can_listen": gate.allows("artifact", a["id"], "read_bytes")} for a in artifacts],
+                    "can_chat": AdvocateGate(db, target).can_chat(),
+                    "assignments_visible": len(gate.list("assignment", "read_metadata")),
+                    "note": "names and counts only; no text is printed"}
         if args.command == "authz-revoke":
             row = db.execute("SELECT id FROM grants WHERE uid=?", (args.grant_uid,)).fetchone()
             if row is None:

@@ -87,6 +87,16 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
       await page.waitForFunction(() => document.querySelectorAll('.turn').length === 2);
       assert.equal((await page.content()).includes(fixture.hidden), false);
     });
+    await test('an invitation link logs in without pasting and removes the token from the address', async () => {
+      const fresh = await (await browser.newContext()).newPage();
+      fresh.on('pageerror', e => errors.push(e.message));
+      await fresh.goto(`${base}/advocate#t=${encodeURIComponent(fixture.token)}`);
+      await fresh.waitForSelector('#chat:not([hidden])');
+      assert.equal(new URL(fresh.url()).hash, '');
+      assert.match(await fresh.textContent('#notices'), /Udostępnione sprawy: .+ · materiałów z tekstem: 1\./);
+      assert.equal((await fresh.content()).includes(fixture.token), false);
+      await fresh.close();
+    });
     await test('logout ends the session', async () => {
       await Promise.all([page.waitForNavigation(), page.click('#logout button')]);
       await page.waitForSelector('#login:not([hidden])');

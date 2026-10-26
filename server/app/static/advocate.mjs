@@ -283,7 +283,19 @@ function setupVoice() {
   });
 }
 
+/** An invitation link carries the token after '#': it never reaches the server or proxy logs. */
+function loginFromInvitation() {
+  if (!location.hash.startsWith('#t=')) return false;
+  const token = decodeURIComponent(location.hash.slice(3));
+  history.replaceState(null, '', location.pathname);
+  const form = document.querySelector('#login form');
+  form.querySelector('input[name=token]').value = token;
+  form.submit();
+  return true;
+}
+
 async function start() {
+  if (loginFromInvitation()) return;
   const status = await api('/api/advocate/status');
   if (status.status === 401) { show('login'); return; }
   if (status.status !== 200 || !status.body.can_chat) {
@@ -305,6 +317,12 @@ async function start() {
              opt_in_by_recipient: 'Właściciel materiału nie widzi rozmowy, dopóki jej nie udostępnisz.'}[status.body.owner_visibility]
       || `Widoczność rozmowy dla właściciela: ${status.body.owner_visibility}.`),
     el('p', 'Etykiety opisują rodzaj twierdzenia, nie prawdopodobieństwo. Transkrypcje są wynikiem rozpoznawania mowy i mogą zawierać błędy.', 'meta'));
+  const shared = status.body.shared;
+  if (shared) {
+    notices.prepend(el('p', shared.cases.length
+      ? `Udostępnione sprawy: ${shared.cases.join(', ')} · materiałów z tekstem: ${shared.materials}.`
+      : 'Nie udostępniono Ci jeszcze żadnej sprawy.'));
+  }
   if (status.headers.get('X-AGEDS-Auth-Mode') === 'legacy_open') {
     notices.append(el('p', 'Tryb bez kont: każdy, kto ma dostęp do tego adresu, działa jako właściciel.', 'warn'));
   }

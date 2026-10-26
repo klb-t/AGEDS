@@ -659,7 +659,10 @@ def api_advocate_status(access: Access = scoped('chat_with_advocate')):
         principal = _advocate_principal(db, access)
         provider = configured_provider(db, principal)
         name = db.execute('SELECT display_name FROM principals WHERE id=?', (principal,)).fetchone()['display_name']
-        return {'principal': name, 'auth_mode': access.mode,
+        gate = AdvocateGate(db, principal)
+        shared = {'cases': [c['name'] for c in gate.list('case', 'read_metadata')],
+                  'materials': len(gate.list('artifact', 'read_text'))}
+        return {'principal': name, 'auth_mode': access.mode, 'shared': shared,
                 'can_chat': AdvocateGate(db, principal).can_chat(),
                 'provider': None if provider is None else {'name': provider.name, 'model': provider.config['model']},
                 'voice': _voice_status(db, principal),

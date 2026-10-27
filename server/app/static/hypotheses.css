@@ -47,6 +47,7 @@
 .hyp-mini{display:grid;gap:.2rem}.hyp-mini button{padding:.4rem}
 .hyp-flag{display:inline-block;border:1px solid var(--hyp-warn);border-radius:6px;padding:0 .4rem;font-size:.8rem;margin:.1rem 0}
 .hyp-flag-unsupported{border-color:var(--hyp-crit);background:#d03b3b22}
+.hyp-flag-no_disconfirmation_search,.hyp-flag-contrary_candidates_unreviewed{border-style:dashed}
 .hyp-superseded td{opacity:.55}
 .hyp-typology{display:flex;flex-wrap:wrap;gap:.3rem 1.2rem;padding-left:1.2rem}
 .hyp-quadrants{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}

@@ -57,6 +57,8 @@ def test_api_flow_and_error_mapping(client):
     candidates = ok(client.post(f'/api/hypotheses/{hid}/candidates', json={'limit': 10}))
     assert candidates['added_item_ids']
     ok(client.post(f'/api/hypotheses/{hid}/candidates', json={'provider': 'remote'}), 422)
+    ok(client.post(f'/api/hypotheses/{hid}/candidates', json={'direction': 'disconfirming'}), 422)  # none preregistered
+    ok(client.post(f'/api/hypotheses/{hid}/candidates', json={'direction': 'sideways'}), 422)
     ok(client.post(f'/api/hypotheses/{hid}/candidates', json={'opt_in': 'yes'}), 422)
     item = ok(client.post(f'/api/hypotheses/{hid}/dossier', json={'target_kind': 'event', 'target_id': ids['stimulus'][0],
                                                                   'classification': 'context'}))

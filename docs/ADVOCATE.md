@@ -90,6 +90,10 @@ characters) is unverified. An avatar is not implemented.
 - Export without `read_text` keeps an allow-list of metadata columns; everything else is nulled and listed.
 - A model's `proven` must quote the cited passage verbatim (`advocate.proven_policy`, preset
   `require_verbatim_quote`); passages are marked as data in the prompt; the page shows the cited passage under a claim.
+- The prompt asks the model not to omit material contrary to the question's thesis. A fragment
+  that contradicts the thesis or another fragment becomes its own claim with status
+  `contradicts` and a citation; without a valid citation it becomes `claim_without_basis`.
+  `contradicts` is a label from the model, not a finding.
 - No database transaction is held across a provider call; the worst case is reserved before the call
   (`advocate.daily_budget_eur`, optional `advocate.daily_budget_per_principal_eur`) and settled after it.
 - Assignments without a status from non-human authors are `ai_proposed` and open nothing.

@@ -175,6 +175,35 @@ only creates `candidate` items:
   provider, model, version and opt-in. Provider output is validated against the database (unresolvable
   references are rejected and counted); its rationale is stored as labelled model text, never as evidence.
 
+### Material against the hypothesis (2026-10-27)
+
+A definition can preregister what would count against it:
+`dossier.disconfirming_queries` (FTS5, the same limits as `queries`) and
+`dossier.disconfirmation_criteria` (text). Both enter the normalized definition only when
+given, so existing definitions keep their hash.
+
+`candidate_search(direction=…)` runs the supporting queries (`definition`), the
+disconfirming ones (`disconfirming`) or `both`; `both` is the default when the definition has
+disconfirming queries. CLI: `dossier-candidates --direction`; API: `direction`. Each FTS
+report and hint names its `search_direction`, and a hit of both says so in
+`search_directions`. A contrary hit is still a `candidate`: only a human classifies it as
+`contradicting`.
+
+`dossier.disconfirmation_status` reports:
+* the preregistered disconfirming queries and criteria;
+* disconfirming searches for the latest version;
+* contrary hits by classification.
+
+The disclosure shows this as the known unknown `disconfirmation_search`. It is flagged when
+nothing was preregistered, nothing was searched for the current version, or contrary hits
+await review. Every current thesis carries `disconfirmation_flags`
+(`no_disconfirmation_search`, `contrary_candidates_unreviewed`). These are kept apart from
+`flags`, which stay about the thesis's own evidence. Finding no contrary hit is not proof that
+none exists; see the documentation gaps of the event study.
+
+Not covered: ledger entries (bank, health) are not in the search index or dossier targets.
+Cite them through their statement artifact.
+
 ## Theses and epistemic disclosure
 
 Review 2 P3: next to `current_theses_without_evidence` (no pointer) the disclosure lists

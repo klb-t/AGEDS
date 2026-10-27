@@ -44,6 +44,11 @@ FLAG_TEXT = {
     'quote_without_exact_source': ('cytat bez źródła o dokładnym tekście', 'quote without an exact-text source'),
     'source_changed': ('źródło zmieniło się od dodania do dossier', 'a source changed since it was added'),
     'superseded': ('zastąpiona nowszą wersją', 'superseded by a newer revision'),
+    'no_disconfirmation_search': ('nie szukano materiału sprzecznego (brak wyszukiwania z zapytaniami przeciwnymi '
+                                  'dla bieżącej wersji hipotezy)',
+                                  'no search for contrary material (no disconfirming-query search for the current version)'),
+    'contrary_candidates_unreviewed': ('trafienia zapytań przeciwnych czekają na ocenę człowieka',
+                                       'hits of disconfirming queries await human review'),
 }
 
 
@@ -109,6 +114,8 @@ def list_theses(db: sqlite3.Connection, hypothesis_id: int) -> dict:
         raise HypothesisNotFound(f'hypothesis {hypothesis_id} does not exist')
     rows = db.execute('SELECT * FROM hypothesis_theses WHERE hypothesis_id=? ORDER BY id', (hypothesis_id,)).fetchall()
     superseded = {r['previous_thesis_id']: r['id'] for r in rows if r['previous_thesis_id'] is not None}
+    from .dossier import disconfirmation_status
+    contrary = disconfirmation_status(db, hypothesis_id) if rows else None
     labels = {t[0]: (index + 1, t[1], t[2]) for index, t in enumerate(TYPOLOGY)}
     cache: dict[int, dict] = {}
     theses = []
@@ -120,6 +127,10 @@ def list_theses(db: sqlite3.Connection, hypothesis_id: int) -> dict:
                 cache[item_id] = get_item(db, item_id)
             items.append(cache[item_id])
         flags = _flags(row['status_type'], items, row['id'] in superseded)
+        # About the hypothesis's search for contrary material, not about this thesis's own evidence.
+        contrary_flags = [] if row['id'] in superseded else (
+            (['no_disconfirmation_search'] if not contrary['searches_for_latest_version'] else [])
+            + (['contrary_candidates_unreviewed'] if contrary['contrary_hits_by_classification']['candidate'] else []))
         rank, pl, en = labels[row['status_type']]
         theses.append({
             'thesis_id': row['id'], 'hypothesis_id': hypothesis_id, 'text': row['text'], 'status_type': row['status_type'],
@@ -128,6 +139,8 @@ def list_theses(db: sqlite3.Connection, hypothesis_id: int) -> dict:
             'evidence': [{'item_id': i['item_id'], 'target_kind': i['target_kind'], 'target_id': i['target_id'],
                           'classification': i['classification'], 'source_check': i['source_check']} for i in items],
             'flags': flags, 'flags_text': {f: FLAG_TEXT[f] for f in flags}, 'unsupported': 'unsupported' in flags,
+            'disconfirmation_flags': contrary_flags,
+            'disconfirmation_flags_text': {f: FLAG_TEXT[f] for f in contrary_flags},
             'flags_computed': True, 'created_at': row['created_at'], 'actor': row['actor'],
         })
     current = [t for t in theses if t['superseded_by'] is None]
@@ -197,8 +210,13 @@ def disclosure_view(db: sqlite3.Connection, hypothesis_id: int) -> dict:
         {'fact': 'latest_registered_at', 'value': latest['registered_at']},
         {'fact': 'dossier_counts', 'value': dossier['counts']},
     ]
+    from .dossier import disconfirmation_status
+    contrary = disconfirmation_status(db, hypothesis_id)
     known_unknowns = [
         {'fact': 'candidates_awaiting_human_review', 'value': dossier['counts']['candidate']},
+        {'fact': 'disconfirmation_search', 'value': contrary,
+         'flagged': (not contrary['preregistered_queries'] or not contrary['searches_for_latest_version']
+                     or contrary['contrary_hits_by_classification']['candidate'] > 0)},
         {'fact': 'current_theses_without_evidence', 'value': theses['unsupported_current']},
         {'fact': 'current_theses_without_accepted_evidence', 'value': theses['without_accepted_evidence_current'],
          'note': 'no pointer, or pointers only to candidates/rejected items (flags unsupported, evidence_not_accepted)'},

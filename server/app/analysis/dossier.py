@@ -226,6 +226,36 @@ def list_dossier(db: sqlite3.Connection, hypothesis_id: int) -> dict:
             'note': 'Klasyfikacja jest decyzją człowieka; propozycje automatyczne pozostają kandydatami do akceptacji.'}
 
 
+def disconfirmation_status(db: sqlite3.Connection, hypothesis_id: int) -> dict:
+    """Was material that would count against the hypothesis preregistered, searched and reviewed?"""
+    latest = db.execute('''SELECT id, definition_json FROM hypothesis_versions WHERE hypothesis_id=?
+                           ORDER BY version_number DESC LIMIT 1''', (hypothesis_id,)).fetchone()
+    if latest is None:
+        raise HypothesisNotFound(f'hypothesis {hypothesis_id} does not exist')
+    dossier_def = json.loads(latest['definition_json']).get('dossier', {})
+    runs = db.execute('''SELECT r.hypothesis_version_id, r.parameters_json, r.result_json FROM hypothesis_runs r
+                         JOIN hypothesis_versions v ON v.id=r.hypothesis_version_id
+                         WHERE v.hypothesis_id=? AND r.kind='candidate_search' ORDER BY r.id''', (hypothesis_id,)).fetchall()
+    contrary_locators, latest_runs = set(), 0
+    for run in runs:
+        if json.loads(run['parameters_json']).get('direction') not in ('disconfirming', 'both'):
+            continue
+        latest_runs += run['hypothesis_version_id'] == latest['id']
+        for proposal in json.loads(run['result_json']).get('proposals', []):
+            if 'disconfirming' in ((proposal.get('hint') or {}).get('search_directions') or []):
+                contrary_locators.add(proposal['locator_sha256'])
+    by_class = {c: 0 for c in CLASSIFICATIONS}
+    for row in db.execute('SELECT id, locator_sha256 FROM hypothesis_dossier_items WHERE hypothesis_id=?', (hypothesis_id,)):
+        if row['locator_sha256'] in contrary_locators:
+            by_class[get_item(db, row['id'])['classification']] += 1
+    return {'preregistered_queries': len(dossier_def.get('disconfirming_queries', [])),
+            'preregistered_criteria': bool(dossier_def.get('disconfirmation_criteria')),
+            'searches_for_latest_version': latest_runs,
+            'contrary_hits_by_classification': by_class,
+            'note': 'a hit of a disconfirming query is a candidate, not a contradiction; finding none is not proof '
+                    'that none exists (see documentation gaps)'}
+
+
 # ---------------------------------------------------------------- candidate proposals
 
 @dataclass
@@ -302,10 +332,20 @@ def _rule_hits(db: sqlite3.Connection, definition: dict, limit: int, category_co
     return [{k: v for k, v in h.items() if k != 't'} for h in hits[:limit]]
 
 
+DIRECTIONS = ('definition', 'disconfirming', 'both')
+
+
 def candidate_search(db: sqlite3.Connection, hypothesis_id: int, *, version_id: int | None = None,
                      queries: list[str] | None = None, use_rules: bool = True, provider: str = 'none',
-                     opt_in: bool = False, limit: int = 50, actor=None, category_config=None) -> dict:
-    """Propose candidates (FTS + rules + optional provider); every proposal stays ``candidate``."""
+                     opt_in: bool = False, limit: int = 50, actor=None, category_config=None,
+                     direction: str | None = None) -> dict:
+    """Propose candidates (FTS + rules + optional provider); every proposal stays ``candidate``.
+
+    ``direction``: ``definition`` (the supporting queries), ``disconfirming`` (the preregistered
+    queries for material that would count against the hypothesis) or ``both`` (default when the
+    definition has disconfirming queries). Each FTS hint names its ``search_direction``; a hit is
+    still only a candidate, and its direction is a search label, not a classification.
+    """
     from ..search import SearchQueryError, search_page
     db.row_factory = sqlite3.Row
     actor = clean_actor(actor)
@@ -321,22 +361,33 @@ def candidate_search(db: sqlite3.Connection, hypothesis_id: int, *, version_id: 
     version_id = _version_of(db, hypothesis_id, version_id)
     version = require_registered(db, version_id)
     definition = version['definition']
+    contrary = list(definition['dossier'].get('disconfirming_queries', []))
+    if direction is None:
+        direction = 'both' if contrary and queries is None else 'definition'
+    if direction not in DIRECTIONS:
+        raise HypothesisError(f'direction must be one of {", ".join(DIRECTIONS)}')
+    if direction != 'definition' and not contrary:
+        raise HypothesisError('the registered definition has no dossier.disconfirming_queries; register a version with them')
     if queries is None:
         queries = list(definition['dossier']['queries']) or [definition[n]['text_query'] for n in ('stimulus', 'outcome')
                                                               if 'text_query' in definition[n]]
     if not isinstance(queries, list) or any(not isinstance(q, str) or not q.strip() for q in queries) or len(queries) > 20:
         raise HypothesisError('queries must be a list of up to 20 nonblank FTS5 queries')
+    planned = ([(q, 'definition') for q in queries] if direction in ('definition', 'both') else []) + \
+              ([(q, 'disconfirming') for q in contrary] if direction in ('disconfirming', 'both') else [])
     fts_report, proposals = [], []
-    for query in queries:
+    for query, search_direction in planned:
         try:
             page = search_page(query, min(limit, 200))
         except SearchQueryError as exc:
             raise HypothesisError(f'query {query!r}: {exc}') from exc
-        fts_report.append({'query': query, 'results': len(page['results']), 'has_more': page['has_more']})
+        fts_report.append({'query': query, 'search_direction': search_direction, 'results': len(page['results']),
+                           'has_more': page['has_more']})
         for hit in page['results']:
             kind = FTS_KIND_MAP.get(hit['object_kind'])
             if kind:
-                proposals.append({'origin': 'fts', 'kind': kind, 'id': int(hit['object_id']), 'hint': {'query': query}})
+                proposals.append({'origin': 'fts', 'kind': kind, 'id': int(hit['object_id']),
+                                  'hint': {'query': query, 'search_direction': search_direction}})
     rule_hits = _rule_hits(db, definition, limit, category_config) if use_rules else []
     proposals.extend({'origin': 'rule', **h} for h in rule_hits)
     pool = []
@@ -367,12 +418,19 @@ def candidate_search(db: sqlite3.Connection, hypothesis_id: int, *, version_id: 
                     if raw.get('proposed_classification') in CLASSIFICATIONS else None,
                     'label': 'model output; a hypothesis about relevance, not evidence'}
             proposals.append({'origin': 'llm', 'kind': raw['target_kind'], 'id': raw['target_id'], 'hint': hint})
+    directions: dict[tuple, set] = {}
+    for proposal in proposals:
+        found = proposal['hint'].get('search_direction') if isinstance(proposal.get('hint'), dict) else None
+        if found:
+            directions.setdefault((proposal['origin'], proposal['kind'], proposal['id']), set()).add(found)
     unique, seen = [], set()
     for proposal in proposals:
         key = (proposal['origin'], proposal['kind'], proposal['id'])
         if key in seen:
             continue
         seen.add(key)
+        if key in directions:  # a hit of both directions says so
+            proposal = {**proposal, 'hint': {**proposal['hint'], 'search_directions': sorted(directions[key])}}
         try:
             locator, excerpt = locate(db, proposal['kind'], proposal['id'])
         except HypothesisNotFound:
@@ -380,7 +438,9 @@ def candidate_search(db: sqlite3.Connection, hypothesis_id: int, *, version_id: 
                              'reason': 'record vanished'})
             continue
         unique.append({**proposal, 'locator': locator, 'excerpt': excerpt, 'locator_sha256': sha256_canonical(locator)})
-    parameters = {'queries': queries, 'use_rules': use_rules, 'provider': provider, 'provider_model': chosen.model,
+    parameters = {'queries': queries, 'direction': direction,
+                  'disconfirming_queries': contrary if direction != 'definition' else [],
+                  'use_rules': use_rules, 'provider': provider, 'provider_model': chosen.model,
                   'provider_model_version': chosen.model_version, 'opt_in': opt_in, 'limit': limit}
     input_record = [[p['origin'], p['kind'], p['id'], p['locator_sha256']] for p in unique]
     result = {'schema': 'ageds.dossier-candidates/v1', 'disclaimer': disclaimer(),

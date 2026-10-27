@@ -8,6 +8,7 @@ const LABELS = {
   proven: 'wynika z cytowanych fragmentów',
   claim: 'twierdzenie zawarte w materiale',
   hypothesis: 'wniosek (hipoteza)',
+  contradicts: 'fragment przeczy tezie pytania lub innemu fragmentowi',
   unknown: 'brak podstawy w materiale',
   claim_without_basis: 'bez cytatu – niezweryfikowane',
 };

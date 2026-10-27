@@ -28,7 +28,7 @@ from .assignments import new_uid
 from .search import SearchQueryError, scoped_search_page
 
 # Presets; unknown labels are kept and reported, never upgraded.
-CLAIM_STATUSES = ('quoted_material', 'proven', 'claim', 'hypothesis', 'unknown', 'claim_without_basis')
+CLAIM_STATUSES = ('quoted_material', 'proven', 'claim', 'hypothesis', 'contradicts', 'unknown', 'claim_without_basis')
 MAX_QUESTION_CHARS = 4000
 MAX_PASSAGES = 8
 MAX_TERMS = 12
@@ -262,7 +262,7 @@ def verify(claims, basis: list[dict], gate: AdvocateGate, *, from_model: bool = 
         status = claim.get('status') if isinstance(claim.get('status'), str) else 'unknown'
         if status not in CLAIM_STATUSES:
             warnings.append({'code': 'status_not_in_presets', 'position': position, 'status': status})
-        if status in ('proven', 'quoted_material') and not valid:
+        if status in ('proven', 'quoted_material', 'contradicts') and not valid:
             status = 'claim_without_basis'
         elif from_model and status == 'proven' and not _proven_holds(claim['text'], [by_ref[r] for r in valid], proven_policy):
             status = 'claim'

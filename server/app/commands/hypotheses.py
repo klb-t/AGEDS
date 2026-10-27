@@ -106,6 +106,8 @@ def register(subparsers) -> None:
     p.add_argument('--limit', type=_positive, default=50)
     p.add_argument('--version', type=_positive, default=None)
     p.add_argument('--categories', type=Path, default=None, help='private category configuration for category selectors')
+    p.add_argument('--direction', choices=('definition', 'disconfirming', 'both'), default=None,
+                   help='supporting queries, preregistered disconfirming queries, or both (default: both when registered)')
     p.add_argument('--actor', default=None)
     p = subparsers.add_parser('dossier-list', help='dossier items with current classification and decision history')
     p.add_argument('hypothesis_id', type=_positive)
@@ -179,7 +181,8 @@ def _dispatch(args, db) -> dict:
     if c == 'dossier-candidates':
         return dossier.candidate_search(db, args.hypothesis_id, version_id=args.version, queries=args.query,
                                         use_rules=not args.no_rules, provider=args.provider, opt_in=args.opt_in,
-                                        limit=args.limit, actor=args.actor, category_config=args.categories)
+                                        limit=args.limit, actor=args.actor, category_config=args.categories,
+                                        direction=args.direction)
     if c == 'dossier-list':
         return dossier.list_dossier(db, args.hypothesis_id)
     if c == 'thesis-add':

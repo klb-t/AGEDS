@@ -194,18 +194,36 @@ def _analysis(value) -> dict:
     return result
 
 
+MAX_CRITERIA_CHARS = 4000
+
+
+def _query_list(value, name: str) -> list[str]:
+    if not isinstance(value, list) or len(value) > MAX_QUERIES:
+        raise HypothesisError(f'dossier.{name} must be a list of up to {MAX_QUERIES} FTS5 queries')
+    return [normalize_selector({'text_query': query}, f'dossier.{name}[{index}]', require_criterion=True)['text_query']
+            for index, query in enumerate(value)]
+
+
 def _dossier(value) -> dict:
+    """Queries for supporting material and, preregistered, for material that would count against.
+
+    ``disconfirming_queries`` and ``disconfirmation_criteria`` are added to the normalized
+    definition only when given, so definitions without them keep their hash.
+    """
     if value is None:
         return {'queries': []}
-    if not isinstance(value, dict) or set(value) - {'queries'}:
-        raise HypothesisError('dossier must be {queries: [FTS5 text, ...]}')
-    queries = value.get('queries', [])
-    if not isinstance(queries, list) or len(queries) > MAX_QUERIES:
-        raise HypothesisError(f'dossier.queries must be a list of up to {MAX_QUERIES} FTS5 queries')
-    checked = []
-    for index, query in enumerate(queries):
-        checked.append(normalize_selector({'text_query': query}, f'dossier.queries[{index}]', require_criterion=True)['text_query'])
-    return {'queries': checked}
+    allowed = {'queries', 'disconfirming_queries', 'disconfirmation_criteria'}
+    if not isinstance(value, dict) or set(value) - allowed:
+        raise HypothesisError('dossier must be {queries, disconfirming_queries?, disconfirmation_criteria?}')
+    out = {'queries': _query_list(value.get('queries', []), 'queries')}
+    if value.get('disconfirming_queries'):
+        out['disconfirming_queries'] = _query_list(value['disconfirming_queries'], 'disconfirming_queries')
+    criteria = value.get('disconfirmation_criteria')
+    if criteria is not None:
+        if not isinstance(criteria, str) or not criteria.strip() or len(criteria) > MAX_CRITERIA_CHARS:
+            raise HypothesisError(f'dossier.disconfirmation_criteria must be nonblank text up to {MAX_CRITERIA_CHARS} characters')
+        out['disconfirmation_criteria'] = criteria.strip()
+    return out
 
 
 def normalize_definition(raw) -> dict:

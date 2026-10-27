@@ -1230,7 +1230,18 @@
         "server/app/importers/email_mbox.py",
         "docs/IMPORTERS_COMM.md",
         "server/tests/test_import_comm.py",
-        "server/tests/test_review_fixes_ingest.py"
+        "server/tests/test_review_fixes_ingest.py",
+        "server/app/connectors/",
+        "server/app/schema/connectors.py",
+        "server/app/commands/connectors.py",
+        "docs/GMAIL_API.md",
+        "server/app/analysis/{dossier,preregistration,theses}.py",
+        "server/app/api/hypotheses.py",
+        "server/app/commands/hypotheses.py",
+        "server/app/templates/hypotheses.html",
+        "server/app/static/{hypotheses.css,advocate.mjs}",
+        "server/app/{advocate,providers}.py",
+        "docs/{HYPOTHESES,ADVOCATE}.md"
       ],
       "based_on_commit": "7295148 + 3fc9ef4",
       "acceptance": [
@@ -1304,6 +1315,15 @@
           "flow": "catalog-scan -> import-plan -> approve-all-ready -> run: 5/5 units done; coverage section in pilot_report",
           "defect_fixed": "email parser v3: forwarded message/rfc822 extracted as attachment (was walked into, body polluted)",
           "real_exports": "not used yet"
+        },
+        "gmail_api": {
+          "commit": "a8bc004",
+          "state": "code + authorisation guide; fake-transport tests; owner account never used"
+        },
+        "contrary_material": {
+          "added": "preregistered disconfirming queries/criteria, direction-tagged candidate search, disclosure fact disconfirmation_search, thesis disconfirmation_flags, advocate status contradicts",
+          "not_covered": "ledger entries not searchable/dossier targets (cite via statement artifact)",
+          "browser": "hypotheses 10/10, advocate, advocate_model green after fixing a misplaced API argument found by the browser run"
         }
       }
     }

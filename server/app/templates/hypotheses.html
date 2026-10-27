@@ -122,7 +122,7 @@
 <table data-theses><tr><th>#</th><th>Status</th><th>Teza</th><th>Dowody (pozycje dossier)</th><th>Flagi (wyliczane)</th></tr>
 {% for t in selected.theses.theses %}<tr data-thesis-id="{{t.thesis_id}}" data-flags="{{t.flags|join(' ')}}"{% if t.superseded_by %} class="hyp-superseded"{% endif %}><td>{{t.thesis_id}}{% if t.previous_thesis_id %}<br><small>← {{t.previous_thesis_id}}</small>{% endif %}</td><td>{{t.status_rank}}. {{t.status_label_pl}}</td><td>{{t.text}}</td>
 <td>{% for e in t.evidence %}<span class="hyp-chip">#{{e.item_id}} {{e.target_kind}} {{e.target_id}} · {{e.classification}}</span> {% else %}—{% endfor %}</td>
-<td>{% for f in t.flags %}<span class="hyp-flag hyp-flag-{{f}}" data-flag="{{f}}">{{t.flags_text[f][0]}}</span> {% else %}—{% endfor %}</td></tr>
+<td>{% for f in t.flags %}<span class="hyp-flag hyp-flag-{{f}}" data-flag="{{f}}">{{t.flags_text[f][0]}}</span> {% else %}—{% endfor %}{% for f in t.disconfirmation_flags or [] %} <span class="hyp-flag hyp-flag-{{f}}" data-disconfirmation-flag="{{f}}">{{t.disconfirmation_flags_text[f][0]}}</span>{% endfor %}</td></tr>
 {% else %}<tr><td colspan="5">Brak tez.</td></tr>{% endfor %}</table>
 <form data-thesis-form><h3>Dodaj tezę</h3>
 <label>Treść<textarea name="text" rows="2" required></textarea></label>

@@ -217,3 +217,40 @@ def test_epistemic_disclosure_combines_human_text_and_computed_facts(env):
     with pytest.raises(sqlite3.IntegrityError, match='append-only'):
         db.execute('UPDATE hypothesis_disclosures SET text=?', ('rewritten',))
     db.rollback()
+
+
+def test_material_against_the_hypothesis_is_preregistered_searched_and_disclosed(env):
+    from server.app import evidence
+    db, hid = env['db'], env['hid']
+    contrary_text = evidence.add_derived_text(env['artifact'], 'transcript', ' de afspraak is geannuleerd')
+    # without disconfirming queries: no contrary search possible, and that is visible
+    with pytest.raises(HypothesisError, match='disconfirming_queries'):
+        dossier.candidate_search(db, hid, direction='disconfirming')
+    plain = theses.add_thesis(db, hid, 'The visit happened.', 'inference_chain', [])
+    assert plain['flags'] == ['unsupported'] and plain['disconfirmation_flags'] == ['no_disconfirmation_search']
+    quadrant = next(q for q in theses.disclosure_view(db, hid)['quadrants'] if q['quadrant'] == 'known_unknowns')
+    fact = next(f for f in quadrant['computed_facts'] if f['fact'] == 'disconfirmation_search')
+    assert fact['flagged'] and fact['value']['preregistered_queries'] == 0
+    # a definition without the new keys keeps its hash
+    old = pr.normalize_definition(corpus.definition_for(env['scenario']))
+    assert 'disconfirming_queries' not in old['dossier']
+    definition = corpus.definition_for(env['scenario']) | {'title': 'with contrary search'}
+    definition['dossier'] = {'queries': ['wizyta'], 'disconfirming_queries': ['geannuleerd'],
+                             'disconfirmation_criteria': 'a cancelled appointment or a visit that did not take place'}
+    hid2 = pr.register_hypothesis(db, definition)['hypothesis_id']
+    run = dossier.candidate_search(db, hid2, use_rules=False)
+    assert [(f['query'], f['search_direction']) for f in run['fts']] == [('wizyta', 'definition'), ('geannuleerd', 'disconfirming')]
+    proposals = json.loads(db.execute('SELECT result_json FROM hypothesis_runs WHERE id=?', (run['run_id'],)).fetchone()[0])['proposals']
+    contrary = [p for p in proposals if 'disconfirming' in p['hint']['search_directions']]
+    assert [(p['kind'], p['id']) for p in contrary] == [('derived_text', contrary_text)]
+    status = dossier.disconfirmation_status(db, hid2)
+    assert (status['preregistered_queries'], status['preregistered_criteria'], status['searches_for_latest_version']) == (1, True, 1)
+    assert status['contrary_hits_by_classification']['candidate'] == 1
+    thesis = theses.add_thesis(db, hid2, 'The visit happened.', 'inference_chain', [])
+    assert thesis['disconfirmation_flags'] == ['contrary_candidates_unreviewed']
+    item = next(i for i in dossier.list_dossier(db, hid2)['items'] if i['target_id'] == contrary_text)
+    assert item['classification'] == 'candidate'  # a contrary hit is not a contradiction until a human says so
+    dossier.classify(db, item['item_id'], 'contradicting', rationale='cancellation contradicts the visit', actor='analyst')
+    assert dossier.disconfirmation_status(db, hid2)['contrary_hits_by_classification']['contradicting'] == 1
+    listed = next(t for t in theses.list_theses(db, hid2)['theses'] if t['thesis_id'] == thesis['thesis_id'])
+    assert listed['disconfirmation_flags'] == []

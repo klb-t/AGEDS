@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from server.app import advocate, auth, authz, db, evidence, main
+from server.app import advocate, auth, authz, db, evidence, main, providers
 from server.app import assignments as model
 
 HIDDEN = 'CANARY-adwokat-ukryte'
@@ -228,6 +228,16 @@ class AdvocateCoreTests(AdvocateFixture):
         self.assertEqual({r['ref'] for r in report['removed_citations']}, {'p2', 'p9'})
         self.assertEqual({w['code'] for w in report['warnings']},
                          {'status_not_in_presets', 'malformed_claim', 'proven_downgraded'})
+
+    def test_contradicting_fragment_needs_a_citation(self):
+        basis = [{'ref': 'p1', 'object': ['artifact', self.shared], 'text': 'Afspraak geannuleerd.'}]
+        claims = [{'text': 'Wizyta została odwołana [cit:p1]', 'status': 'contradicts', 'citations': ['p1']},
+                  {'text': 'Coś przeczy tezie', 'status': 'contradicts', 'citations': []}]
+        with db.session() as conn:
+            checked, report = advocate.verify(claims, basis, advocate.AdvocateGate(conn, self.recipient))
+        self.assertEqual([c['status'] for c in checked], ['contradicts', 'claim_without_basis'])
+        self.assertNotIn('status_not_in_presets', {w['code'] for w in report['warnings']})
+        self.assertIn('"contradicts"', providers.SYSTEM_PROMPT)
 
     def test_proven_policy_values(self):
         basis = [{'ref': 'p1', 'object': ['artifact', self.shared], 'text': 'Termin płatności minął w kwietniu.'}]

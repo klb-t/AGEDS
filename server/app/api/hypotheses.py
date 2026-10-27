@@ -75,6 +75,7 @@ class CandidatesIn(BaseModel):
     limit: Annotated[StrictInt, Field(ge=1, le=dossier_mod.MAX_CANDIDATES)] = 50
     version_id: PositiveId | None = None
     category_config: dict[str, Any] | None = None
+    direction: Literal['definition', 'disconfirming', 'both'] | None = None
     actor: str | None = None
 
 
@@ -183,7 +184,7 @@ def api_add_item(hypothesis_id: SqlId, body: ItemIn):
 def api_candidates(hypothesis_id: SqlId, body: CandidatesIn):
     return _call(dossier_mod.candidate_search, hypothesis_id, version_id=body.version_id, queries=body.queries,
                  use_rules=body.use_rules, provider=body.provider, opt_in=body.opt_in, limit=body.limit, actor=body.actor,
-                 category_config=body.category_config)
+                 category_config=body.category_config, direction=body.direction)
 
 
 @router.post('/api/hypotheses/{hypothesis_id}/theses')

@@ -28,6 +28,16 @@ def has_table(db, name: str) -> bool:
     return db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone() is not None
 
 
+def _alignment(value) -> dict | None:
+    if not isinstance(value, dict):
+        return None
+    reference = value.get('reference') or {}
+    return {'status': value.get('status'), 'reason': value.get('reason'),
+            'reference': f"{reference.get('engine')} {reference.get('model')}" if reference else None,
+            **{k: value.get(k) for k in ('model_words', 'reference_words', 'exact', 'fuzzy', 'interpolated', 'untimed',
+                                         'text_agreement_ratio', 'segments_aligned', 'segments_model_estimate')}}
+
+
 def collect(db) -> dict:
     report = {'generated_at': datetime.now(timezone.utc).isoformat()}
     try:
@@ -63,6 +73,8 @@ def collect(db) -> dict:
                           'speakers': sorted({s.get('speaker_hypothesis') for s in segments if s.get('speaker_hypothesis')}),
                           'segment_languages': metadata.get('segment_languages'),
                           'timing': metadata.get('timing') or ('word timing' if any(s.get('words') for s in segments) else None),
+                          'word_citable_segments': (metadata.get('word_timing') or {}).get('available_segments'),
+                          'alignment': _alignment(metadata.get('timing_alignment')),
                           'transcoding': (metadata.get('transcoding') or {}).get('to'),
                           'excerpt': (text['text'] or '')[:EXCERPT]})
         artifacts.append({**artifact, 'acquisitions': observations, 'derived_texts': texts})
@@ -91,7 +103,14 @@ def collect(db) -> dict:
         if not artifact['derived_texts']:
             gaps.append(f"artifact {artifact['id']} ({artifact['original_name']}): no derived text yet")
         for text in artifact['derived_texts']:
-            if text['kind'] == 'transcript' and text['timing'] != 'word timing':
+            align = text['alignment']
+            if text['kind'] == 'transcript' and align and align['status'] == 'aligned':
+                gaps.append(f"artifact {artifact['id']}: transcript {text['id']}: {text['word_citable_segments']} of {text['segments']} "
+                            f"segments word-citable (times from {align['reference']}); text agreement with the reference "
+                            f"{align['text_agreement_ratio']}: the rest keep model estimates; listen where engines disagree")
+            elif text['kind'] == 'transcript' and align:
+                gaps.append(f"artifact {artifact['id']}: transcript {text['id']}: timing reference unavailable ({align['reason']})")
+            elif text['kind'] == 'transcript' and text['timing'] != 'word timing':
                 gaps.append(f"artifact {artifact['id']}: transcript {text['id']} has no word timing (segment citations only)")
             if text['kind'] == 'transcript' and text['time_coverage'] is not None and not 0.8 <= text['time_coverage'] <= 1.02:
                 gaps.append(f"artifact {artifact['id']}: transcript {text['id']} segment times cover "
@@ -132,6 +151,10 @@ def markdown(report: dict) -> str:
                        f"{t['speakers'] or '—'}, czas: {t['timing'] or '—'}"
                        + (f", pokrycie czasem {t['time_coverage']:.0%}" if t.get('time_coverage') is not None else '')
                        + (f", przekodowano do {t['transcoding']}" if t['transcoding'] else '')
+                       + (f"\n  czas słów: {t['alignment']['reference']} — segmentów z cytowaniem słów {t['word_citable_segments']}"
+                          f"/{t['segments']}, słowa dokładne/rozmyte/interpolowane/bez czasu {t['alignment']['exact']}/"
+                          f"{t['alignment']['fuzzy']}/{t['alignment']['interpolated']}/{t['alignment']['untimed']}, zgodność tekstu "
+                          f"{t['alignment']['text_agreement_ratio']}" if t['alignment'] and t['alignment']['status'] == 'aligned' else '')
                        + f"\n  > {t['excerpt']!s}")
     out.append(f"- kandydaci zdarzeń (nigdy zdarzenia): {sum(c['count'] for c in report['event_candidates'])}; zdarzenia: {report['events']}")
     if 'provider' in report:

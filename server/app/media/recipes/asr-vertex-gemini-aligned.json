@@ -1,0 +1,45 @@
+{
+  "schema": "ageds.media_recipe",
+  "schema_version": 1,
+  "id": "asr-vertex-gemini-aligned",
+  "kind": "asr",
+  "revision": 2,
+  "description": "Gemini on Vertex AI (owner consent R100) for the text, speaker hypotheses and per-segment language; word times from local faster-whisper (large-v3-turbo, pinned revision, CPU int8, multilingual, no VAD, no network call once cached) aligned to the Gemini words. The comparison of both engines is stored with the transcript. Segments with too few matched words keep the model estimate. Settings chosen on three pilot recordings (revision 1 used small with VAD: fewer aligned segments). Alignment is not verification of what was said.",
+  "strategy": "vertex_gemini",
+  "engine": "vertex-gemini",
+  "model": "gemini-3.5-flash",
+  "device": "vertex:global",
+  "compute_type": "remote",
+  "model_options": {
+    "timing_reference": {
+      "engine": "faster-whisper",
+      "model": "large-v3-turbo",
+      "revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
+      "device": "cpu",
+      "compute_type": "int8",
+      "vad_filter": false,
+      "multilingual": true,
+      "condition_on_previous_text": false,
+      "language": null,
+      "min_matched_ratio": 0.5
+    }
+  },
+  "vad": {
+    "enabled": false,
+    "parameters": null
+  },
+  "word_timestamps": true,
+  "language": null,
+  "allowed_languages": [
+    "pl",
+    "nl",
+    "en"
+  ],
+  "windows": null,
+  "detection": null,
+  "transcribe_options": {},
+  "limits": {
+    "max_inline_bytes": 15000000,
+    "max_output_tokens": 32768
+  }
+}

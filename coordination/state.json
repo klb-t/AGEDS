@@ -1213,7 +1213,14 @@
         "server/app/media/recipes/*vertex*",
         "server/app/worker.py",
         "scripts/pilot_local.sh",
-        "server/tests/test_media_vertex.py"
+        "server/tests/test_media_vertex.py",
+        "server/app/pilot_transfer.py",
+        "scripts/transfer_pilot_to_production.sh",
+        "server/app/media/alignment.py",
+        "server/app/media/recipes/asr-vertex-gemini-{aligned,chirp}.json",
+        "scripts/pilot_report.py",
+        "docs/MULTILINGUAL_ASR.md",
+        "server/tests/test_{pilot_transfer,media_alignment}.py"
       ],
       "based_on_commit": "7295148 + 3fc9ef4",
       "acceptance": [
@@ -1239,7 +1246,7 @@
           "workbench": 9
         },
         "pilot": "~/ageds-pilot: 7 real files scanned read-only and ingested, originals unchanged; ASR/OCR not run",
-        "blocked_on": "sending real files to Vertex was refused by the session permission check (Data Exfiltration)",
+        "blocked_on": null,
         "ci": "Manual verification green on 65c7823 (reported by coordinator)",
         "reimport_idempotence": "second scan+ingest of the same 7 files: 7 artifacts (same ids), 14 acquisitions, originals unchanged",
         "pilot_report": "scripts/pilot_report.py: read-only Markdown/JSON from the database",
@@ -1253,6 +1260,21 @@
           "cost": "0.146681 EUR at preset prices (credits), 35735 input / 10342 output tokens",
           "originals": "unchanged (sha256 verified before and after)",
           "data": "real owner material; no synthetic data in the pilot database"
+        },
+        "pilot_transfer": {
+          "commit": "d0b11d9",
+          "command": "import-pilot-results (acquire by SHA-256 + copy versions, no model call)",
+          "script": "scripts/transfer_pilot_to_production.sh (dry run default; coordinator runs --apply after deploying)",
+          "rehearsal": "local copy of the real pilot: 7 acquired, 7 versions copied, second run 0; deleted after"
+        },
+        "asr_timing": {
+          "date": "2026-10-27",
+          "data": "real pilot recordings (artifacts 4, 5, 6)",
+          "preset": "asr-vertex-gemini-aligned rev 2: Gemini text + faster-whisper large-v3-turbo word times (multilingual, no VAD), aligned; comparison in metadata.timing_alignment",
+          "option": "asr-vertex-gemini-chirp: Speech-to-Text v2 chirp_2 word offsets, synchronous <=60 s, not run on real data",
+          "rev1_small_vad": "versions 8-10: 37/124 segments aligned; numpy-float times made word_timing report 0 citable (fixed)",
+          "rev2_result": "versions 11-13: 28/55, 23/46, 26/46 segments word-citable; text agreement 0.628/0.552/0.654",
+          "pilot_provider_spend_eur_total": 0.4019
         }
       }
     }

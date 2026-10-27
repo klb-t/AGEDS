@@ -171,6 +171,43 @@ raw `sender_text` (only a `Name:` prefix), `time_text` (raw OCR time string, las
 all kept in metadata; date and zone unknown), `body_text`, `layout_side` (a layout hypothesis,
 not identity) and box locators. Candidates are never events; nothing promotes them.
 
+## 6a. Vertex Gemini engines and the timing reference
+
+`asr-vertex-gemini`, `ocr-vertex-gemini` and `ocr-vertex-gemini-chat` send the material to
+Gemini on Vertex AI under a recorded provider consent covering the artifact and within the daily
+budget (reservation, then settlement in `provider_calls`). Gemini returns text, speaker
+hypotheses and per-segment language, but only **estimated** segment times; a PDF uses its text
+layer first and the model only for pages without one.
+
+Word times come from a separate **timing reference** named in the recipe's
+`model_options.timing_reference` and switched on by `word_timestamps: true`
+(`server/app/media/alignment.py`):
+
+* `asr-vertex-gemini-aligned` (pilot default): local faster-whisper with word timestamps
+  (model and revision pinned, CPU, no network call once the model is cached) on the same bytes
+  that were sent to Gemini.
+* `asr-vertex-gemini-chirp`: Speech-to-Text v2 (Chirp 2) word offsets; paid per audio
+  second and booked like the Gemini call; synchronous recognition only, so at most 60 s
+  (a longer recording keeps the model estimates and records why). Price is an unverified preset.
+
+Gemini's raw words (joining exactly to the stored segment text) are matched in order to the
+reference words (difflib on case/diacritic-folded words; `exact`, or `fuzzy` ≥ 0.8 inside a
+mismatched block). A matched word takes the reference interval. Unmatched words between two
+matched ones share that gap in equal parts (`interpolated`, the whole gap kept as `bound`).
+A segment receives words, and becomes word-citable, only when at least `min_matched_ratio`
+(default 0.5) of its words matched. Otherwise it keeps the model estimate with an
+`alignment_note`. Every aligned segment keeps `model_estimate`.
+
+The comparison is stored in the version's `metadata.timing_alignment`:
+* the reference transcript;
+* counts of exact, fuzzy, interpolated and untimed words;
+* text agreement;
+* per-segment deltas between the estimate and the aligned interval.
+
+If the reference fails, the paid Gemini text is still published with
+`timing_alignment.status = unavailable` and the reason. Two engines agreeing is not proof of
+what was said, and a low agreement is a reason to listen, not a verdict on either engine.
+
 ## 7. Queue, estimates, recovery
 
 Media jobs use the existing leased queue: a run per attempt, publication only by the owner of

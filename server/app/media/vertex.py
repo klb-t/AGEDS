@@ -188,6 +188,7 @@ class VertexGeminiASR:
         effective = recipe['effective']
         self.model, self.location = effective['model'], effective['device'].split(':', 1)[1]
         self.limits = effective['limits']
+        self.reference = effective['model_options'].get('timing_reference') if effective['word_timestamps'] else None
         self.artifact_id = None
         self.prepared = {}
 
@@ -203,7 +204,9 @@ class VertexGeminiASR:
                                'response_schema': ASR_SCHEMA, 'temperature': 0.0, 'recipe_id': self.recipe['id'],
                                'recipe_sha256': self.recipe['sha256'], 'recipe': effective},
                 'metadata': {'consent': 'R100 recorded as provider consent; checked before the call',
-                             'timestamps': 'model estimates; no word timing', 'speakers': 'labels are hypotheses'}}
+                             'timestamps': ('word times from the timing reference, aligned to the model text'
+                                            if self.reference else 'model estimates; no word timing'),
+                             'timing_reference': self.reference, 'speakers': 'labels are hypotheses'}}
 
     def transcribe(self, audio):
         from ..worker import TranscriptionResult  # same result contract as faster-whisper
@@ -265,9 +268,34 @@ class VertexGeminiASR:
                     'input_mime_detected': mime,
                     'transcoding': transcoding, 'duration_seconds_ffprobe': duration,
                     'usage': {k: usage.get(k) for k in ('promptTokenCount', 'candidatesTokenCount', 'actual_eur')}}
+        if self.reference is not None:
+            segments = self._align(segments, sent, duration, metadata)
         work = {'unit': 'audio_second', 'amount': duration if duration is not None else 'unknown',
                 'basis': 'ffprobe duration of the original bytes'}
         return TranscriptionResult(' '.join(texts), dominant, segments, metadata, work)
+
+
+    def _align(self, segments: list, sent: bytes, duration, metadata: dict) -> list:
+        """Word times from the reference engine; on failure the model estimates stay and the reason is stored."""
+        from . import alignment
+        ref = self.reference
+        try:
+            if ref['engine'] == 'faster-whisper':
+                words, info = alignment.faster_whisper_words(sent, ref)
+            else:
+                config = _config(self.model, self.location, 256)
+                words, info = alignment.google_speech_words(
+                    sent, {**ref, 'project': ref.get('project') or config.get('project')}, duration=duration,
+                    artifact_id=self.artifact_id)
+        except Exception as exc:  # the paid model text is kept; only the time source is missing
+            metadata['timing_alignment'] = {'status': 'unavailable', 'engine': ref['engine'],
+                                            'reason': f'{type(exc).__name__}: {str(exc)[:300]}'}
+            return segments
+        aligned, report = alignment.align(segments, words, min_matched_ratio=ref.get('min_matched_ratio', 0.5))
+        metadata['timing_alignment'] = {'status': 'aligned', 'reference': info, **report}
+        metadata['timing'] = ('word times from {} aligned to the model text in {} of {} segments; the rest are model '
+                              'estimates'.format(ref['engine'], report['segments_aligned'], len(aligned)))
+        return aligned
 
 
 class VertexGeminiOCR:

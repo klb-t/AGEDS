@@ -355,10 +355,18 @@ def _validate_vertex_asr(r: dict) -> None:
         raise RecipeError('model must name a Gemini model')
     if not isinstance(r['device'], str) or not r['device'].startswith('vertex:') or len(r['device']) <= 7:
         raise RecipeError('device must be "vertex:<location>"')
-    if r['compute_type'] != 'remote' or r['model_options'] != {} or r['transcribe_options'] != {}:
-        raise RecipeError('vertex_gemini takes compute_type "remote" and no local model or decoding options')
-    if r['vad'] != {'enabled': False, 'parameters': None} or r['word_timestamps'] is not False:
-        raise RecipeError('vertex_gemini has no local VAD and no word timestamps')
+    if r['compute_type'] != 'remote' or r['transcribe_options'] != {}:
+        raise RecipeError('vertex_gemini takes compute_type "remote" and no decoding options')
+    if r['vad'] != {'enabled': False, 'parameters': None}:
+        raise RecipeError('vertex_gemini has no local VAD')
+    if not isinstance(r['model_options'], dict) or set(r['model_options']) - {'timing_reference'}:
+        raise RecipeError('vertex_gemini model_options accepts only timing_reference')
+    if type(r['word_timestamps']) is not bool:
+        raise RecipeError('word_timestamps must be a boolean')
+    if r['word_timestamps'] and 'timing_reference' not in r['model_options']:
+        raise RecipeError('vertex_gemini word timestamps come from model_options.timing_reference')
+    if 'timing_reference' in r['model_options']:
+        _validate_timing_reference(r['model_options']['timing_reference'])
     if r['windows'] is not None or r['detection'] is not None or r['language'] is not None:
         raise RecipeError('vertex_gemini identifies language per segment; language, windows and detection are null')
     allowed = r['allowed_languages']
@@ -369,6 +377,42 @@ def _validate_vertex_asr(r: dict) -> None:
         raise RecipeError('limits must define max_inline_bytes and max_output_tokens')
     _finite(limits['max_inline_bytes'], 'limits.max_inline_bytes', low=1, high=20 * 1024 * 1024, integer=True)
     _finite(limits['max_output_tokens'], 'limits.max_output_tokens', low=256, high=65535, integer=True)
+
+
+TIMING_REFERENCE_KEYS = {
+    'faster-whisper': ({'engine', 'model', 'device', 'compute_type'},
+                       {'revision', 'download_root', 'local_files_only', 'cpu_threads', 'vad_filter', 'language',
+                        'multilingual', 'condition_on_previous_text', 'vad_parameters', 'min_matched_ratio'}),
+    'google-speech-v2': ({'engine', 'model', 'location', 'language_codes', 'price_usd_per_minute'},
+                         {'project', 'eur_per_usd', 'min_matched_ratio'}),
+}
+
+
+def _validate_timing_reference(ref) -> None:
+    """The engine whose word offsets become the time axis of the model transcript."""
+    if not isinstance(ref, dict) or ref.get('engine') not in TIMING_REFERENCE_KEYS:
+        raise RecipeError('timing_reference.engine must be ' + ' or '.join(sorted(TIMING_REFERENCE_KEYS)))
+    required, optional = TIMING_REFERENCE_KEYS[ref['engine']]
+    if required - set(ref) or set(ref) - required - optional:
+        raise RecipeError(f'timing_reference for {ref["engine"]} needs {sorted(required)} and accepts {sorted(optional)}')
+    for key in required - {'language_codes', 'price_usd_per_minute'}:
+        if not isinstance(ref[key], str) or not ref[key].strip() or len(ref[key]) > 512:
+            raise RecipeError(f'timing_reference.{key} must be a nonblank string')
+    if 'language_codes' in ref and (not isinstance(ref['language_codes'], list) or not ref['language_codes'] or
+                                    any(not isinstance(c, str) or not 2 <= len(c) <= 16 for c in ref['language_codes'])):
+        raise RecipeError('timing_reference.language_codes must list BCP-47 codes')
+    if 'price_usd_per_minute' in ref:
+        _finite(ref['price_usd_per_minute'], 'timing_reference.price_usd_per_minute', low=0, high=10)
+    if 'min_matched_ratio' in ref:
+        _finite(ref['min_matched_ratio'], 'timing_reference.min_matched_ratio', low=0, high=1)
+    for key in ('vad_filter', 'local_files_only', 'multilingual', 'condition_on_previous_text'):
+        if key in ref and type(ref[key]) is not bool:
+            raise RecipeError(f'timing_reference.{key} must be a boolean')
+    if 'vad_parameters' in ref and ref['vad_parameters'] is not None and (
+            not isinstance(ref['vad_parameters'], dict) or set(ref['vad_parameters']) - VAD_PARAMETER_KEYS):
+        raise RecipeError('timing_reference.vad_parameters accepts only ' + ', '.join(sorted(VAD_PARAMETER_KEYS)))
+    if ref.get('language') is not None and (not isinstance(ref['language'], str) or not ASR_LANGUAGE.match(ref['language'])):
+        raise RecipeError('timing_reference.language must be null or a language code')
 
 
 def _validate_asr(r: dict) -> None:

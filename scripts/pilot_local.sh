@@ -12,7 +12,7 @@ REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 PILOT="${AGEDS_PILOT_DIR:-$HOME/ageds-pilot}"
 PY="$REPO/.venv/bin/python"
 export EW_DATA_DIR="$PILOT/data" EW_DB_PATH="$PILOT/data/evidence.db" EW_STORE_DIR="$PILOT/data/store"
-export EW_CASE_NAME="${EW_CASE_NAME:-Pilot}" EW_ASR_RECIPE="${EW_ASR_RECIPE:-asr-vertex-gemini}"
+export EW_CASE_NAME="${EW_CASE_NAME:-Pilot}" EW_ASR_RECIPE="${EW_ASR_RECIPE:-asr-vertex-gemini-aligned}"
 export EW_OCR_RECIPE="${EW_OCR_RECIPE:-ocr-vertex-gemini}"
 cd "$REPO"
 cli() { "$PY" -m server.app.cli "$@"; }

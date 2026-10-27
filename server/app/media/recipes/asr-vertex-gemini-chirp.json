@@ -1,0 +1,42 @@
+{
+  "schema": "ageds.media_recipe",
+  "schema_version": 1,
+  "id": "asr-vertex-gemini-chirp",
+  "kind": "asr",
+  "revision": 1,
+  "description": "Gemini on Vertex AI for the text; word times from Speech-to-Text v2 (Chirp 2, word offsets) aligned to the Gemini words. Paid per audio second and booked in the daily budget; synchronous recognition only, so recordings up to 60 s (longer ones keep model estimates and record why). Price is an unverified preset.",
+  "strategy": "vertex_gemini",
+  "engine": "vertex-gemini",
+  "model": "gemini-3.5-flash",
+  "device": "vertex:global",
+  "compute_type": "remote",
+  "model_options": {
+    "timing_reference": {
+      "engine": "google-speech-v2",
+      "model": "chirp_2",
+      "location": "europe-west4",
+      "language_codes": [
+        "auto"
+      ],
+      "price_usd_per_minute": 0.016
+    }
+  },
+  "vad": {
+    "enabled": false,
+    "parameters": null
+  },
+  "word_timestamps": true,
+  "language": null,
+  "allowed_languages": [
+    "pl",
+    "nl",
+    "en"
+  ],
+  "windows": null,
+  "detection": null,
+  "transcribe_options": {},
+  "limits": {
+    "max_inline_bytes": 15000000,
+    "max_output_tokens": 32768
+  }
+}

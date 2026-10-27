@@ -7,6 +7,9 @@
 * ``event_candidates`` — sender/time/text candidates parsed from OCR of a chat
   screenshot, with box locators. Status is always ``candidate``: they are not
   events and nothing promotes them automatically.
+* ``derived_text_status`` — a human or operator marks a text version superseded by
+  another (with the reason) or reinstates it; append-only, the latest row counts.
+  The version itself is never changed or hidden from history.
 """
 MIGRATIONS: tuple[tuple[int, str, str], ...] = (
     (40, 'media_speaker_turns', '''
@@ -93,5 +96,28 @@ CREATE TRIGGER IF NOT EXISTS event_candidates_no_delete
     (43, 'media_job_and_run_indexes', '''
 CREATE INDEX IF NOT EXISTS idx_jobs_kind_artifact_status ON jobs(kind, artifact_id, status, id);
 CREATE INDEX IF NOT EXISTS idx_runs_artifact ON processing_runs(artifact_id, id);
+'''),
+    (44, 'media_derived_text_status', '''
+CREATE TABLE IF NOT EXISTS derived_text_status (
+  id INTEGER PRIMARY KEY,
+  derived_text_id INTEGER NOT NULL REFERENCES derived_text(id),
+  status TEXT NOT NULL CHECK(status IN ('superseded', 'reinstated')),
+  superseded_by_id INTEGER REFERENCES derived_text(id),
+  reason TEXT NOT NULL CHECK(length(trim(reason)) > 0),
+  actor TEXT NOT NULL,
+  metadata_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CHECK((status = 'superseded') = (superseded_by_id IS NOT NULL)),
+  CHECK(superseded_by_id IS NULL OR superseded_by_id <> derived_text_id)
+);
+CREATE INDEX IF NOT EXISTS idx_derived_text_status ON derived_text_status(derived_text_id, id);
+CREATE TRIGGER IF NOT EXISTS derived_text_status_no_update
+  BEFORE UPDATE ON derived_text_status BEGIN
+    SELECT RAISE(ABORT, 'version status is append-only; add a reinstated row instead');
+  END;
+CREATE TRIGGER IF NOT EXISTS derived_text_status_no_delete
+  BEFORE DELETE ON derived_text_status BEGIN
+    SELECT RAISE(ABORT, 'version status is append-only; add a reinstated row instead');
+  END;
 '''),
 )

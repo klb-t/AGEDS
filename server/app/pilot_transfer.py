@@ -4,7 +4,8 @@ The originals are acquired here through the normal catalog path first; this step
 copies each pilot text version (ASR/OCR) onto the artifact with the same SHA-256, as a
 new version with its own processing run. The run records the pilot run it copies, the
 pilot database's SHA-256 and that no model was called. Event candidates follow their
-text version. Running it again changes nothing (one transfer key per pilot version).
+text version, and so do superseded marks. Running it again changes nothing: a version is keyed by
+the original's SHA-256 and the hash of its text, segments and metadata, a mark by its own content.
 Nothing is copied for an artifact whose bytes are not already preserved here.
 """
 from __future__ import annotations
@@ -28,6 +29,44 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def version_key(version) -> str:
+    content = hashlib.sha256('\x1f'.join((version['kind'], version['text'] or '', version['segments_json'] or '',
+                                           version['metadata_json'] or '')).encode()).hexdigest()
+    return f'{version["artifact_sha256"]}:{content}'
+
+
+def _copy_marks(source, keys: dict, *, apply: bool, actor: str) -> list:
+    from .media.version_status import mark
+    if not source.execute("SELECT 1 FROM sqlite_master WHERE name='derived_text_status'").fetchone():
+        return []
+    copied = []
+    for row in source.execute('SELECT * FROM derived_text_status ORDER BY id'):
+        if row['derived_text_id'] not in keys or (row['superseded_by_id'] and row['superseded_by_id'] not in keys):
+            continue
+        key = hashlib.sha256(json.dumps([keys[row['derived_text_id']], keys.get(row['superseded_by_id']), row['status'],
+                                         row['reason'], row['created_at']]).encode()).hexdigest()
+        with session() as db:
+            if db.execute("SELECT 1 FROM derived_text_status WHERE json_extract(metadata_json,'$.pilot_transfer_key')=?",
+                          (key,)).fetchone():
+                continue
+            target = {k: db.execute("SELECT id FROM derived_text WHERE json_extract(metadata_json,'$.pilot_transfer.key')=?",
+                                    (keys[k],)).fetchone() for k in filter(None, (row['derived_text_id'], row['superseded_by_id']))}
+            entry = {'pilot_status_id': row['id'], 'status': row['status'], 'reason': row['reason']}
+            if not apply:
+                copied.append({**entry, 'dry_run': True})
+                continue
+            if any(v is None for v in target.values()):
+                continue
+            if apply:
+                entry['status_id'] = mark(db, target[row['derived_text_id']]['id'],
+                                          superseded_by_id=target[row['superseded_by_id']]['id'] if row['superseded_by_id'] else None,
+                                          reason=row['reason'], actor=actor,
+                                          metadata={'pilot_transfer_key': key, 'pilot_actor': row['actor'],
+                                                    'pilot_created_at': row['created_at']})
+            copied.append(entry)
+    return copied
+
+
 def transfer(pilot_db: Path, *, apply: bool = False, actor: str = 'pilot-transfer') -> dict:
     pilot_db = Path(pilot_db)
     pilot_sha = _sha256_file(pilot_db)
@@ -37,8 +76,11 @@ def transfer(pilot_db: Path, *, apply: bool = False, actor: str = 'pilot-transfe
     try:
         versions = source.execute('''SELECT d.*, a.sha256 AS artifact_sha256, a.original_name
                                      FROM derived_text d JOIN artifacts a ON a.id = d.artifact_id ORDER BY d.id''').fetchall()
+        keys = {}
         for version in versions:
-            key = f'{pilot_sha}:{version["id"]}'
+            # Content identity, not the pilot file's hash: the pilot may change between runs.
+            key = version_key(version)
+            keys[version['id']] = key
             with session() as db:
                 target = db.execute('SELECT id FROM artifacts WHERE sha256=? ORDER BY id LIMIT 1',
                                     (version['artifact_sha256'],)).fetchone()
@@ -96,6 +138,7 @@ def transfer(pilot_db: Path, *, apply: bool = False, actor: str = 'pilot-transfe
                            (actor, 'pilot_transfer', 'derived_text', derived_id,
                             json.dumps({'key': key, 'run_id': run_id, 'event_candidates': candidates})))
             report['copied'].append({**entry, 'derived_text_id': derived_id, 'run_id': run_id, 'event_candidates': candidates})
+        report['marks'] = _copy_marks(source, keys, apply=apply, actor=actor)
     finally:
         source.close()
     return report

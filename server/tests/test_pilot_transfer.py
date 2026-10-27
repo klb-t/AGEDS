@@ -3,10 +3,13 @@ from __future__ import annotations
 
 import json
 import shutil
+import sqlite3
 from pathlib import Path
+from unittest.mock import patch
 
 from server.app import db, pilot_transfer, worker
 from server.app.jobs import claim_job
+from server.app.media import alignment
 from server.app.media.queue import enqueue_media_job
 from server.app.transcription import enqueue_transcription
 from server.tests.test_media_ocr_diarization import png_bytes
@@ -89,3 +92,40 @@ class PilotTransferTests(vertex_tests.VertexCase):
         self.assertEqual((again['to_acquire'], again['transfer']['copied']), ([], []))
         self.assertEqual(len(self.rows('derived_text')), 2)
         self.assertEqual(sorted(p.name for p in source.iterdir()), ['call.wav', 'chat.png', 'unrelated.txt'])
+
+    def test_superseded_marks_follow_and_a_changed_pilot_does_not_duplicate(self):
+        from server.app.media.version_status import mark, superseded
+        self.transport(vertex_tests.VertexAsrTests.SEGMENTS)
+        audio = Path(self.corpus['audio_codeswitch']).read_bytes()
+        aid = self.add_artifact(audio, 'call.wav', 'audio/wav')
+        enqueue_transcription(aid, recipe='asr-vertex-gemini')
+        worker.process_job(claim_job())
+        enqueue_transcription(aid, recipe='asr-vertex-gemini-aligned')
+        with patch.object(alignment, 'faster_whisper_words', side_effect=RuntimeError('offline')):
+            worker.process_job(claim_job())
+        old, new = [r['id'] for r in self.rows('derived_text')]
+        pilot_live = self.settings.db_path
+        target = self.root / 'production'
+        (target / 'store').mkdir(parents=True)
+        pilot = self.root / 'pilot.db'
+        shutil.copy(pilot_live, pilot)
+        self.use_settings(db_path=target / 'evidence.db', store_dir=target / 'store', data_dir=target)
+        db.init_db()
+        self.store = target / 'store'
+        self.add_artifact(audio, 'call.wav', 'audio/wav')
+        first = pilot_transfer.transfer(pilot, apply=True)
+        self.assertEqual((len(first['copied']), first['marks']), (2, []))
+        # the pilot changes afterwards: a mark is added, so the pilot file hash differs
+        conn = sqlite3.connect(pilot)
+        conn.row_factory = sqlite3.Row
+        mark(conn, old, superseded_by_id=new, reason='validator defect in revision 1', actor='owner')
+        conn.commit()
+        conn.close()
+        second = pilot_transfer.transfer(pilot, apply=True)
+        self.assertEqual((second['copied'], len(second['marks'])), ([], 1))
+        self.assertEqual(len(self.rows('derived_text')), 2)
+        copies = [r['id'] for r in self.rows('derived_text')]
+        with db.session() as conn:
+            self.assertEqual(superseded(conn), {copies[0]: superseded(conn)[copies[0]]})
+            self.assertEqual(superseded(conn)[copies[0]]['superseded_by_id'], copies[1])
+        self.assertEqual(pilot_transfer.transfer(pilot, apply=True)['marks'], [])

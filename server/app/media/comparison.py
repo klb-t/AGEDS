@@ -225,6 +225,8 @@ def artifact_versions(artifact_id: int, *, limit: int = 200) -> list[dict]:
                              FROM derived_text d LEFT JOIN processing_runs r ON r.id=d.run_id
                              WHERE d.artifact_id=? AND d.kind IN ('transcript','ocr') ORDER BY d.id DESC LIMIT ?""",
                           (artifact_id, limit)).fetchall()
+        from .version_status import superseded
+        marks = superseded(db, artifact_id)
     result = []
     for row in rows:
         try:
@@ -246,5 +248,6 @@ def artifact_versions(artifact_id: int, *, limit: int = 200) -> list[dict]:
             'recipe_sha256': recipe.get('sha256', 'unknown'), 'pin_status': recipe.get('pin_status', 'unknown'),
             'strategy': effective.get('strategy', effective.get('layout', 'unknown')),
             'word_timing': word_timing_capabilities(segments)['status'] if row['kind'] == 'transcript' and segments is not None else 'n/a',
+            'superseded': marks.get(row['id']),
         })
     return result

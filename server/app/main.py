@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from contextlib import closing
+from .media.version_status import NOT_SUPERSEDED_SQL, superseded as superseded_versions
 from .db import connect, init_db, session
 from .config import settings
 from .evidence import IntegrityError, ensure_source, ingest_file, temporary_copy_acquisitions
@@ -182,13 +183,15 @@ def artifact(request:Request,artifact_id:SqlPathId):
         if not art:raise HTTPException(404)
         previews=[dict(r) for r in db.execute("SELECT id,kind,model,language,substr(text,1,4096) AS text,length(text)>4096 AS text_truncated FROM derived_text WHERE artifact_id=? AND kind!='transcript' ORDER BY id DESC LIMIT 51",(artifact_id,))]
         events=[dict(r) for r in db.execute("SELECT id,ts_start,event_type,direction,contact_label,phone_or_address,substr(body,1,4096) AS body,substr(subject,1,4096) AS subject FROM events WHERE artifact_id=? ORDER BY ts_start LIMIT 101",(artifact_id,))]
+    with session() as db:
+        superseded_map = superseded_versions(db, artifact_id)
     version_page = _read_page_http(artifact_id, 'transcripts')
     citation_page = _read_page_http(artifact_id, 'citations')
     annotation_page = _read_page_http(artifact_id, 'annotations')
     return templates.TemplateResponse(request,'artifact.html',{
         'a':dict(art),'texts':previews[:50],'text_previews_more':len(previews)>50,
         'annotations':annotation_page['items'],'events':events[:100],'events_more':len(events)>100,
-        'citations':citation_page['items'],'version_page':version_page,
+        'citations':citation_page['items'],'version_page':version_page,'superseded':superseded_map,
         'citation_page':citation_page,'annotation_page':annotation_page})
 
 
@@ -308,13 +311,13 @@ def api_artifacts(limit:int=Query(500,ge=1,le=10000),access:Access=scoped('read_
                 WHEN EXISTS(SELECT 1 FROM derived_text d WHERE d.artifact_id=a.id AND d.kind='transcript') THEN 'done'
                 ELSE 'none'
               END transcript_status,
-              (SELECT language FROM derived_text d WHERE d.artifact_id=a.id AND d.kind='transcript' ORDER BY d.id DESC LIMIT 1) transcript_language,
-              (SELECT substr(text,1,400) FROM derived_text d WHERE d.artifact_id=a.id AND d.kind='transcript' ORDER BY d.id DESC LIMIT 1) transcript_preview,
+              (SELECT language FROM derived_text d WHERE d.artifact_id=a.id AND d.kind='transcript' AND {current} ORDER BY d.id DESC LIMIT 1) transcript_language,
+              (SELECT substr(text,1,400) FROM derived_text d WHERE d.artifact_id=a.id AND d.kind='transcript' AND {current} ORDER BY d.id DESC LIMIT 1) transcript_preview,
               (SELECT priority FROM jobs j WHERE j.artifact_id=a.id AND j.kind='transcribe' ORDER BY j.id DESC LIMIT 1) queued_priority
             FROM artifacts a
             WHERE a.mime_type LIKE 'audio/%' OR a.mime_type LIKE 'video/%'
             ORDER BY COALESCE(queued_priority,-1) DESC,a.id DESC LIMIT ?
-        """,(limit if everything else -1,)).fetchall()
+        """.replace('{current}', NOT_SUPERSEDED_SQL),(limit if everything else -1,)).fetchall()
         if not everything:
             # Filter before the limit so hidden rows cannot shorten or reorder a page.
             rows=[r for r in rows if gate.allows('artifact',r['id'],'read_metadata')][:limit]
@@ -323,7 +326,7 @@ def api_artifacts(limit:int=Query(500,ge=1,le=10000),access:Access=scoped('read_
             d=dict(r)
             if not everything:
                 # Status, language and preview come only from text versions this reader may see.
-                visible_texts = [t for t in db.execute("SELECT id,language,substr(text,1,400) AS preview FROM derived_text WHERE artifact_id=? AND kind='transcript' ORDER BY id DESC",(d['id'],))
+                visible_texts = [t for t in db.execute(f"SELECT id,language,substr(text,1,400) AS preview FROM derived_text d WHERE artifact_id=? AND kind='transcript' AND {NOT_SUPERSEDED_SQL} ORDER BY id DESC",(d['id'],))
                                  if gate.allows('derived_text', t['id'], 'read_metadata')]
                 latest = visible_texts[0] if visible_texts else None
                 d['transcript_language'] = latest['language'] if latest else None
@@ -385,7 +388,8 @@ def api_transcript(artifact_id:SqlPathId,derived_text_id:int|None=Query(None,ge=
         allow = _row_filter(db, access, 'derived_text', 'read_text')
         if derived_text_id is None:
             # The latest version this reader may see, not the latest version overall.
-            r = next((row for row in db.execute("SELECT * FROM derived_text WHERE artifact_id=? AND kind='transcript' ORDER BY id DESC",(artifact_id,))
+            # Superseded versions stay addressable by id but are not the default.
+            r = next((row for row in db.execute(f"SELECT * FROM derived_text d WHERE artifact_id=? AND kind='transcript' AND {NOT_SUPERSEDED_SQL} ORDER BY id DESC",(artifact_id,))
                       if allow is None or allow(row['id'])), None)
         else:
             r=db.execute("SELECT * FROM derived_text WHERE artifact_id=? AND id=? AND kind='transcript'",(artifact_id,derived_text_id)).fetchone()

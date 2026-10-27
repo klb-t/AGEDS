@@ -136,6 +136,12 @@ def _parser() -> argparse.ArgumentParser:
     pilot.add_argument("--pilot-db", type=Path, required=True)
     pilot.add_argument("--source", type=Path, help="directory with the pilot originals: acquire them here first (read-only scan)")
     pilot.add_argument("--apply", action="store_true", help="write; without it only report what would be copied")
+    status = commands.add_parser("derived-text-supersede", help="mark a text version superseded by a newer one (append-only, with reason)")
+    status.add_argument("derived_text_id", type=_positive_integer)
+    status.add_argument("--by", type=_positive_integer, help="the superseding version; omit with --reinstate")
+    status.add_argument("--reinstate", action="store_true")
+    status.add_argument("--reason", required=True)
+    status.add_argument("--actor", default="cli")
     from .commands import register_all
     register_all(commands)
     return parser
@@ -361,6 +367,16 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command.startswith("advocate-"):
             _emit({"command": args.command, **_advocate_command(args)})
+            return 0
+        if args.command == "derived-text-supersede":
+            from .db import init_db, session
+            from .media.version_status import mark
+            if args.reinstate == (args.by is not None):
+                raise ValueError("give either --by VERSION or --reinstate")
+            init_db()
+            with session() as db:
+                row = mark(db, args.derived_text_id, superseded_by_id=args.by, reason=args.reason, actor=args.actor)
+            _emit({"command": args.command, "status_id": row, "derived_text_id": args.derived_text_id, "superseded_by_id": args.by})
             return 0
         if args.command == "import-pilot-results":
             from .db import init_db

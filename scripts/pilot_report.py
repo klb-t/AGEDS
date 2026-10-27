@@ -54,6 +54,12 @@ def collect(db) -> dict:
             report['scans'].append({'id': scan['id'], 'collection_id': scan.get('collection_id'), 'status': scan.get('status'),
                                     'entries': coverage.get('entries'), 'complete': coverage.get('complete'),
                                     'incomplete_reasons': coverage.get('incomplete_reasons')})
+    marks = {}
+    if has_table(db, 'derived_text_status'):
+        for mark in rows(db, 'SELECT * FROM derived_text_status s WHERE id=(SELECT MAX(id) FROM derived_text_status '
+                             'WHERE derived_text_id=s.derived_text_id)'):
+            if mark['status'] == 'superseded':
+                marks[mark['derived_text_id']] = {'by': mark['superseded_by_id'], 'reason': mark['reason']}
     artifacts = []
     for artifact in rows(db, 'SELECT id, original_name, mime_type, size_bytes, sha256, created_at FROM artifacts ORDER BY id'):
         observations = db.execute('SELECT count(*) FROM source_observations WHERE artifact_id=?', (artifact['id'],)).fetchone()[0]
@@ -73,6 +79,7 @@ def collect(db) -> dict:
                           'speakers': sorted({s.get('speaker_hypothesis') for s in segments if s.get('speaker_hypothesis')}),
                           'segment_languages': metadata.get('segment_languages'),
                           'timing': metadata.get('timing') or ('word timing' if any(s.get('words') for s in segments) else None),
+                          'superseded': marks.get(text['id']),
                           'word_citable_segments': (metadata.get('word_timing') or {}).get('available_segments'),
                           'alignment': _alignment(metadata.get('timing_alignment')),
                           'transcoding': (metadata.get('transcoding') or {}).get('to'),
@@ -103,6 +110,10 @@ def collect(db) -> dict:
         if not artifact['derived_texts']:
             gaps.append(f"artifact {artifact['id']} ({artifact['original_name']}): no derived text yet")
         for text in artifact['derived_texts']:
+            if text['superseded']:
+                gaps.append(f"artifact {artifact['id']}: {text['kind']} {text['id']} superseded by {text['superseded']['by']} "
+                            f"({text['superseded']['reason']}); kept in history, not counted below")
+                continue
             align = text['alignment']
             if text['kind'] == 'transcript' and align and align['status'] == 'aligned':
                 gaps.append(f"artifact {artifact['id']}: transcript {text['id']}: {text['word_citable_segments']} of {text['segments']} "
@@ -146,6 +157,10 @@ def markdown(report: dict) -> str:
         out.append(f"- błąd zadania {f['id']} ({f['kind']}, artefakt {f['artifact_id']}): {f['error']}")
     for a in report['artifacts']:
         for t in a['derived_texts']:
+            if t['superseded']:
+                out.append(f"- artefakt {a['id']} → {t['kind']} #{t['id']} (model {t['model']}): **zastąpiona przez "
+                           f"#{t['superseded']['by']}** — {t['superseded']['reason']} (zostaje w historii)")
+                continue
             out.append(f"- artefakt {a['id']} → {t['kind']} #{t['id']} ({t['layer']}, model {t['model']}): {t['segments']} segm., "
                        f"{t['characters']} znaków, języki {t['segment_languages'] or t['language']}, mówcy (hipotezy) "
                        f"{t['speakers'] or '—'}, czas: {t['timing'] or '—'}"

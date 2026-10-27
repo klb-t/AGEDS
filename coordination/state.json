@@ -1239,7 +1239,10 @@
           "workbench": 9
         },
         "pilot": "~/ageds-pilot: 7 real files scanned read-only and ingested, originals unchanged; ASR/OCR not run",
-        "blocked_on": "sending real files to Vertex was refused by the session permission check (Data Exfiltration)"
+        "blocked_on": "sending real files to Vertex was refused by the session permission check (Data Exfiltration)",
+        "ci": "Manual verification green on 65c7823 (reported by coordinator)",
+        "reimport_idempotence": "second scan+ingest of the same 7 files: 7 artifacts (same ids), 14 acquisitions, originals unchanged",
+        "pilot_report": "scripts/pilot_report.py: read-only Markdown/JSON from the database"
       }
     }
   ],

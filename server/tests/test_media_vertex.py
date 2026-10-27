@@ -153,3 +153,26 @@ class VertexOcrTests(VertexCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class PilotReportTests(VertexCase):
+    SEGMENTS = VertexAsrTests.SEGMENTS
+
+    def test_report_separates_layers_and_counts_from_the_database(self):
+        import importlib.util
+        import sqlite3
+        spec = importlib.util.spec_from_file_location('pilot_report', Path(__file__).resolve().parents[2] / 'scripts' / 'pilot_report.py')
+        report_module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(report_module)
+        self.transport(self.SEGMENTS)
+        aid = self.add_audio()
+        enqueue_transcription(aid, recipe='asr-vertex-gemini')
+        worker.process_job(claim_job())
+        conn = sqlite3.connect(f'file:{self.settings.db_path}?mode=ro', uri=True)
+        conn.row_factory = sqlite3.Row
+        report = report_module.collect(conn)
+        text = report['artifacts'][0]['derived_texts'][0]
+        self.assertEqual((text['layer'], text['model'], text['speakers']), ('model output', 'gemini-3.5-flash', ['S1', 'S2']))
+        self.assertEqual(report['provider']['calls'], 1)
+        self.assertIn('no word timing', ' '.join(report['gaps']))
+        self.assertIn('wynik modelu', report_module.markdown(report))

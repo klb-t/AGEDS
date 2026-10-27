@@ -201,8 +201,16 @@ await review. Every current thesis carries `disconfirmation_flags`
 `flags`, which stay about the thesis's own evidence. Finding no contrary hit is not proof that
 none exists; see the documentation gaps of the event study.
 
-Not covered: ledger entries (bank, health) are not in the search index or dossier targets.
-Cite them through their statement artifact.
+Ledger material is reachable the same way:
+* Every bank, card or travel row and every health session is an event, indexed like any
+  event. Since 2026-10-27 its search text also carries the parsed amount (signed and
+  unsigned), currency, flow, counterparty and account, or the sample types and units of a
+  session.
+* An event item can pin one parsed row under it: `ledger_entry_id` or `health_sample_id`
+  (CLI `--ledger-entry` / `--health-sample`, API fields of the same name). The row is pinned
+  by its `row_sha256`, the same way as `observation_id` for an artifact item.
+* Recipients keep exactly the visibility they had: the added text is part of the event's own
+  search row, behind the event's `read_text` gate. The dossier is installation-only.
 
 ## Theses and epistemic disclosure
 

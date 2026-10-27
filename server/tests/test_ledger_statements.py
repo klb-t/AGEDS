@@ -178,3 +178,43 @@ def test_balance_check_arithmetic_is_exact():
     status, detail = bank.balance_check(opening, closing, [{'exact': '0.30', 'currency': 'USD'}])
     assert status == 'not_checkable' and detail['entries_excluded']['other_currency'] == 1
     assert bank.balance_check(None, closing, [])[0] == 'not_checkable'
+
+
+def test_ledger_values_are_searchable_pinnable_and_gated_like_their_event(env):
+    from server.app import authz, db as dbmod, search
+    from server.app.analysis import dossier, preregistration
+    from server.app.assignments import create_principal
+    from server.tests.corpus import hypotheses as corpus
+    result = camt053.import_camt053(Path(env['m']['camt']['two_statements']))
+    entry = rows("SELECT * FROM ledger_entries WHERE artifact_id=? AND amount_exact IS NOT NULL ORDER BY id LIMIT 1",
+                 (result['artifact_id'],))[0]
+    amount = entry['amount_exact'].lstrip('-+')
+    hits = search.search_page(f'"{amount}"')['results']
+    assert ('event', entry['event_id']) in {(h['object_kind'], int(h['object_id'])) for h in hits}
+    content = rows("SELECT content FROM search_fts WHERE object_kind='event' AND object_id=?", (entry['event_id'],))[0]['content']
+    camt053.import_camt053(Path(env['m']['camt']['two_statements']))  # re-import appends nothing
+    assert rows("SELECT content FROM search_fts WHERE object_kind='event' AND object_id=?", (entry['event_id'],))[0]['content'] == content
+    with dbmod.session() as conn:
+        hid = preregistration.register_hypothesis(conn, corpus.definition_for(corpus.SCENARIOS['unknown_zone']()))['hypothesis_id']
+        item = dossier.add_item(conn, hid, 'event', entry['event_id'], ledger_entry_id=entry['id'],
+                                classification='contradicting')
+        assert (item['locator']['record']['row_sha256'], item['source_check']) == (entry['row_sha256'], 'matches')
+        assert amount in item['excerpt']
+        whole = dossier.add_item(conn, hid, 'event', entry['event_id'])  # the event alone is a different item
+        assert whole['item_id'] != item['item_id'] and 'record' not in whole['locator']
+        other = rows('SELECT id FROM ledger_entries WHERE event_id<>? LIMIT 1', (entry['event_id'],))[0]['id']
+        with pytest.raises(dossier.HypothesisNotFound):  # a row must belong to the event it is pinned under
+            dossier.add_item(conn, hid, 'event', entry['event_id'], ledger_entry_id=other)
+        # a recipient sees the ledger text exactly when it may read the event, as before
+        recipient = create_principal(conn, 'recipient')
+        gate = authz.ContentGate(conn, recipient)
+        assert not gate.allows('event', entry['event_id'], 'read_text')
+        assert search.scoped_search_page(f'"{amount}"', 20, gate)['results'] == []
+        case_id = conn.execute('SELECT s.case_id FROM artifacts a JOIN sources s ON s.id=a.source_id WHERE a.id=?',
+                               (result['artifact_id'],)).fetchone()[0]
+        authz.grant(conn, recipient, authz.create_scope(conn, 'case', {'case_id': case_id}), ['read_text', 'read_metadata'])
+        search.clear_cache()
+        gate = authz.ContentGate(conn, recipient)
+        assert gate.allows('event', entry['event_id'], 'read_text')
+        assert ('event', entry['event_id']) in {(h['object_kind'], int(h['object_id']))
+                                                for h in search.scoped_search_page(f'"{amount}"', 20, gate)['results']}

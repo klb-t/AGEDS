@@ -69,4 +69,5 @@ def write_statement(statement: dict, records: list[dict]) -> int:
                 event_id = store.add_event(db, record['candidates'], **record['event'])
                 for entry in record['entries']:
                     store.insert_row(db, 'ledger_entries', {**entry, 'event_id': event_id, 'statement_id': statement_id})
+                    store.append_search_text(db, event_id, store.entry_search_text(entry))
     return statement_id

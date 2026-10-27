@@ -86,6 +86,8 @@ def register(subparsers) -> None:
     p.add_argument('kind', choices=KINDS)
     p.add_argument('target_id', type=_positive)
     p.add_argument('--observation', type=_positive, default=None, help='source observation id (artifact items)')
+    p.add_argument('--ledger-entry', type=_positive, default=None, help='ledger row of this event (event items)')
+    p.add_argument('--health-sample', type=_positive, default=None, help='health sample of this session event (event items)')
     p.add_argument('--classification', choices=CLASSES, default=None)
     p.add_argument('--rationale', default=None)
     p.add_argument('--version', type=_positive, default=None, help='hypothesis version the decision refers to (default latest)')
@@ -174,7 +176,8 @@ def _dispatch(args, db) -> dict:
     if c == 'dossier-add':
         return dossier.add_item(db, args.hypothesis_id, args.kind, args.target_id, observation_id=args.observation,
                                 classification=args.classification, rationale=args.rationale, version_id=args.version,
-                                note=args.note, actor=args.actor)
+                                note=args.note, actor=args.actor, ledger_entry_id=args.ledger_entry,
+                                health_sample_id=args.health_sample)
     if c == 'dossier-classify':
         return dossier.classify(db, args.item_id, args.classification, rationale=args.rationale, version_id=args.version,
                                 actor=args.actor)

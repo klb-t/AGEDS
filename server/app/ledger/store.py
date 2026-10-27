@@ -104,6 +104,29 @@ def add_event(db: sqlite3.Connection, candidates: list[TimeCandidate], **event) 
     return event_id
 
 
+def append_search_text(db: sqlite3.Connection, event_id: int, text: str) -> None:
+    """Add parsed ledger values to the event's search row once (same object, same read_text gate).
+
+    The event's own body stays the source text; this only makes amounts, currencies and sample
+    types findable. Re-import with identical rows appends nothing.
+    """
+    text = ' '.join(text.split())
+    if not text:
+        return
+    row = db.execute("SELECT rowid, content FROM search_fts WHERE object_kind='event' AND object_id=? ORDER BY rowid LIMIT 1",
+                     (event_id,)).fetchone()
+    if row is None or text in (row['content'] or ''):
+        return
+    db.execute('UPDATE search_fts SET content=? WHERE rowid=?', (f"{row['content'] or ''}\n{text}", row['rowid']))
+
+
+def entry_search_text(entry: dict) -> str:
+    amount = entry.get('amount_exact')
+    parts = [entry.get('record_kind'), amount, amount.lstrip('-+') if isinstance(amount, str) else None,
+             entry.get('currency'), entry.get('flow'), entry.get('counterparty_name'), entry.get('counterparty_account')]
+    return ' '.join(str(p) for p in parts if p)
+
+
 def mask_account(value: str | None, keep: int = 4) -> str | None:
     """Display masking only (stored values stay raw): keep the country/check prefix and last digits."""
     if value is None:

@@ -1241,7 +1241,12 @@
         "server/app/templates/hypotheses.html",
         "server/app/static/{hypotheses.css,advocate.mjs}",
         "server/app/{advocate,providers}.py",
-        "docs/{HYPOTHESES,ADVOCATE}.md"
+        "docs/{HYPOTHESES,ADVOCATE}.md",
+        "server/app/ledger/{store,bank,health}.py",
+        "server/app/importers/tabular_profiles.py",
+        "server/app/static/hypotheses.mjs",
+        "docs/LEDGER.md",
+        "server/tests/test_ledger_{statements,health}.py"
       ],
       "based_on_commit": "7295148 + 3fc9ef4",
       "acceptance": [
@@ -1322,8 +1327,13 @@
         },
         "contrary_material": {
           "added": "preregistered disconfirming queries/criteria, direction-tagged candidate search, disclosure fact disconfirmation_search, thesis disconfirmation_flags, advocate status contradicts",
-          "not_covered": "ledger entries not searchable/dossier targets (cite via statement artifact)",
+          "not_covered": null,
           "browser": "hypotheses 10/10, advocate, advocate_model green after fixing a misplaced API argument found by the browser run"
+        },
+        "ledger_search": {
+          "search": "amount/currency/flow/counterparty (ledger) and sample types (health) appended once to the event search row, same read_text gate",
+          "dossier": "event items pin one ledger_entry_id / health_sample_id by row_sha256 (no schema change: dossier target_kind CHECK is fixed)",
+          "correction": "bank/health rows were already events (indexed by body/title) and event-targetable; the earlier report overstated the gap"
         }
       }
     }

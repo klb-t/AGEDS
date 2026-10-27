@@ -26,6 +26,8 @@ from .hypotheses import (DISCLAIMER, HypothesisError, HypothesisNotFound, canoni
 from .preregistration import require_registered
 
 TARGET_KINDS = ('event', 'artifact', 'derived_text', 'anchor', 'annotation')
+# Parsed rows of an event that an event item can pin (like an acquisition of an artifact item).
+EVENT_RECORDS = ('ledger_entry_id', 'health_sample_id')
 CLASSIFICATIONS = ('candidate', 'supporting', 'contradicting', 'context', 'rejected')
 HUMAN_CLASSES = CLASSIFICATIONS
 EXCERPT_CHARS = 500
@@ -42,7 +44,37 @@ def _excerpt(text: str | None) -> str | None:
     return text[:EXCERPT_CHARS]
 
 
-def locate(db: sqlite3.Connection, kind: str, target_id: int, *, observation_id: int | None = None) -> tuple[dict, str | None]:
+def _event_record(db: sqlite3.Connection, event_id: int, *, ledger_entry_id, health_sample_id) -> tuple[dict, str] | None:
+    """A ledger row or health sample parsed from this event's source, pinned by its own row hash."""
+    if ledger_entry_id is not None and health_sample_id is not None:
+        raise HypothesisError('give at most one of ledger_entry_id and health_sample_id')
+    if ledger_entry_id is not None:
+        row = db.execute('SELECT * FROM ledger_entries WHERE id=? AND event_id=?', (ledger_entry_id, event_id)).fetchone()
+        if row is None:
+            raise HypothesisNotFound(f'ledger entry {ledger_entry_id} of event {event_id} does not exist')
+        record = {'table': 'ledger_entries', 'id': row['id'], 'artifact_id': row['artifact_id'],
+                  'statement_id': row['statement_id'], 'parser': row['parser'], 'parser_version': row['parser_version'],
+                  'source_position': row['source_position'], 'row_sha256': row['row_sha256']}
+        text = ' · '.join(str(v) for v in (row['record_kind'],
+                                           f"{row['amount_exact']} {row['currency'] or ''}".strip() if row['amount_exact'] else None,
+                                           row['counterparty_name'], row['description']) if v)
+        return record, text
+    if health_sample_id is not None:
+        row = db.execute('SELECT * FROM health_samples WHERE id=? AND session_event_id=?', (health_sample_id, event_id)).fetchone()
+        if row is None:
+            raise HypothesisNotFound(f'health sample {health_sample_id} of event {event_id} does not exist')
+        record = {'table': 'health_samples', 'id': row['id'], 'artifact_id': row['artifact_id'], 'parser': row['parser'],
+                  'parser_version': row['parser_version'], 'source_position': row['source_position'],
+                  'row_sha256': row['row_sha256']}
+        text = ' · '.join(str(v) for v in (row['start_raw'], row['sample_type'],
+                                           f"{row['value_raw']} {row['unit'] or ''}".strip() if row['value_raw'] else None,
+                                           row['basis']) if v)
+        return record, text
+    return None
+
+
+def locate(db: sqlite3.Connection, kind: str, target_id: int, *, observation_id: int | None = None,
+           ledger_entry_id: int | None = None, health_sample_id: int | None = None) -> tuple[dict, str | None]:
     """Return ``(locator, excerpt)`` pinning the current version of one record, or raise NotFound."""
     db.row_factory = sqlite3.Row
     if kind not in TARGET_KINDS:
@@ -51,6 +83,11 @@ def locate(db: sqlite3.Connection, kind: str, target_id: int, *, observation_id:
         raise HypothesisError('target id must be a positive integer')
     if observation_id is not None and kind != 'artifact':
         raise HypothesisError('observation_id applies to artifact items only')
+    if (ledger_entry_id is not None or health_sample_id is not None) and kind != 'event':
+        raise HypothesisError('ledger_entry_id and health_sample_id apply to event items only')
+    for value in (ledger_entry_id, health_sample_id):
+        if value is not None and (type(value) is not int or value < 1):
+            raise HypothesisError('record ids must be positive integers')
     if kind == 'event':
         row = db.execute('SELECT id,artifact_id,source_id,event_type,external_id,subject,body FROM events WHERE id=?',
                          (target_id,)).fetchone()
@@ -60,6 +97,9 @@ def locate(db: sqlite3.Connection, kind: str, target_id: int, *, observation_id:
                    'event_type': row['event_type'], 'external_id': row['external_id'],
                    'body_sha256': sha256_text(row['body'] or '')}
         text = ((row['subject'] + ' — ') if row['subject'] else '') + (row['body'] or '')
+        found = _event_record(db, row['id'], ledger_entry_id=ledger_entry_id, health_sample_id=health_sample_id)
+        if found is not None:  # only then is the key present, so existing event locators keep their hash
+            locator['record'], text = found
         return locator, _excerpt(text)
     if kind == 'artifact':
         row = db.execute('SELECT id,sha256,original_name,size_bytes FROM artifacts WHERE id=?', (target_id,)).fetchone()
@@ -102,7 +142,10 @@ def locate(db: sqlite3.Connection, kind: str, target_id: int, *, observation_id:
 def _verify(db: sqlite3.Connection, item: sqlite3.Row) -> str:
     stored = json.loads(item['locator_json'])
     try:
-        current, _ = locate(db, item['target_kind'], item['target_id'], observation_id=stored.get('observation_id'))
+        record = stored.get('record') or {}
+        current, _ = locate(db, item['target_kind'], item['target_id'], observation_id=stored.get('observation_id'),
+                            ledger_entry_id=record.get('id') if record.get('table') == 'ledger_entries' else None,
+                            health_sample_id=record.get('id') if record.get('table') == 'health_samples' else None)
     except HypothesisNotFound:
         return 'missing'
     return 'matches' if sha256_canonical(current) == item['locator_sha256'] else 'changed'
@@ -152,7 +195,8 @@ def _decide(db, item_id, version_id, classification, decided_by, rationale, acto
 
 def add_item(db: sqlite3.Connection, hypothesis_id: int, kind: str, target_id: int, *, observation_id: int | None = None,
              classification: str | None = None, rationale: str | None = None, version_id: int | None = None,
-             note: str | None = None, actor=None) -> dict:
+             note: str | None = None, actor=None, ledger_entry_id: int | None = None,
+             health_sample_id: int | None = None) -> dict:
     """Human adds a pointer; with ``classification`` it is classified in the same transaction."""
     actor = clean_actor(actor)
     rationale = clean_text(rationale, 'rationale', max_chars=MAX_RATIONALE_CHARS, required=False)
@@ -162,7 +206,8 @@ def add_item(db: sqlite3.Connection, hypothesis_id: int, kind: str, target_id: i
     db.execute('BEGIN IMMEDIATE')
     try:
         version_id = _version_of(db, hypothesis_id, version_id)
-        locator, excerpt = locate(db, kind, target_id, observation_id=observation_id)
+        locator, excerpt = locate(db, kind, target_id, observation_id=observation_id, ledger_entry_id=ledger_entry_id,
+                                  health_sample_id=health_sample_id)
         item_id, created = _insert_item(db, hypothesis_id, kind, target_id, locator, excerpt, 'human', None,
                                         {'note': note} if note else {}, actor)
         if created or classification is not None:

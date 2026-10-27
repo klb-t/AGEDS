@@ -51,6 +51,8 @@ class ItemIn(BaseModel):
     target_kind: Literal['event', 'artifact', 'derived_text', 'anchor', 'annotation']
     target_id: PositiveId
     observation_id: PositiveId | None = None
+    ledger_entry_id: PositiveId | None = None
+    health_sample_id: PositiveId | None = None
     classification: Literal['candidate', 'supporting', 'contradicting', 'context', 'rejected'] | None = None
     rationale: str | None = None
     version_id: PositiveId | None = None
@@ -177,7 +179,8 @@ def api_add_item(hypothesis_id: SqlId, body: ItemIn):
     return {'disclaimer': disclaimer(), **_call(dossier_mod.add_item, hypothesis_id, body.target_kind, body.target_id,
                                                observation_id=body.observation_id, classification=body.classification,
                                                rationale=body.rationale, version_id=body.version_id, note=body.note,
-                                               actor=body.actor)}
+                                               actor=body.actor, ledger_entry_id=body.ledger_entry_id,
+                                               health_sample_id=body.health_sample_id)}
 
 
 @router.post('/api/hypotheses/{hypothesis_id}/candidates')

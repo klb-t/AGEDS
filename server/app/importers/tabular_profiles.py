@@ -1170,3 +1170,4 @@ def _write(records: list[dict], profile: dict, set_label: str, artifact_id: int,
                         'event_id': event_id, 'artifact_id': artifact_id, 'statement_id': None,
                         'parser': PARSER_NAME, 'parser_version': PARSER_VERSION, 'reading_key': reading_key, **entry,
                         'metadata_json': {**entry['metadata_json'], 'profile_set': set_label}})
+                    store.append_search_text(db, event_id, store.entry_search_text(entry))

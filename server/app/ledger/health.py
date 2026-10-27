@@ -182,6 +182,8 @@ def write_session(event: dict, candidates: list[TimeCandidate], samples: list[di
         for offset in range(0, len(samples), SAMPLE_BATCH):
             store.insert_many(db, 'health_samples', [{**s, 'session_event_id': event_id}
                                                      for s in samples[offset:offset + SAMPLE_BATCH]])
+        kinds = sorted({f"{s.get('sample_type')} {s.get('unit') or ''}".strip() for s in samples if s.get('sample_type')})
+        store.append_search_text(db, event_id, ' '.join(kinds[:50]))
     return event_id
 
 

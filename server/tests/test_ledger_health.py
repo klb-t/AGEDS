@@ -220,3 +220,22 @@ def test_fitbit_local_times_projections_and_log_types(env):
     distance = samples(exercise['artifact_id'], sample_type='exercise.distance')[0]
     assert distance['value_exact'] == '2.12345678901234567' and distance['unit'] == 'Kilometer'
     assert [t['kind'] for t in yoga['times']] == ['start'] and 'duration_unparsed' in yoga['meta']['issues']
+
+
+def test_health_sample_types_are_searchable_and_one_sample_can_be_pinned(env):
+    from server.app import db as dbmod, search
+    from server.app.analysis import dossier, preregistration
+    from server.tests.corpus import hypotheses as hyp_corpus
+    health_apple.import_apple_health(Path(env['m']['health']['apple']['export']), enable_health=True)
+    sample = rows('SELECT * FROM health_samples WHERE session_event_id IS NOT NULL ORDER BY id LIMIT 1')[0]
+    content = rows("SELECT content FROM search_fts WHERE object_kind='event' AND object_id=?",
+                   (sample['session_event_id'],))[0]['content']
+    assert sample['sample_type'] in content
+    assert ('event', sample['session_event_id']) in {(h['object_kind'], int(h['object_id']))
+                                                     for h in search.search_page(f'"{sample["sample_type"]}"', 200)['results']}
+    with dbmod.session() as conn:
+        hid = preregistration.register_hypothesis(conn, hyp_corpus.definition_for(hyp_corpus.SCENARIOS['unknown_zone']()))['hypothesis_id']
+        item = dossier.add_item(conn, hid, 'event', sample['session_event_id'], health_sample_id=sample['id'])
+        assert item['locator']['record'] == {**item['locator']['record'], 'table': 'health_samples', 'id': sample['id'],
+                                             'row_sha256': sample['row_sha256']}
+        assert item['source_check'] == 'matches'

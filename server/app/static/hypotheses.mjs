@@ -132,6 +132,8 @@ export function init(root = document) {
     await postJSON(`/api/hypotheses/${hypothesisId}/dossier`, {
       target_kind: form.elements.target_kind.value, target_id: optionalInteger(form.elements.target_id.value, 'ID'),
       observation_id: optionalInteger(form.elements.observation_id.value, 'obserwacja') ?? null,
+      ledger_entry_id: optionalInteger(form.elements.ledger_entry_id.value, 'wpis ledger') ?? null,
+      health_sample_id: optionalInteger(form.elements.health_sample_id.value, 'próbka zdrowia') ?? null,
       classification: form.elements.classification.value || null, rationale: form.elements.rationale.value || null,
       actor: form.elements.actor.value || null});
     reloadTo(hypothesisId);

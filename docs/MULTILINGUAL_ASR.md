@@ -190,6 +190,25 @@ Word times come from a separate **timing reference** named in the recipe's
   second and booked like the Gemini call; synchronous recognition only, so at most 60 s
   (a longer recording keeps the model estimates and records why). Price is an unverified preset.
 
+* `asr-vertex-gemini-forced`: forced alignment of the Gemini text itself to the audio
+  (torchaudio MMS_FA, CTC; weights pinned by SHA-256; optional `server/requirements-align.txt`).
+  Every word gets a time and an acoustic score. A segment is word-citable only when its mean
+  score is ≥ 0.7. Placeholders such as `[niezrozumiałe]` and digits are aligned as wildcards.
+  Wildcards between segments absorb speech the model did not transcribe.
+
+Comparison on the three pilot phone calls (real data, 2026-10-27; offline on the stored Gemini
+text, no model call):
+
+| Preset | Segments word-citable (artifacts 4, 5, 6) |
+|---|---|
+| `asr-vertex-gemini-aligned` | 28/55, 23/46, 26/46 (77/147) |
+| `asr-vertex-gemini-forced` at score 0.5 | 23/55, 0/46, 4/46 (27/147) |
+
+Forced alignment failed on the quieter remote speaker of two calls, and loudness normalisation
+did not help. Where both presets time a segment, segment ends agree to about 0.05 s and starts
+to about 1 s (median). The aligned preset stays the default. A real end-to-end run of the forced
+preset (artifact 4, throwaway copy) made 22/60 segments citable.
+
 Gemini's raw words (joining exactly to the stored segment text) are matched in order to the
 reference words (difflib on case/diacritic-folded words; `exact`, or `fuzzy` ≥ 0.8 inside a
 mismatched block). A matched word takes the reference interval. Unmatched words between two

@@ -385,6 +385,7 @@ TIMING_REFERENCE_KEYS = {
                         'multilingual', 'condition_on_previous_text', 'vad_parameters', 'min_matched_ratio'}),
     'google-speech-v2': ({'engine', 'model', 'location', 'language_codes', 'price_usd_per_minute'},
                          {'project', 'eur_per_usd', 'min_matched_ratio'}),
+    'mms-forced-align': ({'engine', 'model'}, {'model_sha256', 'min_score', 'window_seconds', 'context_seconds'}),
 }
 
 
@@ -403,6 +404,14 @@ def _validate_timing_reference(ref) -> None:
         raise RecipeError('timing_reference.language_codes must list BCP-47 codes')
     if 'price_usd_per_minute' in ref:
         _finite(ref['price_usd_per_minute'], 'timing_reference.price_usd_per_minute', low=0, high=10)
+    if ref['engine'] == 'mms-forced-align':
+        if ref['model'] != 'MMS_FA':
+            raise RecipeError('mms-forced-align runs torchaudio.pipelines.MMS_FA (model "MMS_FA")')
+        if 'model_sha256' in ref and (not isinstance(ref['model_sha256'], str) or not re.fullmatch(r'[0-9a-f]{64}', ref['model_sha256'])):
+            raise RecipeError('timing_reference.model_sha256 must be a lowercase SHA-256')
+        for key, low, high in (('min_score', 0, 1), ('window_seconds', 5, 60), ('context_seconds', 0, 10)):
+            if key in ref:
+                _finite(ref[key], f'timing_reference.{key}', low=low, high=high)
     if 'min_matched_ratio' in ref:
         _finite(ref['min_matched_ratio'], 'timing_reference.min_matched_ratio', low=0, high=1)
     for key in ('vad_filter', 'local_files_only', 'multilingual', 'condition_on_previous_text'):

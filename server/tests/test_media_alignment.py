@@ -139,3 +139,53 @@ class AlignedRecipeTests(vertex_tests.VertexCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ForcedAlignRecipeTests(vertex_tests.VertexCase):
+    REPLY = AlignedRecipeTests.REPLY
+
+    def test_letters_fold_diacritics_and_drop_symbols(self):
+        from server.app.media.forced_align import _letters
+        alphabet = set("abcdefghijklmnopqrstuvwxyz'")
+        self.assertEqual([_letters(w, alphabet) for w in ('Źdźbło,', ' [niezrozumiałe]', '10:42', "I'm")],
+                         ['zdzblo', 'niezrozumiale', '', "i'm"])
+
+    def test_forced_preset_publishes_scored_words_and_records_the_reference(self):
+        from server.app.media import forced_align
+        self.transport(self.REPLY)
+        def fake(data, segments, ref):
+            out = []
+            for i, seg in enumerate(segments):
+                raws = alignment.split_words(seg['text'])
+                words = [{'word': raw, 'start': i * 2 + k * 0.2, 'end': i * 2 + k * 0.2 + 0.1, 'probability': None,
+                          'score': 0.9, 'match': 'forced'} for k, raw in enumerate(raws)]
+                out.append({**seg, 'model_estimate': {'start': seg['start'], 'end': seg['end']}, 'words': words,
+                            'start': words[0]['start'], 'end': words[-1]['end'], 'timing_source': 'forced_alignment'})
+            return out, {'segments_aligned': len(out), 'segments_model_estimate': 0, 'min_score': ref['min_score'],
+                         'segments': [], 'reference': {'engine': 'mms-forced-align', 'model': 'torchaudio.pipelines.MMS_FA'}}
+        with patch.object(forced_align, 'align', side_effect=fake) as called:
+            enqueue_transcription(self.add_audio(), recipe='asr-vertex-gemini-forced')
+            worker.process_job(claim_job())
+        self.assertEqual(called.call_args.args[2]['min_score'], 0.7)
+        version = self.rows('derived_text')[0]
+        metadata = json.loads(version['metadata_json'])
+        self.assertEqual((metadata['timing_alignment']['status'], metadata['word_timing']['status']), ('aligned', 'available'))
+        self.assertEqual({s['timing_source'] for s in json.loads(version['segments_json'])}, {'forced_alignment'})
+
+    def test_missing_torch_keeps_the_text(self):
+        from server.app.media import forced_align
+        self.transport(self.REPLY)
+        with patch.object(forced_align, 'align', side_effect=ImportError('No module named torchaudio')):
+            enqueue_transcription(self.add_audio(), recipe='asr-vertex-gemini-forced')
+            worker.process_job(claim_job())
+        metadata = json.loads(self.rows('derived_text')[0]['metadata_json'])
+        self.assertEqual(metadata['timing_alignment']['status'], 'unavailable')
+        self.assertIn('torchaudio', metadata['timing_alignment']['reason'])
+
+    def test_forced_recipe_validation(self):
+        base = effective_recipe('asr-vertex-gemini-forced')['effective']
+        validate_effective(base)
+        ref = base['model_options']['timing_reference']
+        for change in ({'model': 'wav2vec2'}, {'model_sha256': 'ABC'}, {'min_score': 2}, {'audio_filter': 'amovie=/etc/passwd'}):
+            with self.subTest(change=change), self.assertRaises(RecipeError):
+                validate_effective(dict(base, model_options={'timing_reference': {**ref, **change}}))

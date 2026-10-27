@@ -1220,7 +1220,12 @@
         "server/app/media/recipes/asr-vertex-gemini-{aligned,chirp}.json",
         "scripts/pilot_report.py",
         "docs/MULTILINGUAL_ASR.md",
-        "server/tests/test_{pilot_transfer,media_alignment}.py"
+        "server/tests/test_{pilot_transfer,media_alignment}.py",
+        "server/app/media/forced_align.py",
+        "server/app/media/version_status.py",
+        "server/app/media/recipes/asr-vertex-gemini-forced.json",
+        "server/requirements-align.txt",
+        "server/tests/test_version_status.py"
       ],
       "based_on_commit": "7295148 + 3fc9ef4",
       "acceptance": [
@@ -1275,6 +1280,17 @@
           "rev1_small_vad": "versions 8-10: 37/124 segments aligned; numpy-float times made word_timing report 0 citable (fixed)",
           "rev2_result": "versions 11-13: 28/55, 23/46, 26/46 segments word-citable; text agreement 0.628/0.552/0.654",
           "pilot_provider_spend_eur_total": 0.4019
+        },
+        "superseded_marks": {
+          "commit": "2b6064d",
+          "pilot": "8->11, 9->12, 10->13 (validator defect in rev 1), backup ~/ageds-pilot/backups/20261027T184152Z"
+        },
+        "forced_alignment": {
+          "data": "real pilot recordings, offline on stored Gemini text of versions 11-13",
+          "citable_at_score_0_5": "23/55, 0/46, 4/46 (27/147) vs aligned preset 77/147",
+          "agreement_where_both": "segment ends ~0.05 s, starts ~1 s median",
+          "decision": "asr-vertex-gemini-aligned stays default; asr-vertex-gemini-forced optional (min_score 0.7)",
+          "e2e": "artifact 4 on a throwaway pilot copy: 22/60 citable, pinned weights verified, Gemini 0.0697 EUR"
         }
       }
     }

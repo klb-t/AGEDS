@@ -1,0 +1,41 @@
+{
+  "schema": "ageds.media_recipe",
+  "schema_version": 1,
+  "id": "asr-vertex-gemini-forced",
+  "kind": "asr",
+  "revision": 1,
+  "description": "Gemini on Vertex AI for the text; word times by local forced alignment of the Gemini text to the audio (torchaudio MMS_FA, CTC, pinned weights, CPU, no network once cached; needs server/requirements-align.txt). Every word gets a time and an acoustic score; a segment is word-citable only when its mean score is at least 0.7. On the three pilot phone calls it made fewer segments citable than asr-vertex-gemini-aligned (27 vs 77 at score 0.5) and failed on the quieter remote speaker, so it is not the default. Not verification of what was said.",
+  "strategy": "vertex_gemini",
+  "engine": "vertex-gemini",
+  "model": "gemini-3.5-flash",
+  "device": "vertex:global",
+  "compute_type": "remote",
+  "model_options": {
+    "timing_reference": {
+      "engine": "mms-forced-align",
+      "model": "MMS_FA",
+      "model_sha256": "20ef12963ab4924bef49ac4fc7f58ad5da2ee43b2c11bc8c853c9b90ecdbc680",
+      "min_score": 0.7,
+      "window_seconds": 20.0,
+      "context_seconds": 2.0
+    }
+  },
+  "vad": {
+    "enabled": false,
+    "parameters": null
+  },
+  "word_timestamps": true,
+  "language": null,
+  "allowed_languages": [
+    "pl",
+    "nl",
+    "en"
+  ],
+  "windows": null,
+  "detection": null,
+  "transcribe_options": {},
+  "limits": {
+    "max_inline_bytes": 15000000,
+    "max_output_tokens": 32768
+  }
+}

@@ -1,0 +1,5 @@
+# Optional: forced alignment (preset asr-vertex-gemini-forced). CPU wheels:
+#   pip install -r server/requirements-align.txt --index-url https://download.pytorch.org/whl/cpu
+# The MMS_FA weights (1.18 GB) download once into the torch hub cache; the preset pins their SHA-256.
+torch==2.5.1
+torchaudio==2.5.1

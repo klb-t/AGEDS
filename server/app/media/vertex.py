@@ -279,6 +279,19 @@ class VertexGeminiASR:
         """Word times from the reference engine; on failure the model estimates stay and the reason is stored."""
         from . import alignment
         ref = self.reference
+        if ref['engine'] == 'mms-forced-align':
+            from . import forced_align
+            try:
+                aligned, report = forced_align.align(sent, segments, ref)
+            except Exception as exc:  # the paid model text is kept; only the time source is missing
+                metadata['timing_alignment'] = {'status': 'unavailable', 'engine': ref['engine'],
+                                                'reason': f'{type(exc).__name__}: {str(exc)[:300]}'}
+                return segments
+            metadata['timing_alignment'] = {'status': 'aligned', **report}
+            metadata['timing'] = ('word times by forced alignment of the model text to the audio in {} of {} segments '
+                                  '(score >= {}); the rest are model estimates'.format(
+                                      report['segments_aligned'], len(aligned), report['min_score']))
+            return aligned
         try:
             if ref['engine'] == 'faster-whisper':
                 words, info = alignment.faster_whisper_words(sent, ref)

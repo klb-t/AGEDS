@@ -132,6 +132,10 @@ def _parser() -> argparse.ArgumentParser:
     preview = commands.add_parser("authz-preview", help="what a principal can see now (names and counts, no text)")
     preview.add_argument("--principal-uid", required=True)
     commands.add_parser("authz-show", help="list principals, grants and settings without secrets")
+    pilot = commands.add_parser("import-pilot-results", help="copy pilot ASR/OCR versions onto artifacts with the same SHA-256 (no model call)")
+    pilot.add_argument("--pilot-db", type=Path, required=True)
+    pilot.add_argument("--source", type=Path, help="directory with the pilot originals: acquire them here first (read-only scan)")
+    pilot.add_argument("--apply", action="store_true", help="write; without it only report what would be copied")
     from .commands import register_all
     register_all(commands)
     return parser
@@ -357,6 +361,14 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command.startswith("advocate-"):
             _emit({"command": args.command, **_advocate_command(args)})
+            return 0
+        if args.command == "import-pilot-results":
+            from .db import init_db
+            from .pilot_transfer import acquire_and_transfer, transfer
+            init_db()
+            result = acquire_and_transfer(args.pilot_db, args.source, apply=args.apply) if args.source \
+                else transfer(args.pilot_db, apply=args.apply)
+            _emit({"command": args.command, **result})
             return 0
         if args.command.startswith("authz-"):
             _emit({"command": args.command, **_authz_command(args)})

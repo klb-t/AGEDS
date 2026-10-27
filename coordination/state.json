@@ -304,7 +304,7 @@
     {
       "id": "AGEDS-TASK-20261025-P8",
       "owner": "rzecznik_p8",
-      "status": "blocked",
+      "status": "done",
       "scope": [
         "server/app/providers.py",
         "server/app/advocate.py",
@@ -320,9 +320,8 @@
         "backend_tests": 504,
         "data": "synthetic",
         "fake_transport": "passed",
-        "real_vertex_call": "not_executed"
-      },
-      "blocked_on": "Real Vertex call was denied by the session permission check; needs the session owner's approval."
+        "real_vertex_call": "executed 2026-10-27 on synthetic data: ok, 613/112 tokens; TTS ok 119040 B"
+      }
     },
     {
       "id": "AGEDS-TASK-20261025-P10",

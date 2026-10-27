@@ -427,6 +427,8 @@ bez cache po każdej z losowych operacji, hypothesis 60 ciągów), cache użyty 
 wykryta; usunięcie principala lub cofnięć z klucza jest maskowane redundancją `Coverage.key` (świadoma obrona w głąb).
 Pomiar (syntetyczny korpus): 8000 dokumentów, pierwsze zapytanie 0,4–1,2 s.
 
+**Test dymny z prawdziwym Vertex (2026-10-27, zgoda właściciela w sesji):** dane syntetyczne, tymczasowa baza; `gemini-3.5-flash` na `global` z konta serwisowego VM odpowiedział (613 tokenów wejścia, 112 wyjścia, ok. 0,0019 € wg cen presetu), trzy twierdzenia: dwa `proven` z dosłownym cytatem fragmentu, jedno `hypothesis` (brak dowodu zapłaty, tylko twierdzenie najemcy); Cloud Text-to-Speech `pl-PL-Wavenet-B` zwrócił 119 040 B MP3. Rezerwacja i rozliczenie kosztu zapisane w `provider_calls`.
+
 **Stan P8 (2026-10-25):** kod i testy na atrapie wykonane; **prawdziwe wywołanie Vertex NIE zostało jeszcze
 wykonane** (próba w sesji zablokowana przez kontrolę uprawnień; czeka na zgodę właściciela sesji). `server/app/providers.py`:
 dostawca = ustawienie `advocate.provider` (preset Vertex `gemini-3.5-flash`, `global`, projekt z metadata servera,

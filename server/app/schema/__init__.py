@@ -29,12 +29,13 @@ import sqlite3
 
 EXTENSION_MODULES = (
     'catalog', 'records', 'timeline', 'media', 'analysis', 'reports', 'integrations', 'workbench',
-    'importplan', 'location', 'traces', 'ledger',
+    'importplan', 'location', 'traces', 'ledger', 'connectors',
 )
 _RANGES = {
     'catalog': (10, 19), 'records': (20, 29), 'timeline': (30, 39), 'media': (40, 49),
     'analysis': (50, 59), 'reports': (60, 69), 'integrations': (70, 79), 'workbench': (80, 89),
     'importplan': (90, 99), 'location': (100, 109), 'traces': (110, 119), 'ledger': (120, 129),
+    'connectors': (130, 139),
 }
 
 

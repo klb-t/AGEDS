@@ -23,6 +23,7 @@ COMMAND_MODULES = (
     'location',
     'traces',
     'ledger',
+    'connectors',
 )
 
 

@@ -47,7 +47,7 @@ EXTENSION_TABLES = (
     'logical_records', 'logical_occurrences', 'chat_attachment_refs',
     'contact_observations', 'contact_observation_values', 'recording_name_observations',
     'event_media_references',
-    'speaker_turns', 'speaker_assignments', 'event_candidates', 'derived_text_status',
+    'speaker_turns', 'speaker_assignments', 'event_candidates', 'derived_text_status', 'gmail_api_fetches',
     'annotation_proposals', 'hypothesis_imports', 'relation_hypotheses',
     'reports',
     'timeline_correlation_runs', 'timeline_hypotheses', 'timeline_hypothesis_status',

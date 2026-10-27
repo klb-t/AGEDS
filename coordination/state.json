@@ -1242,7 +1242,18 @@
         "blocked_on": "sending real files to Vertex was refused by the session permission check (Data Exfiltration)",
         "ci": "Manual verification green on 65c7823 (reported by coordinator)",
         "reimport_idempotence": "second scan+ingest of the same 7 files: 7 artifacts (same ids), 14 acquisitions, originals unchanged",
-        "pilot_report": "scripts/pilot_report.py: read-only Markdown/JSON from the database"
+        "pilot_report": "scripts/pilot_report.py: read-only Markdown/JSON from the database",
+        "pilot_run": {
+          "date": "2026-10-27",
+          "consent": "owner in session (\"Zezwalam\") + R100",
+          "jobs": "7/7 done (3 ASR, 4 OCR) via gemini-3.5-flash, global",
+          "asr": "three UWV phone calls, NL/EN, 2-3 speaker hypotheses each, AMR transcoded to FLAC in memory",
+          "timing": "model timestamps plausible for 1 recording (101%), past the end for 1 (103%), unreliable for 1 (24% coverage, 2 untimed segments)",
+          "ocr": "4 screenshots (GCP billing/credits UI, not case material) read line by line, no pixel boxes",
+          "cost": "0.146681 EUR at preset prices (credits), 35735 input / 10342 output tokens",
+          "originals": "unchanged (sha256 verified before and after)",
+          "data": "real owner material; no synthetic data in the pilot database"
+        }
       }
     }
   ],

@@ -249,11 +249,20 @@ class VertexGeminiASR:
             for segment in segments:
                 if segment['end'] is not None and segment['end'] > duration + 1.0:
                     segment['timing_warning'] = 'end beyond recording duration'
+        timed = [seg['end'] for seg in segments if seg['end'] is not None]
+        timing_quality = 'unknown'
+        if duration and timed:
+            covered = max(timed) / duration
+            timing_quality = ('suspect: segment times cover only {:.0%} of the recording'.format(covered) if covered < 0.8
+                              else 'suspect: segment times run past the recording end' if covered > 1.02 else 'plausible')
+        if any(seg['start'] is None for seg in segments):
+            timing_quality += '; some segments have no usable time'
         dominant = max(languages, key=languages.get) if languages else None
         metadata = {'language_meaning': 'most frequent segment language reported by the model',
                     'segment_languages': {str(k): v for k, v in languages.items()},
                     'transcript_confidence': 'unknown', 'speaker_labels': 'model hypotheses, not identities',
-                    'timing': 'model estimates in seconds; word timing unavailable', 'input_mime_detected': mime,
+                    'timing': 'model estimates in seconds; word timing unavailable', 'timing_quality': timing_quality,
+                    'input_mime_detected': mime,
                     'transcoding': transcoding, 'duration_seconds_ffprobe': duration,
                     'usage': {k: usage.get(k) for k in ('promptTokenCount', 'candidatesTokenCount', 'actual_eur')}}
         work = {'unit': 'audio_second', 'amount': duration if duration is not None else 'unknown',

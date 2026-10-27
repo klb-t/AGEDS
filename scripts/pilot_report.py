@@ -52,7 +52,12 @@ def collect(db) -> dict:
                              'FROM derived_text WHERE artifact_id=? ORDER BY id', (artifact['id'],)):
             segments = json.loads(text['segments_json'] or '[]')
             metadata = json.loads(text['metadata_json'] or '{}')
-            texts.append({'id': text['id'], 'layer': 'model output' if text['kind'] in ('transcript', 'ocr') else text['kind'],
+            duration = metadata.get('duration_seconds_ffprobe')
+            ends = [seg['end'] for seg in segments if isinstance(seg.get('end'), (int, float))]
+            coverage = round(max(ends) / duration, 3) if duration and ends else None
+            texts.append({'time_coverage': coverage, 'untimed_segments': sum(1 for seg in segments if seg.get('start') is None)
+                          if text['kind'] == 'transcript' else None,
+                          'id': text['id'], 'layer': 'model output' if text['kind'] in ('transcript', 'ocr') else text['kind'],
                           'kind': text['kind'], 'model': text['model'], 'language': text['language'],
                           'segments': len(segments), 'characters': len(text['text'] or ''),
                           'speakers': sorted({s.get('speaker_hypothesis') for s in segments if s.get('speaker_hypothesis')}),
@@ -88,6 +93,11 @@ def collect(db) -> dict:
         for text in artifact['derived_texts']:
             if text['kind'] == 'transcript' and text['timing'] != 'word timing':
                 gaps.append(f"artifact {artifact['id']}: transcript {text['id']} has no word timing (segment citations only)")
+            if text['kind'] == 'transcript' and text['time_coverage'] is not None and not 0.8 <= text['time_coverage'] <= 1.02:
+                gaps.append(f"artifact {artifact['id']}: transcript {text['id']} segment times cover "
+                            f"{text['time_coverage']:.0%} of the recording: model timestamps are unreliable here")
+            if text['kind'] == 'transcript' and text['untimed_segments']:
+                gaps.append(f"artifact {artifact['id']}: transcript {text['id']} has {text['untimed_segments']} segments without usable time")
             if text['kind'] == 'ocr':
                 gaps.append(f"artifact {artifact['id']}: OCR {text['id']} has no pixel boxes (page/line locators)")
     gaps += ['ASR/OCR quality is not measured against a human reference here; speaker labels are hypotheses',
@@ -120,6 +130,7 @@ def markdown(report: dict) -> str:
             out.append(f"- artefakt {a['id']} → {t['kind']} #{t['id']} ({t['layer']}, model {t['model']}): {t['segments']} segm., "
                        f"{t['characters']} znaków, języki {t['segment_languages'] or t['language']}, mówcy (hipotezy) "
                        f"{t['speakers'] or '—'}, czas: {t['timing'] or '—'}"
+                       + (f", pokrycie czasem {t['time_coverage']:.0%}" if t.get('time_coverage') is not None else '')
                        + (f", przekodowano do {t['transcoding']}" if t['transcoding'] else '')
                        + f"\n  > {t['excerpt']!s}")
     out.append(f"- kandydaci zdarzeń (nigdy zdarzenia): {sum(c['count'] for c in report['event_candidates'])}; zdarzenia: {report['events']}")

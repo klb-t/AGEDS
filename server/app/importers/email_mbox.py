@@ -36,7 +36,9 @@ from .comm_common import (DEFAULT_LIMITS, CommLimits, Issues, acquire, acquire_b
 PARSER_NAME = 'email_rfc5322'
 # '2' (2026-10-16, review finding 5): attachment locators carry the container's
 # SHA-256 (comm_common.container_scheme); a container imported by '1' stays '1'.
-PARSER_VERSION = '2'
+# '3' (2026-10-27): a forwarded message/rfc822 part is extracted as one attachment (it was walked
+# into, so its text landed among this message's text parts and nothing was extracted).
+PARSER_VERSION = '3'
 
 _MONTHS = {m: i for i, m in enumerate(('jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'), 1)}
 _DAYS = ('mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun')
@@ -285,7 +287,9 @@ def _part_paths(message, limits: CommLimits):
             yield None, None
             return
         yield path or '0', part
-        if part.is_multipart():
+        # A forwarded message (message/rfc822) is one attachment, not part of this message's body:
+        # the email library reports it as multipart, so do not descend into it.
+        if part.is_multipart() and part.get_content_type() != 'message/rfc822':
             children = part.get_payload()
             if isinstance(children, list):
                 for index in range(len(children) - 1, -1, -1):
@@ -581,9 +585,18 @@ class _Importer:
             if part is None:
                 problems.append('mime_part_limit')
                 break
+            content_type = part.get_content_type()
+            if content_type == 'message/rfc822':
+                disposition = (part.get_content_disposition() or '').lower()
+                filename = part.get_filename()
+                if filename is not None:
+                    filename, name_problems = decode_words(str(filename))
+                    problems.extend(name_problems)
+                attachments.append(self._attachment(part, path=path, index=index, filename=filename,
+                                                    content_type=content_type, disposition=disposition))
+                continue
             if part.is_multipart():
                 continue
-            content_type = part.get_content_type()
             if part.get_content_maintype() == 'multipart':
                 # Broken MIME: a multipart without a usable boundary. Keep its
                 # undecoded text as the body view; the original stays in the store.
@@ -641,6 +654,11 @@ class _Importer:
             payload = inner[0].as_bytes() if isinstance(inner, list) and inner else None
             item['extraction'] = 'reserialized_message_not_byte_exact'
             is_raw = False
+            if isinstance(inner, list) and inner:
+                # Raw header values of the forwarded message, as written; not parsed into events here.
+                item['forwarded_headers_raw'] = {key: bounded_text(str(inner[0].get(key)), 500)[0]
+                                                 for key in ('From', 'To', 'Subject', 'Date', 'Message-ID')
+                                                 if inner[0].get(key) is not None}
         else:
             payload = part.get_payload(decode=True)
             item['extraction'] = f"content_transfer_decoding:{(part.get('Content-Transfer-Encoding') or '7bit').strip().lower()}"
@@ -652,7 +670,7 @@ class _Importer:
             item.update(status='not_extracted', reason='attachment_size_limit', size_bytes=len(payload))
             self.counts['attachments_not_extracted'] += 1
             return item
-        name = safe_name(filename, f'part-{path}')
+        name = safe_name(filename, f'part-{path}.eml' if content_type == 'message/rfc822' else f'part-{path}')
         if not filename:
             item['filename_status'] = 'missing_in_source_synthesized'
         locator = f'{self.base_locator}!/message/{index}/mime-part/{path}'

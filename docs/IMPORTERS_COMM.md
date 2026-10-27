@@ -64,8 +64,12 @@ leaves out and how to run it. Acceptance evidence: [receipt](validation/IMPORT_C
   usable boundary keeps its undecoded payload as body view, flagged. MIME defects of
   every part are recorded.
 * Attachments and inline parts → child artifacts with filename (RFC 2231/2047 decoded),
-  content type, size and SHA-256, plus `event_media_references` rows. `message/rfc822`
-  parts are re-serialized (`is_raw=0`, flagged not byte-exact). Parts over
+  content type, size and SHA-256, plus `event_media_references` rows. A forwarded
+  `message/rfc822` part is one attachment (an `.eml` child, re-serialized, `is_raw=0`,
+  flagged not byte-exact) with the forwarded message's raw `From/To/Subject/Date/Message-ID`
+  values. Its text is not part of the outer body. Until parser version 3 (2026-10-27) the
+  part was walked into, so its text landed among the outer text parts and nothing was
+  extracted. Parts over
   `max_attachment_bytes` are `not_extracted`.
 
 Date rules (RFC 5322 §3.3/§4.3):
@@ -201,6 +205,51 @@ PNG `eXIf`: `DateTimeOriginal`, `DateTimeDigitized`, `DateTime`, `OffsetTime*`,
 `SubSecTime*`, `Make`/`Model`/`Software` and GPS **presence** only (coordinates never
 decoded). IFD loops, out-of-bounds values and truncated segments are flagged. Works on new
 image files or on already acquired artifacts (e.g. WhatsApp media).
+
+## Owner workflow: Gmail and WhatsApp exports → coverage report
+
+1. Export, keep the files unchanged.
+   * Gmail: Google Takeout → Mail, MBOX format → `takeout-*.zip`. Do not unzip; the catalog
+     reads the archive, and the import plan finds `Takeout/Mail/*.mbox` inside it.
+   * Single messages: `.eml` files.
+   * WhatsApp: chat → Export chat → *with media* → the zip (Android) or the folder with
+     `_chat.txt` (iOS).
+2. Put them in one folder, then run:
+
+   ```bash
+   scripts/pilot_local.sh cli catalog-collection-add "Exports <date>" --acquisition-method export
+   scripts/pilot_local.sh cli catalog-scan --collection <id> <folder>
+   scripts/pilot_local.sh cli import-plan-create --collection <id>
+   scripts/pilot_local.sh cli import-plan-show <plan>
+   scripts/pilot_local.sh cli import-plan-decide <plan> --base-version 1 --actor owner --approve-all-ready
+   scripts/pilot_local.sh cli import-plan-run <plan> --version 2
+   .venv/bin/python scripts/pilot_report.py
+   ```
+
+   `import-plan-show` lists what will be imported; review it before deciding. The source
+   folder is read only.
+3. The report's *Pokrycie: poczta i czaty* section has, for every import run: importer,
+   parser version, counts, completeness and issue codes. Per kind it gives the message
+   count, messages without a usable time, first and last message, threads or chats,
+   senders, messages per month and gaps of 14 days or more. It also counts attachments
+   and WhatsApp media as `present`, `missing_from_export` and `omitted_by_export`.
+   * Email times are UTC only where the Date zone is explicit; `CET`/`CEST` and missing
+     zones stay untimed.
+   * WhatsApp times are phone-local as written, zone unknown.
+   * A gap is a gap in the export, not proof that nothing happened.
+
+Rehearsed on 2026-10-27 with **synthetic** structures shaped like real exports, only inside
+a throwaway directory:
+* a Takeout zip with a Gmail mbox (labels, thread ids, mboxrd `>From`, an encoded-word
+  subject, an RFC 2231 PDF, an inline image, an HTML-only message, a forwarded
+  `message/rfc822`, a `CEST` date);
+* `.eml` files, one without `Message-ID`;
+* an Android NL WhatsApp zip with photo, voice note, PDF, `<Media weggelaten>` and a
+  47-day gap;
+* an iOS folder with U+200E marks and one media file missing.
+
+All five units were detected and imported. The rehearsal found the `message/rfc822` defect
+above. Real exports were not used.
 
 ## Schema (`server/app/schema/records.py`, versions 25–27)
 

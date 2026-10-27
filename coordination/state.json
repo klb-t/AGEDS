@@ -1225,7 +1225,12 @@
         "server/app/media/version_status.py",
         "server/app/media/recipes/asr-vertex-gemini-forced.json",
         "server/requirements-align.txt",
-        "server/tests/test_version_status.py"
+        "server/tests/test_version_status.py",
+        "server/app/media/recipes/asr-vertex-gemini-hybrid.json",
+        "server/app/importers/email_mbox.py",
+        "docs/IMPORTERS_COMM.md",
+        "server/tests/test_import_comm.py",
+        "server/tests/test_review_fixes_ingest.py"
       ],
       "based_on_commit": "7295148 + 3fc9ef4",
       "acceptance": [
@@ -1291,6 +1296,14 @@
           "agreement_where_both": "segment ends ~0.05 s, starts ~1 s median",
           "decision": "asr-vertex-gemini-aligned stays default; asr-vertex-gemini-forced optional (min_score 0.7)",
           "e2e": "artifact 4 on a throwaway pilot copy: 22/60 citable, pinned weights verified, Gemini 0.0697 EUR"
+        },
+        "notation_hypothesis": "pilot recording 6: hypothesis_only (7/12 within 2 s < 80%); nothing reinterpreted",
+        "hybrid": "offline on real pilot: 41/55, 23/46, 26/46 citable (13 unconfirmed fills on artifact 4); optional preset",
+        "comm_exports": {
+          "data": "SYNTHETIC export structures (Takeout zip mbox, eml, WhatsApp Android zip NL, iOS folder) in a throwaway dir",
+          "flow": "catalog-scan -> import-plan -> approve-all-ready -> run: 5/5 units done; coverage section in pilot_report",
+          "defect_fixed": "email parser v3: forwarded message/rfc822 extracted as attachment (was walked into, body polluted)",
+          "real_exports": "not used yet"
         }
       }
     }

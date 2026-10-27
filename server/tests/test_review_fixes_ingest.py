@@ -227,7 +227,8 @@ def test_finding5_two_takeouts_with_the_same_mbox_name_both_import(env):
     assert len(children) == 3 and len({c['sha256'] for c in children}) == 1  # one stored copy, three provenances
     for child in children:
         assert child['source_locator'].startswith(f"upload:email:{TAKEOUT_NAME}@sha256:{child['container_sha']}!/message/")
-    assert {r['parser_version'] for r in env.rows('SELECT parser_version FROM event_media_references')} == {'2'}
+    versions = {r['parser_version'] for r in env.rows('SELECT parser_version FROM event_media_references')}
+    assert versions and '1' not in versions  # content-identity locators (version >= 2)
 
 
 def test_finding5_reexported_whatsapp_zip_with_unchanged_media(env, tmp_path):

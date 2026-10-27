@@ -165,6 +165,26 @@ def test_single_eml_rfc2231_filename_and_pst(env):
     assert child['sha256'] == env['m']['pdf']['sha256']
 
 
+def test_forwarded_message_part_is_one_attachment_not_body_text(env, tmp_path):
+    eml = tmp_path / 'forward.eml'
+    eml.write_bytes(b'From: a@example.org\r\nTo: b@example.org\r\nSubject: Fwd: x\r\nDate: Mon, 1 Jan 2024 10:00:00 +0000\r\n'
+                    b'Message-ID: <outer@example.org>\r\nMIME-Version: 1.0\r\n'
+                    b'Content-Type: multipart/mixed; boundary="b1"\r\n\r\n--b1\r\nContent-Type: text/plain\r\n\r\nZie bijlage.\r\n'
+                    b'--b1\r\nContent-Type: message/rfc822\r\nContent-Disposition: attachment\r\n\r\n'
+                    b'From: origin@example.org\r\nSubject: Origineel\r\nDate: Sun, 31 Dec 2023 09:00:00 +0100\r\n'
+                    b'Message-ID: <inner@example.org>\r\n\r\nOorspronkelijke tekst.\r\n--b1--\r\n')
+    result = email_mbox.import_eml(eml)
+    event = events(result['artifact_id'], 'email')[0]
+    assert 'Zie bijlage.' in event['body'] and 'Oorspronkelijke' not in event['body']
+    assert 'other_text_plain_parts' not in json.dumps(event['meta'])
+    [attachment] = event['meta']['attachments']
+    assert (attachment['content_type'], attachment['extraction']) == ('message/rfc822', 'reserialized_message_not_byte_exact')
+    assert attachment['forwarded_headers_raw']['Message-ID'] == '<inner@example.org>'
+    child = rows('SELECT * FROM artifacts WHERE parent_artifact_id=?', (result['artifact_id'],))[0]
+    assert child['original_name'].endswith('.eml') and child['mime_type'] == 'message/rfc822'
+    assert 'Oorspronkelijke tekst.' in Path(child['stored_path']).read_text()
+
+
 @pytest.mark.parametrize('raw, utc, status', [
     ('Mon, 1 Jan 2024 10:00:00 +0000', '2024-01-01T10:00:00Z', 'explicit_offset'),
     ('Mon, 1 Jan 2024 10:00:00 -0000', '2024-01-01T10:00:00Z', 'explicit_offset'),
@@ -793,3 +813,23 @@ def test_my_activity_refuses_other_takeout_layouts(env, tmp_path):
                                {'header': 'Search', 'title': 'ok', 'time': '2024-01-01T00:00:00Z'}]), encoding='utf-8')
     result = takeout_activity.import_my_activity(odd)
     assert result['events'] == 1 and result['issues']['by_code'] == {'record_not_my_activity_shape': 1}
+
+
+def test_pilot_report_communication_coverage(env):
+    import importlib.util
+    from server.app.importers import whatsapp_media
+    spec = importlib.util.spec_from_file_location('pilot_report', Path(__file__).resolve().parents[2] / 'scripts' / 'pilot_report.py')
+    report_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(report_module)
+    email_mbox.import_mbox(Path(env['m']['mbox']['path']))
+    whatsapp_media.import_whatsapp_export(Path(env['m']['whatsapp']['zip']))
+    conn = sqlite3.connect(f"file:{dbmod.settings.db_path}?mode=ro", uri=True)
+    conn.row_factory = sqlite3.Row
+    comm = report_module.communications(conn)
+    assert [r['importer'] for r in comm['runs']] == ['email_rfc5322', 'whatsapp_media']
+    assert comm['kinds']['email']['messages'] == env['m']['mbox']['messages']
+    assert comm['kinds']['email']['without_time'] >= 1  # the message without Date and the CET one stay untimed
+    statuses = {(r['reference_kind'], r['status']): r['count'] for r in comm['attachments_and_media']}
+    assert statuses[('whatsapp_media', 'missing_from_export')] == env['m']['whatsapp']['zip_expect']['missing_from_export']
+    assert 'not proof that nothing happened' in comm['meaning']
+    assert 'Pokrycie: poczta i czaty' in report_module.markdown(report_module.collect(conn))

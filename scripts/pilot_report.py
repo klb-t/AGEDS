@@ -38,6 +38,53 @@ def _alignment(value) -> dict | None:
                                          'text_agreement_ratio', 'segments_aligned', 'segments_model_estimate')}}
 
 
+COMM_TYPES = ('email', 'whatsapp_message')
+GAP_DAYS = 14
+
+
+def communications(db) -> dict:
+    """Coverage of imported mail and chat exports: what the exports contain, not what happened."""
+    runs = []
+    for row in rows(db, "SELECT a.object_id AS artifact_id, a.details_json, a.ts, f.original_name FROM audit_log a "
+                        "LEFT JOIN artifacts f ON f.id=a.object_id WHERE a.action='import_run' ORDER BY a.id"):
+        details = json.loads(row['details_json'] or '{}')
+        if details.get('importer') not in ('email_rfc5322', 'whatsapp_media', 'whatsapp_txt'):
+            continue
+        runs.append({'artifact_id': row['artifact_id'], 'name': row['original_name'], 'importer': details.get('importer'),
+                     'parser_version': details.get('parser_version'), 'at': row['ts'], 'counts': details.get('counts'),
+                     'complete': (details.get('coverage') or {}).get('complete'), 'issues': details.get('issue_counts')})
+    kinds = {}
+    for kind in COMM_TYPES:
+        events = rows(db, 'SELECT id, ts_start, thread_id, sender, contact_label FROM events WHERE event_type=? ORDER BY ts_start',
+                      (kind,))
+        if not events:
+            continue
+        timed = [e['ts_start'] for e in events if e['ts_start']]
+        months = {}
+        for ts in timed:
+            months[ts[:7]] = months.get(ts[:7], 0) + 1
+        gaps = []
+        for a, b in zip(timed, timed[1:]):
+            try:
+                days = (datetime.fromisoformat(b.replace('Z', '+00:00')[:19]) -
+                        datetime.fromisoformat(a.replace('Z', '+00:00')[:19])).days
+            except ValueError:
+                continue
+            if days >= GAP_DAYS:
+                gaps.append({'from': a, 'to': b, 'days': days})
+        kinds[kind] = {'messages': len(events), 'without_time': len(events) - len(timed),
+                       'first': timed[0] if timed else None, 'last': timed[-1] if timed else None,
+                       'threads_or_chats': len({e['thread_id'] for e in events if e['thread_id']}),
+                       'senders': len({e['sender'] for e in events if e['sender']}), 'per_month': months, 'gaps': gaps,
+                       'time_basis': ('Date header converted to UTC only where its zone is explicit'
+                                      if kind == 'email' else 'phone-local time as written in the export; zone unknown')}
+    references = rows(db, 'SELECT reference_kind, status, count(*) AS count FROM event_media_references GROUP BY reference_kind, status') \
+        if has_table(db, 'event_media_references') else []
+    return {'runs': runs, 'kinds': kinds, 'attachments_and_media': references,
+            'meaning': f'counts and spans of the imported exports; a gap of {GAP_DAYS}+ days is a gap in the export, '
+                       'not proof that nothing happened; the export holds what the account or phone kept at export time'}
+
+
 def collect(db) -> dict:
     report = {'generated_at': datetime.now(timezone.utc).isoformat()}
     try:
@@ -86,6 +133,7 @@ def collect(db) -> dict:
                           'excerpt': (text['text'] or '')[:EXCERPT]})
         artifacts.append({**artifact, 'acquisitions': observations, 'derived_texts': texts})
     report['artifacts'] = artifacts
+    report['communications'] = communications(db)
     report['reimport'] = {'artifacts': len(artifacts),
                           'acquisitions': db.execute('SELECT count(*) FROM source_observations').fetchone()[0],
                           'meaning': 'identical bytes keep one artifact; every acquisition is one observation'}
@@ -172,6 +220,21 @@ def markdown(report: dict) -> str:
                           f"{t['alignment']['text_agreement_ratio']}" if t['alignment'] and t['alignment']['status'] == 'aligned' else '')
                        + f"\n  > {t['excerpt']!s}")
     out.append(f"- kandydaci zdarzeń (nigdy zdarzenia): {sum(c['count'] for c in report['event_candidates'])}; zdarzenia: {report['events']}")
+    comm = report.get('communications') or {}
+    if comm.get('runs') or comm.get('kinds'):
+        out.append('\n## Pokrycie: poczta i czaty (zawartość eksportów)\n')
+        for run in comm['runs']:
+            out.append(f"- import {run['importer']} v{run['parser_version']} — {run['name']}: {run['counts']}, "
+                       f"kompletny: {run['complete']}" + (f", problemy {run['issues']}" if run['issues'] else ''))
+        for kind, k in comm['kinds'].items():
+            out.append(f"- {kind}: {k['messages']} wiadomości ({k['without_time']} bez czasu), {k['first']} → {k['last']}, "
+                       f"wątków/czatów {k['threads_or_chats']}, nadawców {k['senders']}; czas: {k['time_basis']}")
+            out.append('  - miesięcznie: ' + ', '.join(f'{m}: {n}' for m, n in sorted(k['per_month'].items())))
+            for gap in k['gaps']:
+                out.append(f"  - luka {gap['days']} dni: {gap['from']} → {gap['to']}")
+        for ref in comm['attachments_and_media']:
+            out.append(f"- {ref['reference_kind']} / {ref['status']}: {ref['count']}")
+        out.append(f"\n{comm['meaning']}.")
     if 'provider' in report:
         p = report['provider']
         out.append(f"\n## Koszty dostawcy\n\n{p['calls']} wywołań {p['by_purpose']}, tokeny {p['input_tokens']}/{p['output_tokens']}, "

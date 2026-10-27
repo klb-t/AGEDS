@@ -1,0 +1,42 @@
+<!doctype html><html {{ ui_html_attrs() }}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Raport pokrycia</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/owner.css"></head><body>
+<header>{% include '_nav.html' %}<div><h1>Raport pokrycia i pilota</h1><p>z bazy, tylko odczyt · wygenerowano {{ r.generated_at }} · kod <code>{{ r.code_commit[:12] }}</code></p></div></header>
+<main class="owner" data-owner-page="report">
+<p class="owner-layers">Warstwy: <b>bajty źródła i ich pozyskania</b> · <b>wynik modelu</b> (ASR/OCR, z modelem i przebiegiem) · interpretacje. Fragmenty tekstu modelu są cytatem wyniku modelu, nie treścią źródła.</p>
+
+<section class="panel"><h2>Oryginały</h2>
+<p>{{ r.reimport.artifacts }} oryginałów, {{ r.reimport.acquisitions }} pozyskań (te same bajty = jeden oryginał; każde pozyskanie zapisane osobno).</p>
+<div class="owner-scroll"><table data-report-artifacts><tr><th>ID</th><th>Plik</th><th>Typ</th><th>Bajty</th><th>SHA-256</th><th>Pozyskania</th><th>Wersje tekstu</th></tr>
+{% for a in r.artifacts %}<tr><td><a href="/artifact/{{ a.id }}">{{ a.id }}</a></td><td>{{ a.original_name }}</td><td>{{ a.mime_type }}</td><td class="num">{{ a.size_bytes }}</td><td><code>{{ (a.sha256 or '')[:16] }}…</code></td><td class="num">{{ a.acquisitions }}</td><td class="num">{{ a.derived_texts|length }}</td></tr>{% endfor %}</table></div>
+</section>
+
+<section class="panel"><h2>Wynik modelu (transkrypcje i OCR)</h2>
+<p>Zadania: {% for j in r.jobs %}{{ j.kind }}/{{ j.status }}: {{ j.count }}{% if not loop.last %}, {% endif %}{% else %}brak{% endfor %}.</p>
+{% for f in r.failures %}<p class="wb-alert">Błąd zadania {{ f.id }} ({{ f.kind }}, oryginał {{ f.artifact_id }}): {{ f.error }}</p>{% endfor %}
+{% for a in r.artifacts %}{% for t in a.derived_texts %}
+<article class="owner-text{% if t.superseded %} owner-superseded{% endif %}" data-report-text="{{ t.id }}">
+<h3>Oryginał {{ a.id }} → {{ t.kind }} #{{ t.id }} <small>({{ t.layer }}, model {{ t.model or '—' }})</small></h3>
+{% if t.superseded %}<p><b>Zastąpiona przez #{{ t.superseded.by }}</b> — {{ t.superseded.reason }} (zostaje w historii)</p>{% else %}
+<p>{{ t.segments }} segmentów, {{ t.characters }} znaków; języki {{ t.segment_languages or t.language or '—' }}; mówcy (hipotezy) {{ t.speakers|join(', ') or '—' }}; czas: {{ t.timing or '—' }}{% if t.time_coverage is not none %}; pokrycie czasem {{ (t.time_coverage * 100)|round|int }}%{% endif %}</p>
+{% if t.alignment and t.alignment.status == 'aligned' %}<p>Czas słów: {{ t.alignment.reference }} — segmentów z cytowaniem słów {{ t.word_citable_segments }}/{{ t.segments }}; zgodność tekstu z referencją {{ t.alignment.text_agreement_ratio }}.</p>{% endif %}
+<blockquote>{{ t.excerpt }}</blockquote>{% endif %}
+</article>{% endfor %}{% endfor %}
+{% if r.provider %}<p>Koszty dostawcy: {{ r.provider.calls }} wywołań, tokeny {{ r.provider.input_tokens }}/{{ r.provider.output_tokens }}, razem {{ r.provider.cost_eur }} € <small>({{ r.provider.cost_basis }})</small>.</p>{% endif %}
+<p>Kandydaci zdarzeń z OCR (nigdy zdarzenia): {{ r.event_candidates|sum(attribute='count') }}; zdarzenia: {{ r.events }}.</p>
+</section>
+
+{% set comm = r.communications %}
+<section class="panel" data-report-communications><h2>Pokrycie: poczta i czaty (zawartość eksportów)</h2>
+{% if comm.runs or comm.kinds %}
+<ul>{% for run in comm.runs %}<li>Import {{ run.importer }} v{{ run.parser_version }} — {{ run.name }}: kompletny {{ run.complete }}{% if run.issues %}, problemy {{ run.issues }}{% endif %}</li>{% endfor %}</ul>
+{% for kind, k in comm.kinds.items() %}<h3>{{ kind }}</h3>
+<p>{{ k.messages }} wiadomości ({{ k.without_time }} bez czasu), {{ k.first }} → {{ k.last }}, wątków/czatów {{ k.threads_or_chats }}, nadawców {{ k.senders }}. <small>Czas: {{ k.time_basis }}</small></p>
+<p>Miesięcznie: {% for m, n in k.per_month|dictsort %}{{ m }}: {{ n }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+{% for gap in k.gaps %}<p class="owner-gap">Luka {{ gap.days }} dni: {{ gap.from }} → {{ gap.to }}</p>{% endfor %}{% endfor %}
+<ul>{% for ref in comm.attachments_and_media %}<li>{{ ref.reference_kind }} / {{ ref.status }}: {{ ref.count }}</li>{% endfor %}</ul>
+<p><small>{{ comm.meaning }}.</small></p>
+{% else %}<p>Nie zaimportowano jeszcze poczty ani czatów.</p>{% endif %}
+</section>
+
+<section class="panel"><h2>Luki</h2><ul data-report-gaps>{% for g in r.gaps %}<li>{{ g }}</li>{% endfor %}</ul></section>
+</main></body></html>

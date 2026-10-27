@@ -2,7 +2,7 @@
 # AGEDS pilot outside Docker: a separate database and content store (never /var/lib/ageds), Vertex as
 # the default ASR/OCR preset (owner consent R100), loopback only. Needs no sudo.
 #   scripts/pilot_local.sh init            # create the data dir, owner, provider, consent, budget
-#   scripts/pilot_local.sh serve           # API and pages on 127.0.0.1:${AGEDS_PILOT_PORT:-8091}
+#   scripts/pilot_local.sh serve           # pages and API on 127.0.0.1:${AGEDS_PILOT_PORT:-8091}, plus a worker
 #   scripts/pilot_local.sh work [N]        # run the worker for N jobs (default: until the queue is empty)
 #   scripts/pilot_local.sh backup          # SQLite online backup + content store copy + SHA-256 manifest
 #   scripts/pilot_local.sh cli ARGS...     # any `python -m server.app.cli` command against the pilot
@@ -34,7 +34,11 @@ case "${1:-}" in
     cli advocate-budget "${AGEDS_PILOT_BUDGET_EUR:-1.0}"
     ;;
   serve)
-    exec "$PY" -m uvicorn server.app.main:app --host 127.0.0.1 --port "${AGEDS_PILOT_PORT:-8091}"
+    # The web pages queue ASR/OCR; a worker next to the server processes them (stopped with the server).
+    "$PY" -m server.app.worker &
+    WORKER=$!
+    trap 'kill "$WORKER" 2>/dev/null' EXIT INT TERM
+    "$PY" -m uvicorn server.app.main:app --host 127.0.0.1 --port "${AGEDS_PILOT_PORT:-8091}"
     ;;
   work)
     "$PY" - "${2:-0}" <<'PYEOF'

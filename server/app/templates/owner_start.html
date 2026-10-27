@@ -1,0 +1,34 @@
+<!doctype html><html {{ ui_html_attrs() }}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Start pracy</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/owner.css"></head><body>
+<header>{% include '_nav.html' %}<div><h1>Start pracy</h1><p>wgraj materiał → plan importu → oryginały → transkrypcja i OCR → raport</p></div></header>
+<main class="owner" data-owner-page="start">
+{% if error %}<p class="wb-alert" role="alert" data-owner-error>{{ error }}</p>{% endif %}
+<section class="panel">
+<h2>1. Wgraj pliki</h2>
+<form action="/start/upload" method="post" enctype="multipart/form-data" data-owner-upload>
+  <label>Pliki (można zaznaczyć wiele naraz)<input type="file" name="files" multiple required data-owner-files></label>
+  <label>Opis paczki (opcjonalnie)<input name="label" maxlength="200" placeholder="np. eksport Gmail z 27.10"></label>
+  <input type="hidden" name="browser_times" value="{}" data-owner-times>
+  <button>Wgraj i przygotuj plan importu</button>
+</form>
+<details open><summary>Co obsługuje i jakie są granice — przeczytaj przed wgraniem</summary>
+<ul class="owner-limits">
+  <li><b>Poczta:</b> zip z Google Takeout (Poczta → MBOX) bez rozpakowywania, plik <code>.mbox</code> albo pojedyncze <code>.eml</code>. Załączniki i przekazane wiadomości są zachowywane jako osobne pliki.</li>
+  <li><b>WhatsApp:</b> zip „Eksportuj czat → z multimediami” (Android) albo plik <code>_chat.txt</code> razem z plikami multimediów (iOS) w jednej paczce.</li>
+  <li><b>Nagrania, zdjęcia, dokumenty</b> (np. <code>.amr .wav .m4a .mp3 .png .jpg .pdf</code>): zachowywane jako oryginały; transkrypcja i OCR w kroku 4.</li>
+  <li>Oryginały są tylko czytane; zapisywane są kopie z sumą SHA-256. <b>Daty plików na serwerze to daty wgrania</b>, nie daty oryginałów; daty podane przez przeglądarkę są zapisywane osobno jako deklarowane.</li>
+  <li>Limit paczki: {{ (limit_bytes / 1024 / 1024 / 1024)|round(1) }} GiB. Nagranie dla transkrypcji przez Vertex: do 15 MB.</li>
+  <li>Transkrypcja i OCR przez Vertex wymagają zgody i budżetu w <a href="/settings">Ustawieniach</a>{% if not vertex_ready %} — <b data-owner-vertex-missing>zgoda lub dostawca nie są jeszcze ustawione</b>{% endif %}. Wynik modelu jest wynikiem modelu, nie treścią źródła.</li>
+  <li>Bez rozpakowywania nie są czytane archiwa zaszyfrowane hasłem; takie pliki są zachowywane, ale nie importowane.</li>
+  <li>Bezpośredni dostęp do konta Gmail (bez eksportu) nie jest dostępny z przeglądarki: wymaga osobnej autoryzacji (docs/GMAIL_API.md).</li>
+</ul></details>
+</section>
+<section class="panel">
+<h2>Wgrane paczki</h2>
+{% if batches %}<table data-owner-batches><tr><th>ID</th><th>Opis</th><th>Wgrano</th></tr>
+{% for b in batches %}<tr><td>{{ b.id }}</td><td><a href="/start/batch/{{ b.id }}">{{ b.label }}</a></td><td>{{ b.created_at }}</td></tr>{% endfor %}</table>
+{% else %}<p>Jeszcze nic nie wgrano.</p>{% endif %}
+</section>
+</main>
+<script type="module" src="/static/owner.mjs"></script>
+</body></html>

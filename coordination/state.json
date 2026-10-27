@@ -1252,7 +1252,20 @@
         "server/app/media/vertex.py",
         "scripts/{deploy_vm,transfer_pilot_to_production}.sh",
         "server/Dockerfile",
-        "server/tests/test_review3_regressions.py"
+        "server/tests/test_review3_regressions.py",
+        "server/app/owner.py",
+        "server/app/api/owner.py",
+        "server/app/api/__init__.py",
+        "server/app/pilot_report.py",
+        "server/app/templates/owner_{start,batch,report,settings}.html",
+        "server/app/static/owner.{css,mjs}",
+        "server/app/media/recipe.py",
+        "scripts/pilot_report.py",
+        "docs/OWNER_WEB.md",
+        "docs/README.md",
+        "server/tests/test_owner_web.py",
+        "server/tests/browser_owner_fixture.py",
+        "server/tests/browser/owner.cjs"
       ],
       "based_on_commit": "7295148 + 3fc9ef4",
       "acceptance": [
@@ -1360,6 +1373,13 @@
           "reviewer_repro": "8/8 finding tests now fail, 2/2 controls pass",
           "regressions": "server/tests/test_review3_regressions.py (17)",
           "checks": "backend 1581 passed / 3 skipped, JS 137, verify OK, browser 13 suites 128 steps"
+        },
+        "owner_web": {
+          "pages": "/start, /start/batch/<id>, /report, /settings (consents vertex/google_tts, provider, budget, voice, default presets)",
+          "browser_synthetic": "owner.cjs 7/7 (fake Vertex transport, worker thread)",
+          "browser_real_copy": "pilot copy: report+settings rendered, 7 real files uploaded, plan 7 units completed, process queued 0 (same bytes already had text), 0 provider calls; copy deleted",
+          "defect_found_on_real_data": "identical re-uploads become new artifact rows; processing now skips bytes that already have the text",
+          "checks": "backend 1585 passed / 3 skipped, JS 137, i18n complete, verify OK, browser 14 suites 135 steps"
         }
       }
     }

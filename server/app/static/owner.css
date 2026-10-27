@@ -1,0 +1,21 @@
+.owner{display:grid;gap:1rem;min-width:0}
+.owner .panel{min-width:0}
+.owner table{width:100%}
+.owner-scroll{overflow-x:auto}
+.owner-limits li{margin:.2rem 0}
+.owner-inline{display:flex;flex-wrap:wrap;gap:.5rem;align-items:flex-end}
+.owner-inline label{flex:1 1 200px}
+.owner-inline button,.owner form button{width:auto}
+.owner-radio{display:block;padding:.15rem 0}
+.owner-radio input{width:auto}
+.owner fieldset{border:1px solid #30363d;border-radius:8px;margin:0 0 .6rem;padding:.4rem .6rem}
+.owner-chip{display:inline-block;border:1px solid #30363d;border-radius:6px;padding:0 .35rem;font-size:.8rem;margin:.1rem 0}
+.owner-job-failed{border-color:#d03b3b}
+.owner-job-done{border-color:#2ea043}
+.owner-job-queued,.owner-job-running{border-style:dashed}
+.owner-button{display:inline-block;padding:.45rem .8rem;border:1px solid #1f6feb;border-radius:6px}
+.owner-text{border-top:1px solid #30363d;padding-top:.5rem}
+.owner-superseded{opacity:.6}
+.owner blockquote{margin:.3rem 0 .6rem;padding-left:.6rem;border-left:3px solid #30363d;white-space:pre-wrap;overflow-wrap:anywhere}
+.owner-gap{color:#d29922}
+.owner td,.owner th{overflow-wrap:anywhere}

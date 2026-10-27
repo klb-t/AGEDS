@@ -1,0 +1,47 @@
+<!doctype html><html {{ ui_html_attrs() }}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Paczka {{ collection.id }}</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/owner.css"></head><body>
+<header>{% include '_nav.html' %}<div><h1>Paczka {{ collection.id }}: {{ collection.label }}</h1><p>wgrano {{ collection.created_at }} · oryginały tylko do odczytu · <a href="/start">wszystkie paczki</a></p></div></header>
+<main class="owner" data-owner-page="batch" data-collection-id="{{ collection.id }}">
+{% if error %}<p class="wb-alert" role="alert" data-owner-error>{{ error }}</p>{% endif %}
+{% if done %}<p class="wb-done" role="status" data-owner-done="{{ done }}">{% if done == 'uploaded' %}Wgrano i skatalogowano. Sprawdź plan importu poniżej.{% elif done.startswith('kept:') %}Zachowano jako oryginały: {{ done[5:] }}.{% elif done.startswith('queued:') %}Dodano do kolejki zadań: {{ done[7:] }} (pliki z gotowym tekstem dla tych samych bajtów pominięto).{% endif %}</p>{% endif %}
+
+<section class="panel">
+<h2>1. Wgrane pliki</h2>
+<table data-owner-files-table><tr><th>Plik</th><th>Bajty</th><th>SHA-256</th><th>Data wg przeglądarki (deklarowana)</th></tr>
+{% for f in collection.metadata.files or [] %}<tr><td>{{ f.name }}</td><td class="num">{{ f.bytes }}</td><td><code>{{ f.sha256[:16] }}…</code></td><td>{{ (collection.metadata.browser_last_modified or {}).get(f.name) or '—' }}</td></tr>{% endfor %}</table>
+<p><small>Katalog: {% if scan %}skan {{ scan.id }}, status {{ scan.status }}{% if coverage %}, wpisów {{ coverage.entries }}, kompletny: {{ coverage.complete }}{% endif %}{% else %}brak skanu{% endif %}. Daty plików na serwerze to daty wgrania.</small></p>
+</section>
+
+<section class="panel">
+<h2>2. Plan importu (eksporty poczty, czatów, dokumentów)</h2>
+{% if plan_id %}{% set s = plan_summary %}
+<p data-owner-plan="{{ plan_id }}">Plan {{ plan_id }}: {{ s['items'] }} jednostek do importu — zaproponowane {{ s.by_status.proposed }}, zatwierdzone {{ s.by_status.approved }}, zrobione {{ s.by_status.done }}, błędy {{ s.by_status.failed }}.</p>
+{% if s['items'] %}<ul>{% for key, row in s.by_importer.items() %}<li>{{ key }}: {{ row['items'] }} (zrobione {{ row.done }})</li>{% endfor %}</ul>
+<p><a class="owner-button" href="/import?plan={{ plan_id }}" data-owner-plan-link>Przejrzyj, zatwierdź i uruchom import</a></p>
+{% else %}<p>W paczce nie ma eksportów do importu; pliki można zachować jako oryginały w kroku 3.</p>{% endif %}
+{% else %}<p>Brak planu.</p>{% endif %}
+</section>
+
+<section class="panel">
+<h2>3. Pozostałe pliki jako oryginały</h2>
+<p>Pliki, których nie obejmuje plan (nagrania, zdjęcia, same archiwa eksportu …), można zachować jako oryginały z weryfikacją SHA-256.</p>
+<table data-owner-unclaimed><tr><th>Plik (lokalizacja w paczce)</th><th>Typ</th><th>Bajty</th><th>Zachowany</th></tr>
+{% for e in unclaimed %}<tr><td>{{ e.locator }}</td><td>{{ e.sniffed_mime or e.family or '' }}</td><td class="num">{{ e.size_bytes }}</td><td>{{ 'tak' if e.kept else 'nie' }}</td></tr>{% else %}<tr><td colspan="4">Brak.</td></tr>{% endfor %}</table>
+{% if unclaimed|selectattr('kept', 'equalto', 0)|list %}<form method="post" action="/start/batch/{{ collection.id }}/originals"><button data-owner-keep>Zachowaj jako oryginały</button></form>{% endif %}
+</section>
+
+<section class="panel">
+<h2>4. Transkrypcja i OCR</h2>
+<p>Domyślne presety (zmiana w <a href="/settings">Ustawieniach</a>): transkrypcja <code>{{ recipes.transcribe }}</code>, OCR <code>{{ recipes.ocr }}</code>.
+{% if ('vertex' in recipes.transcribe or 'vertex' in recipes.ocr) and not vertex_consent %}<b data-owner-consent-missing>Brak zgody na Vertex — zadania Vertex zakończą się błędem bez wysłania czegokolwiek, dopóki zgoda nie zostanie zapisana.</b>{% endif %}</p>
+<table data-owner-artifacts><tr><th>ID</th><th>Oryginał</th><th>Typ</th><th>Wersje tekstu</th><th>Zadania</th></tr>
+{% for a in artifacts %}<tr data-artifact-id="{{ a.id }}"><td><a href="/artifact/{{ a.id }}">{{ a.id }}</a></td><td>{{ a.original_name }}</td><td>{{ a.mime_type }}</td>
+<td>{% for t in a.texts %}<span class="owner-chip" data-text-kind="{{ t.kind }}">{{ t.kind }} #{{ t.id }} ({{ t.model or '—' }})</span> {% else %}—{% endfor %}{% if a.same_bytes_texts %}<br><small data-same-bytes>te same bajty mają już: {% for t in a.same_bytes_texts %}<a href="/artifact/{{ t.artifact_id }}">{{ t.kind }} #{{ t.id }}</a>{% if not loop.last %}, {% endif %}{% endfor %} — nie będą przetwarzane ponownie</small>{% endif %}</td>
+<td>{% for j in a.jobs %}<span class="owner-chip owner-job-{{ j.status }}" data-job-status="{{ j.status }}">{{ j.kind }}: {{ j.status }}</span>{% if j.error %} <small>{{ j.error[:120] }}</small>{% endif %} {% else %}{{ '—' if a.processing else 'nie dotyczy' }}{% endfor %}</td></tr>
+{% else %}<tr><td colspan="5">Jeszcze brak oryginałów z tej paczki (uruchom import albo krok 3).</td></tr>{% endfor %}</table>
+{% if artifacts|selectattr('processing')|list %}<form method="post" action="/start/batch/{{ collection.id }}/process"><button data-owner-process>Transkrybuj i rozpoznaj tekst w nowych plikach</button></form>{% endif %}
+<p><a href="/media/queue">Kolejka zadań i postęp</a> · odśwież tę stronę, aby zobaczyć stan.</p>
+</section>
+
+<section class="panel"><h2>5. Raport</h2><p><a href="/report" data-owner-report-link>Raport pokrycia i pilota</a> (co jest w bazie, skąd pochodzi, czego brakuje).</p></section>
+</main></body></html>

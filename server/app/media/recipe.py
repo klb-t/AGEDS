@@ -192,9 +192,23 @@ def load_preset(recipe_id: str) -> tuple[dict, str]:
     return preset, origin
 
 
+DEFAULT_RECIPE_SETTING = 'media.default_recipe.{kind}'  # chosen by the owner on /settings
+
+
 def default_recipe_id(kind: str) -> str:
+    """The owner's choice (setting), else the operator's environment default, else the fallback."""
     if kind not in DEFAULT_RECIPE_ENV:
         raise RecipeError(f'unknown recipe kind {kind}')
+    try:
+        from .. import authz, db as dbmod
+        if not Path(dbmod.settings.db_path).is_file():
+            raise FileNotFoundError  # never create a database just to read a default
+        with dbmod.session() as db:
+            chosen = authz.get_setting(db, DEFAULT_RECIPE_SETTING.format(kind=kind))
+        if isinstance(chosen, str) and chosen:
+            return chosen
+    except Exception:  # no database yet (CLI validation, tests without init): fall back to the environment
+        pass
     env, fallback = DEFAULT_RECIPE_ENV[kind]
     return os.getenv(env, '') or fallback
 

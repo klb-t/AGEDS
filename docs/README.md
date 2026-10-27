@@ -27,6 +27,7 @@
 | Source scan and cache lifecycle | [Production engine](SOURCE_SCAN_ENGINE.md), [Android adapter](ANDROID_SOURCE_SCAN_ADAPTER.md), [Publication gate](SOURCE_SCAN_PUBLICATION_GATE.md), [Guarded cache](SOURCE_SCAN_CACHE_PUBLICATION.md), [ViewModel integration](ANDROID_SCAN_PUBLICATION_INTEGRATION.md). |
 | Device acceptance | [SAF provider harness](ANDROID_SAF_PROVIDER_ACCEPTANCE.md). |
 | AI chat export importers | [ChatGPT/Claude.ai importers and cross-export logical dedup](IMPORTERS_CHAT.md). |
+| Owner's path in the browser | [Upload, plan, originals, ASR/OCR, report and settings without the CLI](OWNER_WEB.md). |
 | Communication, Takeout and media importers | [MBOX/EML, ICS, VCF, call logs, billing, recording names, My Activity, location, browser history, WhatsApp media, EXIF](IMPORTERS_COMM.md). |
 | Common timeline | [Projection rule, correlation hypotheses, timeline API and swimlane view](TIMELINE.md). |
 | Location history and places | [Google/GPX/KML/GeoJSON/FIT samples, provider inferences, private places, geofence presence, map without external tiles](LOCATION.md). |

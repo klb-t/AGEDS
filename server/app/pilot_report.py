@@ -1,0 +1,241 @@
+"""Pilot and coverage report filled from an AGEDS database, read-only (dict, Markdown, web page).
+
+Every figure is read from the database; nothing is inferred. The report keeps the layers apart:
+source bytes and their acquisitions, parser observations, model output (ASR/OCR, with model
+and run), and interpretations. Model text is quoted only as a short excerpt and labelled as such.
+``scripts/pilot_report.py`` writes it to files; ``/report`` shows it in the browser.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import sqlite3
+import subprocess
+from datetime import datetime, timezone
+from pathlib import Path
+
+EXCERPT = 160
+
+
+def rows(db, sql, params=()):
+    return [dict(r) for r in db.execute(sql, params)]
+
+
+def has_table(db, name: str) -> bool:
+    return db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone() is not None
+
+
+def _alignment(value) -> dict | None:
+    if not isinstance(value, dict):
+        return None
+    reference = value.get('reference') or {}
+    return {'status': value.get('status'), 'reason': value.get('reason'),
+            'reference': f"{reference.get('engine')} {reference.get('model')}" if reference else None,
+            **{k: value.get(k) for k in ('model_words', 'reference_words', 'exact', 'fuzzy', 'interpolated', 'untimed',
+                                         'text_agreement_ratio', 'segments_aligned', 'segments_model_estimate')}}
+
+
+COMM_TYPES = ('email', 'whatsapp_message')
+GAP_DAYS = 14
+
+
+def communications(db) -> dict:
+    """Coverage of imported mail and chat exports: what the exports contain, not what happened."""
+    runs = []
+    for row in rows(db, "SELECT a.object_id AS artifact_id, a.details_json, a.ts, f.original_name FROM audit_log a "
+                        "LEFT JOIN artifacts f ON f.id=a.object_id WHERE a.action='import_run' ORDER BY a.id"):
+        details = json.loads(row['details_json'] or '{}')
+        if details.get('importer') not in ('email_rfc5322', 'whatsapp_media', 'whatsapp_txt'):
+            continue
+        runs.append({'artifact_id': row['artifact_id'], 'name': row['original_name'], 'importer': details.get('importer'),
+                     'parser_version': details.get('parser_version'), 'at': row['ts'], 'counts': details.get('counts'),
+                     'complete': (details.get('coverage') or {}).get('complete'), 'issues': details.get('issue_counts')})
+    kinds = {}
+    for kind in COMM_TYPES:
+        events = rows(db, 'SELECT id, ts_start, thread_id, sender, contact_label FROM events WHERE event_type=? ORDER BY ts_start',
+                      (kind,))
+        if not events:
+            continue
+        timed = [e['ts_start'] for e in events if e['ts_start']]
+        months = {}
+        for ts in timed:
+            months[ts[:7]] = months.get(ts[:7], 0) + 1
+        gaps = []
+        for a, b in zip(timed, timed[1:]):
+            try:
+                days = (datetime.fromisoformat(b.replace('Z', '+00:00')[:19]) -
+                        datetime.fromisoformat(a.replace('Z', '+00:00')[:19])).days
+            except ValueError:
+                continue
+            if days >= GAP_DAYS:
+                gaps.append({'from': a, 'to': b, 'days': days})
+        kinds[kind] = {'messages': len(events), 'without_time': len(events) - len(timed),
+                       'first': timed[0] if timed else None, 'last': timed[-1] if timed else None,
+                       'threads_or_chats': len({e['thread_id'] for e in events if e['thread_id']}),
+                       'senders': len({e['sender'] for e in events if e['sender']}), 'per_month': months, 'gaps': gaps,
+                       'time_basis': ('Date header converted to UTC only where its zone is explicit'
+                                      if kind == 'email' else 'phone-local time as written in the export; zone unknown')}
+    references = rows(db, 'SELECT reference_kind, status, count(*) AS count FROM event_media_references GROUP BY reference_kind, status') \
+        if has_table(db, 'event_media_references') else []
+    return {'runs': runs, 'kinds': kinds, 'attachments_and_media': references,
+            'meaning': f'counts and spans of the imported exports; a gap of {GAP_DAYS}+ days is a gap in the export, '
+                       'not proof that nothing happened; the export holds what the account or phone kept at export time'}
+
+
+def collect(db) -> dict:
+    report = {'generated_at': datetime.now(timezone.utc).isoformat()}
+    try:
+        report['code_commit'] = subprocess.run(['git', 'rev-parse', 'HEAD'], capture_output=True, text=True,
+                                               cwd=Path(__file__).resolve().parents[2], timeout=10).stdout.strip() or 'unknown'
+    except (OSError, subprocess.SubprocessError):
+        report['code_commit'] = 'unknown'
+    report['collections'] = rows(db, 'SELECT id, label, acquisition_method, operator, created_at FROM collections ORDER BY id') \
+        if has_table(db, 'collections') else []
+    report['scans'] = []
+    if has_table(db, 'catalog_scans'):
+        for scan in rows(db, 'SELECT * FROM catalog_scans ORDER BY id'):
+            coverage = json.loads(scan.get('coverage_json') or '{}') if 'coverage_json' in scan else {}
+            report['scans'].append({'id': scan['id'], 'collection_id': scan.get('collection_id'), 'status': scan.get('status'),
+                                    'entries': coverage.get('entries'), 'complete': coverage.get('complete'),
+                                    'incomplete_reasons': coverage.get('incomplete_reasons')})
+    marks = {}
+    if has_table(db, 'derived_text_status'):
+        for mark in rows(db, 'SELECT * FROM derived_text_status s WHERE id=(SELECT MAX(id) FROM derived_text_status '
+                             'WHERE derived_text_id=s.derived_text_id)'):
+            if mark['status'] == 'superseded':
+                marks[mark['derived_text_id']] = {'by': mark['superseded_by_id'], 'reason': mark['reason']}
+    artifacts = []
+    for artifact in rows(db, 'SELECT id, original_name, mime_type, size_bytes, sha256, created_at FROM artifacts ORDER BY id'):
+        observations = db.execute('SELECT count(*) FROM source_observations WHERE artifact_id=?', (artifact['id'],)).fetchone()[0]
+        texts = []
+        for text in rows(db, 'SELECT id, kind, model, language, text, segments_json, metadata_json, created_at '
+                             'FROM derived_text WHERE artifact_id=? ORDER BY id', (artifact['id'],)):
+            segments = json.loads(text['segments_json'] or '[]')
+            metadata = json.loads(text['metadata_json'] or '{}')
+            duration = metadata.get('duration_seconds_ffprobe')
+            ends = [seg['end'] for seg in segments if isinstance(seg.get('end'), (int, float))]
+            coverage = round(max(ends) / duration, 3) if duration and ends else None
+            texts.append({'time_coverage': coverage, 'untimed_segments': sum(1 for seg in segments if seg.get('start') is None)
+                          if text['kind'] == 'transcript' else None,
+                          'id': text['id'], 'layer': 'model output' if text['kind'] in ('transcript', 'ocr') else text['kind'],
+                          'kind': text['kind'], 'model': text['model'], 'language': text['language'],
+                          'segments': len(segments), 'characters': len(text['text'] or ''),
+                          'speakers': sorted({s.get('speaker_hypothesis') for s in segments if s.get('speaker_hypothesis')}),
+                          'segment_languages': metadata.get('segment_languages'),
+                          'timing': metadata.get('timing') or ('word timing' if any(s.get('words') for s in segments) else None),
+                          'superseded': marks.get(text['id']),
+                          'word_citable_segments': (metadata.get('word_timing') or {}).get('available_segments'),
+                          'alignment': _alignment(metadata.get('timing_alignment')),
+                          'transcoding': (metadata.get('transcoding') or {}).get('to'),
+                          'excerpt': (text['text'] or '')[:EXCERPT]})
+        artifacts.append({**artifact, 'acquisitions': observations, 'derived_texts': texts})
+    report['artifacts'] = artifacts
+    report['communications'] = communications(db)
+    report['reimport'] = {'artifacts': len(artifacts),
+                          'acquisitions': db.execute('SELECT count(*) FROM source_observations').fetchone()[0],
+                          'meaning': 'identical bytes keep one artifact; every acquisition is one observation'}
+    report['jobs'] = rows(db, 'SELECT kind, status, count(*) AS count FROM jobs GROUP BY kind, status ORDER BY kind, status')
+    report['failures'] = rows(db, "SELECT id, kind, artifact_id, error FROM jobs WHERE status='failed' ORDER BY id")
+    report['runs'] = rows(db, 'SELECT id, job_id, artifact_id, status, tool, provider, model FROM processing_runs ORDER BY id')
+    report['event_candidates'] = rows(db, 'SELECT artifact_id, parser, count(*) AS count FROM event_candidates '
+                                          'GROUP BY artifact_id, parser') if has_table(db, 'event_candidates') else []
+    report['events'] = db.execute('SELECT count(*) FROM events').fetchone()[0]
+    if has_table(db, 'provider_calls'):
+        settled = rows(db, "SELECT purpose, model, status, input_tokens, output_tokens, cost_basis_json FROM provider_calls "
+                           "WHERE status<>'reserved'")
+        report['provider'] = {'calls': len(settled),
+                              'by_purpose': {p: sum(1 for c in settled if c['purpose'] == p) for p in {c['purpose'] for c in settled}},
+                              'input_tokens': sum(c['input_tokens'] or 0 for c in settled),
+                              'output_tokens': sum(c['output_tokens'] or 0 for c in settled),
+                              'cost_eur': round(db.execute('SELECT COALESCE(SUM(cost_eur),0) FROM provider_calls').fetchone()[0], 6),
+                              'errors': [c for c in settled if c['status'] == 'error'],
+                              'cost_basis': 'preset prices (unverified with Google); reservations settled to actual usage'}
+    gaps = []
+    for artifact in artifacts:
+        if not artifact['derived_texts']:
+            gaps.append(f"artifact {artifact['id']} ({artifact['original_name']}): no derived text yet")
+        for text in artifact['derived_texts']:
+            if text['superseded']:
+                gaps.append(f"artifact {artifact['id']}: {text['kind']} {text['id']} superseded by {text['superseded']['by']} "
+                            f"({text['superseded']['reason']}); kept in history, not counted below")
+                continue
+            align = text['alignment']
+            if text['kind'] == 'transcript' and align and align['status'] == 'aligned':
+                gaps.append(f"artifact {artifact['id']}: transcript {text['id']}: {text['word_citable_segments']} of {text['segments']} "
+                            f"segments word-citable (times from {align['reference']}); text agreement with the reference "
+                            f"{align['text_agreement_ratio']}: the rest keep model estimates; listen where engines disagree")
+            elif text['kind'] == 'transcript' and align:
+                gaps.append(f"artifact {artifact['id']}: transcript {text['id']}: timing reference unavailable ({align['reason']})")
+            elif text['kind'] == 'transcript' and text['timing'] != 'word timing':
+                gaps.append(f"artifact {artifact['id']}: transcript {text['id']} has no word timing (segment citations only)")
+            if text['kind'] == 'transcript' and text['time_coverage'] is not None and not 0.8 <= text['time_coverage'] <= 1.02:
+                gaps.append(f"artifact {artifact['id']}: transcript {text['id']} segment times cover "
+                            f"{text['time_coverage']:.0%} of the recording: model timestamps are unreliable here")
+            if text['kind'] == 'transcript' and text['untimed_segments']:
+                gaps.append(f"artifact {artifact['id']}: transcript {text['id']} has {text['untimed_segments']} segments without usable time")
+            if text['kind'] == 'ocr':
+                gaps.append(f"artifact {artifact['id']}: OCR {text['id']} has no pixel boxes (page/line locators)")
+    gaps += ['ASR/OCR quality is not measured against a human reference here; speaker labels are hypotheses',
+             'importing an export is not account access: no mail/chat connectors were used']
+    report['gaps'] = gaps
+    return report
+
+
+def markdown(report: dict) -> str:
+    out = [f"# Raport pilotu AGEDS\n\nWygenerowano {report['generated_at']} z bazy (tylko odczyt); kod `{report['code_commit'][:12]}`.\n"
+           "Warstwy: **bajty źródła i ich pozyskania** · **wynik modelu** (ASR/OCR, z modelem i runem) · interpretacje "
+           "(tu brak). Fragmenty tekstu modelu są cytatem wyniku modelu, nie treścią źródła.\n"]
+    out.append('## Kolekcje i skany\n')
+    for c in report['collections']:
+        out.append(f"- kolekcja {c['id']}: {c['label']} (pozyskanie: {c['acquisition_method'] or 'nieznane'})")
+    for s in report['scans']:
+        out.append(f"- skan {s['id']}: {s['status']}, wpisów {s['entries']}, kompletny: {s['complete']}")
+    out.append('\n## Oryginały\n\n| ID | plik | typ | bajty | SHA-256 | pozyskania | wersje tekstu |\n|---|---|---|---|---|---|---|')
+    for a in report['artifacts']:
+        out.append(f"| {a['id']} | {a['original_name']} | {a['mime_type']} | {a['size_bytes']} | `{(a['sha256'] or '')[:16]}…` | "
+                   f"{a['acquisitions']} | {len(a['derived_texts'])} |")
+    r = report['reimport']
+    out.append(f"\nPonowny import: {r['artifacts']} artefaktów, {r['acquisitions']} pozyskań ({r['meaning']}).\n")
+    out.append('## Przetwarzanie\n')
+    out.append('- zadania: ' + (', '.join(f"{j['kind']}/{j['status']}: {j['count']}" for j in report['jobs']) or 'brak'))
+    for f in report['failures']:
+        out.append(f"- błąd zadania {f['id']} ({f['kind']}, artefakt {f['artifact_id']}): {f['error']}")
+    for a in report['artifacts']:
+        for t in a['derived_texts']:
+            if t['superseded']:
+                out.append(f"- artefakt {a['id']} → {t['kind']} #{t['id']} (model {t['model']}): **zastąpiona przez "
+                           f"#{t['superseded']['by']}** — {t['superseded']['reason']} (zostaje w historii)")
+                continue
+            out.append(f"- artefakt {a['id']} → {t['kind']} #{t['id']} ({t['layer']}, model {t['model']}): {t['segments']} segm., "
+                       f"{t['characters']} znaków, języki {t['segment_languages'] or t['language']}, mówcy (hipotezy) "
+                       f"{t['speakers'] or '—'}, czas: {t['timing'] or '—'}"
+                       + (f", pokrycie czasem {t['time_coverage']:.0%}" if t.get('time_coverage') is not None else '')
+                       + (f", przekodowano do {t['transcoding']}" if t['transcoding'] else '')
+                       + (f"\n  czas słów: {t['alignment']['reference']} — segmentów z cytowaniem słów {t['word_citable_segments']}"
+                          f"/{t['segments']}, słowa dokładne/rozmyte/interpolowane/bez czasu {t['alignment']['exact']}/"
+                          f"{t['alignment']['fuzzy']}/{t['alignment']['interpolated']}/{t['alignment']['untimed']}, zgodność tekstu "
+                          f"{t['alignment']['text_agreement_ratio']}" if t['alignment'] and t['alignment']['status'] == 'aligned' else '')
+                       + f"\n  > {t['excerpt']!s}")
+    out.append(f"- kandydaci zdarzeń (nigdy zdarzenia): {sum(c['count'] for c in report['event_candidates'])}; zdarzenia: {report['events']}")
+    comm = report.get('communications') or {}
+    if comm.get('runs') or comm.get('kinds'):
+        out.append('\n## Pokrycie: poczta i czaty (zawartość eksportów)\n')
+        for run in comm['runs']:
+            out.append(f"- import {run['importer']} v{run['parser_version']} — {run['name']}: {run['counts']}, "
+                       f"kompletny: {run['complete']}" + (f", problemy {run['issues']}" if run['issues'] else ''))
+        for kind, k in comm['kinds'].items():
+            out.append(f"- {kind}: {k['messages']} wiadomości ({k['without_time']} bez czasu), {k['first']} → {k['last']}, "
+                       f"wątków/czatów {k['threads_or_chats']}, nadawców {k['senders']}; czas: {k['time_basis']}")
+            out.append('  - miesięcznie: ' + ', '.join(f'{m}: {n}' for m, n in sorted(k['per_month'].items())))
+            for gap in k['gaps']:
+                out.append(f"  - luka {gap['days']} dni: {gap['from']} → {gap['to']}")
+        for ref in comm['attachments_and_media']:
+            out.append(f"- {ref['reference_kind']} / {ref['status']}: {ref['count']}")
+        out.append(f"\n{comm['meaning']}.")
+    if 'provider' in report:
+        p = report['provider']
+        out.append(f"\n## Koszty dostawcy\n\n{p['calls']} wywołań {p['by_purpose']}, tokeny {p['input_tokens']}/{p['output_tokens']}, "
+                   f"razem {p['cost_eur']} € ({p['cost_basis']}).")
+    out.append('\n## Luki\n')
+    out += [f'- {g}' for g in report['gaps']]
+    return '\n'.join(out) + '\n'

@@ -25,6 +25,7 @@ ROUTER_MODULES = (
     'location',
     'traces',
     'ledger',
+    'owner',
 )
 
 

@@ -1,0 +1,81 @@
+{
+  "receipt": "LEDGER_2026-10-17",
+  "task": "AGEDS-TASK-20261017-L3",
+  "branch": "wt-L3",
+  "base_commit": "790d386",
+  "tested_code_head": "@HEAD@",
+  "tested_working_tree": "code at tested_code_head; docs/LEDGER.md, docs/README.md and this receipt uncommitted",
+  "environment": {
+    "python": "3.13.16 (/home/user/wt/venv)",
+    "chromium": "chromium-1194 (Playwright)",
+    "node": "local"
+  },
+  "commands": [
+    {
+      "cmd": "/home/user/wt/venv/bin/python -m pytest server/tests -q",
+      "result": "@FULL@"
+    },
+    {
+      "cmd": "/home/user/wt/venv/bin/python -m pytest server/tests/test_ledger_tabular.py server/tests/test_ledger_statements.py server/tests/test_ledger_health.py server/tests/test_ledger_budget.py server/tests/test_ledger_importplan.py server/tests/test_ledger_api.py server/tests/test_ledger_billing_golden.py -q",
+      "result": "73 passed"
+    },
+    {
+      "cmd": "node --test server/tests/js/*.test.mjs",
+      "result": "127 passed"
+    },
+    {
+      "cmd": "node server/tests/browser/ledger.cjs",
+      "result": "6 PASS, exit 0"
+    },
+    {
+      "cmd": "node server/tests/browser/acceptance.cjs",
+      "result": "24 PASS, exit 0"
+    },
+    {
+      "cmd": "node server/tests/browser/importplan.cjs",
+      "result": "9 PASS, exit 0"
+    },
+    {
+      "cmd": "node server/tests/browser/analysis_budget.cjs",
+      "result": "9 PASS, exit 0"
+    },
+    {
+      "cmd": "python3 scripts/verify_repository.py",
+      "result": "@VERIFY@"
+    },
+    {
+      "cmd": "ruff check --select F --ignore F811 <ledger files>",
+      "result": "clean"
+    }
+  ],
+  "earlier_run": {
+    "result": "2 failed, 1279 passed, 1 skipped, 764 subtests passed",
+    "cause": "test_e2e_acceptance repository.verify_passes (criterion K4): docs/LEDGER.md linked this receipt before it existed"
+  },
+  "billing_golden_sha256": "a190bb7894accc20af48d69966122c86e7e8ecbe832c5b7cc20b5d4774fafd48",
+  "runtime_executed": [
+    "all ledger importers on generated files",
+    "opt-in refusals",
+    "re-import idempotence",
+    "CLI subprocess",
+    "HTTP routes via TestClient",
+    "import plan scan->plan->decide->execute->rerun",
+    "time budget over imported sessions and rides",
+    "real Chromium page check",
+    "Apple Health bounded memory (tracemalloc)"
+  ],
+  "not_run": [
+    "real bank/transit/ride/health exports",
+    "XLS (BIFF8) ledger input",
+    "network providers (none exist)"
+  ],
+  "shared_edits": [
+    "server/app/importers/billing.py: header/date helpers imported from tabular_profiles (moved unchanged; output byte-identical)",
+    "server/app/analysis/{source,budget,categories}.py + data/budget_defaults.json: signal on items, inferred_duration_bases/inferred_duration_layer, rule kind signal_basis",
+    "server/app/importplan/plan.py: plan option ledger_profiles_path",
+    "server/app/packages.py: ledger tables classified (exported)",
+    "server/tests/corpus/__init__.py: PARTS += 'ledger'",
+    "docs/TIME_BUDGET.md: inferred-duration paragraph and signal_basis rule kind",
+    "docs/README.md: one index line"
+  ]
+}

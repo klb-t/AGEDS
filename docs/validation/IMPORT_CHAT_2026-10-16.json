@@ -1,0 +1,90 @@
+{
+  "schema": "ageds.validation_receipt.v1",
+  "task": "AGEDS-TASK-20261016-B (part 1: AI chat importers + logical dedup across exports)",
+  "date": "2026-10-16",
+  "branch": "wt-B",
+  "tested_git_head": "d8fa22b455f50c03f49af12b5f2c10c395bd2cab",
+  "environment": {
+    "python": "Python 3.13.16",
+    "venv": "$VENV = shared session virtualenv outside the repository (pytest, fastapi, httpx as in server/requirements-test.txt)",
+    "os": "Linux container",
+    "third_party_added": []
+  },
+  "checks": [
+    {
+      "command": "$VENV/bin/python -m pytest server/tests -q",
+      "result": "460 passed, 1 skipped (opt-in scale test), 588 subtests passed",
+      "failed": 0
+    },
+    {
+      "command": "$VENV/bin/python -m pytest server/tests/test_import_chat.py server/tests/test_import_chat_interfaces.py server/tests/test_import_chat_scale.py server/tests/test_extension_foundation.py server/tests/test_importers.py -q",
+      "result": "45 passed, 1 skipped",
+      "failed": 0
+    },
+    {
+      "command": "AGEDS_CHAT_SCALE_MB=120 AGEDS_CHAT_SCALE_REPORT=<new file> $VENV/bin/python -m pytest server/tests/test_import_chat_scale.py -q -s",
+      "result": "1 passed",
+      "failed": 0,
+      "measurements": {
+        "file_bytes": 125831832,
+        "conversations": 2313,
+        "nodes_per_conversation": 25,
+        "events": 57825,
+        "seconds": 43.25,
+        "peak_rss_kb_before_import": 39392,
+        "peak_rss_kb_after_import": 59384,
+        "peak_rss_increase_mb": 19.5,
+        "coverage": "complete"
+      }
+    },
+    {
+      "command": "EW_DATA_DIR/EW_DB_PATH/EW_STORE_DIR=<new scratch dir> python -m server.app.cli import-chatgpt <corpus>/chatgpt/export{1,2,3} --export-label e{1,2,3}; import-chatgpt export1 again; import-chatgpt sharded|edge|malformed; import-claude <corpus>/claude/export1; chat-dedup-report --namespace chatgpt --changes-only --conversation <C>",
+      "result": "all exit 0; malformed export partial coverage announced on stderr; e1 re-import printed identical JSON; 8 event_reobserved audit rows; 16 corpus files byte-identical before/after (sha256sum)",
+      "failed": 0,
+      "database_counts_after": {
+        "artifacts": 12,
+        "source_observations": 13,
+        "events": 90,
+        "event_times": 109,
+        "logical_records": 61,
+        "logical_occurrences": 97,
+        "record_exports": 7,
+        "chat_attachment_refs": 6
+      }
+    },
+    {
+      "command": "python3 scripts/verify_repository.py",
+      "result": "pass after adding this receipt (run before commit)",
+      "failed": 0
+    }
+  ],
+  "runtime_executed": [
+    "ChatGPT and Claude.ai importers through real CLI subprocesses on the synthetic corpus (separate data directory)",
+    "Upload endpoints and dedup report through FastAPI TestClient (in-process HTTP)",
+    "126 MB synthetic ChatGPT export streamed (2,313 conversations, 57,825 events) with bounded memory"
+  ],
+  "unit_tested_only": [
+    "TZ independence (TZ=Pacific/Kiritimati inside pytest)",
+    "mapping-file change creating a new interpretation",
+    "limit handling (conversation bytes, nodes, file size, issue list)"
+  ],
+  "not_run": [
+    "Real ChatGPT/Claude exports (none available; formats follow observed public layouts, encoded as editable mapping files)",
+    "Node/browser tests (no JS or templates changed)",
+    "Android (not changed)",
+    "Concurrent imports into one database",
+    "Gemini conversations (Takeout My Activity belongs to track B2)"
+  ],
+  "boundaries": [
+    "Absence in an export is reported as not observed, never as deletion.",
+    "Peak RSS measured with ru_maxrss in the pytest process; scanned mmap pages are released with MADV_DONTNEED on Linux only.",
+    "Attachment media types of .dat files are extension guesses, not signature checks.",
+    "New tables are not part of metadata packages until track F declares them."
+  ],
+  "shared_edits": [
+    "server/app/evidence.py: add_event(..., db=None) optional caller transaction (behaviour unchanged without db)",
+    "server/app/api/__init__.py: 'imports_chat' appended to ROUTER_MODULES",
+    "server/app/commands/__init__.py: 'imports_chat' appended to COMMAND_MODULES",
+    "docs/README.md: one row linking docs/IMPORTERS_CHAT.md"
+  ]
+}

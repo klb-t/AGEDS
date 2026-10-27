@@ -1,0 +1,78 @@
+{
+ "schema": "ageds.validation-receipt/v1",
+ "task": "AGEDS-TASK-20261016-I",
+ "area": "importplan",
+ "date": "2026-10-16",
+ "branch": "wt-I",
+ "base_commit": "e1ce8d2",
+ "tested_source_commit": "d7fdf707ed77137a07ed253fb58dacba5fa24001",
+ "note": "Code was tested at tested_source_commit; the receipt commit adds only docs/IMPORT_PLAN.md, docs/README.md, docs/validation/README.md and this receipt pair.",
+ "environment": {
+  "python": "3.13.16 (/home/user/wt/venv)",
+  "fastapi": "0.116.1",
+  "openpyxl": "3.1.5",
+  "node": "v22.22.0",
+  "playwright": "1.62.1",
+  "chromium": "141.0.7390.37 (/opt/pw-browsers/chromium-1194)",
+  "network_or_model_calls": "none",
+  "new_python_dependencies": "none"
+ },
+ "commands": [
+  {
+   "cmd": "/home/user/wt/venv/bin/python -m pytest server/tests -q",
+   "result": "748 passed, 1 skipped, 2 xfailed, 680 subtests passed, 0 failed (baseline at e1ce8d2 in this worktree: 719 passed, 1 skipped, 680 subtests)"
+  },
+  {
+   "cmd": "/home/user/wt/venv/bin/python -m pytest server/tests/test_importplan_detect.py server/tests/test_importplan_execute.py server/tests/test_importplan_api.py -q -rxX",
+   "result": "29 passed, 2 xfailed (review findings #5 strict, #1 non-strict), 0 failed",
+   "per_file": {
+    "test_importplan_detect.py": 13,
+    "test_importplan_execute.py": "12 passed + 2 xfailed",
+    "test_importplan_api.py": 4
+   }
+  },
+  {
+   "cmd": "node --test server/tests/js/*.test.mjs",
+   "result": "88 passed, 0 failed (3 new in importplan.test.mjs)"
+  },
+  {
+   "cmd": "NODE_PATH=…/browser-tools/node_modules PYTHON=/home/user/wt/venv/bin/python AGEDS_BROWSER_EXECUTABLE=/opt/pw-browsers/chromium-1194/chrome-linux/chrome node server/tests/browser/importplan.cjs",
+   "result": "9 PASS, exit 0"
+  },
+  {
+   "cmd": "(same environment) node server/tests/browser/media.cjs",
+   "result": "7 PASS, exit 0; FINDING: /media/compare overflows a 390px viewport by 38px (tables); strict only with AGEDS_MEDIA_STRICT_MOBILE=1"
+  },
+  {
+   "cmd": "(same environment) node server/tests/browser/acceptance.cjs",
+   "result": "24 PASS, exit 0 (existing suite unchanged)"
+  },
+  {
+   "cmd": "python3 scripts/verify_repository.py",
+   "result": "passed after adding this receipt (relative links resolve, privacy scan clean)"
+  }
+ ],
+ "runtime_executed": [
+  "Multi-device synthetic layout (server/tests/corpus/import_layout.py): phone A (WhatsApp zip + folder export, 5 recorder-style files, calls-*.xml, sms-*.xml, JPEGs with/without EXIF, operator CSV with preamble, markup-like file names), drive B (Takeout zip with archive_browser.html and a nested zip holding MBOX/ICS/VCF/My Activity JSON+HTML/YouTube history, Location Records.json and Chrome BrowserHistory.json; ChatGPT export zip with two conversation shards, user.json and a file-DAT1.dat that is a PDF; Claude export directory; ambiguous empty conversations.json), drive C (byte-identical copy of the ChatGPT zip and a later ChatGPT export sharing a conversation id).",
+  "Catalog scans of the three roots, plan generation (24 items, exact ordered list asserted), review versions, dry-run summary without writes (all table counts unchanged), sync execution of all 24 items through the real importers, re-run (0 selected), forced re-run (counts of 14 tables unchanged), tampered nested archive member refused (same-size SHA-256 mismatch and size growth), killed process mid-item (BaseException after the first ChatGPT shard) resumed without duplicates and with counts equal to a clean run, importer exception retried, expired lease recovered, queue mode with a lost job lease fenced and drained by the worker entry point, cross-export view before and after import, abandoned running catalog scan closed with audit.",
+  "Real `python -m server.app.cli` subprocesses for collection add, catalog scan, import-plan-create/show/decide/summary/run/runs/cross/list/work and catalog-scan-abandon.",
+  "Real Chromium: /import (generate from three collections, filters, ambiguous refusal then explicit importer, opt-in toggle, billing profile, bulk approval reporting 2 blocked items, sync run, artifact link 200, cross-export table, tree hash of sources unchanged, temp dir empty, no horizontal scroll at 390px, no page/console errors or dialogs, markup-like locator rendered as text and not executed) and track D's /media pages (index, artifact, compare with markup-like model text in <del>/<ins>, OCR page, queue, speakers)."
+ ],
+ "unit_tested_only": [
+  "Detector table overlap ambiguity uses a test-only detector file.",
+  "Planner limit hits (max_probe_bytes) and run limits (max_item_bytes) on the synthetic layout."
+ ],
+ "not_run_or_not_verified": [
+  "No real exports (ChatGPT, Claude, Takeout, WhatsApp, SMS Backup & Restore, call recorders); rules and patterns are examples.",
+  "No timing or memory measurement on large real roots; plan views load all items of a plan per request.",
+  "7z/RAR members (adapters not installed); XLS billing headers are not probed.",
+  "Review finding #1 (temporary copy mtime as source_modified_at) and #5 (child locator parent conflict for a later export at the same locator) are open in importers/evidence owned by other tracks; xfail tests document them.",
+  "No concurrency test with two OS processes; lease/fencing is tested in-process with forced expiry."
+ ],
+ "boundaries": [
+  "Planning reads only bounded prefixes (and whole conversation files up to 64 MiB for ids, XLSX up to 32 MiB for headers) and writes only plan rows.",
+  "Temporary directories are refused inside any catalogued or configured source root and removed after each item; a killed process's directory is removed on recovery.",
+  "Importer writes are idempotent, not fenced; the attempt status publication is fenced by its lease (and by the job lease in queue mode).",
+  "API has no authentication (see HANDOFF)."
+ ]
+}

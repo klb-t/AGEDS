@@ -117,7 +117,7 @@ def reserve(db: sqlite3.Connection, principal_id: int, worst: float, *, provider
         if spent_today_eur(db) + worst > budget:
             raise ProviderUnavailable(f'daily budget {budget} EUR would be exceeded')
         own = authz.get_setting(db, 'advocate.daily_budget_per_principal_eur', None)
-        if isinstance(own, (int, float)) and spent_today_eur(db, principal_id) + worst > own:
+        if principal_id is not None and isinstance(own, (int, float)) and spent_today_eur(db, principal_id) + worst > own:
             raise ProviderUnavailable(f'daily budget {own} EUR for this account would be exceeded')
         started = _now()
         uid = new_uid()

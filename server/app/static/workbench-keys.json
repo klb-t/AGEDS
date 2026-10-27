@@ -1,0 +1,22 @@
+{
+  "schema": "ageds.workbench-keys/v1",
+  "note": "Default keyboard bindings. Edit this file to change them; the browser keeps no hidden overrides. Keys are ignored while typing in inputs, textareas, selects and editable content. A printable single character matches the produced character (so '?' works on any layout); Ctrl/Alt/Meta must match exactly. Sequences are space-separated and must be completed within sequence_timeout_ms.",
+  "sequence_timeout_ms": 1200,
+  "bindings": [
+    {"id": "help", "keys": ["?"], "scope": "global", "label": "keys.help"},
+    {"id": "palette", "keys": ["Ctrl+K", "Meta+K"], "scope": "global", "label": "keys.palette"},
+    {"id": "focus-search", "keys": ["/"], "scope": "global", "label": "keys.focus_search"},
+    {"id": "go-home", "keys": ["g h"], "scope": "global", "label": "keys.go_home", "href": "/"},
+    {"id": "go-workbench", "keys": ["g w"], "scope": "global", "label": "keys.go_workbench", "href": "/workbench"},
+    {"id": "go-folders", "keys": ["g f"], "scope": "global", "label": "keys.go_folders", "href": "/workbench/folders"},
+    {"id": "go-bookmarks", "keys": ["g b"], "scope": "global", "label": "keys.go_bookmarks", "href": "/workbench/bookmarks"},
+    {"id": "go-timeline", "keys": ["g t"], "scope": "global", "label": "keys.go_timeline", "href": "/timeline", "requires_nav": true},
+    {"id": "go-catalog", "keys": ["g c"], "scope": "global", "label": "keys.go_catalog", "href": "/catalog", "requires_nav": true},
+    {"id": "toggle-theme", "keys": ["g d"], "scope": "global", "label": "keys.toggle_theme"},
+    {"id": "close", "keys": ["Escape"], "scope": "overlay", "label": "keys.close"}
+  ],
+  "reserved": [
+    {"page": "/timeline", "owner": "timeline", "keys": ["ArrowLeft", "ArrowRight", "+", "=", "-", "_", "Escape"], "label": "keys.reserved_timeline"},
+    {"page": "*", "owner": "browser", "keys": ["Tab", "Shift+Tab", "Enter", "Space"], "label": "keys.reserved_browser"}
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "schema": "ageds.messaging_mapping",
+  "version": "1",
+  "notice": "X/Twitter 'Download an archive of your data' files as publicly observed (2019-2025): data/tweets.js (older data/tweet.js), data/direct-messages.js, data/direct-messages-group.js, data/account.js. Each file is JavaScript assigning a JSON array: window.YTD.<name>.partN = [...].",
+  "tweet_files_regex": "^(?:tweets|tweet)(?:-part\\d+)?\\.js$",
+  "dm_files_regex": "^direct-messages(?:-group)?(?:-part\\d+)?\\.js$",
+  "account_file": "account.js",
+  "tweet_media_dir": "tweets_media",
+  "dm_media_dir": "direct_messages_media",
+  "dm_group_media_dir": "direct_messages_group_media",
+  "created_at_regex": "^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun) (?P<mon>Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (?P<day>\\d{2}) (?P<h>\\d{2}):(?P<m>\\d{2}):(?P<s>\\d{2}) (?P<off>[+-]\\d{4}) (?P<year>\\d{4})$",
+  "service_start_year": 2006
+}

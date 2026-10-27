@@ -6,12 +6,11 @@ from fastapi import FastAPI, File, Form, HTTPException, Query, Request, UploadFi
 from fastapi import Path as PathParameter
 from fastapi.responses import HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 from contextlib import closing
 from .db import connect, init_db, session
 from .config import settings
-from .evidence import IntegrityError, ensure_source, ingest_file
+from .evidence import IntegrityError, ensure_source, ingest_file, temporary_copy_acquisitions
 from .citations import anchor_payload, create_citation, loads_transcript_segments, milliseconds
 from .importers.sms_backup import import_sms_backup
 from .importers.whatsapp import import_whatsapp_txt
@@ -25,7 +24,11 @@ app=FastAPI(title='AGEDS Evidence Workbench',version='0.2.0')
 app.middleware('http')(auth_headers)
 app.middleware('http')(host_and_origin)
 app.mount('/static',StaticFiles(directory=Path(__file__).parent/'static'),name='static')
-templates=Jinja2Templates(directory=Path(__file__).parent/'templates')
+from .web import templates
+from .api import include_routers
+include_routers(app)
+from .web import NAV as _NAV
+_NAV.append(('/advocate', 'Rzecznik'))  # the advocate page lives in main.py
 MAX_SQL_INTEGER = 2**63 - 1
 SqlPathId = Annotated[int, PathParameter(ge=1, le=MAX_SQL_INTEGER)]
 StrictSqlId = Annotated[StrictInt, Field(ge=1, le=MAX_SQL_INTEGER)]
@@ -92,6 +95,32 @@ def _save_annotation(artifact_id: int, a) -> dict:
                    (annotation_id,json.dumps({'artifact_id':artifact_id,'derived_text_id':a.derivedTextId})))
         return _annotation_payload(db.execute('SELECT * FROM annotations WHERE id=?',(annotation_id,)).fetchone())
 
+CSV_FORMULA_GUARD = 'apostrophe_prefix_v1'
+_FORMULA_LEADS = ('=', '+', '-', '@', '\t', '\r')
+
+
+def _csv_guard(value):
+    """Spreadsheet apps execute text starting with = + - @ TAB CR; such text cells
+    get a leading apostrophe. The JSON APIs keep stored values unchanged."""
+    if isinstance(value, str) and value.startswith(_FORMULA_LEADS):
+        return "'" + value
+    return value
+
+
+def _display_projection(db):
+    from .timeline.projection import ensure_projection
+    from .timeline.ruleset import load_rule
+    return ensure_projection(db, load_rule(kind='display_rule'), {})
+
+
+def _recent_events(db, limit: int) -> list[dict]:
+    """Dashboard list: newest projected time first, undated last; never import time."""
+    from .timeline.query import legacy_events
+    rows = legacy_events(db, _display_projection(db), limit=limit, phone=None, event_type=None)
+    keep = ('id', 'event_type', 'ts_start', 'direction', 'contact_label', 'phone_or_address', 'subject', 'body')
+    return [{k: (row[k][:240] if k == 'body' and isinstance(row[k], str) else row[k]) for k in keep} for row in rows]
+
+
 def dashboard_counts():
     with session() as db:
         return {k:db.execute(sql).fetchone()[0] for k,sql in {
@@ -101,7 +130,7 @@ def dashboard_counts():
 def home(request:Request,q:str='',kind:str=''):
     with session() as db:
         recent=[dict(r) for r in db.execute("SELECT id,original_name,mime_type,size_bytes,sha256,created_at FROM artifacts ORDER BY id DESC LIMIT 30")]
-        events=[dict(r) for r in db.execute("SELECT id,event_type,ts_start,direction,contact_label,phone_or_address,subject,substr(body,1,240) body FROM events ORDER BY COALESCE(ts_start,created_at) DESC LIMIT 30")]
+        events=_recent_events(db, 30)
     search_error = None
     search_status = 200
     page = {'results': [], 'has_more': False, 'complete': True, 'limit': 100}
@@ -123,7 +152,8 @@ async def upload(file:UploadFile=File(...),source_label:str=Form('Manual upload'
         shutil.copyfileobj(file.file,tmp); p=Path(tmp.name)
     try:
         src=ensure_source('manual_upload',source_label)
-        aid=ingest_file(p,source_id=src,source_locator=f'upload:{file.filename}',original_name=file.filename,mime_type=file.content_type)
+        aid=ingest_file(p,source_id=src,source_locator=f'upload:{file.filename}',original_name=file.filename,mime_type=file.content_type,
+                        source_stat='temporary_copy')
         return {'ok':True,'artifact_id':aid}
     finally:p.unlink(missing_ok=True)
 
@@ -131,14 +161,18 @@ async def upload(file:UploadFile=File(...),source_label:str=Form('Manual upload'
 async def import_sms(file:UploadFile=File(...)):
     with tempfile.NamedTemporaryFile(delete=False,suffix='.xml') as tmp:
         shutil.copyfileobj(file.file,tmp); p=Path(tmp.name)
-    try:return import_sms_backup(p,source_locator=f'upload:sms-backup:{file.filename}',original_name=file.filename)
+    try:
+        with temporary_copy_acquisitions():
+            return import_sms_backup(p,source_locator=f'upload:sms-backup:{file.filename}',original_name=file.filename)
     finally:p.unlink(missing_ok=True)
 
 @app.post('/import/whatsapp',dependencies=[installation('ingest')])
 async def import_wa(file:UploadFile=File(...),chat_label:str=Form('')):
     with tempfile.NamedTemporaryFile(delete=False,suffix='.txt') as tmp:
         shutil.copyfileobj(file.file,tmp); p=Path(tmp.name)
-    try:return import_whatsapp_txt(p,chat_label or None,source_locator=f'upload:whatsapp:{file.filename}',original_name=file.filename)
+    try:
+        with temporary_copy_acquisitions():
+            return import_whatsapp_txt(p,chat_label or None,source_locator=f'upload:whatsapp:{file.filename}',original_name=file.filename)
     finally:p.unlink(missing_ok=True)
 
 @app.get('/artifact/{artifact_id}',response_class=HTMLResponse,dependencies=[installation('read_metadata')])
@@ -193,22 +227,28 @@ def api_search(q:str,access:Access=scoped('read_text')):
         'X-AGEDS-Search-Complete': str(page['complete']).lower(),
     })
 
-@app.get('/api/timeline',dependencies=[installation('read_metadata')])
-def timeline(limit:int=Query(500,ge=1,le=10000),phone:str|None=None,event_type:str|None=None):
-    clauses=[];args=[]
-    if phone:clauses.append('phone_or_address=?');args.append(phone)
-    if event_type:clauses.append('event_type=?');args.append(event_type)
-    where=' WHERE '+' AND '.join(clauses) if clauses else ''
-    with session() as db:
-        return [dict(r) for r in db.execute(f"SELECT * FROM events{where} ORDER BY COALESCE(ts_start,created_at) DESC LIMIT ?",(*args,limit))]
+# GET /api/timeline moved to server/app/api/timeline.py (timeline area): same path and
+# response shape; ordering now follows the versioned display-time projection.
 
 @app.get('/export/events.csv',dependencies=[installation('export')])
 def export_events_csv():
-    with session() as db: rows=[dict(r) for r in db.execute("SELECT * FROM events ORDER BY ts_start")]
+    with session() as db:
+        projection = _display_projection(db)
+        order = [r[0] for r in db.execute(
+            "SELECT ref_id FROM timeline_items WHERE projection_id=? AND item_kind='event' "
+            "ORDER BY sort_us IS NULL, sort_us, ref_id", (projection['id'],))]
+        by_id = {r['id']: dict(r) for r in db.execute("SELECT * FROM events ORDER BY id")}
+    seen = set(order)
+    # Every event is exported: rows the projection does not list follow by id.
+    rows = [by_id[i] for i in order if i in by_id] + [row for i, row in by_id.items() if i not in seen]
     buf=io.StringIO();
     if rows:
-        w=csv.DictWriter(buf,fieldnames=rows[0].keys());w.writeheader();w.writerows(rows)
-    return StreamingResponse(iter([buf.getvalue()]),media_type='text/csv',headers={'Content-Disposition':'attachment; filename=events.csv'})
+        w=csv.DictWriter(buf,fieldnames=rows[0].keys());w.writeheader()
+        w.writerows({k: _csv_guard(v) for k, v in row.items()} for row in rows)
+    return StreamingResponse(iter([buf.getvalue()]),media_type='text/csv',headers={
+        'Content-Disposition':'attachment; filename=events.csv',
+        'X-AGEDS-CSV-Formula-Guard': CSV_FORMULA_GUARD,
+        'X-AGEDS-Events-Order': f"projected-time-asc; undated-last-by-event-id; rule {projection['rule']['rule_id']}@{projection['rule']['version']}"})
 
 @app.get('/export/manifest.json',dependencies=[installation('export')])
 def export_manifest():
@@ -314,7 +354,8 @@ async def api_upload_artifact(file:UploadFile=File(...),source_label:str=Form('A
         src=ensure_source('client_upload',source_label)
         aid=ingest_file(p,source_id=src,source_locator=source_locator or f'client-upload:{file.filename}',original_name=file.filename,mime_type=file.content_type,
                         metadata={'client_metadata':client_metadata,'client_metadata_status':'unverified',
-                                  'acquisition_kind':'uploaded_stream','filesystem_stat_scope':'server_temporary_upload_not_original_source'})
+                                  'acquisition_kind':'uploaded_stream','filesystem_stat_scope':'server_temporary_upload_not_original_source'},
+                        source_stat='temporary_copy')
         with session() as db:
             sha=db.execute('SELECT sha256 FROM artifacts WHERE id=?',(aid,)).fetchone()['sha256']
         return {'ok':True,'artifact_id':aid,'sha256':sha}

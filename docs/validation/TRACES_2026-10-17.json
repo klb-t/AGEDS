@@ -1,0 +1,62 @@
+{
+  "schema": "ageds.validation_receipt.v1",
+  "task": "AGEDS-TASK-20261017-L2",
+  "date": "2026-10-17",
+  "branch": "wt-L2",
+  "base": "790d386",
+  "tested_head": "95c0e05",
+  "note": "the receipt commit adds documentation only",
+  "environment": {"python": "3.13.16", "sqlite": "3.45.1", "node": "v22.22.0", "chromium": "141.0.7390.37",
+                  "os": "Linux container, no network models, no paid calls"},
+  "commands": [
+    "/home/user/wt/venv/bin/python -m pytest server/tests -q",
+    "/home/user/wt/venv/bin/python -m pytest server/tests/test_traces_photos.py server/tests/test_traces_messaging.py server/tests/test_traces_activity.py server/tests/test_traces_docs.py server/tests/test_traces_keep_browser.py server/tests/test_traces_plan_api.py -q",
+    "NODE_PATH=<playwright> PYTHON=<venv python> AGEDS_BROWSER_EXECUTABLE=<chromium> node server/tests/browser/traces.cjs",
+    "NODE_PATH=<playwright> PYTHON=<venv python> AGEDS_BROWSER_EXECUTABLE=<chromium> node server/tests/browser/acceptance.cjs",
+    "node --test server/tests/js/*.test.mjs",
+    "python3 scripts/verify_repository.py"
+  ],
+  "results": {
+    "backend_full_suite_at_tested_head": FULL_JSON,
+    "full_suite_checkpoints": [
+      {"commit": "b483b50", "scope": "photos + geotags", "passed": 1219, "skipped": 1, "failed": 0, "subtests_passed": 764},
+      {"commit": "staged before f5918a2", "scope": "messaging", "passed": 704, "failed": 1,
+       "note": "stopped at the first failure: test_reports_interfaces saw the new table trace_provider_locations as undeclared because schema 114 was written while the run was in progress (packages.py edited a moment later); kept as a record, not a code defect"},
+      {"commit": "f5918a2", "scope": "messaging + account activity (the document fixtures in the corpus were added between this run and the commit; covered by the later checkpoints)", "passed": 1233, "skipped": 1, "failed": 0, "subtests_passed": 764},
+      {"commit": "4e56595", "scope": "document metadata", "passed": 1252, "skipped": 1, "failed": 0, "subtests_passed": 764},
+      {"commit": "f7be3df", "scope": "Keep + browser profiles", "passed": 1257, "skipped": 1, "failed": 0, "subtests_passed": 764}
+    ],
+    "traces_tests": {"passed": 50, "failed": 0,
+                     "files": {"test_traces_photos.py": 6, "test_traces_messaging.py": 9, "test_traces_activity.py": 3,
+                               "test_traces_docs.py": 18, "test_traces_keep_browser.py": 4, "test_traces_plan_api.py": 10}},
+    "regression_check": "test_sidecar_rerun_after_images_appends_a_new_match fails with the previous scope hash and passes with the fix (executed both ways)",
+    "browser_traces": {"status": "passed", "cases": [
+      "navigation shows Ślady and the page renders",
+      "event, geotag, match and document counts are listed",
+      "runs show options as text; markup-like labels do not execute",
+      "third-party names and coordinates are not on the page",
+      "no page errors, dialogs or failed requests"]},
+    "browser_acceptance_existing": {"pass_lines": 24, "exit": 0},
+    "javascript": {"passed": 127, "failed": 0, "changed_js": false},
+    "verify_repository": "OK"
+  },
+  "runtime_executed": [
+    "all importers on generated files (photos_takeout, facebook, instagram, telegram, google_chat, twitter_x, linkedin, account_activity, doc_metadata, google_keep, browser_profiles)",
+    "CLI import-trace / traces-kinds / traces-summary / traces-geotags via cli.main",
+    "HTTP upload, EW_SCAN_ROOTS path import, listings and /traces via the FastAPI test client",
+    "catalog scan -> import plan -> decisions -> execution for every traces adapter",
+    "/traces in real Chromium"
+  ],
+  "not_run": [
+    "real vendor exports or devices (none available)",
+    "HEIC/MP4 embedded metadata (not implemented)",
+    "IP geolocation, reverse geocoding, map tiles (not implemented by design)",
+    "Android (unchanged)"
+  ],
+  "shared_edits": [
+    "server/app/importers/exif.py: read_exif/_tiff gps=False option and GPS IFD reader (exif_gps v1); default path unchanged",
+    "server/app/packages.py: classification block for six trace tables",
+    "server/tests/corpus/__init__.py: 'traces' in PARTS",
+    "docs/README.md and docs/validation/README.md: one line each"
+  ]
+}

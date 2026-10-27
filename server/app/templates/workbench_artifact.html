@@ -1,0 +1,22 @@
+<!doctype html><html {{ ui_html_attrs() }}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{{ k.artifact.original_name }} — {{ t('knowledge.title') }}</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/workbench.css"></head><body>
+<header>{% include '_nav.html' %}<div><p><a href="/artifact/{{ k.artifact.id }}">← {{ t('knowledge.back') }}</a></p><h1>{{ k.artifact.original_name }}</h1><p>{{ t('knowledge.title') }} · {{ k.artifact.mime_type or t('common.unknown') }}</p></div></header>
+<main class="wb-main">
+{% include '_wb_messages.html' %}
+<section class="wb-layout">
+<div class="panel">{% include '_wb_knowledge.html' %}</div>
+<div>
+<section class="panel"><h2>{{ t('knowledge.citations') }}</h2>
+<ul class="wb-list">{% for c in k.citations %}<li><small>{{ t('kind.citation') }} #{{ c.id }} · {{ t('wb.folder.pinned_version', id=c.derived_text_id) }} · {{ c.start_ms }}–{{ c.end_ms }} ms</small><p class="transcript">{{ c.quote_preview }}</p><button type="button" class="wb-small wb-secondary" data-wb-copy-citation="{{ c.id }}">{{ t('wb.copy.citation') }}</button></li>{% else %}<li>{{ t('common.none') }}</li>{% endfor %}</ul>
+<p data-wb-copy-status role="status" aria-live="polite"></p></section>
+<section class="panel"><h2>{{ t('knowledge.add_to_folder') }}</h2>
+{% if folders %}<form method="post" action="/workbench/folder-items" data-wb-add-to-folder>
+<label>{{ t('wb.folders.title') }}<select name="folder_id" data-wb-folder-select>{% for f in folders %}<option value="{{ f.id }}">{{ f.path|join(' / ') }}</option>{% endfor %}</select></label>
+<input type="hidden" name="kind" value="artifact"><input type="hidden" name="item_id" value="{{ k.artifact.id }}"><input type="hidden" name="return_to" value="/workbench/artifacts/{{ k.artifact.id }}">
+<label>{{ t('wb.folder.note') }}<input name="note"></label>
+<button>{{ t('wb.folder.add_submit') }}</button></form>{% else %}<p><a href="/workbench/folders">{{ t('wb.folders.create') }}</a></p>{% endif %}
+</section>
+</div>
+</section>
+</main>
+<script type="module" src="/static/workbench.mjs"></script>
+</body></html>

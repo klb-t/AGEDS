@@ -1,0 +1,15 @@
+{
+  "schema": "ageds.media_recipe",
+  "schema_version": 1,
+  "id": "ocr-tesseract-pol-nld-eng",
+  "kind": "ocr",
+  "revision": 1,
+  "description": "Local Tesseract CLI OCR of images and rasterized PDF pages (pol+nld+eng). Output is model text with line boxes; engine word confidence is not correctness.",
+  "engine": "tesseract-cli",
+  "languages": ["pol", "nld", "eng"],
+  "psm": 3,
+  "oem": null,
+  "layout": "document",
+  "pdf": {"rasterizer": "pdftoppm", "dpi": 300, "max_pages": 50},
+  "limits": {"max_input_bytes": 67108864, "max_page_image_bytes": 134217728, "timeout_s": 300, "max_words": 500000}
+}

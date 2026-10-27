@@ -62,7 +62,13 @@ class SearchRenderingTests(unittest.TestCase):
             self.assertEqual(page.status_code, 200)
             parsed = ParsedHtml()
             parsed.feed(page.text)
-            self.assertFalse([tag for tag, _ in parsed.tags if tag in ('script', 'img', 'svg', 'mark')])
+            # Only the page's own shell scripts may appear: module scripts served from /static/
+            # and the inert JSON shell configuration. Source text never becomes a tag.
+            scripts = [attrs for tag, attrs in parsed.tags if tag == 'script']
+            self.assertTrue(all((attrs.get('type') == 'module' and attrs.get('src', '').startswith('/static/'))
+                                or (attrs.get('type') == 'application/json' and attrs.get('id') == 'ageds-shell-config')
+                                for attrs in scripts), scripts)
+            self.assertFalse([tag for tag, _ in parsed.tags if tag in ('img', 'svg', 'mark')])
             self.assertFalse([attrs for _, attrs in parsed.tags if any(name.startswith('on') for name in attrs)])
             self.assertIn(self.raw, parsed.text)
             result = client.get('/api/search', params={'q': 'needle'})

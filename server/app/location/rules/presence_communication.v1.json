@@ -1,0 +1,25 @@
+{
+  "rule_id": "presence_communication",
+  "version": 1,
+  "kind": "location_correlation_rule",
+  "status": "released",
+  "relation": "communication_during_device_presence",
+  "description": "Pairs a place presence interval (derived from device samples) with a call, message or e-mail whose time lies within the interval or a tolerance around it. A hypothesis for human review: a device at a place and communication activity at that time do not show who communicated, from where, or with which device.",
+  "left": {"source": "location_presence_intervals of one presence run"},
+  "right": {"event_types": ["call", "sms", "mms", "email", "email_message", "chat_message", "whatsapp_message"]},
+  "parameters": {
+    "tolerance_s": 300,
+    "require_inner_overlap": false,
+    "max_candidates_per_interval": 200,
+    "max_hypotheses": 100000,
+    "label_match": false
+  },
+  "criteria": {
+    "inner_overlap_s": "seconds of overlap between the communication range [t_lo, max(t_end, t_hi)] and the interval's observed span",
+    "inner_gap_s": "smallest distance between both ranges (0 when inside); the gate is inner_gap_s <= tolerance_s",
+    "within_outer_bounds": "the communication time lies inside [outer_start, outer_end]",
+    "same_stream_hint": "never computed: nothing links a communication event to the device stream of the presence; recorded as unknown",
+    "time_basis": "basis of the communication time from the timeline projection"
+  },
+  "probability": "none: hypotheses carry per-criterion evidence only; acceptance is a human decision"
+}

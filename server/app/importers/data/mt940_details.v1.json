@@ -1,0 +1,20 @@
+{
+  "schema": "ageds.mt940-details",
+  "version": "1",
+  "notice": "EXAMPLE structure hints for the free-form :86: field. Banks use numbered subfields (e.g. ?20 or <20) or slash codes (/NAME/…/REMI/…); none of these is verified against a specific bank. The raw :86: text is always kept; a parsed structure is a parser observation, not the bank's meaning.",
+  "subfield_separators": ["?", "<"],
+  "subfield_codes": {
+    "00": "posting_text",
+    "10": "primanota",
+    "20": "remittance", "21": "remittance", "22": "remittance", "23": "remittance", "24": "remittance",
+    "25": "remittance", "26": "remittance", "27": "remittance", "28": "remittance", "29": "remittance",
+    "30": "counterparty_bank", "31": "counterparty_account", "32": "counterparty_name", "33": "counterparty_name",
+    "34": "return_reason", "38": "counterparty_iban",
+    "60": "remittance", "61": "remittance", "62": "remittance", "63": "remittance"
+  },
+  "slash_codes": {
+    "NAME": "counterparty_name", "IBAN": "counterparty_iban", "BIC": "counterparty_bic", "REMI": "remittance",
+    "EREF": "end_to_end_reference", "MARF": "mandate_reference", "CSID": "creditor_id", "TRCD": "transaction_code",
+    "ORDP": "ordering_party", "BENM": "beneficiary", "CNTP": "counterparty", "ADDR": "counterparty_address"
+  }
+}

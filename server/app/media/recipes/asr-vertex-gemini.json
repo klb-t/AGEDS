@@ -1,0 +1,32 @@
+{
+  "schema": "ageds.media_recipe",
+  "schema_version": 1,
+  "id": "asr-vertex-gemini",
+  "kind": "asr",
+  "revision": 1,
+  "description": "Whole-file transcription by Gemini on Vertex AI (owner consent R100): segments with model-estimated times, speaker hypotheses and per-segment language (pl/nl/en/other). No word timing: citations are segment selectors. Formats Gemini does not accept (e.g. AMR) are transcoded in memory to FLAC for the call only.",
+  "strategy": "vertex_gemini",
+  "engine": "vertex-gemini",
+  "model": "gemini-3.5-flash",
+  "device": "vertex:global",
+  "compute_type": "remote",
+  "model_options": {},
+  "vad": {
+    "enabled": false,
+    "parameters": null
+  },
+  "word_timestamps": false,
+  "language": null,
+  "allowed_languages": [
+    "pl",
+    "nl",
+    "en"
+  ],
+  "windows": null,
+  "detection": null,
+  "transcribe_options": {},
+  "limits": {
+    "max_inline_bytes": 15000000,
+    "max_output_tokens": 32768
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "schema": "ageds.recording-name-patterns",
+  "version": "1",
+  "notice": "EXAMPLE patterns in the style of common call-recorder apps. They are not claimed to match any specific app or app version; file-name conventions change between versions, settings and locales. Number, name and direction from a file name are correlation hypotheses, never facts. Time from a file name has an unknown zone.",
+  "patterns": [
+    {
+      "id": "example_name_number_datetime_v1",
+      "description": "Example: 'Call recording NAME_+31600000001_20240105_101500.m4a' style",
+      "regex": "^(?:Call recording )?(?P<name>[^_]+?)_(?P<number>\\+?\\d[\\d ]{4,})_(?P<date>\\d{8})_(?P<time>\\d{6})(?:\\.[A-Za-z0-9]{1,5})?$",
+      "date_format": "%Y%m%d",
+      "time_format": "%H%M%S"
+    },
+    {
+      "id": "example_direction_number_dashes_v1",
+      "description": "Example: 'out-+48000000101-2024-01-05-10-15-00.amr' style with a direction token",
+      "regex": "^(?P<direction>in|out|incoming|outgoing)[-_ ](?P<number>\\+?\\d{5,})[-_ ](?P<date>\\d{4}-\\d{2}-\\d{2})[-_ ](?P<time>\\d{2}-\\d{2}-\\d{2})(?:\\.[A-Za-z0-9]{1,5})?$",
+      "date_format": "%Y-%m-%d",
+      "time_format": "%H-%M-%S",
+      "direction_map": {"in": "incoming", "incoming": "incoming", "out": "outgoing", "outgoing": "outgoing"}
+    },
+    {
+      "id": "example_at_name_parenthesized_number_v1",
+      "description": "Example: 'Call@Name(+31600000002)_20240105101500.m4a' style",
+      "regex": "^Call@(?P<name>.+?)\\((?P<number>\\+?[\\d ]{5,})\\)_(?P<date>\\d{8})(?P<time>\\d{6})(?:\\.[A-Za-z0-9]{1,5})?$",
+      "date_format": "%Y%m%d",
+      "time_format": "%H%M%S"
+    },
+    {
+      "id": "example_generic_timestamp_v1",
+      "description": "Example fallback: any name containing YYYYMMDD and HHMMSS; no number or name is extracted",
+      "regex": "(?<!\\d)(?P<date>20\\d{6})[-_ ]?(?P<time>\\d{6})(?!\\d)",
+      "date_format": "%Y%m%d",
+      "time_format": "%H%M%S",
+      "search": true
+    }
+  ]
+}

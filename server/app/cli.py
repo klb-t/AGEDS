@@ -132,6 +132,8 @@ def _parser() -> argparse.ArgumentParser:
     preview = commands.add_parser("authz-preview", help="what a principal can see now (names and counts, no text)")
     preview.add_argument("--principal-uid", required=True)
     commands.add_parser("authz-show", help="list principals, grants and settings without secrets")
+    from .commands import register_all
+    register_all(commands)
     return parser
 
 
@@ -359,6 +361,10 @@ def main(argv: list[str] | None = None) -> int:
         if args.command.startswith("authz-"):
             _emit({"command": args.command, **_authz_command(args)})
             return 0
+        from .commands import dispatch
+        extension_result = dispatch(args)
+        if extension_result is not None:
+            return extension_result
         if args.command == "scan":
             from .scanner import ScanLimits, export_manifest, scan_sources
             limits = ScanLimits(**{name: getattr(args, name) for name in _LIMIT_NAMES if getattr(args, name) is not None})

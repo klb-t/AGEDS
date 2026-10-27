@@ -1,0 +1,15 @@
+{
+  "schema": "ageds.media_recipe",
+  "schema_version": 1,
+  "id": "ocr-chat-screenshot-pol-nld-eng",
+  "kind": "ocr",
+  "revision": 1,
+  "description": "OCR of a chat screenshot (pol+nld+eng) plus a layout heuristic that proposes sender/time/text event candidates with box locators. Candidates are never events.",
+  "engine": "tesseract-cli",
+  "languages": ["pol", "nld", "eng"],
+  "psm": 4,
+  "oem": null,
+  "layout": "chat_screenshot",
+  "pdf": {"rasterizer": "pdftoppm", "dpi": 200, "max_pages": 20},
+  "limits": {"max_input_bytes": 67108864, "max_page_image_bytes": 134217728, "timeout_s": 300, "max_words": 500000}
+}

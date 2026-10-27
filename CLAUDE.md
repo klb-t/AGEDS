@@ -7,8 +7,13 @@ archived plans are context. Do not resume expired overnight claims.
 
 AGEDS currently provides an Android-first Evidence Workbench backed by FastAPI,
 SQLite and a local transcription worker. It preserves source acquisitions,
-versions derived text, pins citations and exports inert metadata. The five-layer
-legal-analysis standard and ecosystem adapters remain future work.
+versions derived text, pins citations and exports inert metadata. Since
+2026-10-16 it also catalogs multi-device sources, imports chat/mail/Takeout
+exports, projects one timeline, and keeps interpretive layers (time budgets,
+preregistered hypotheses, reports) separate from evidence; a read API with local
+tokens serves ChatADHD/Loom adapters. The five-layer legal-analysis standard
+remains future work. Feature areas own their files through the registries in
+`server/app/{schema,api,commands}/__init__.py` (see docs/plans/).
 
 ## Development boundaries
 

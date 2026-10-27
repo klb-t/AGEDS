@@ -1,0 +1,37 @@
+{
+  "rule_id": "same_conversation",
+  "version": 1,
+  "kind": "correlation_rule",
+  "status": "released",
+  "relation": "same_conversation_across_exports_hypothesis",
+  "description": "Proposes that two exports (artifacts) contain the same chatbot conversation. Primary evidence: the importer's logical records (logical_records/logical_occurrences: one conversation id observed in several exports), with per-record content differences (edits, regenerations) and records not observed in one export. Fallback for importers without logical records: identical thread_id and chatbot on chat events of different artifacts. Absence is 'not observed', never deletion.",
+  "left": {
+    "kind": "artifact",
+    "selector": "export file containing the conversation"
+  },
+  "right": {
+    "kind": "artifact",
+    "selector": "another export file containing the same conversation id"
+  },
+  "parameters": {
+    "logical_record_kind": "conversation",
+    "fallback_event_types": [
+      "chat_message"
+    ],
+    "chatbot_metadata_paths": [
+      "$.chat.chatbot",
+      "$.chatbot"
+    ],
+    "max_threads": 100000,
+    "max_artifacts_per_thread": 20,
+    "max_records_per_conversation": 100000,
+    "max_example_ids": 5
+  },
+  "criteria": {
+    "logical_record": "gate (primary): one logical conversation record with occurrences in two exports (identity asserted by the source's own conversation id, recorded by the importer)",
+    "records": "evidence: message records shared, with differing content hashes, or observed in only one export",
+    "conversation_content": "evidence: conversation-level content hash (title) equal or not",
+    "thread_id": "gate (fallback): identical thread_id and chatbot on events without logical occurrences",
+    "message_times": "evidence: first/last projected time of the conversation's events in each export"
+  }
+}

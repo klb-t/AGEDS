@@ -1,0 +1,20 @@
+{
+  "schema": "ageds.call-log-codes",
+  "version": "1",
+  "notice": "Mapping of numeric codes in SMS Backup & Restore calls.xml to labels. The values follow the Android CallLog.Calls TYPE_* and PRESENTATION_* constants as publicly documented; a backup app or device may use other codes. Unmapped codes are kept raw and flagged, never guessed.",
+  "type": {
+    "1": "incoming",
+    "2": "outgoing",
+    "3": "missed",
+    "4": "voicemail",
+    "5": "rejected",
+    "6": "blocked",
+    "7": "answered_externally"
+  },
+  "presentation": {
+    "1": "allowed",
+    "2": "restricted",
+    "3": "unknown",
+    "4": "payphone"
+  }
+}

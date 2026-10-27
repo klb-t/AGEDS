@@ -1,0 +1,59 @@
+{
+  "schema": "ageds.browser_profile_mapping",
+  "version": "1",
+  "notice": "Local browser profile history databases as documented by the projects (Chromium History: urls/visits, WebKit epoch microseconds since 1601-01-01 UTC; Firefox places.sqlite: moz_places/moz_historyvisits, PRTime microseconds since 1970). Transition codes are the documented constants; examples, not a guarantee for every version.",
+  "chromium": {
+    "required_tables": [
+      "urls",
+      "visits"
+    ],
+    "core_transition_mask": 255,
+    "transition_names": {
+      "0": "link",
+      "1": "typed",
+      "2": "auto_bookmark",
+      "3": "auto_subframe",
+      "4": "manual_subframe",
+      "5": "generated",
+      "6": "auto_toplevel",
+      "7": "form_submit",
+      "8": "reload",
+      "9": "keyword",
+      "10": "keyword_generated"
+    },
+    "non_navigation_core_types": [
+      3,
+      4
+    ],
+    "service_start_year": 2008
+  },
+  "firefox": {
+    "required_tables": [
+      "moz_places",
+      "moz_historyvisits"
+    ],
+    "transition_names": {
+      "1": "link",
+      "2": "typed",
+      "3": "bookmark",
+      "4": "embed",
+      "5": "redirect_permanent",
+      "6": "redirect_temporary",
+      "7": "download",
+      "8": "framed_link",
+      "9": "reload"
+    },
+    "non_navigation_types": [
+      4,
+      8
+    ],
+    "service_start_year": 2002
+  },
+  "session_rule": {
+    "id": "browser_session_gap_v1",
+    "default_gap_minutes": 30,
+    "top_domains": 10
+  },
+  "max_url_chars": 4096,
+  "max_title_chars": 1024
+}

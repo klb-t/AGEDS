@@ -1,0 +1,27 @@
+{
+  "schema": "ageds.activity_categories.v1",
+  "version": "example-2026-10-16",
+  "description": "Generic EXAMPLE only. Copy it outside the repository, adapt it privately and pass it with --config or AGEDS_ACTIVITY_CATEGORIES. Values below use reserved example domains and fictional number ranges.",
+  "categories": [
+    {"id": "praca_projekty", "label": "Praca / projekty", "color": "#3987e5"},
+    {"id": "sprawy_urzedowe", "label": "Sprawy urzędowe", "color": "#d95926"},
+    {"id": "zdrowie", "label": "Zdrowie", "color": "#199e70"},
+    {"id": "odpoczynek", "label": "Odpoczynek", "color": "#c98500"},
+    {"id": "inne", "label": "Inne", "color": "#d55181"}
+  ],
+  "default_category": "inne",
+  "combine": "max",
+  "official_categories": ["sprawy_urzedowe"],
+  "rules": [
+    {"id": "urzedy-kontrahenci", "version": 1, "kind": "counterparty",
+     "values": ["+48 000 000 101", "office@example.org"], "weights": {"sprawy_urzedowe": 1}},
+    {"id": "urzedy-domeny", "version": 1, "kind": "email_domain",
+     "values": ["urzad.example.org"], "weights": {"sprawy_urzedowe": 1}},
+    {"id": "zdrowie-slowa", "version": 1, "kind": "keyword", "fields": ["subject", "body"],
+     "values": ["lekarz", "recepta", "wizyta"], "weights": {"zdrowie": 1}},
+    {"id": "chatbot-projekty", "version": 1, "kind": "chatbot",
+     "values": ["claude", "chatgpt"], "weights": {"praca_projekty": 1}},
+    {"id": "tag-odpoczynek", "version": 1, "kind": "tag",
+     "values": ["odpoczynek"], "weights": {"odpoczynek": 1}}
+  ]
+}

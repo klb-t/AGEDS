@@ -1,0 +1,485 @@
+{
+ "schema": "ageds.workbench-validation/v1",
+ "task": "AGEDS-TASK-20261016-H",
+ "source_baseline": "887cc55 (F0 + track G integrated)",
+ "tested_code_head": "41142842068636dbabbb07db8b8eb730cc314728",
+ "branch": "wt-H",
+ "checked_at": "2026-10-16",
+ "python": "Python 3.13.16",
+ "node": "v22.22.0",
+ "chromium": "141.0.7390.37",
+ "playwright": "1.62.1",
+ "environment": "/home/user/wt/venv (shared session venv); no model, no network calls in code paths, no new dependencies",
+ "commands": [
+  {
+   "command": "/home/user/wt/venv/bin/python -m pytest server/tests -q",
+   "summary": "526 passed, 3 warnings, 742 subtests passed in 51.34s",
+   "exit_code": 0,
+   "note": "471 pre-existing tests (one assertion refined, see shared edits) + 55 new workbench tests (84 subtests)"
+  },
+  {
+   "command": "/home/user/wt/venv/bin/python -m pytest server/tests/test_workbench_search.py server/tests/test_workbench_saved_tags.py server/tests/test_workbench_folders_bookmarks.py server/tests/test_workbench_i18n_theme.py server/tests/test_workbench_knowledge.py -q",
+   "summary": "55 passed, 3 warnings, 84 subtests passed in 11.63s",
+   "exit_code": 0
+  },
+  {
+   "command": "node --test server/tests/js/*.test.mjs",
+   "summary": "98 tests, 98 pass, 0 fail (85 pre-existing + 13 new)",
+   "exit_code": 0
+  },
+  {
+   "command": "NODE_PATH=<scratchpad>/browser-tools/node_modules PYTHON=/home/user/wt/venv/bin/python AGEDS_BROWSER_EXECUTABLE=/opt/pw-browsers/chromium-1194/chrome-linux/chrome node server/tests/browser/acceptance.cjs",
+   "summary": "24 PASS lines, status passed, page_errors []",
+   "exit_code": 0
+  },
+  {
+   "command": "NODE_PATH=... PYTHON=... AGEDS_BROWSER_EXECUTABLE=... node server/tests/browser/workbench.cjs",
+   "summary": "9 PASS lines, status passed, page_errors []",
+   "exit_code": 0,
+   "cases": [
+    "shell loads on every page without errors and keeps source HTML inert",
+    "theme toggle cycles auto → light → dark, persists in a cookie and is rendered by the server",
+    "page renders and toggles without cookie storage",
+    "language switch: Accept-Language, cookie from the selector, ?lang= override",
+    "shortcuts overlay opens with ?, closes with Escape and never steals typing",
+    "command palette jumps by id and searches all layers",
+    "bulk tag flow: select all, add, audited summary, remove",
+    "folder add and remove keep evidence untouched; citation copies as text",
+    "artifact page knowledge panel renders without disturbing the citation workspace"
+   ],
+   "copy_mode": "clipboard",
+   "bulk_tag": {
+    "added": 3,
+    "removed": 1
+   },
+   "failed_responses": [],
+   "console_errors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found) @ /favicon.ico"
+   ],
+   "console_error_note": "the only console error is the browser's automatic /favicon.ico request (no favicon route exists)"
+  },
+  {
+   "command": "/home/user/wt/venv/bin/python -m server.app.cli workbench-theme-report",
+   "summary": "all text pairs >= 4.5:1 in both themes",
+   "exit_code": 0
+  },
+  {
+   "command": "/home/user/wt/venv/bin/python -m server.app.cli workbench-i18n-check",
+   "summary": "complete=True; pl keys 373",
+   "exit_code": 0
+  },
+  {
+   "command": "python3 scripts/verify_repository.py",
+   "summary": "Historical snapshots: 108; active pages: 54; relative links: 256; privacy-scanned files: 347",
+   "exit_code": 0
+  }
+ ],
+ "contrast": {
+  "dark": {
+   "all_aa": true,
+   "minimum": {
+    "foreground": "on-accent",
+    "background": "accent-hover",
+    "ratio": 4.63
+   },
+   "pairs": [
+    {
+     "foreground": "text",
+     "background": "bg",
+     "fg": "#e6edf3",
+     "bg": "#0d1117",
+     "ratio": 16.02
+    },
+    {
+     "foreground": "text",
+     "background": "surface",
+     "fg": "#e6edf3",
+     "bg": "#161b22",
+     "ratio": 14.64
+    },
+    {
+     "foreground": "text",
+     "background": "input-bg",
+     "fg": "#e6edf3",
+     "bg": "#0d1117",
+     "ratio": 16.02
+    },
+    {
+     "foreground": "text",
+     "background": "neutral-button",
+     "fg": "#e6edf3",
+     "bg": "#21262d",
+     "ratio": 12.88
+    },
+    {
+     "foreground": "muted",
+     "background": "bg",
+     "fg": "#8b949e",
+     "bg": "#0d1117",
+     "ratio": 6.15
+    },
+    {
+     "foreground": "muted",
+     "background": "surface",
+     "fg": "#8b949e",
+     "bg": "#161b22",
+     "ratio": 5.62
+    },
+    {
+     "foreground": "muted",
+     "background": "input-bg",
+     "fg": "#8b949e",
+     "bg": "#0d1117",
+     "ratio": 6.15
+    },
+    {
+     "foreground": "link",
+     "background": "bg",
+     "fg": "#58a6ff",
+     "bg": "#0d1117",
+     "ratio": 7.49
+    },
+    {
+     "foreground": "link",
+     "background": "surface",
+     "fg": "#58a6ff",
+     "bg": "#161b22",
+     "ratio": 6.85
+    },
+    {
+     "foreground": "code",
+     "background": "bg",
+     "fg": "#79c0ff",
+     "bg": "#0d1117",
+     "ratio": 9.73
+    },
+    {
+     "foreground": "code",
+     "background": "surface",
+     "fg": "#79c0ff",
+     "bg": "#161b22",
+     "ratio": 8.89
+    },
+    {
+     "foreground": "on-accent",
+     "background": "accent",
+     "fg": "#ffffff",
+     "bg": "#1a7f37",
+     "ratio": 5.08
+    },
+    {
+     "foreground": "on-accent",
+     "background": "accent-hover",
+     "fg": "#ffffff",
+     "bg": "#238636",
+     "ratio": 4.63
+    },
+    {
+     "foreground": "mark-text",
+     "background": "mark-bg",
+     "fg": "#0d1117",
+     "bg": "#d29922",
+     "ratio": 7.5
+    },
+    {
+     "foreground": "danger",
+     "background": "surface",
+     "fg": "#ff7b72",
+     "bg": "#161b22",
+     "ratio": 6.86
+    },
+    {
+     "foreground": "warning",
+     "background": "surface",
+     "fg": "#e3b341",
+     "bg": "#161b22",
+     "ratio": 8.89
+    },
+    {
+     "foreground": "ok",
+     "background": "surface",
+     "fg": "#56d364",
+     "bg": "#161b22",
+     "ratio": 8.98
+    },
+    {
+     "foreground": "badge-raw",
+     "background": "surface",
+     "fg": "#d2a8ff",
+     "bg": "#161b22",
+     "ratio": 8.88
+    },
+    {
+     "foreground": "badge-parser",
+     "background": "surface",
+     "fg": "#79c0ff",
+     "bg": "#161b22",
+     "ratio": 8.89
+    },
+    {
+     "foreground": "badge-model",
+     "background": "surface",
+     "fg": "#e3b341",
+     "bg": "#161b22",
+     "ratio": 8.89
+    },
+    {
+     "foreground": "badge-human",
+     "background": "surface",
+     "fg": "#56d364",
+     "bg": "#161b22",
+     "ratio": 8.98
+    },
+    {
+     "foreground": "badge-unclassified",
+     "background": "surface",
+     "fg": "#8b949e",
+     "bg": "#161b22",
+     "ratio": 5.62
+    }
+   ]
+  },
+  "light": {
+   "all_aa": true,
+   "minimum": {
+    "foreground": "warning",
+    "background": "surface",
+    "ratio": 4.57
+   },
+   "pairs": [
+    {
+     "foreground": "text",
+     "background": "bg",
+     "fg": "#1f2328",
+     "bg": "#ffffff",
+     "ratio": 15.8
+    },
+    {
+     "foreground": "text",
+     "background": "surface",
+     "fg": "#1f2328",
+     "bg": "#f6f8fa",
+     "ratio": 14.84
+    },
+    {
+     "foreground": "text",
+     "background": "input-bg",
+     "fg": "#1f2328",
+     "bg": "#ffffff",
+     "ratio": 15.8
+    },
+    {
+     "foreground": "text",
+     "background": "neutral-button",
+     "fg": "#1f2328",
+     "bg": "#eaeef2",
+     "ratio": 13.55
+    },
+    {
+     "foreground": "muted",
+     "background": "bg",
+     "fg": "#59636e",
+     "bg": "#ffffff",
+     "ratio": 6.11
+    },
+    {
+     "foreground": "muted",
+     "background": "surface",
+     "fg": "#59636e",
+     "bg": "#f6f8fa",
+     "ratio": 5.74
+    },
+    {
+     "foreground": "muted",
+     "background": "input-bg",
+     "fg": "#59636e",
+     "bg": "#ffffff",
+     "ratio": 6.11
+    },
+    {
+     "foreground": "link",
+     "background": "bg",
+     "fg": "#0969da",
+     "bg": "#ffffff",
+     "ratio": 5.19
+    },
+    {
+     "foreground": "link",
+     "background": "surface",
+     "fg": "#0969da",
+     "bg": "#f6f8fa",
+     "ratio": 4.88
+    },
+    {
+     "foreground": "code",
+     "background": "bg",
+     "fg": "#0550ae",
+     "bg": "#ffffff",
+     "ratio": 7.59
+    },
+    {
+     "foreground": "code",
+     "background": "surface",
+     "fg": "#0550ae",
+     "bg": "#f6f8fa",
+     "ratio": 7.13
+    },
+    {
+     "foreground": "on-accent",
+     "background": "accent",
+     "fg": "#ffffff",
+     "bg": "#1a7f37",
+     "ratio": 5.08
+    },
+    {
+     "foreground": "on-accent",
+     "background": "accent-hover",
+     "fg": "#ffffff",
+     "bg": "#116329",
+     "ratio": 7.39
+    },
+    {
+     "foreground": "mark-text",
+     "background": "mark-bg",
+     "fg": "#1f2328",
+     "bg": "#fff8c5",
+     "ratio": 14.66
+    },
+    {
+     "foreground": "danger",
+     "background": "surface",
+     "fg": "#cf222e",
+     "bg": "#f6f8fa",
+     "ratio": 5.03
+    },
+    {
+     "foreground": "warning",
+     "background": "surface",
+     "fg": "#9a6700",
+     "bg": "#f6f8fa",
+     "ratio": 4.57
+    },
+    {
+     "foreground": "ok",
+     "background": "surface",
+     "fg": "#1a7f37",
+     "bg": "#f6f8fa",
+     "ratio": 4.77
+    },
+    {
+     "foreground": "badge-raw",
+     "background": "surface",
+     "fg": "#8250df",
+     "bg": "#f6f8fa",
+     "ratio": 4.74
+    },
+    {
+     "foreground": "badge-parser",
+     "background": "surface",
+     "fg": "#0550ae",
+     "bg": "#f6f8fa",
+     "ratio": 7.13
+    },
+    {
+     "foreground": "badge-model",
+     "background": "surface",
+     "fg": "#9a6700",
+     "bg": "#f6f8fa",
+     "ratio": 4.57
+    },
+    {
+     "foreground": "badge-human",
+     "background": "surface",
+     "fg": "#1a7f37",
+     "bg": "#f6f8fa",
+     "ratio": 4.77
+    },
+    {
+     "foreground": "badge-unclassified",
+     "background": "surface",
+     "fg": "#59636e",
+     "bg": "#f6f8fa",
+     "ratio": 5.74
+    }
+   ]
+  }
+ },
+ "contrast_change_to_dark_look": {
+  "before": {
+   "fg": "#e6edf3",
+   "bg": "#238636",
+   "ratio": 3.92,
+   "aa_normal_text": false
+  },
+  "after": {
+   "fg": "#ffffff",
+   "bg": "#1a7f37",
+   "ratio": 5.08,
+   "hover_bg": "#238636",
+   "hover_ratio": 4.63
+  }
+ },
+ "i18n": {
+  "languages": {
+   "pl": {
+    "keys": 373,
+    "missing": 0,
+    "extra": 0,
+    "placeholder_mismatch": 0
+   },
+   "nl": {
+    "keys": 384,
+    "missing": 0,
+    "extra": 0,
+    "placeholder_mismatch": 0
+   },
+   "en": {
+    "keys": 384,
+    "missing": 0,
+    "extra": 0,
+    "placeholder_mismatch": 0
+   }
+  },
+  "precedence": [
+   "?lang= (request only)",
+   "cookie ageds_lang",
+   "Accept-Language",
+   "pl"
+  ]
+ },
+ "runtime_executed": [
+  "FastAPI TestClient against every /api/workbench route and /workbench pages on fresh SQLite per test, in pl/nl/en",
+  "SQLite triggers on artifacts/events/derived_text/annotations maintaining workbench_fts; backfill by migration 80 on pre-existing rows; drift detection and rebuild",
+  "Adversarial FTS input (unterminated quotes, unknown/forbidden columns incl. folded:, SQL-looking text, deep groups, 5,000-char query, NUL, lone surrogate), VM budget exhaustion -> 503 and recovery",
+  "Polish diacritics incl. l-stroke folding (zazolc, lodzi, lukasz) through the separate index only; stored text unchanged",
+  "Real CLI subprocesses: workbench-folder-export (new file only; refused in EW_SCAN_ROOTS, store, existing file), workbench-search, workbench-tag, workbench-index-check, workbench-theme-report, workbench-i18n-check, CLI import isolation",
+  "Evidence-table digest unchanged across tagging, folder operations and index rebuild",
+  "Real Chromium 141 (Playwright 1.62.1): theme cycle and cookie, server-rendered explicit theme, prefers-color-scheme, blocked cookie/localStorage, language via Accept-Language/selector/?lang=, shortcut overlay and typing protection, g f navigation, palette jump and layered search, bulk tag add/remove with audit summary, folder add/copy citation/remove, artifact knowledge panel next to the citation workspace, source HTML inert, no page errors",
+  "Existing Chromium acceptance (24 PASS) on the changed templates/CSS/nav"
+ ],
+ "unit_tested_only": [
+  "Keyboard registry conflict detection for page-scoped bindings other areas may add (Node tests)",
+  "Recently-viewed list sanitising of stored entries (Node tests)"
+ ],
+ "not_run": [
+  "Large-corpus performance of the index triggers or layered search (no benchmark)",
+  "Screen reader / full WCAG audit beyond token contrast",
+  "Timeline page (track C) rendering bookmarks; catalogue (track A) deep links",
+  "Android client",
+  "EW_REQUIRE_TOKEN=1 together with the workbench pages in a browser (the JS fetches of /api/workbench/* would need a token)"
+ ],
+ "boundaries": [
+  "No authentication; same-origin write guard only on workbench routes",
+  "Facet counts are lower bounds above 5,000 matches; snippets are plain text",
+  "Workbench tables are not in metadata packages until area F declares extension tables",
+  "Citation-workspace list items rendered by citations.mjs stay Polish in all languages",
+  "Pages with hard-coded dark CSS (timeline.css) do not opt in to the light theme"
+ ],
+ "shared_edits": [
+  "server/app/templates/_nav.html",
+  "server/app/templates/integrations.html",
+  "server/tests/test_search_rendering.py",
+  "docs/README.md",
+  "docs/validation/README.md"
+ ]
+}

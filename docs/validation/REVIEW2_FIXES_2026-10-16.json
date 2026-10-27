@@ -1,0 +1,187 @@
+{
+  "task": "AGEDS-TASK-20261016-R2",
+  "base": "8e491f7",
+  "head": "ebdf5af",
+  "merged_integration_head": "5688fd7 (includes Z e2e acceptance)",
+  "completed_by": "coordinator after the R2 agent stopped at a usage limit; all fixes and docs were committed by R2 before the stop",
+  "findings": [
+    {
+      "id": "1",
+      "severity": "high",
+      "finding": "Permutation/stratified nulls placed stimuli on outcome times (miscalibrated, p=0.001 under H0)",
+      "status": "fixed",
+      "commits": "794a652",
+      "tests": "test_review2_eventstudy.py::test_review2_1_null_models_are_calibrated_under_independence, ::test_review2_1_default_pool_excludes_outcome_events, ::test_review2_1_pool_of_only_the_stimuli_is_refused_not_reported_as_p_1, ::test_review2_1_borrowed_density_event_is_not_its_own_documentation",
+      "decision": "Event-study method v2: outcome (and borrowed density) events are not eligible stimulus positions; H0 calibration tests for permutation, stratified and block nulls. Stored v1 runs stay as historical records."
+    },
+    {
+      "id": "2",
+      "severity": "medium-high",
+      "finding": "Budget/feature runs held the SQLite write lock during grid computation",
+      "status": "fixed",
+      "commits": "2b82384",
+      "tests": "test_review2_budget.py::test_review2_2_no_write_lock_is_held_while_the_grid_is_computed",
+      "decision": "Compute first, then store label run + run in one short transaction."
+    },
+    {
+      "id": "3",
+      "severity": "medium",
+      "finding": "Full grid product materialized before the cap (memory exhaustion via HTTP)",
+      "status": "fixed",
+      "commits": "57c6654",
+      "tests": "test_review2_budget.py::test_review2_3_lazy_grid_matches_the_materialized_grid, ::test_review2_3_full_grid_never_materializes_the_product, ::test_review2_3_http_full_grid_of_64_values_per_axis_is_bounded",
+      "decision": "Lazy deduplicated grid with early stop; totals from distinct axis sizes."
+    },
+    {
+      "id": "4",
+      "severity": "medium",
+      "finding": "Projection eviction between refresh and read silently emptied analysis inputs",
+      "status": "fixed",
+      "commits": "0e03694, 2b7fdbc",
+      "tests": "test_review2_timeline.py::test_review2_4_* (5 tests)",
+      "decision": "Reads in one snapshot re-checked for eviction; retry, then 503 / ProjectionNotFresh; never an empty stored run."
+    },
+    {
+      "id": "5",
+      "severity": "medium",
+      "finding": "DNS rebinding passed the CSRF guard (Origin compared with Host)",
+      "status": "fixed",
+      "commits": "fe60a82",
+      "tests": "test_review2_security.py::test_review2_5_* (6 tests)",
+      "decision": "Host allowlist: localhost, IP literals, EW_TRUSTED_HOSTS / EW_TRUSTED_ORIGINS; Origin checked against the allowlist. Named LAN host names need explicit configuration (documented in GETTING_STARTED)."
+    },
+    {
+      "id": "6",
+      "severity": "medium",
+      "finding": "EW_REQUIRE_TOKEN left data-bearing pages and report files open",
+      "status": "fixed",
+      "commits": "fe60a82",
+      "tests": "test_review2_security.py::test_review2_6_require_token_protects_pages_and_report_files, ::test_review2_6_login_redirect_stays_on_this_server",
+      "decision": "All pages and report files need the token (session cookie for browsers); login form and static assets stay open."
+    },
+    {
+      "id": "7",
+      "severity": "medium",
+      "finding": "Post-hoc re-tagging changed results without a preregistration deviation flag",
+      "status": "fixed",
+      "commits": "794a652",
+      "tests": "test_review2_eventstudy.py::test_review2_7_post_hoc_retagging_is_a_flagged_deviation, ::test_review2_7_new_events_alone_are_reported_but_not_flagged, ::test_review2_7_tag_edits_between_registration_and_the_first_run_are_flagged",
+      "decision": "Selection-drift and post-registration edit checks; surfaced in result and disclosure."
+    },
+    {
+      "id": "8",
+      "severity": "low-medium",
+      "finding": "count_both remainder could invert lower/probable/upper",
+      "status": "fixed",
+      "commits": "57c6654, 99de5e1",
+      "tests": "test_review2_budget.py::test_review2_8_bounds_are_ordered_for_every_overlap_rule, ::test_review2_8_count_both_unlabelled_remainder_follows_the_confirmed_layer",
+      "decision": "Rule time_budget.v3 with RULE_HISTORY entry; e2e expectations follow."
+    },
+    {
+      "id": "9",
+      "severity": "low",
+      "finding": "Exact Fraction arithmetic made two-sided normalized summaries very slow and uncounted",
+      "status": "fixed",
+      "commits": "794a652",
+      "tests": "test_review2_eventstudy.py::test_review2_9_* (3 tests)",
+      "decision": "Integer cross-multiplication for extremes, fsum for displayed means, cost in the work estimate."
+    },
+    {
+      "id": "10",
+      "severity": "low",
+      "finding": "Import-plan heartbeat stopped after one failed renewal",
+      "status": "fixed",
+      "commits": "4d2e8bf",
+      "tests": "test_review2_jobs.py::test_review2_10_heartbeat_retries_after_a_failed_renewal, ::test_review2_10_heartbeat_stops_when_the_lease_was_taken_over",
+      "decision": "Retry with backoff; stop only when the lease was taken over."
+    },
+    {
+      "id": "11",
+      "severity": "low",
+      "finding": "Unbounded numeric decoding options over HTTP",
+      "status": "fixed",
+      "commits": "4d2e8bf",
+      "tests": "test_review2_jobs.py::test_review2_11_* (4 tests)",
+      "decision": "Bounded decoding/VAD/PDF/speaker override values."
+    },
+    {
+      "id": "12",
+      "severity": "low",
+      "finding": "Block permutation wrapped a full block onto slot 0 with a partial last block",
+      "status": "fixed",
+      "commits": "794a652",
+      "tests": "test_review2_eventstudy.py::test_review2_12_* (2 tests)",
+      "decision": "Full-block permutation; at least two full blocks required."
+    },
+    {
+      "id": "13",
+      "severity": "low",
+      "finding": "Synthetic fake model provider reachable over HTTP",
+      "status": "fixed",
+      "commits": "57c6654",
+      "tests": "test_review2_budget.py::test_review2_13_fake_provider_needs_the_test_environment",
+      "decision": "Gated behind EW_ANALYSIS_TEST_PROVIDERS."
+    },
+    {
+      "id": "P1",
+      "severity": "plausible",
+      "finding": "Long recordings starting before the load margin lost confirmed time",
+      "status": "real, fixed",
+      "commits": "2dd74fd",
+      "tests": "test_review2_budget.py::test_review2_p1_long_declared_duration_starting_before_the_margin_is_loaded",
+      "decision": "Items loaded up to duration_lookback_s (default 24 h) when their declared duration reaches the window."
+    },
+    {
+      "id": "P2",
+      "severity": "plausible",
+      "finding": "Each rejected token took the write lock",
+      "status": "real, fixed",
+      "commits": "fe60a82",
+      "tests": "test_review2_security.py::test_review2_p2_repeated_rejections_do_not_take_the_write_lock",
+      "decision": "Repeated rejections counted lazily."
+    },
+    {
+      "id": "P3",
+      "severity": "plausible",
+      "finding": "Disclosure undercounted theses without accepted evidence",
+      "status": "real, fixed",
+      "commits": "4e30db3",
+      "tests": "test_review2_hypotheses.py::test_review2_p3_theses_without_accepted_evidence_are_disclosed",
+      "decision": "Disclosure counts theses whose pointers reach only candidate/rejected items, next to theses without any pointer."
+    },
+    {
+      "id": "P4",
+      "severity": "plausible",
+      "finding": "/api/timeline with assume_zone had the same eviction race",
+      "status": "real, fixed",
+      "commits": "0e03694",
+      "tests": "test_review2_timeline.py::test_review2_p4_timeline_http_reads_survive_an_eviction",
+      "decision": "Same snapshot re-check as #4."
+    }
+  ],
+  "checks": {
+    "pytest_full": "1204 passed, 1 skipped (opt-in chat scale), 764 subtests; the only 2 failures were e2e checks of verify_repository caused by this receipt missing — rerun after adding it below",
+    "pytest_review2": "132 passed (server/tests/test_review2_*.py)",
+    "node": "127 passed",
+    "browser_real_chromium": {
+      "acceptance.cjs": 24,
+      "timeline.cjs": 8,
+      "workbench.cjs": 9,
+      "reports.cjs": 10,
+      "analysis_budget.cjs": 9,
+      "hypotheses.cjs": 10,
+      "importplan.cjs": 9,
+      "media.cjs": 7,
+      "test_catalog_browser.py": "1 passed"
+    }
+  },
+  "method_versions": {
+    "event_study": "v2 (v1 runs remain historical)",
+    "time_budget": "time_budget.v3 (v1/v2 runs remain historical)"
+  },
+  "not_verified": [
+    "real DNS-rebinding attack page",
+    "Android client against a named LAN host (needs EW_TRUSTED_HOSTS)",
+    "large real corpora for calibration beyond synthetic H0 tests"
+  ]
+}

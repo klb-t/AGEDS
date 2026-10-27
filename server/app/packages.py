@@ -33,6 +33,97 @@ OBJECT_TABLES = {
     'tag': 'tags', 'job': 'jobs', 'link': 'links',
 }
 
+# Extension tables (feature areas, schema versions >= 10) travel in a separate,
+# versioned ``extension_tables`` section. The core ``tables``/``integrity``
+# format above is unchanged. Only tables named here are exported: a new table
+# is never included silently. A table present in the database but neither
+# declared, excluded nor internal is listed by name in ``undeclared_tables``.
+EXTENSION_SCHEMA_ID = 'ageds.metadata-extension-tables/v1'
+EXTENSION_TABLES = (
+    'collections', 'catalog_scans', 'catalog_content_groups', 'catalog_entries', 'catalog_entry_times',
+    'catalog_issues', 'catalog_entry_artifacts', 'catalog_marks', 'catalog_profiles',
+    'catalog_description_runs', 'catalog_annotations', 'catalog_annotation_decisions',
+    'event_times', 'record_exports', 'record_export_files', 'record_export_parses',
+    'logical_records', 'logical_occurrences', 'chat_attachment_refs',
+    'contact_observations', 'contact_observation_values', 'recording_name_observations',
+    'event_media_references',
+    'speaker_turns', 'speaker_assignments', 'event_candidates',
+    'annotation_proposals', 'hypothesis_imports', 'relation_hypotheses',
+    'reports',
+    'timeline_correlation_runs', 'timeline_hypotheses', 'timeline_hypothesis_status',
+    'workbench_saved_searches', 'workbench_saved_search_runs', 'workbench_folders', 'workbench_folder_items',
+    'workbench_bookmarks',
+    # E1 (time budget): append-only interpretive runs with parameters/config hash/result hash, the
+    # labelling runs and per-event labels they reference (the private category configuration is only
+    # hashed, so labels cannot be rebuilt from a package), human label corrections, and model runs
+    # with their labelled outputs (A04: every model attempt is pinned).
+    'analysis_runs', 'analysis_label_runs', 'analysis_event_labels', 'analysis_label_annotations',
+    'analysis_model_runs', 'analysis_model_outputs',
+    # E2 (hypotheses): preregistered versions (hash chain), event-study/candidate runs, dossier
+    # pointers and human classifications, theses and disclosures; all append-only human/interpretive.
+    'hypotheses', 'hypothesis_versions', 'hypothesis_runs', 'hypothesis_dossier_items',
+    'hypothesis_dossier_decisions', 'hypothesis_theses', 'hypothesis_thesis_evidence', 'hypothesis_disclosures',
+    # I (import planner): immutable plans and items, human decisions per plan version, execution runs
+    # and attempts (provenance of what was imported with which importer/config; leases are historical
+    # metadata as for core jobs/processing_runs), and audited abandonments of catalog scans.
+    'import_plans', 'import_plan_items', 'import_plan_item_members', 'import_plan_versions',
+    'import_plan_decisions', 'import_plan_runs', 'import_plan_attempts', 'catalog_scan_abandonments',
+    # L1 (location): import identities and runs (importer, parser version, stored precision, stream, counts,
+    # coverage), private place sets used by presence runs (they define what a presence interval means),
+    # append-only presence runs/intervals and correlation runs, hypotheses and their review history.
+    'location_imports', 'location_import_runs', 'location_place_sets', 'location_presence_runs',
+    'location_presence_intervals', 'location_correlation_runs', 'location_correlation_hypotheses',
+    'location_correlation_status',
+    # L2 (traces): parser observations of personal-data exports and file metadata, all append-only.
+    # Photo sidecars keep third-party ``people`` names raw (exported like every observation); geotag,
+    # provider-location and browser-visit rows exist only as far as the per-run opt-ins
+    # (enable_location / enable_browser_history) allowed; sidecar-to-media matches are rule-id
+    # hypotheses over a hashed candidate scope.
+    'trace_photo_sidecars', 'trace_photo_matches', 'trace_geotags', 'trace_document_metadata',
+    'trace_browser_visits', 'trace_provider_locations',
+    # L3 (ledger): append-only parser observations of bank statements (stated balances and the
+    # code-computed balance check), typed ledger entries (exact decimal amounts, minor units,
+    # counterparty text) and health/fitness samples (special category data, imported only with a
+    # per-run opt-in; exported like other observations — the package is private metadata).
+    'ledger_statements', 'ledger_entries', 'health_samples',
+    # Advocate model (2026-10-25..27): principals, case assignments and fragments, material versions,
+    # case relations, scopes, grants and settings (access history), packages and their snapshots,
+    # conversations, turns, answers, derived states, provider consents and calls (hashes, token counts,
+    # costs; prompt text only where log_prompt_content was enabled). This is the owner's whole-database
+    # export; recipients get export_scope_package instead.
+    'principals', 'assignments', 'fragments', 'artifact_versions', 'case_relations',
+    'scopes', 'grants', 'capability_registry', 'authz_settings',
+    'packages', 'package_items', 'package_snapshots',
+    'conversations', 'advocate_turns', 'advocate_answers', 'derived_states',
+    'provider_consents', 'provider_calls',
+)
+EXCLUDED_EXTENSION_TABLES = {
+    'api_tokens': 'credential table: token keys, salts and secret digests are never exported',
+    'auth_methods': 'credential table: advocate API tokens and browser sessions (salts, secret digests)',
+    'timeline_projections': 'derived cache: rebuilt from events/event_times by the versioned display rule',
+    'timeline_items': 'derived cache: rebuilt from events/event_times by the versioned display rule',
+    'timeline_projection_builds': 'derived cache build log (rule hash and watermarks of a rebuildable projection)',
+    'workbench_search_docs': 'derived search index content, rebuilt by workbench-index-check --rebuild',
+    'timeline_projection_evictions': 'derived cache bookkeeping: evictions of rebuildable timeline projections',
+    'api_token_rejections': ('transient security telemetry (rejected token attempts per hour, key and reason); '
+                             'references the excluded credential table api_tokens'),
+    # L1 (location): bulk raw samples. Millions of rows per export; re-derived exactly by re-importing the
+    # preserved original with the parser version and parameters recorded in location_imports.
+    'location_fixes': ('bulk raw position samples (millions per export); rebuilt by re-importing the preserved '
+                       'original with the parser version and parameters recorded in location_imports'),
+    'location_fix_observations': 'per-export locators of the excluded bulk table location_fixes (rebuilt by re-import)',
+    'location_signals': ('bulk raw non-positional signals (Wi-Fi scan summaries, activity records); rebuilt by '
+                         're-importing the preserved original'),
+    'location_signal_observations': 'per-export locators of the excluded bulk table location_signals (rebuilt by re-import)',
+}
+EXCLUDED_EXTENSION_COLUMNS = {
+    'annotation_proposals': {'token_id': 'reference into the excluded credential table api_tokens'},
+}
+# Credential-like column names refused in any exported extension row.
+CREDENTIAL_COLUMNS = frozenset({'secret_sha256', 'salt', 'token_key', 'secret', 'password', 'token'})
+# SQLite internals and the derived, rebuildable full-text index are not metadata.
+INTERNAL_TABLE_PREFIXES = ('sqlite_', 'search_fts', 'workbench_fts')
+
 
 def canonical_json(value: Any) -> bytes:
     return json.dumps(value, ensure_ascii=False, sort_keys=True,
@@ -51,12 +142,56 @@ def _integrity(payload: dict) -> dict:
     }
 
 
-def export_metadata_package() -> dict:
+def _order_clause(db, name: str) -> str:
+    """Primary-key order; static identifiers from PRAGMA, never user input."""
+    columns = sorted((row[5], row[1]) for row in db.execute(f'PRAGMA table_info("{name}")') if row[5])
+    return ','.join('"' + column.replace('"', '""') + '"' for _, column in columns) or 'rowid'
+
+
+def extension_section(db, existing: set[str]) -> dict:
+    """Declared extension tables in the caller's read transaction.
+
+    Excluded tables and columns are named with their reason; nothing outside
+    ``EXTENSION_TABLES`` is exported. Missing declared tables are explicit.
+    """
+    declared = set(TABLES) | set(EXTENSION_TABLES) | set(EXCLUDED_EXTENSION_TABLES)
+    tables = {}
+    for name in EXTENSION_TABLES:
+        if name not in existing:
+            tables[name] = []
+            continue
+        excluded = EXCLUDED_EXTENSION_COLUMNS.get(name, {})
+        rows = []
+        for row in db.execute(f'SELECT * FROM "{name}" ORDER BY {_order_clause(db, name)}'):
+            item = {key: row[key] for key in row.keys() if key not in excluded}
+            leaked = CREDENTIAL_COLUMNS.intersection(item)
+            if leaked:
+                raise RuntimeError(f'extension table {name} has credential-like columns {sorted(leaked)}; '
+                                   'declare an exclusion in packages.EXCLUDED_EXTENSION_COLUMNS')
+            rows.append(item)
+        tables[name] = rows
+    return {
+        'schema': EXTENSION_SCHEMA_ID,
+        'declared': list(EXTENSION_TABLES),
+        'excluded_tables': dict(sorted(EXCLUDED_EXTENSION_TABLES.items())),
+        'excluded_columns': {table: dict(sorted(columns.items()))
+                             for table, columns in sorted(EXCLUDED_EXTENSION_COLUMNS.items())},
+        'missing_tables': [name for name in EXTENSION_TABLES if name not in existing],
+        'undeclared_tables': sorted(name for name in existing if name not in declared
+                                    and not name.startswith(INTERNAL_TABLE_PREFIXES)),
+        'tables': tables,
+        'table_sha256': {name: _sha(rows) for name, rows in tables.items()},
+    }
+
+
+def export_metadata_package(*, include_extension_tables: bool = True) -> dict:
     """Snapshot all core metadata in one read transaction, without migration.
 
     Older databases can be inspected without rewriting them: missing additive
     tables are explicit, and historical rows are not fabricated. A consumer must
     not treat empty missing tables as evidence that no such history existed.
+    Declared extension tables are added as a separate versioned section; the
+    payload digest covers it, the core table digests are unchanged.
     """
     # Verification can be used in an isolated CLI without importing config,
     # whose initialization creates live storage directories.
@@ -78,6 +213,8 @@ def export_metadata_package() -> dict:
             'missing_tables': [name for name in TABLES if name not in existing],
             'tables': tables,
         }
+        if include_extension_tables:
+            payload['extension_tables'] = extension_section(db, existing)
         # Reject nonfinite numeric database values instead of emitting JSON NaN.
         payload['integrity'] = _integrity(payload)
         db.rollback()
@@ -291,6 +428,12 @@ def validate_metadata_package(package: Any, *, budget: VerificationBudget | None
                 error('unknown_link_target_kind', path, 'Unknown target kind cannot be verified.')
             else:
                 warning('unknown_audit_target_kind', path, 'Domain-specific audit target cannot be resolved by v1.')
+        elif identity is None and not strict:
+            # An audit row naming a kind but no id records an action without a target
+            # object (e.g. a file-name import run); nothing is referenced, so nothing can
+            # be broken. Links (strict) still require both. Historical rows of this shape
+            # exist and audit rows are never rewritten.
+            warning('audit_target_id_missing', path, f'Audit row names {target} without an ID; no object is referenced.')
         elif type(identity) is not int or identity not in indexes[target]:
             error('broken_object_reference', path, f'Referenced {target} ID does not exist.')
 
@@ -353,8 +496,78 @@ def validate_metadata_package(package: Any, *, budget: VerificationBudget | None
         for name in missing:
             if rows[name]:
                 error('contradictory_missing_table', f'$.tables.{name}', 'A missing table cannot also contain rows.')
+    if 'extension_tables' in package:
+        _validate_extension_section(package['extension_tables'], error, counts)
     warning('unsigned_metadata_only', '$', 'Digest is not authentication; source bytes and replay are not included or verified.')
     return result()
+
+
+def _validate_extension_section(section: Any, error, counts: dict) -> None:
+    """Structure and per-table digests of the optional extension section.
+
+    Packages without the section (older exports) validate exactly as before.
+    Rows are not cross-checked against core tables here: the section declares
+    and digests what was exported; its semantics belong to each owning area.
+    """
+    base = '$.extension_tables'
+    if not isinstance(section, dict):
+        error('invalid_extension_section', base, 'Extension section must be an object.')
+        return
+    expected = {'schema', 'declared', 'excluded_tables', 'excluded_columns', 'missing_tables',
+                'undeclared_tables', 'tables', 'table_sha256'}
+    if set(section) != expected:
+        error('invalid_extension_section', base, 'Extension section fields differ from v1.')
+        return
+    if section['schema'] != EXTENSION_SCHEMA_ID:
+        error('unsupported_extension_schema', f'{base}.schema', f'Expected {EXTENSION_SCHEMA_ID}.', 'digest')
+        return
+    declared, tables, digests = section['declared'], section['tables'], section['table_sha256']
+    excluded_tables, excluded_columns = section['excluded_tables'], section['excluded_columns']
+    if (not isinstance(declared, list) or any(not isinstance(name, str) for name in declared)
+            or len(set(declared)) != len(declared)):
+        error('invalid_extension_section', f'{base}.declared', 'Declared tables must be unique names.')
+        return
+    if not isinstance(tables, dict) or set(tables) != set(declared):
+        error('undeclared_extension_table', f'{base}.tables', 'Exported tables must equal the declared list.')
+        return
+    if not isinstance(digests, dict) or set(digests) != set(declared):
+        error('invalid_extension_section', f'{base}.table_sha256', 'Each declared table must have a digest.', 'digest')
+        return
+    if not isinstance(excluded_tables, dict) or not isinstance(excluded_columns, dict):
+        error('invalid_extension_section', base, 'Exclusions must be objects with reasons.')
+        return
+    for name in excluded_tables:
+        if name in tables:
+            error('excluded_extension_table_present', f'{base}.tables.{name}', 'An excluded table cannot be exported.')
+    for field in ('missing_tables', 'undeclared_tables'):
+        value = section[field]
+        if not isinstance(value, list) or any(not isinstance(name, str) for name in value):
+            error('invalid_extension_section', f'{base}.{field}', 'Must be a list of table names.')
+    if isinstance(section['missing_tables'], list):
+        for name in section['missing_tables']:
+            if name not in tables:
+                error('invalid_extension_section', f'{base}.missing_tables', 'Missing tables must be declared tables.')
+            elif tables[name]:
+                error('contradictory_missing_table', f'{base}.tables.{name}', 'A missing table cannot also contain rows.')
+    for name in declared:
+        rows = tables[name]
+        path = f'{base}.tables.{name}'
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            error('invalid_extension_table', path, 'Extension table must be an array of objects.')
+            continue
+        counts[f'extension:{name}'] = len(rows)
+        try:
+            if digests.get(name) != _sha(rows):
+                error('extension_table_digest_mismatch', path, 'Extension table digest does not match.', 'digest')
+        except (TypeError, ValueError, OverflowError, UnicodeError, RecursionError) as exc:
+            error('noncanonical_table_json', path, str(exc), 'digest')
+        forbidden = set(excluded_columns.get(name, {})) if isinstance(excluded_columns.get(name), dict) else set()
+        for position, row in enumerate(rows):
+            present = (forbidden | CREDENTIAL_COLUMNS).intersection(row)
+            if present:
+                error('excluded_extension_column_present', f'{path}[{position}]',
+                      'Excluded or credential-like column present: ' + ', '.join(sorted(present)))
+                break
 
 
 def _strict_stored_json(raw: str, *, finite: bool = True, budget: VerificationBudget | None = None) -> Any:

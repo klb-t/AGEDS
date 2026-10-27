@@ -12,6 +12,11 @@ AGEDS preserves communication records and recordings, tracks how they were acqui
 - Browser and Android transcript review, annotations and citations pinned to the selected version and segment or word occurrence.
 - Bounded, read-only source scanning for CSV/TSV, XLS, XLSX and WAV, with explicit format, resource and coverage limits.
 - Metadata package verification, exact canonical roundtrip through an inert SQLite archive, and independently inspectable citation packets.
+- A read-only catalog of many devices, accounts and exports (including nested archives), with content groups, coverage gaps and a reviewable import plan.
+- Importers for ChatGPT and Claude.ai exports, e-mail, calendars, contacts, call logs, billing tables, Google Takeout activity, WhatsApp media and photo metadata.
+- One common timeline over all sources with explicit time bases, uncertainty, swimlanes and reviewable correlation hypotheses.
+- Interpretive layers kept separate from evidence: time budgets with bounds, preregistered hypotheses with a permutation event study, and reports with a method section and verifiable manifests.
+- A versioned read API with local tokens and adapters for ChatADHD and Loom.
 
 See [features and boundaries](docs/FEATURES.md) for the supported scope.
 
@@ -46,8 +51,8 @@ Open <http://127.0.0.1:8080>. Local transcription is an optional worker with sep
 
 ## Current limits
 
-The service has no built-in authentication or tenant isolation; local use assumes a trusted operator. Source preservation is enforced by the application and filesystem checks, rather than physical WORM storage or signed provenance. A content hash establishes byte identity, not authorship, truth or acquisition time.
+The service has no user accounts or tenant isolation. Local tokens protect the read API and, when `EW_REQUIRE_TOKEN=1`, state-changing and data-bearing routes; local use still assumes a trusted operator. Source preservation is enforced by the application and filesystem checks, rather than physical WORM storage or signed provenance. A content hash establishes byte identity, not authorship, truth or acquisition time.
 
-Source scanners report partial coverage and unsupported formats explicitly. Word citations depend on stored ASR timing; they do not establish acoustic alignment or recognition quality. Metadata archives exclude source media and cannot restore a live database, resume jobs or replay inference. Physical-device and SAF acceptance are separate from successful compilation and host tests. Ecosystem adapters and broader legal-analysis workflows remain future work.
+Source scanners report partial coverage and unsupported formats explicitly. Word citations depend on stored ASR timing; they do not establish acoustic alignment or recognition quality. Metadata archives exclude source media and cannot restore a live database, resume jobs or replay inference. Physical-device and SAF acceptance are separate from successful compilation and host tests. OCR, diarization and multilingual ASR were tested with fake engines only. Time budgets and hypothesis results are interpretive aids, not observations or causal conclusions. The five-layer legal-analysis standard remains future work.
 
 [Documentation](docs/README.md) · [Local checks](docs/DEVELOPMENT.md) · [Change history](CHANGELOG.md) · [Development handoff](HANDOFF.md)

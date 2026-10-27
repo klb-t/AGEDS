@@ -149,6 +149,24 @@ def installation(capability: str):
     return Depends(_mark(guard, f'installation:{capability}'))
 
 
+def installation_by_method():
+    """Whole feature areas without per-row scoping (catalogue, imports, timeline, reports ...).
+
+    Reads need installation-wide read_metadata, writes installation-wide administer.
+    In legacy_open nothing changes; in tokens mode recipients get 403 here until an area
+    gains its own per-row authorization.
+    """
+    def guard(request: Request) -> Access:
+        access = _resolve(request)
+        if not access.open:
+            capability = 'read_metadata' if request.method in ('GET', 'HEAD', 'OPTIONS') else 'administer'
+            with _read() as db:
+                if not ContentGate(db, access.principal_id).installation(capability):
+                    raise HTTPException(403, 'not permitted')
+        return access
+    return Depends(_mark(guard, 'installation:by_method'))
+
+
 def scoped(capability: str):
     """Route filters its rows through Access.gate(); global access not required."""
     def guard(request: Request) -> Access:
@@ -221,16 +239,21 @@ def allowed_hosts() -> set:
 
 
 async def host_and_origin(request: Request, call_next):
-    hosts = allowed_hosts()
-    host = _host_name(request.headers.get('host', ''))
-    if '*' not in hosts and host not in hosts:
+    # The Host rule is the integrations allow-list (IP literals, localhost, EW_TRUSTED_HOSTS,
+    # EW_TRUSTED_ORIGINS) united with EW_ALLOWED_HOSTS and http.allowed_hosts: one policy, two layers.
+    from .api.integrations import _trusted_origins, host_allowed
+    if not host_allowed(request.headers.get('host')):
         return JSONResponse(status_code=400, content={'detail': 'host not allowed'})
-    if request.method in UNSAFE_METHODS:
-        fetch_site = request.headers.get('sec-fetch-site')
-        if fetch_site in ('cross-site', 'same-site'):
-            return JSONResponse(status_code=403, content={'detail': 'cross-site request refused'})
+    # A request carrying a token header cannot be forged by another site: custom headers need a
+    # CORS preflight and no CORS is enabled. Cookie-borne browser requests are checked.
+    header_authenticated = bool(request.headers.get(TOKEN_HEADER) or request.headers.get('authorization'))
+    if request.method in UNSAFE_METHODS and not header_authenticated:
         origin = request.headers.get('origin')
-        if origin and origin != 'null':
+        trusted_origin = bool(origin) and urlsplit(origin).netloc.lower() in _trusted_origins()
+        fetch_site = request.headers.get('sec-fetch-site')
+        if fetch_site in ('cross-site', 'same-site') and not trusted_origin:
+            return JSONResponse(status_code=403, content={'detail': 'cross-site request refused'})
+        if origin and origin != 'null' and not trusted_origin:
             parts = urlsplit(origin)
             if parts.netloc.lower() != request.headers.get('host', '').lower():
                 return JSONResponse(status_code=403, content={'detail': 'cross-origin request refused'})

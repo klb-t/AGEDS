@@ -1,0 +1,64 @@
+<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rejestry</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/ledger.css"></head><body>
+<header>{% include '_nav.html' %}<div><h1>Rejestry</h1><p>wyciągi, przejazdy i dane zdrowotne jako obserwacje eksportów · kwoty dokładne · oryginały tylko do odczytu</p></div></header>
+<main class="ledger">
+<section class="panel" aria-labelledby="ledger-overview">
+  <h2 id="ledger-overview">Przegląd</h2>
+  <dl class="ledger-counts">
+    <dt>Wpisy</dt><dd>{{ overview.counts.ledger_entries }}{% for k, v in overview.entries_by_kind.items() %} <small>{{k}}: {{v}}</small>{% endfor %}</dd>
+    <dt>Wyciągi</dt><dd>{{ overview.counts.ledger_statements }}{% for k, v in overview.balance_checks.items() %} <span class="ledger-check ledger-check-{{k}}">{{k}}: {{v}}</span>{% endfor %}</dd>
+    <dt>Sesje zdrowotne</dt><dd>{{ overview.health_sessions }} <small>próbki: {{ overview.counts.health_samples }}</small></dd>
+  </dl>
+  <p><small>Konta: {% if masked %}maskowane w widoku (<a href="/ledger?mask=0">pokaż surowe</a>){% else %}surowe (<a href="/ledger">maskuj</a>){% endif %}. Wartości zapisane pozostają surowe.</small></p>
+</section>
+
+<section class="panel" aria-labelledby="ledger-statements">
+  <h2 id="ledger-statements">Wyciągi i kontrola sald</h2>
+  <p><small>Saldo otwarcia + suma zaksięgowanych wpisów, liczone przez kod na dokładnych liczbach dziesiętnych. Rozbieżność jest zgłaszana, nigdy poprawiana.</small></p>
+  <table class="ledger-table"><thead><tr><th>#</th><th>Parser</th><th>Konto</th><th>Wpisy</th><th>Otwarcie</th><th>Obliczone</th><th>Zamknięcie</th><th>Różnica</th><th>Kontrola</th></tr></thead><tbody>
+  {% for s in statements %}<tr><td>{{s.id}}</td><td>{{s.parser}} <small>{{s.statement_key}}</small></td><td>{{s.account_raw or '—'}}</td><td>{{s.entry_count}}</td>
+    <td>{{s.check.opening or '—'}} {{s.currency or ''}}</td><td>{{s.check.computed_closing or '—'}}</td><td>{{s.check.stated_closing or '—'}}</td>
+    <td>{{s.check.difference or '—'}}</td><td><span class="ledger-check ledger-check-{{s.balance_check}}">{{s.balance_check}}</span>{% if s.check.reason %} <small>{{s.check.reason}}</small>{% endif %}</td></tr>
+  {% else %}<tr><td colspan="9"><small>Brak wyciągów. Użyj <code>camt-import</code> lub <code>mt940-import</code>.</small></td></tr>{% endfor %}
+  </tbody></table>
+</section>
+
+<section class="panel" aria-labelledby="ledger-totals">
+  <h2 id="ledger-totals">Sumy (jednostki drobne)</h2>
+  <table class="ledger-table"><thead><tr><th>Rodzaj</th><th>Waluta</th><th>Kierunek</th><th>Wpisy</th><th>Suma</th><th>Bez jednostek drobnych</th></tr></thead><tbody>
+  {% for t in totals %}<tr><td>{{t.record_kind}}</td><td>{{t.currency or '—'}}</td><td>{{t.flow or '—'}}</td><td>{{t.entries}}</td><td class="num">{{t.sum_exact if t.sum_exact is not none else '—'}}</td><td>{{t.entries_without_minor_units}}</td></tr>
+  {% else %}<tr><td colspan="6"><small>Brak wpisów.</small></td></tr>{% endfor %}
+  </tbody></table>
+</section>
+
+<section class="panel" aria-labelledby="ledger-entries">
+  <h2 id="ledger-entries">Wpisy</h2>
+  <form method="get" action="/ledger" class="ledger-filter">{% if not masked %}<input type="hidden" name="mask" value="0">{% endif %}
+    <label>Rodzaj <select name="kind"><option value="">wszystkie</option>{% for k in ['financial_transaction', 'travel_segment', 'travel_tap', 'ride'] %}<option value="{{k}}"{% if kind == k %} selected{% endif %}>{{k}}</option>{% endfor %}</select></label><button>Filtruj</button></form>
+  <table class="ledger-table"><thead><tr><th>#</th><th>Rodzaj</th><th>Pozycja</th><th>Kwota</th><th>Kontrahent</th><th>Konto</th><th>Opis</th><th>Czas trwania</th><th>Wystąpienie</th><th>Zdarzenie</th></tr></thead><tbody>
+  {% for e in entries['items'] %}<tr><td>{{e.id}}</td><td>{{e.record_kind}}</td><td><small>{{e.parser}} {{e.source_position}}</small></td>
+    <td class="num">{{e.amount_exact if e.amount_exact is not none else '—'}} {{e.currency or ''}}</td><td>{{e.counterparty_name or '—'}}</td><td>{{e.counterparty_account or '—'}}</td>
+    <td>{{e.description or ''}}</td><td>{{e.duration_s if e.duration_s is not none else '—'}}</td><td>{{e.content_occurrence}}</td>
+    <td><a href="/api/timeline/items/event:{{e.event_id}}">event:{{e.event_id}}</a> · <a href="/artifact/{{e.artifact_id}}">artefakt</a></td></tr>
+  {% else %}<tr><td colspan="10"><small>Brak wpisów. Użyj <code>ledger-import --profile …</code>.</small></td></tr>{% endfor %}
+  </tbody></table>
+  {% if entries.has_more %}<p><a href="/ledger?after={{entries.next_after_id}}{% if kind %}&amp;kind={{kind}}{% endif %}{% if not masked %}&amp;mask=0{% endif %}">Następne</a></p>{% endif %}
+</section>
+
+<section class="panel" aria-labelledby="ledger-health">
+  <h2 id="ledger-health">Sesje zdrowotne</h2>
+  <p><small>Dane szczególnej kategorii, importowane tylko z jawną zgodą na dany przebieg (<code>--enable-health</code>), przetwarzane lokalnie. Sen i treningi to wnioskowanie urządzenia/aplikacji, nie obserwacja osoby; w budżecie czasu liczą się jako szacunek.</small></p>
+  <table class="ledger-table"><thead><tr><th>Zdarzenie</th><th>Rodzaj</th><th>Źródło</th><th>Początek (UTC)</th><th>Koniec (UTC)</th><th>Rozpiętość</th><th>Podstawa</th><th>Próbki</th></tr></thead><tbody>
+  {% for s in sessions %}<tr><td>{{s.event_id}}</td><td>{{s.subject}}</td><td>{{s.source}}</td><td>{{s.ts_start or 'strefa nieznana'}}</td><td>{{s.ts_end or '—'}}</td>
+    <td>{% if s.span and s.span.seconds is not none %}{{ s.span.seconds }} s <small>{{s.span.basis}}</small>{% else %}—{% endif %}</td><td>{{ s.signal.basis if s.signal else '—' }}</td><td>{{s.samples}}</td></tr>
+  {% else %}<tr><td colspan="8"><small>Brak sesji.</small></td></tr>{% endfor %}
+  </tbody></table>
+</section>
+
+<section class="panel" aria-labelledby="ledger-profiles">
+  <h2 id="ledger-profiles">Profile tabel (przykłady)</h2>
+  <p><small>{{ profiles.notice }}</small></p>
+  <ul class="ledger-profiles">{% for p in profiles.profiles %}<li><code>{{p.id}}</code> — {{p.label}} <small>{{p.record_kind}} · kodowanie {{p.encoding}} · separator {{p.delimiter}} · kwota {{p.amount_mode}}</small></li>{% endfor %}</ul>
+</section>
+</main>
+</body></html>

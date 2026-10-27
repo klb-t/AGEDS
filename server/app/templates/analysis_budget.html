@@ -1,0 +1,38 @@
+<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Budżet czasu · Evidence Workbench</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/analysis_budget.css"></head><body>
+<header>{% include '_nav.html' %}<div><h1>Budżet czasu</h1><p>Wynik interpretacyjny: szacunki z dolną granicą, wariantem prawdopodobnym i górną granicą. „nieobserwowane” to brak obserwacji, nie bezczynność.</p></div></header>
+<main class="ab-main" data-budget data-state="init">
+<section class="panel" aria-label="Wybór przebiegu">
+  <div class="ab-controls">
+    <label>Przebieg<select data-runs aria-label="Przebieg analizy"></select></label>
+    <label>Okres świecy<select data-granularity aria-label="Okres świecy"></select></label>
+  </div>
+  <p class="ab-status" data-status role="status">Wczytywanie…</p>
+  <details class="ab-new"><summary>Nowy przebieg (nowe parametry = nowy zapis; poprzednie zostają)</summary>
+    <form data-new-run class="ab-form">
+      <label>Od<input name="from" required placeholder="2025-03-27"></label>
+      <label>Do (wyłącznie)<input name="to" required placeholder="2025-04-04"></label>
+      <label>Strefa kalendarza<input name="zone" required value="Europe/Warsaw"></label>
+      <label>Przyjęta strefa dla czasów bez strefy (opcjonalnie)<input name="assume_zone" placeholder="np. Europe/Warsaw"></label>
+      <label>Identyfikator decyzji o strefie (wymagany z przyjętą strefą)<input name="assumption_rule" placeholder="np. operator-2025-telefon-A"></label>
+      <label class="ab-wide">Parametry (JSON, opcjonalnie)<textarea name="params" rows="3" placeholder='{"session_gap_s": 900, "overlap_rule": "split_equal"}'></textarea></label>
+      <label class="ab-wide">Konfiguracja kategorii (JSON, opcjonalnie; inaczej plik serwera z AGEDS_ACTIVITY_CATEGORIES — ścieżki nie są przyjmowane przez HTTP)<textarea name="config" rows="3"></textarea></label>
+      <button type="submit">Oblicz</button>
+    </form>
+  </details>
+</section>
+<section class="panel" aria-label="Świece">
+  <h2>Świece</h2>
+  <p class="ab-note">Korpus = zakres wariantu prawdopodobnego w siatce parametrów; knot = od minimum dolnej granicy do maksimum górnej; kreski = dolna i górna granica przy parametrach przebiegu; jasna linia = wariant prawdopodobny. Kliknij świecę, aby zobaczyć zdarzenia.</p>
+  <div class="ab-legend" data-legend></div>
+  <div class="ab-chart" data-chart></div>
+  <h3>nieobserwowane (udział okresu)</h3>
+  <div class="ab-chart" data-unobserved-strip></div>
+</section>
+<section class="panel" data-candle-panel hidden aria-live="polite"><h2>Zdarzenia świecy</h2><div class="ab-scroll" data-candle-events></div></section>
+<section class="panel"><h2>Tabela</h2><div class="ab-scroll" data-table></div></section>
+<section class="panel"><h2>Analiza wrażliwości</h2><div class="ab-scroll" data-sensitivity></div></section>
+<section class="panel"><h2>Wyłączenia</h2><div data-exclusions></div></section>
+<section class="panel"><h2>Metoda i pochodzenie</h2><div data-method></div></section>
+</main>
+<script type="module" src="/static/analysis_budget.mjs"></script>
+</body></html>

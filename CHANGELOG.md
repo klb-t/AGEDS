@@ -2,6 +2,17 @@
 
 Functional increments are listed below. Exact tested revisions, environment details and original failures remain in the [historical development records](docs/archive/2026-09-30_2026-10-01/README.md). [HANDOFF.md](HANDOFF.md) identifies current validation and remaining work.
 
+## 2026-10-16 — Catalog, common timeline and interpretive layers
+
+- Add area-owned extension points (additive migration ranges, routers with data-driven navigation, CLI subcommands, synthetic corpus parts), collections and append-only time candidates with explicit zone status and DST ambiguity.
+- Add a read-only multi-device catalog with nested archives, byte-signature typing, content groups, coverage gaps and model descriptions as promotable hypotheses, plus a reviewable, resumable import plan.
+- Add ChatGPT/Claude.ai importers with logical identity across exports, and e-mail, calendar, contact, call-log, billing, recording-name, Takeout, WhatsApp-media and EXIF importers.
+- Add a versioned timeline projection with uncertainty intervals, swimlanes, bookmarks and reviewable correlation hypotheses; the dashboard, `/api/timeline` and `events.csv` no longer order by import time.
+- Pin ASR recipes to jobs and add a per-segment language strategy, run comparison, a WER/CER tool and OCR/diarization adapters (fake-engine tested).
+- Add time budgets with bounds and an unobserved band, preregistered hypotheses with a permutation event study, and reports with a method section, verifiable manifests and citation bundles.
+- Add a read API with local tokens, CSRF and host checks, ChatADHD intent and proposal adapters, Loom graph export with quarantine, and workbench conveniences (layered search, folders, tags, themes, PL/NL/EN).
+- Fix the findings of two adversarial reviews with regression tests; add privacy heuristics to the repository verifier.
+
 ## 2026-10-02 — Repository documentation
 
 - Separate local setup, supported capabilities and contributor checks from implementation receipts.

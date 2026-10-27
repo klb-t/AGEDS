@@ -1,0 +1,28 @@
+{
+  "schema": "ageds.media_recipe",
+  "schema_version": 1,
+  "id": "ocr-vertex-gemini",
+  "kind": "ocr",
+  "revision": 1,
+  "description": "OCR of images and PDFs by Gemini on Vertex AI (owner consent R100): lines per page without pixel boxes. PDF pages with a text layer use it; the model reads the rest.",
+  "engine": "vertex-gemini:gemini-3.5-flash@global",
+  "languages": [
+    "pol",
+    "nld",
+    "eng"
+  ],
+  "psm": null,
+  "oem": null,
+  "layout": "document",
+  "pdf": {
+    "rasterizer": "text_layer_then_model",
+    "dpi": null,
+    "max_pages": 200
+  },
+  "limits": {
+    "max_input_bytes": 15000000,
+    "max_page_image_bytes": 15000000,
+    "timeout_s": 600,
+    "max_words": 2000000
+  }
+}

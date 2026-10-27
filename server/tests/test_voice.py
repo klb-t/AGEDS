@@ -33,8 +33,9 @@ class VoiceTests(AdvocateFixture):
         with db.session() as conn:
             authz.set_setting(conn, 'advocate.provider', {'type': 'vertex_gemini', 'project': 'synthetic-project'})
             authz.set_setting(conn, 'advocate.voice', {'enabled': True})
-            providers.record_consent(conn, 'vertex', authz.create_scope(conn, 'installation', {}),
-                                     granted_by='owner', basis_text='synthetic test consent')
+            for provider in ('vertex', 'google_tts'):  # text-to-speech is a separate service with its own consent
+                providers.record_consent(conn, provider, authz.create_scope(conn, 'installation', {}),
+                                         granted_by='owner', basis_text='synthetic test consent')
 
     def voice(self, conn, principal=None):
         voice = providers.configured_voice(conn, principal or self.recipient)
@@ -101,8 +102,9 @@ class VoiceTests(AdvocateFixture):
                 providers.revoke_consent(conn, row['uid'], actor='owner')
             with self.assertRaises(providers.ProviderUnavailable):
                 self.voice(conn).synthesize(conn, answer['answer_uid'])
-            providers.record_consent(conn, 'vertex', authz.create_scope(conn, 'installation', {}),
-                                     granted_by='owner', basis_text='again')
+            for provider in ('vertex', 'google_tts'):
+                providers.record_consent(conn, provider, authz.create_scope(conn, 'installation', {}),
+                                         granted_by='owner', basis_text='again')
             authz.set_setting(conn, 'advocate.daily_budget_eur', 0.0)
             with self.assertRaises(providers.ProviderUnavailable):
                 self.voice(conn).synthesize(conn, answer['answer_uid'])

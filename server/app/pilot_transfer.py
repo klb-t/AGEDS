@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
+import stat
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,8 +24,12 @@ from .evidence import add_derived_text
 
 
 def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with open(path, 'rb') as handle:
+    """SHA-256 of a regular file, never through a symbolic link (the catalog scan skips links too)."""
+    fd = os.open(path, os.O_RDONLY | getattr(os, 'O_NOFOLLOW', 0))
+    with os.fdopen(fd, 'rb') as handle:
+        if not stat.S_ISREG(os.fstat(handle.fileno()).st_mode):
+            raise ValueError(f'{path.name} is not a regular file')
+        digest = hashlib.sha256()
         for chunk in iter(lambda: handle.read(1 << 20), b''):
             digest.update(chunk)
     return digest.hexdigest()
@@ -163,7 +169,8 @@ def acquire_and_transfer(pilot_db: Path, source_dir: Path, *, apply: bool = Fals
     from .catalog.scan import run_catalog_scan
     pilot_db, source_dir = Path(pilot_db), Path(source_dir)
     wanted = _pilot_artifacts(pilot_db)
-    found = {_sha256_file(p): p.name for p in sorted(source_dir.iterdir()) if p.is_file()}
+    # Regular files only: a symbolic link would satisfy this check but is never acquired (review 3, R3-7).
+    found = {_sha256_file(p): p.name for p in sorted(source_dir.iterdir()) if stat.S_ISREG(p.lstat().st_mode)}
     missing = sorted(name for sha, name in wanted.items() if sha not in found)
     if missing:
         raise ValueError(f'source directory lacks {len(missing)} pilot originals: {missing}')
@@ -196,5 +203,10 @@ def acquire_and_transfer(pilot_db: Path, source_dir: Path, *, apply: bool = Fals
                 break
         ingested = ingest.ingest_entries(entry_ids, actor=actor)
         report['acquisition'] = {'collection_id': collection['id'], 'scan_id': scan['scan_id'], 'ingested': ingested['ingested']}
+        with session() as db:
+            present = {row['sha256'] for row in db.execute('SELECT sha256 FROM artifacts')}
+        still = sorted(found[sha] for sha in to_acquire if sha not in present)
+        if still:
+            raise ValueError(f'{len(still)} pilot originals were not acquired by the scan: {still}; nothing was copied')
     report['transfer'] = transfer(pilot_db, apply=True, actor=actor)
     return report

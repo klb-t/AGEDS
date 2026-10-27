@@ -91,6 +91,8 @@ SETTINGS = {
                                       'note': 'applies to conversations started afterwards; each keeps its own'},
     'auth.mode': {'order': ['tokens', 'external', 'legacy_open']},
     'advocate.proven_policy': {'order': ['downgrade_all', 'require_verbatim_quote', 'accept_model']},
+    # More words allowed outside a verbatim quote lets more unquoted text pass as 'proven'.
+    'advocate.proven_max_extra_words': {'numeric': 'higher_is_wider', 'preset': 6},
     'advocate.log_prompt_content': {'order': [False, True]},
     # A wider vocabulary or depth can make an existing predicate match more: diffed like access settings.
     'assignment.opening_statuses': {'access': True},
@@ -166,6 +168,10 @@ def set_setting(db: sqlite3.Connection, key: str, value, *, actor: str | None = 
         old_rank, new_rank = _rank(spec['order'], previous), _rank(spec['order'], value)
         if new_rank is None or (old_rank is not None and new_rank > old_rank) or (old_rank is None and new_rank > 0):
             widening = True if value != previous else widening
+    if spec.get('numeric') == 'higher_is_wider' and value != previous:
+        before_value = previous if isinstance(previous, (int, float)) and type(previous) is not bool else spec.get('preset', 0)
+        if not isinstance(value, (int, float)) or type(value) is bool or value > before_value:
+            widening = True
     warnings = []
     known = spec.get('presets', spec.get('order'))
     if known is not None and value not in known and not any(

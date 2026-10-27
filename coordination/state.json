@@ -1246,7 +1246,13 @@
         "server/app/importers/tabular_profiles.py",
         "server/app/static/hypotheses.mjs",
         "docs/LEDGER.md",
-        "server/tests/test_ledger_{statements,health}.py"
+        "server/tests/test_ledger_{statements,health}.py",
+        "server/app/{http_authz,packages,pilot_transfer}.py",
+        "server/app/api/integrations.py",
+        "server/app/media/vertex.py",
+        "scripts/{deploy_vm,transfer_pilot_to_production}.sh",
+        "server/Dockerfile",
+        "server/tests/test_review3_regressions.py"
       ],
       "based_on_commit": "7295148 + 3fc9ef4",
       "acceptance": [
@@ -1334,6 +1340,26 @@
           "search": "amount/currency/flow/counterparty (ledger) and sample types (health) appended once to the event search row, same read_text gate",
           "dossier": "event items pin one ledger_entry_id / health_sample_id by row_sha256 (no schema change: dossier target_kind CHECK is fixed)",
           "correction": "bank/health rows were already events (indexed by body/title) and event-targetable; the earlier report overstated the gap"
+        },
+        "review3": {
+          "reviewed_commit": "b46cd70",
+          "confirmed_fixed": [
+            "R3-1",
+            "R3-2",
+            "R3-3",
+            "R3-4",
+            "R3-5",
+            "R3-6",
+            "R3-7"
+          ],
+          "unconfirmed_addressed": [
+            "budget reservation from decoded audio / parsed PDF pages",
+            "legacy_open clients = ageds_default gateway only, uvicorn --no-proxy-headers",
+            "transfer script passes paths as arguments, refuses symlinks"
+          ],
+          "reviewer_repro": "8/8 finding tests now fail, 2/2 controls pass",
+          "regressions": "server/tests/test_review3_regressions.py (17)",
+          "checks": "backend 1581 passed / 3 skipped, JS 137, verify OK, browser 13 suites 128 steps"
         }
       }
     }

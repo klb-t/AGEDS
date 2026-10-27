@@ -219,11 +219,16 @@ def _normal(text: str) -> str:
     return ' '.join(_fold(text).split())
 
 
-def _proven_holds(claim_text: str, cited: list[dict], policy: str) -> bool:
+PROVEN_MAX_EXTRA_WORDS = 6  # preset of advocate.proven_max_extra_words
+
+
+def _proven_holds(claim_text: str, cited: list[dict], policy: str, max_extra_words: int = PROVEN_MAX_EXTRA_WORDS) -> bool:
     """Deterministic check of a model's 'proven' (advocate.proven_policy).
 
     require_verbatim_quote (preset): the claim quotes at least one span in quotation
-    marks and every quoted span occurs verbatim in a cited passage. downgrade_all: never.
+    marks, every quoted span occurs verbatim in a cited passage, and outside the quotes the
+    claim has at most ``max_extra_words`` words, such as "Według transkrypcji:". So a short
+    quote cannot carry an unquoted conclusion (review 3, R3-5). downgrade_all: never.
     accept_model: the model's label stands (an explicit, confirmed owner choice).
     """
     if policy == 'accept_model':
@@ -232,7 +237,10 @@ def _proven_holds(claim_text: str, cited: list[dict], policy: str) -> bool:
         return False
     spans = [next(g for g in match.groups() if g) for match in QUOTED_SPAN.finditer(claim_text)]
     passages = [_normal(entry.get('text') or '') for entry in cited]
-    return bool(spans) and all(any(_normal(span) in passage for passage in passages) for span in spans)
+    if not spans or not all(any(_normal(span) in passage for passage in passages) for span in spans):
+        return False
+    outside = re.findall(r'\w+', CITATION.sub('', QUOTED_SPAN.sub(' ', claim_text)))
+    return len(outside) <= max_extra_words
 
 
 def verify(claims, basis: list[dict], gate: AdvocateGate, *, from_model: bool = True,
@@ -245,6 +253,9 @@ def verify(claims, basis: list[dict], gate: AdvocateGate, *, from_model: bool = 
     """
     if proven_policy is None:
         proven_policy = authz.get_setting(gate.db, 'advocate.proven_policy', 'require_verbatim_quote')
+    max_extra = authz.get_setting(gate.db, 'advocate.proven_max_extra_words', PROVEN_MAX_EXTRA_WORDS)
+    if type(max_extra) is not int or not 0 <= max_extra <= 50:
+        max_extra = PROVEN_MAX_EXTRA_WORDS
     by_ref = {entry['ref']: entry for entry in basis}
     checked, removed, warnings = [], [], []
     for position, claim in enumerate(claims if isinstance(claims, list) else []):
@@ -264,7 +275,8 @@ def verify(claims, basis: list[dict], gate: AdvocateGate, *, from_model: bool = 
             warnings.append({'code': 'status_not_in_presets', 'position': position, 'status': status})
         if status in ('proven', 'quoted_material', 'contradicts') and not valid:
             status = 'claim_without_basis'
-        elif from_model and status == 'proven' and not _proven_holds(claim['text'], [by_ref[r] for r in valid], proven_policy):
+        elif from_model and status == 'proven' and not _proven_holds(claim['text'], [by_ref[r] for r in valid], proven_policy,
+                                                                    max_extra):
             status = 'claim'
             warnings.append({'code': 'proven_downgraded', 'position': position, 'policy': proven_policy})
         elif from_model and status == 'quoted_material' and not any(

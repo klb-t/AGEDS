@@ -253,10 +253,10 @@ def export_events_csv():
         'X-AGEDS-CSV-Formula-Guard': CSV_FORMULA_GUARD,
         'X-AGEDS-Events-Order': f"projected-time-asc; undated-last-by-event-id; rule {projection['rule']['rule_id']}@{projection['rule']['version']}"})
 
-@app.get('/export/manifest.json',dependencies=[installation('export')])
-def export_manifest():
+@app.get('/export/manifest.json')
+def export_manifest(access:Access=installation('export')):
     from .packages import export_metadata_package
-    return JSONResponse(export_metadata_package())
+    return JSONResponse(export_metadata_package(viewer_id=access.principal_id))
 
 @app.get('/api/export/scoped')
 def api_scoped_export(access:Access=scoped('export')):
@@ -301,7 +301,8 @@ class ScanIn(BaseModel):
 def api_artifacts(limit:int=Query(500,ge=1,le=10000),access:Access=scoped('read_metadata')):
     with session() as db:
         gate = access.gate(db)
-        everything = gate is None or gate.installation('read_metadata')
+        # The unfiltered listing includes text previews, so it needs read_text as well (review 3, R3-1).
+        everything = gate is None or (gate.installation('read_metadata') and gate.installation('read_text'))
         rows=db.execute("""
             SELECT a.id,a.original_name,a.mime_type,a.size_bytes,a.sha256,a.created_at,a.source_locator,
               CASE

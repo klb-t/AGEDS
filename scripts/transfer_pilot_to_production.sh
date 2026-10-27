@@ -20,6 +20,10 @@ while [ $# -gt 0 ]; do case "$1" in
 [ -n "$SOURCE" ] && [ -d "$SOURCE" ] || { echo "--source DIR (the pilot originals) is required" >&2; exit 2; }
 [ -f "$PILOT_DB" ] || { echo "pilot database not found: $PILOT_DB" >&2; exit 2; }
 SOURCE="$(cd "$SOURCE" && pwd)"
+case "$SOURCE$PILOT_DB" in *:*|*$'\n'*) echo "paths must not contain ':' or a line break (docker -v)" >&2; exit 2;; esac
+if [ -n "$(find "$SOURCE" -maxdepth 1 -type l -print -quit)" ]; then
+  echo "the source directory contains symbolic links; copy the originals in as regular files" >&2; exit 2
+fi
 cd "$REPO"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 TARGET="$BACKUPS/$STAMP-pre-pilot-transfer"
@@ -48,8 +52,8 @@ src.backup(dst)
 assert dst.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
 dst.close(); src.close()' "$DATA/evidence.db" "$TARGET/evidence.db"
 run sudo cp -a "$DATA/store" "$TARGET/store"
-run sudo sh -c "cd '$TARGET' && find store -type f -print0 | sort -z | xargs -0 -r sha256sum > store.sha256 && sha256sum evidence.db > evidence.sha256"
-run sudo sh -c "cd '$DATA' && find store -type f -print0 | sort -z | xargs -0 -r sha256sum | diff - '$TARGET/store.sha256'"
+run sudo sh -c 'cd "$1" && find store -type f -print0 | sort -z | xargs -0 -r sha256sum > store.sha256 && sha256sum evidence.db > evidence.sha256' sh "$TARGET"
+run sudo sh -c 'cd "$1" && find store -type f -print0 | sort -z | xargs -0 -r sha256sum | diff - "$2/store.sha256"' sh "$DATA" "$TARGET"
 echo "   pilot snapshot (consistent, without WAL) - the transferred and recorded database"
 run sudo python3 -c 'import sqlite3,sys
 src = sqlite3.connect("file:" + sys.argv[1] + "?mode=ro", uri=True)
@@ -57,12 +61,12 @@ dst = sqlite3.connect(sys.argv[2])
 src.backup(dst)
 assert dst.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
 dst.close(); src.close()' "$PILOT_DB" "$TARGET/pilot-evidence.db"
-run sudo sh -c "cd '$TARGET' && sha256sum pilot-evidence.db > pilot-evidence.sha256 && (cd '$SOURCE' && sha256sum *) > source.sha256"
+run sudo sh -c 'cd "$1" && sha256sum pilot-evidence.db > pilot-evidence.sha256 && (cd "$2" && find . -maxdepth 1 -type f -print0 | sort -z | xargs -0 -r sha256sum) > source.sha256' sh "$TARGET" "$SOURCE"
 
 echo "== 3. plan, then transfer (one process; the source is mounted read-only)"
 run "${ONE_OFF[@]}"
 run "${ONE_OFF[@]}" --apply
-run sh -c "cd '$SOURCE' && sha256sum * | diff - '$TARGET/source.sha256' && echo 'source unchanged'"
+run sh -c 'cd "$1" && find . -maxdepth 1 -type f -print0 | sort -z | xargs -0 -r sha256sum | diff - "$2/source.sha256" && echo "source unchanged"' sh "$SOURCE" "$TARGET"
 
 echo "== 4. start and check"
 run "${COMPOSE[@]}" up -d api worker

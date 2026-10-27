@@ -165,8 +165,9 @@ class N4NoTransactionAcrossProviderCalls(Base):
         with db.session() as conn:
             authz.set_setting(conn, 'advocate.provider', {'type': 'vertex_gemini', 'project': 'synthetic'})
             authz.set_setting(conn, 'advocate.voice', {'enabled': True})
-            providers.record_consent(conn, 'vertex', authz.create_scope(conn, 'installation', {}),
-                                     granted_by='owner', basis_text='t')
+            for provider in ('vertex', 'google_tts'):
+                providers.record_consent(conn, provider, authz.create_scope(conn, 'installation', {}),
+                                         granted_by='owner', basis_text='t')
         observed = []
         with db.session() as conn:
             def watch(reply):

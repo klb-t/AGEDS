@@ -18,6 +18,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -179,6 +180,40 @@ def _duration_seconds(data: bytes) -> float | None:
         return None
 
 
+def _decoded_seconds(data: bytes) -> float | None:
+    """Length of the audio ffmpeg actually decodes (8 kHz mono s16), not what a header claims."""
+    ffmpeg = shutil.which('ffmpeg')
+    if ffmpeg is None:
+        return None
+    with _private_copy(data) as path:
+        result = subprocess.run([ffmpeg, '-hide_banner', '-loglevel', 'error', '-i', path, '-ac', '1', '-ar', '8000',
+                                 '-f', 's16le', 'pipe:1'], capture_output=True, timeout=600)
+    return len(result.stdout) / 16000 if result.returncode == 0 and result.stdout else None
+
+
+def budget_seconds(sent: bytes, claimed: float | None) -> tuple[float, str]:
+    """Seconds for the worst-case reservation (review 3): decoded length, the header's claim if longer,
+    else a byte-based upper bound (4000 B/s, below any speech codec Gemini accepts here)."""
+    decoded = _decoded_seconds(sent)
+    if decoded is not None:
+        return max(decoded, claimed or 0.0), 'decoded audio length (header claim if longer)'
+    return max(claimed or 0.0, len(sent) / 4000), 'bytes / 4000 (no decoder available)'
+
+
+PAGE_OBJECT = re.compile(rb'/Type\s*/Page(?![A-Za-z])')
+
+
+def pdf_pages_for_budget(data: bytes) -> int:
+    """Pages for the reservation: the larger of pypdf's count and the page objects in the bytes."""
+    count = len(PAGE_OBJECT.findall(data))
+    try:
+        from pypdf import PdfReader
+        count = max(count, len(PdfReader(io.BytesIO(data)).pages))
+    except Exception:  # an unreadable PDF still reserves by its visible page objects
+        pass
+    return max(1, count)
+
+
 class VertexGeminiASR:
     """Strategy ``vertex_gemini``: one whole-file call returning timed, speaker-labelled segments."""
 
@@ -229,7 +264,8 @@ class VertexGeminiASR:
         if mime not in GEMINI_AUDIO:
             sent, transcoding = _transcode_flac(data)
         duration = _duration_seconds(data)
-        tokens = (duration or len(sent) / 4000) * AUDIO_TOKENS_PER_SECOND + len(ASR_PROMPT) / CHARS_PER_TOKEN
+        reserved_seconds, reservation_basis = budget_seconds(sent, duration)
+        tokens = reserved_seconds * AUDIO_TOKENS_PER_SECOND + len(ASR_PROMPT) / CHARS_PER_TOKEN
         config = _config(self.model, self.location, self.limits['max_output_tokens'])
         parts = [{'inlineData': {'mimeType': 'audio/flac' if transcoding else mime,
                                  'data': base64.b64encode(sent).decode()}}, {'text': ASR_PROMPT}]
@@ -267,6 +303,7 @@ class VertexGeminiASR:
                     'timing': 'model estimates in seconds; word timing unavailable', 'timing_quality': timing_quality,
                     'input_mime_detected': mime,
                     'transcoding': transcoding, 'duration_seconds_ffprobe': duration,
+                    'budget_reservation': {'seconds': round(reserved_seconds, 3), 'basis': reservation_basis},
                     'usage': {k: usage.get(k) for k in ('promptTokenCount', 'candidatesTokenCount', 'actual_eur')}}
         if self.reference is not None:
             segments = self._align(segments, sent, duration, metadata)
@@ -350,7 +387,7 @@ class VertexGeminiOCR:
             f' Spodziewane języki: {", ".join(languages)}.'
         config = _config(self.model, self.location, max_output_tokens)
         parts = [{'inlineData': {'mimeType': mime, 'data': base64.b64encode(data).decode()}}, {'text': prompt}]
-        estimate = 1300 * max(1, data.count(b'/Type /Page') if mime == 'application/pdf' else 1) + len(prompt) / CHARS_PER_TOKEN
+        estimate = 1300 * (pdf_pages_for_budget(data) if mime == 'application/pdf' else 1) + len(prompt) / CHARS_PER_TOKEN
         decoded, usage = call(config, parts, OCR_SCHEMA, purpose='ocr', input_tokens_estimate=estimate,
                               refs=[('artifact', artifact_id)] if artifact_id else [], transport=self.transport)
         return {'decoded': decoded if isinstance(decoded, dict) else {}, 'prompt': prompt, 'usage': usage}

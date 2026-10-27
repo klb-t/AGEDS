@@ -149,17 +149,36 @@ def installation(capability: str):
     return Depends(_mark(guard, f'installation:{capability}'))
 
 
+# Feature-area reads that hand out files or whole exports (review 3, R3-1).
+EXPORT_PATH_SEGMENTS = ('export', 'files', 'packet')
+
+
+def by_method_capability(method: str, path: str) -> str:
+    """Capability a feature-area request needs installation-wide.
+
+    These areas serve full text (search, transcripts, timelines, dossiers, ledger rows), so a read
+    needs read_text, not read_metadata; exports and file downloads need export; writes administer.
+    """
+    if method not in ('GET', 'HEAD', 'OPTIONS'):
+        return 'administer'
+    segments = [part for part in path.split('/') if part]
+    if any(part in EXPORT_PATH_SEGMENTS or part.endswith('export') or part.endswith('-exports') for part in segments):
+        return 'export'
+    return 'read_text'
+
+
 def installation_by_method():
     """Whole feature areas without per-row scoping (catalogue, imports, timeline, reports ...).
 
-    Reads need installation-wide read_metadata, writes installation-wide administer.
-    In legacy_open nothing changes; in tokens mode recipients get 403 here until an area
-    gains its own per-row authorization.
+    Reads need installation-wide read_text (exports and files: export), writes installation-wide
+    administer; see ``by_method_capability``. A metadata-only delegate is refused here. In
+    legacy_open nothing changes; in tokens mode recipients get 403 here until an area gains its
+    own per-row authorization.
     """
     def guard(request: Request) -> Access:
         access = _resolve(request)
         if not access.open:
-            capability = 'read_metadata' if request.method in ('GET', 'HEAD', 'OPTIONS') else 'administer'
+            capability = by_method_capability(request.method, request.url.path)
             with _read() as db:
                 if not ContentGate(db, access.principal_id).installation(capability):
                     raise HTTPException(403, 'not permitted')
@@ -238,6 +257,11 @@ def allowed_hosts() -> set:
     return hosts
 
 
+def is_bearer(value: str | None) -> bool:
+    """An Authorization value a browser never adds on its own (unlike cached Basic credentials)."""
+    return bool(value) and value.strip().lower().startswith('bearer ')
+
+
 async def host_and_origin(request: Request, call_next):
     # The Host rule is the integrations allow-list (IP literals, localhost, EW_TRUSTED_HOSTS,
     # EW_TRUSTED_ORIGINS) united with EW_ALLOWED_HOSTS and http.allowed_hosts: one policy, two layers.
@@ -245,8 +269,9 @@ async def host_and_origin(request: Request, call_next):
     if not host_allowed(request.headers.get('host')):
         return JSONResponse(status_code=400, content={'detail': 'host not allowed'})
     # A request carrying a token header cannot be forged by another site: custom headers need a
-    # CORS preflight and no CORS is enabled. Cookie-borne browser requests are checked.
-    header_authenticated = bool(request.headers.get(TOKEN_HEADER) or request.headers.get('authorization'))
+    # CORS preflight and no CORS is enabled. Cookie-borne browser requests are checked, and so are
+    # Basic/Digest/Negotiate credentials, which a browser attaches by itself (review 3, R3-3).
+    header_authenticated = bool(request.headers.get(TOKEN_HEADER)) or is_bearer(request.headers.get('authorization'))
     if request.method in UNSAFE_METHODS and not header_authenticated:
         origin = request.headers.get('origin')
         trusted_origin = bool(origin) and urlsplit(origin).netloc.lower() in _trusted_origins()

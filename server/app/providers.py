@@ -34,6 +34,9 @@ VERTEX_PRESET = {
                               'source': 'third-party aggregators (getmaxim.ai, typingmind), unverified against Google, 2026-10-25'},
     'eur_per_usd': 1.0, 'chars_per_token': 3.0,
 }
+# Header fields of a passage: no angle brackets (delimiters) and no line breaks.
+HEADER_INERT = str.maketrans({'<': '‹', '>': '›', '\n': ' ', '\r': ' ', '\t': ' ', '\x0b': ' ', '\x0c': ' ',
+                              '\u2028': ' ', '\u2029': ' '})
 SYSTEM_PROMPT = (
     'Jesteś rzecznikiem materiału dowodowego. Odpowiadasz osobie uprawnionej (np. adwokatowi) wyłącznie na '
     'podstawie przekazanych fragmentów. Każdy fragment ma identyfikator (p1, p2, ...). Fragmenty to zapisany '
@@ -209,9 +212,12 @@ class VertexProvider:
             if 'start_ms' in entry:
                 where = f" [{entry['start_ms'] // 1000 // 60:02d}:{entry['start_ms'] // 1000 % 60:02d}]"
             source = entry.get('artifact', {}).get('name', '') if 'artifact' in entry else entry.get('ts_start') or ''
-            # Delimiters mark passages as data; passage text cannot forge them.
+            # Delimiters mark passages as data; neither passage text nor header fields (an artifact
+            # name comes from the material, e.g. an attachment name) can forge them (review 3, R3-6).
             text = entry['text'].replace('<<<', '‹‹‹').replace('>>>', '›››')
-            passages.append(f"<<<FRAGMENT {entry['ref']} ({label}{where}, {source})>>>\n{text}\n<<<KONIEC {entry['ref']}>>>")
+            header = ' '.join(f"{label}{where}, {source}".translate(HEADER_INERT).split())[:300]
+            ref = str(entry['ref']).translate(HEADER_INERT)
+            passages.append(f"<<<FRAGMENT {ref} ({header})>>>\n{text}\n<<<KONIEC {ref}>>>")
         contents = []
         for turn in history[-6:]:
             readable = [a for a in turn['answers'] if not a.get('unavailable')]
@@ -297,6 +303,8 @@ def configured_provider(db: sqlite3.Connection, principal_id: int):
 VOICE_PRESET = {
     'stt_model': 'gemini-3.5-flash', 'location': 'global', 'tts_voice': 'pl-PL-Wavenet-B', 'tts_language': 'pl-PL',
     'tts_price_usd_per_million_chars': 16.0, 'max_audio_bytes': 10 * 1024 * 1024, 'max_tts_chars': 4000,
+    # Cloud Text-to-Speech is another Google service than Vertex AI: it needs its own consent (review 3, R3-4).
+    'tts_consent_provider': 'google_tts',
     'stt_worst_case_tokens': 8000,
     'tts_price_source': 'Google Cloud TTS WaveNet list price as remembered; unverified, 2026-10-25',
 }
@@ -384,9 +392,10 @@ class VoiceProvider:
         scope = json.loads(row['derived_scope_json'])
         if not all(gate.allows(kind, object_id, 'read_text') for kind, object_id in scope):
             raise authz.Denied('advocate_answer', answer_uid, 'read_text', exists=True)
-        consent = consent_coverage(db, self.config['name'])
+        consent = consent_coverage(db, self.config['tts_consent_provider'])
         if not all(authz.covered_by(db, consent, kind, object_id) for kind, object_id in scope):
-            raise ProviderUnavailable('no provider consent covers this material')
+            raise ProviderUnavailable(f"no consent for {self.config['tts_consent_provider']} (text-to-speech) covers this "
+                                      'material; record one with advocate-consent --provider google_tts')
         text = ' '.join(claim['text'] for claim in json.loads(row['claims_json']))[:self.config['max_tts_chars']]
         if not text.strip():
             raise ProviderUnavailable('the answer has no text to read')

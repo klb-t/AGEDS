@@ -383,15 +383,17 @@ def _trusted(value: str, host: str | None) -> bool:
 def csrf_refusal(method: str, headers: dict[str, str]) -> str | None:
     """Why a state-changing browser request is refused as cross-site, or None (review finding 6).
 
-    Applies to every non-GET/HEAD/OPTIONS request without an ``Authorization``
-    header (a header a cross-site page cannot send without a CORS preflight,
-    which this server never grants). ``Sec-Fetch-Site: cross-site`` is refused;
+    Applies to every non-GET/HEAD/OPTIONS request without an ``Authorization: Bearer``
+    header (a value a cross-site page cannot send without a CORS preflight, which this
+    server never grants; Basic/Digest credentials the browser adds itself are checked,
+    review 3 R3-3). ``Sec-Fetch-Site: cross-site`` is refused;
     otherwise ``Origin`` (or, without it, ``Referer``) must name an allowlisted host
     (``host_allowed``) that is this server (same netloc as ``Host``, itself
     allowlisted before) or an origin in ``EW_TRUSTED_ORIGINS`` (review 2 finding 5).
     Requests without these headers (CLI, curl, scripts) are allowed.
     """
-    if method in SAFE_METHODS or 'authorization' in headers:
+    from ..http_authz import is_bearer
+    if method in SAFE_METHODS or is_bearer(headers.get('authorization')):
         return None
     if headers.get('sec-fetch-site', '').strip().lower() == 'cross-site':
         return 'cross-site request (Sec-Fetch-Site)'

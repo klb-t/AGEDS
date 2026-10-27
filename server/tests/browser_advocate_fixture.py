@@ -49,8 +49,9 @@ def main():
                 # Test-only transport: deterministic replies, never a network call.
                 from server.app import providers
                 authz.set_setting(conn, 'advocate.provider', {'type': 'vertex_gemini', 'project': 'synthetic-test'})
-                providers.record_consent(conn, 'vertex', authz.create_scope(conn, 'installation', {}),
-                                         granted_by='browser fixture', basis_text='synthetic browser test')
+                for provider in ('vertex', 'google_tts'):
+                    providers.record_consent(conn, provider, authz.create_scope(conn, 'installation', {}),
+                                             granted_by='browser fixture', basis_text='synthetic browser test')
                 def transport(config, body):
                     text = json.dumps({'claims': [{'text': 'Według transkrypcji: „Umowa najmu została podpisana piątego marca.”',
                                                    'status': 'proven', 'citations': ['p1']},

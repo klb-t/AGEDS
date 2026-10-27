@@ -38,7 +38,13 @@ OBJECT_TABLES = {
 # format above is unchanged. Only tables named here are exported: a new table
 # is never included silently. A table present in the database but neither
 # declared, excluded nor internal is listed by name in ``undeclared_tables``.
-EXTENSION_SCHEMA_ID = 'ageds.metadata-extension-tables/v1'
+EXTENSION_SCHEMA_V1 = 'ageds.metadata-extension-tables/v1'
+# v2 (review 3): adds redacted_private_rows and redaction_rule; v1 packages still validate.
+EXTENSION_SCHEMA_ID = 'ageds.metadata-extension-tables/v2'
+EXTENSION_FIELDS_V1 = {'schema', 'declared', 'excluded_tables', 'excluded_columns', 'missing_tables',
+                       'undeclared_tables', 'tables', 'table_sha256'}
+EXTENSION_FIELDS = {EXTENSION_SCHEMA_V1: EXTENSION_FIELDS_V1,
+                    EXTENSION_SCHEMA_ID: EXTENSION_FIELDS_V1 | {'redacted_private_rows', 'redaction_rule'}}
 EXTENSION_TABLES = (
     'collections', 'catalog_scans', 'catalog_content_groups', 'catalog_entries', 'catalog_entry_times',
     'catalog_issues', 'catalog_entry_artifacts', 'catalog_marks', 'catalog_profiles',
@@ -148,14 +154,55 @@ def _order_clause(db, name: str) -> str:
     return ','.join('"' + column.replace('"', '""') + '"' for _, column in columns) or 'rowid'
 
 
-def extension_section(db, existing: set[str]) -> dict:
+# Private advocate content: columns redacted in the whole-database export unless the exporting
+# principal took part, or the conversation's own owner-visibility mode is 'full' (review 3, R3-2).
+PRIVATE_CONTENT_COLUMNS = {
+    'conversations': ('title',),
+    'advocate_turns': ('question', 'retrieval_json'),
+    'advocate_answers': ('claims_json', 'basis_json', 'verification_json'),
+    'derived_states': ('content_json',),
+}
+
+
+def _conversation_open(conversation, viewer_id: int | None) -> bool:
+    settings = json.loads(conversation['settings_json'] or '{}')
+    mode = settings.get('owner_visibility', 'none')
+    if mode == 'opt_in_by_recipient':
+        mode = 'full' if settings.get('shared_with_owner') is True else 'none'
+    return mode == 'full' or (viewer_id is not None and conversation['principal_id'] == viewer_id)
+
+
+def _private_owner(db, name: str, row) -> tuple[bool, object] | None:
+    """The conversation (or private summary) that owns a row's content; None for rows that are not private."""
+    if name == 'conversations':
+        return row
+    if name == 'advocate_turns':
+        return db.execute('SELECT * FROM conversations WHERE id=?', (row['conversation_id'],)).fetchone()
+    if name == 'advocate_answers':
+        return db.execute('''SELECT c.* FROM advocate_turns t JOIN conversations c ON c.id=t.conversation_id
+                             WHERE t.id=?''', (row['turn_id'],)).fetchone()
+    if name == 'derived_states':
+        transformation = json.loads(row['transformation_json'] or '{}')
+        if row['kind'] != 'advocate_summary' or transformation.get('sharing', 'creator_only') == 'inputs_readers':
+            return None
+        return {'settings_json': json.dumps({'owner_visibility': transformation.get('owner_visibility', 'none')}),
+                'principal_id': row['created_by_principal_id']}
+    return None
+
+
+def _redact(value) -> str:
+    text = value if isinstance(value, str) else json.dumps(value)
+    return f'[redacted: private advocate content; sha256={hashlib.sha256(text.encode()).hexdigest()}; chars={len(text)}]'
+
+
+def extension_section(db, existing: set[str], *, viewer_id: int | None = None) -> dict:
     """Declared extension tables in the caller's read transaction.
 
     Excluded tables and columns are named with their reason; nothing outside
     ``EXTENSION_TABLES`` is exported. Missing declared tables are explicit.
     """
     declared = set(TABLES) | set(EXTENSION_TABLES) | set(EXCLUDED_EXTENSION_TABLES)
-    tables = {}
+    tables, redacted = {}, {}
     for name in EXTENSION_TABLES:
         if name not in existing:
             tables[name] = []
@@ -168,6 +215,13 @@ def extension_section(db, existing: set[str]) -> dict:
             if leaked:
                 raise RuntimeError(f'extension table {name} has credential-like columns {sorted(leaked)}; '
                                    'declare an exclusion in packages.EXCLUDED_EXTENSION_COLUMNS')
+            if name in PRIVATE_CONTENT_COLUMNS:
+                owner = _private_owner(db, name, row)
+                if owner is not None and not _conversation_open(owner, viewer_id):
+                    for column in PRIVATE_CONTENT_COLUMNS[name]:
+                        if item.get(column) is not None:
+                            item[column] = _redact(item[column])
+                    redacted.setdefault(name, []).append(row['id'])
             rows.append(item)
         tables[name] = rows
     return {
@@ -177,6 +231,9 @@ def extension_section(db, existing: set[str]) -> dict:
         'excluded_columns': {table: dict(sorted(columns.items()))
                              for table, columns in sorted(EXCLUDED_EXTENSION_COLUMNS.items())},
         'missing_tables': [name for name in EXTENSION_TABLES if name not in existing],
+        'redacted_private_rows': redacted,
+        'redaction_rule': 'advocate questions, answers and private summaries are kept only as hashes unless the exporting '
+                          'principal took part or the conversation is visible to the owner in full',
         'undeclared_tables': sorted(name for name in existing if name not in declared
                                     and not name.startswith(INTERNAL_TABLE_PREFIXES)),
         'tables': tables,
@@ -184,7 +241,7 @@ def extension_section(db, existing: set[str]) -> dict:
     }
 
 
-def export_metadata_package(*, include_extension_tables: bool = True) -> dict:
+def export_metadata_package(*, include_extension_tables: bool = True, viewer_id: int | None = None) -> dict:
     """Snapshot all core metadata in one read transaction, without migration.
 
     Older databases can be inspected without rewriting them: missing additive
@@ -214,7 +271,7 @@ def export_metadata_package(*, include_extension_tables: bool = True) -> dict:
             'tables': tables,
         }
         if include_extension_tables:
-            payload['extension_tables'] = extension_section(db, existing)
+            payload['extension_tables'] = extension_section(db, existing, viewer_id=viewer_id)
         # Reject nonfinite numeric database values instead of emitting JSON NaN.
         payload['integrity'] = _integrity(payload)
         db.rollback()
@@ -513,13 +570,17 @@ def _validate_extension_section(section: Any, error, counts: dict) -> None:
     if not isinstance(section, dict):
         error('invalid_extension_section', base, 'Extension section must be an object.')
         return
-    expected = {'schema', 'declared', 'excluded_tables', 'excluded_columns', 'missing_tables',
-                'undeclared_tables', 'tables', 'table_sha256'}
-    if set(section) != expected:
-        error('invalid_extension_section', base, 'Extension section fields differ from v1.')
+    expected = EXTENSION_FIELDS.get(section.get('schema'))
+    if expected is None:
+        error('unsupported_extension_schema', f'{base}.schema', f'Expected one of {sorted(EXTENSION_FIELDS)}.', 'digest')
         return
-    if section['schema'] != EXTENSION_SCHEMA_ID:
-        error('unsupported_extension_schema', f'{base}.schema', f'Expected {EXTENSION_SCHEMA_ID}.', 'digest')
+    if set(section) != expected:
+        error('invalid_extension_section', base, f"Extension section fields differ from {section['schema']}.")
+        return
+    redacted = section.get('redacted_private_rows', {})
+    if not isinstance(redacted, dict) or any(name not in PRIVATE_CONTENT_COLUMNS or not isinstance(ids, list)
+                                             or any(type(i) is not int for i in ids) for name, ids in redacted.items()):
+        error('invalid_extension_section', f'{base}.redacted_private_rows', 'Redacted rows must list integer ids per private table.')
         return
     declared, tables, digests = section['declared'], section['tables'], section['table_sha256']
     excluded_tables, excluded_columns = section['excluded_tables'], section['excluded_columns']

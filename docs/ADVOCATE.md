@@ -75,6 +75,20 @@ characters) is unverified. An avatar is not implemented.
 - `metadata_only` owner visibility shows that a turn exists, never the question; earlier answers re-enter a prompt
   only while provider consent covers their inputs.
 - Export needs `export` and `read_metadata`; text columns need `read_text` too and are otherwise nulled and listed.
+- Feature areas (catalogue, imports, timeline, workbench, reports, hypotheses, ledger …) need,
+  installation-wide, `read_text` for reads, `export` for exports and file downloads, and
+  `administer` for writes. Until review 3 a read needed only `read_metadata`, so a
+  metadata-only delegate could read full text there. `/api/artifacts` shows text previews only
+  with `read_text`.
+- The whole-database export (`/export/manifest.json`, CLI `metadata-export`) keeps
+  recipients' advocate questions, answers and private summaries only as hashes
+  (`redacted_private_rows`). The exception is the exporting principal's own conversation, or
+  one started under `owner_visibility=full`.
+- CSRF: only `X-AGEDS-Token` and `Authorization: Bearer` skip the Origin and Sec-Fetch-Site
+  checks. Basic, Digest and Negotiate credentials, which a browser sends by itself, do not.
+- `deploy_vm.sh` admits as local only the gateway of the `ageds_default` network, not
+  `172.16.0.0/12`. The image runs uvicorn with `--no-proxy-headers`, so `X-Forwarded-For`
+  never sets the client address.
 - Summaries are private to their creator (`summary.sharing`, preset `creator_only`).
 - A blanket `treat_as_case` mapping leaves annotations, audit, principals and tags owner-only
   (`legacy_scope_policy.excluded_kinds`).
@@ -90,6 +104,14 @@ characters) is unverified. An avatar is not implemented.
 - Export without `read_text` keeps an allow-list of metadata columns; everything else is nulled and listed.
 - A model's `proven` must quote the cited passage verbatim (`advocate.proven_policy`, preset
   `require_verbatim_quote`); passages are marked as data in the prompt; the page shows the cited passage under a claim.
+- Review 3 (2026-10-27):
+  - `proven` also requires that, outside its verbatim quotes, a claim has at most
+    `advocate.proven_max_extra_words` words (preset 6), so a short quote cannot carry an
+    unquoted conclusion. Raising the limit counts as widening.
+  - Passage header fields (an artifact name comes from the material) are made inert like the
+    passage text.
+  - Reading aloud needs its own consent for Cloud Text-to-Speech
+    (`advocate-consent --provider google_tts …`), separate from Vertex AI.
 - The prompt asks the model not to omit material contrary to the question's thesis. A fragment
   that contradicts the thesis or another fragment becomes its own claim with status
   `contradicts` and a citation; without a valid citation it becomes `claim_without_basis`.

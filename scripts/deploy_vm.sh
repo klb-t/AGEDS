@@ -74,7 +74,14 @@ else
 fi
 
 echo "== 3c. legacy_open accepts only local clients; the host-side proxy reaches the container from the docker bridge"
-run "${COMPOSE[@]}" exec -T api python -m app.cli authz-setting --key http.legacy_open_clients --value-json '["172.16.0.0/12"]'
+echo "   only that network's gateway counts as local, not every container on the host (review 3)"
+if [ "$APPLY" = yes ]; then
+  GATEWAY="$(sudo docker network inspect ageds_default -f '{{range .IPAM.Config}}{{.Gateway}}{{end}}')"
+  case "$GATEWAY" in ''|*[!0-9.]*) echo "could not read the gateway of ageds_default: '$GATEWAY'" >&2; exit 1;; esac
+else
+  GATEWAY='<gateway of ageds_default>'
+fi
+run "${COMPOSE[@]}" exec -T api python -m app.cli authz-setting --key http.legacy_open_clients --value-json "[\"$GATEWAY/32\"]"
 echo "   (any process on this VM can reach the published loopback port; switch to tokens: authz-mode tokens)"
 
 echo "== 4. checks"

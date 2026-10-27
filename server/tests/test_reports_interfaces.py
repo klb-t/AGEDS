@@ -183,7 +183,7 @@ def test_extension_tables_in_metadata_export(env, tmp_path):
     env.report('timeline', {}, env.root / 'package-report')
     package = packages.export_metadata_package()
     section = package['extension_tables']
-    assert section['schema'] == 'ageds.metadata-extension-tables/v1'
+    assert section['schema'] == packages.EXTENSION_SCHEMA_ID == 'ageds.metadata-extension-tables/v2'
     assert section['undeclared_tables'] == [] and 'api_tokens' not in section['tables']
     assert section['excluded_tables'] == dict(sorted(packages.EXCLUDED_EXTENSION_TABLES.items()))
     assert 'credential' in section['excluded_tables']['api_tokens']

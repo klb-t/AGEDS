@@ -29,7 +29,16 @@ from .db import session
 AUDIO_PREFIXES = ('audio/', 'video/')
 DOCUMENT_MIMES = ('application/pdf',)
 IMAGE_PREFIX = 'image/'
-MAX_UPLOAD_BYTES = int(os.environ.get('EW_MAX_UPLOAD_BYTES', str(8 * 1024 ** 3)))
+MAX_UPLOAD_BYTES = int(os.environ.get('EW_MAX_UPLOAD_BYTES', str(8 * 1024 ** 3)))  # preset when no setting
+UPLOAD_LIMIT_SETTING = 'upload.max_bytes'  # chosen by the owner on /settings
+
+
+def max_upload_bytes() -> int:
+    """The owner's limit for one upload batch (setting), else the operator's environment preset."""
+    from . import authz
+    with session() as db:
+        value = authz.get_setting(db, UPLOAD_LIMIT_SETTING)
+    return value if type(value) is int and value > 0 else MAX_UPLOAD_BYTES
 
 
 class OwnerError(ValueError):
@@ -42,7 +51,7 @@ def incoming_root() -> Path:
 
 def safe_filename(name: str | None, used: set[str]) -> str:
     """A plain file name for the server copy: no path parts, no control characters, unique in the batch."""
-    base = Path(str(name or '')).name.replace('\\', '_')
+    base = Path(str(name or '')).name.replace('\\', '_').replace(':', '_')  # no drive letters or streams
     base = ''.join(ch for ch in unicodedata.normalize('NFC', base) if unicodedata.category(ch)[0] != 'C').strip()
     base = re.sub(r'^\.+', '', base)[:200] or 'upload'
     candidate, n = base, 1
@@ -76,7 +85,7 @@ def write_upload(batch: Path, name: str, stream, used: set[str], budget: list[in
             if size > budget[0]:
                 out.close()
                 target.unlink()
-                raise OwnerError(f'upload exceeds the limit of {MAX_UPLOAD_BYTES} bytes (EW_MAX_UPLOAD_BYTES)')
+                raise OwnerError('upload exceeds the batch limit (Ustawienia → limit wgrywania)')
             digest.update(chunk)
             out.write(chunk)
     budget[0] -= size

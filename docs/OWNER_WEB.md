@@ -20,6 +20,24 @@ The owner is told before use:
 * Password-protected archives are kept but not imported.
 * Direct Gmail access needs the separate authorisation in [GMAIL_API](GMAIL_API.md).
 
+Upload safety (`UploadSurfaceTests` in `server/tests/test_owner_web.py`):
+* **Names:**
+  * a stored name is a plain basename: no path parts, `\` and `:` replaced, control and
+    format characters (NUL, RTL override) dropped, leading dots removed, NFC-normalized;
+  * case-insensitive collisions in a batch get ` (2)`, ` (3)`;
+  * files are created with `O_EXCL` and set to 0400, so nothing is ever overwritten.
+* **Archives** are never extracted into the batch. The catalog reads them in place; ingest
+  writes a member only to a fixed temporary name (`payload`), so `../`, absolute and
+  symbolic-link members cannot write outside. A link member is its own bytes, never its
+  target.
+* **Zip bombs** are cut by the catalog limits: a member over the 200:1 compression ratio (from
+  1 MiB) is not hashed, the scan is marked incomplete (`limit_hits`), and the member cannot be
+  ingested.
+* **Size:** the limit per batch is a setting on `/settings` (preset `EW_MAX_UPLOAD_BYTES`,
+  8 GiB). A batch over the limit is removed whole.
+* **CSRF:** a cross-site POST, also with Basic credentials, is refused (403) before anything is
+  written.
+
 Bytes that already have a transcript or OCR text under another acquisition (the same files
 uploaded again) are not sent again. The page names the existing version instead.
 `scripts/pilot_local.sh serve` starts a worker next to the server, so queued jobs run without

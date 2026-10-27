@@ -203,8 +203,11 @@ def default_recipe_id(kind: str) -> str:
         from .. import authz, db as dbmod
         if not Path(dbmod.settings.db_path).is_file():
             raise FileNotFoundError  # never create a database just to read a default
-        with dbmod.session() as db:
+        db = dbmod.connect(read_only=True)  # a read never writes or migrates
+        try:
             chosen = authz.get_setting(db, DEFAULT_RECIPE_SETTING.format(kind=kind))
+        finally:
+            db.close()
         if isinstance(chosen, str) and chosen:
             return chosen
     except Exception:  # no database yet (CLI validation, tests without init): fall back to the environment

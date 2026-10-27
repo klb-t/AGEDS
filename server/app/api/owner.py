@@ -55,7 +55,7 @@ def start_page(request: Request, error: str | None = Query(None, max_length=500)
         consent = _active_consent(db, 'vertex')
         provider = authz.get_setting(db, 'advocate.provider')
     return templates.TemplateResponse(request, 'owner_start.html', {
-        'batches': owner.recent_batches(), 'error': error, 'limit_bytes': owner.MAX_UPLOAD_BYTES,
+        'batches': owner.recent_batches(), 'error': error, 'limit_bytes': owner.max_upload_bytes(),
         'vertex_ready': bool(consent) and bool(provider)})
 
 
@@ -66,7 +66,7 @@ def start_upload(files: list[UploadFile] = File(...), label: str = Form(''), bro
     except ValueError:
         times = {}
     batch = owner.new_batch_dir()
-    written, used, budget = [], set(), [owner.MAX_UPLOAD_BYTES]
+    written, used, budget = [], set(), [owner.max_upload_bytes()]
     try:
         for upload in files:
             if upload.filename:
@@ -147,7 +147,8 @@ def settings_page(request: Request, done: str | None = Query(None, max_length=60
     presets = {kind: _presets(kind) for kind in ('asr', 'ocr')}
     return templates.TemplateResponse(request, 'owner_settings.html', {
         'consents': consents, 'providers_known': CONSENT_PROVIDERS, 'done': done, 'error': error, **state,
-        'presets': presets, 'defaults': {kind: default_recipe_id(kind) for kind in ('asr', 'ocr')}})
+        'presets': presets, 'defaults': {kind: default_recipe_id(kind) for kind in ('asr', 'ocr')},
+        'upload_limit_gib': round(owner.max_upload_bytes() / 1024 ** 3, 3)})
 
 
 @router.post('/settings/consent')
@@ -198,6 +199,19 @@ def settings_voice(state: str = Form(...)):
     with session() as db:
         authz.set_setting(db, 'advocate.voice', {'enabled': True} if state == 'on' else None, actor='owner-web')
     return _back('/settings', done='voice')
+
+
+@router.post('/settings/upload-limit')
+def settings_upload_limit(gib: str = Form(...)):
+    try:
+        value = float(gib.replace(',', '.'))
+    except ValueError:
+        return _back('/settings', error='limit musi być liczbą (GiB)')
+    if not 0.001 <= value <= 1024:
+        return _back('/settings', error='limit od 0,001 do 1024 GiB')
+    with session() as db:
+        authz.set_setting(db, owner.UPLOAD_LIMIT_SETTING, int(value * 1024 ** 3), actor='owner-web')
+    return _back('/settings', done='upload-limit')
 
 
 @router.post('/settings/recipes')

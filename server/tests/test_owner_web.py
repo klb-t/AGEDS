@@ -2,10 +2,12 @@
 import io
 import json
 import os
+import unicodedata
 import zipfile
+from pathlib import Path
 
 from server.tests.test_review_regressions import Base
-from server.app import db, owner
+from server.app import authz, db, owner
 
 
 def whatsapp_zip() -> bytes:
@@ -126,3 +128,107 @@ class OwnerWebTests(Base):
         self.assertEqual((default_recipe_id('asr'), default_recipe_id('ocr')), ('asr-vertex-gemini-aligned', 'ocr-vertex-gemini'))
         page = self.client.get('/settings', headers=h).text
         self.assertIn('2.5 €', page)
+
+
+class UploadSurfaceTests(Base):
+    """The upload is a new attack surface (coordinator, 2026-10-27): names, archives, size, CSRF, overwrites."""
+
+    def owner_headers(self):
+        return self.h(self.owner_token)
+
+    def upload(self, files, headers=None, **data):
+        return self.client.post('/start/upload', files=[('files', f) for f in files], data=data,
+                                headers=headers if headers is not None else self.owner_headers(), follow_redirects=False)
+
+    def latest_batch(self):
+        return sorted(owner.incoming_root().iterdir())[-1]
+
+    def test_hostile_names_stay_plain_names_inside_the_batch(self):
+        used = set()
+        names = [owner.safe_filename(n, used) for n in (
+            '../../etc/passwd', '/etc/shadow', 'C:\\Windows\\system.ini', 'a\x00b.txt', '..', '...hidden',
+            unicodedata.normalize('NFD', 'zażółć.txt'), 'zażółć.txt', 'ZAŻÓŁĆ.TXT', '\u202etxt.exe', '')]
+        self.assertEqual(names[:6], ['passwd', 'shadow', 'C__Windows_system.ini', 'ab.txt', 'upload', 'hidden'])
+        # the NFD and NFC spellings are one name after normalization; case-insensitive collisions get a suffix
+        self.assertEqual(names[6:9], ['zażółć.txt', 'zażółć (2).txt', 'ZAŻÓŁĆ (3).TXT'])
+        self.assertEqual(names[9:], ['txt.exe', 'upload (2)'])
+        for name in names:
+            self.assertNotIn('/', name)
+            self.assertNotIn('\x00', name)
+
+    def test_same_name_twice_never_overwrites(self):
+        r = self.upload([('dup.txt', io.BytesIO(b'first'), 'text/plain'), ('dup.txt', io.BytesIO(b'second'), 'text/plain')])
+        self.assertEqual(r.status_code, 303)
+        batch = self.latest_batch()
+        contents = {p.name: p.read_bytes() for p in batch.iterdir()}
+        self.assertEqual(contents, {'dup.txt': b'first', 'dup (2).txt': b'second'})
+        self.assertTrue(all(os.stat(p).st_mode & 0o777 == 0o400 for p in batch.iterdir()))
+        with self.assertRaises(FileExistsError):  # O_EXCL: an existing name is never reopened for writing
+            owner.write_upload(batch, 'dup.txt', io.BytesIO(b'x'), set(), [10 ** 6])
+
+    def test_zip_slip_and_symlink_members_write_nothing_outside(self):
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w') as z:
+            z.writestr('../../escaped.txt', b'slip')
+            z.writestr('/abs/evil.txt', b'absolute')
+            z.writestr('ok.txt', b'fine')
+            link = zipfile.ZipInfo('link-to-passwd')
+            link.external_attr = (0o120777 << 16)  # a symbolic link member
+            link.create_system = 3
+            z.writestr(link, '/etc/passwd')
+        import tempfile
+        temp_before = {p.name for p in Path(tempfile.gettempdir()).iterdir()}
+        r = self.upload([('evil.zip', io.BytesIO(buffer.getvalue()), 'application/zip')])
+        url = r.headers['location'].split('?')[0]
+        self.client.post(f'{url}/originals', headers=self.owner_headers())
+        batch = self.latest_batch()
+        self.assertEqual([p.name for p in batch.iterdir()], ['evil.zip'])  # nothing extracted into the batch
+        named = [p for p in self.root.rglob('*') if p.name in ('escaped.txt', 'evil.txt', 'link-to-passwd')]
+        self.assertEqual(named, [])  # members are only ever written to a fixed temporary name, never their own path
+        self.assertFalse({p.name for p in Path(tempfile.gettempdir()).iterdir()} - temp_before
+                         & {'escaped.txt', 'evil.txt', 'link-to-passwd', 'abs'})
+        with db.session() as conn:
+            stored = {r['original_name']: open(r['stored_path'], 'rb').read() for r in conn.execute(
+                "SELECT original_name, stored_path FROM artifacts WHERE original_name IN ('link-to-passwd','escaped.txt','evil.txt','ok.txt')")}
+        self.assertEqual(stored.get('ok.txt'), b'fine')
+        if 'link-to-passwd' in stored:  # a link member is its own bytes (the target text), never the target file
+            self.assertEqual(stored['link-to-passwd'], b'/etc/passwd')
+        self.assertNotIn(b'root:', b''.join(stored.values()))
+
+    def test_zip_bomb_is_cut_by_the_catalog_limits(self):
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as z:
+            z.writestr('zeros.bin', b'\x00' * (20 * 1024 * 1024))  # ratio ~1000:1, above the 200:1 limit
+        self.assertLess(len(buffer.getvalue()), 200_000)
+        r = self.upload([('bomb.zip', io.BytesIO(buffer.getvalue()), 'application/zip')])
+        collection = int(r.headers['location'].split('?')[0].rsplit('/', 1)[1])
+        view = owner.batch_view(collection)
+        self.assertFalse(view['coverage']['complete'])
+        self.assertEqual(view['coverage']['limit_hits'], {'compression_ratio_declared': 1})
+        with db.session() as conn:
+            member = conn.execute("SELECT status, sha256 FROM catalog_entries WHERE name='zeros.bin'").fetchone()
+        self.assertTrue(member is None or member['sha256'] is None)  # never hashed, so never ingested
+        self.client.post(f"{r.headers['location'].split('?')[0]}/originals", headers=self.owner_headers())
+        with db.session() as conn:
+            self.assertIsNone(conn.execute("SELECT 1 FROM artifacts WHERE original_name='zeros.bin'").fetchone())
+
+    def test_cross_site_upload_is_refused(self):
+        with db.session() as conn:
+            authz.set_setting(conn, 'auth.mode', 'legacy_open', confirm_widening=True)
+        before = set(owner.incoming_root().iterdir()) if owner.incoming_root().exists() else set()
+        cross = {'Origin': 'https://evil.example', 'Sec-Fetch-Site': 'cross-site'}
+        for extra in ({}, {'Authorization': 'Basic dXNlcjpwYXNz'}):
+            r = self.upload([('x.txt', io.BytesIO(b'x'), 'text/plain')], headers={**cross, **extra})
+            self.assertEqual(r.status_code, 403, extra)
+        after = set(owner.incoming_root().iterdir()) if owner.incoming_root().exists() else set()
+        self.assertEqual(after, before)
+
+    def test_upload_limit_is_a_setting(self):
+        h = self.owner_headers()
+        self.assertIn('error=', self.client.post('/settings/upload-limit', data={'gib': 'x'}, headers=h,
+                                                 follow_redirects=False).headers['location'])
+        self.client.post('/settings/upload-limit', data={'gib': '0,001'}, headers=h)
+        self.assertEqual(owner.max_upload_bytes(), int(0.001 * 1024 ** 3))
+        self.assertIn('0.001 GiB', self.client.get('/settings', headers=h).text)
+        big = self.upload([('big.bin', io.BytesIO(b'x' * (2 * 1024 * 1024)), 'application/octet-stream')])
+        self.assertIn('error=', big.headers['location'])

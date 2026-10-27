@@ -27,6 +27,11 @@
 {% for c in calls %}<tr><td>{{ c.purpose }}</td><td>{{ c.provider_name }}</td><td>{{ c.model }}</td><td>{{ c.status }}</td><td class="num">{{ c.cost_eur }}</td><td>{{ c.started_at }}</td></tr>{% else %}<tr><td colspan="6">Brak.</td></tr>{% endfor %}</table></details>
 </section>
 
+<section class="panel"><h2>Wgrywanie</h2>
+<p>Limit jednej paczki: <b data-owner-upload-limit>{{ upload_limit_gib }} GiB</b> (łącznie wszystkie pliki). Archiwa są rozpakowywane tylko do odczytu, z limitami katalogu (rozmiar po rozpakowaniu, współczynnik kompresji, liczba plików); przekroczenie oznacza skan jako niekompletny.</p>
+<form method="post" action="/settings/upload-limit" class="owner-inline" data-owner-upload-limit-form><label>Limit paczki (GiB)<input name="gib" value="{{ upload_limit_gib }}" inputmode="decimal" required></label><button>Zapisz limit</button></form>
+</section>
+
 <section class="panel"><h2>Domyślne presety transkrypcji i OCR</h2>
 <form method="post" action="/settings/recipes" data-owner-recipes-form>
 {% for kind, label in [('asr', 'Transkrypcja'), ('ocr', 'OCR')] %}<fieldset><legend>{{ label }}</legend>

@@ -391,8 +391,18 @@ TIMING_REFERENCE_KEYS = {
 
 def _validate_timing_reference(ref) -> None:
     """The engine whose word offsets become the time axis of the model transcript."""
+    if isinstance(ref, dict) and ref.get('engine') == 'hybrid':
+        if set(ref) != {'engine', 'primary', 'fill'}:
+            raise RecipeError('a hybrid timing_reference has exactly engine, primary and fill')
+        if not isinstance(ref['primary'], dict) or ref['primary'].get('engine') != 'faster-whisper':
+            raise RecipeError('hybrid primary must be a faster-whisper timing reference')
+        if not isinstance(ref['fill'], dict) or ref['fill'].get('engine') != 'mms-forced-align':
+            raise RecipeError('hybrid fill must be an mms-forced-align timing reference')
+        _validate_timing_reference(ref['primary'])
+        _validate_timing_reference(ref['fill'])
+        return
     if not isinstance(ref, dict) or ref.get('engine') not in TIMING_REFERENCE_KEYS:
-        raise RecipeError('timing_reference.engine must be ' + ' or '.join(sorted(TIMING_REFERENCE_KEYS)))
+        raise RecipeError('timing_reference.engine must be hybrid or ' + ' or '.join(sorted(TIMING_REFERENCE_KEYS)))
     required, optional = TIMING_REFERENCE_KEYS[ref['engine']]
     if required - set(ref) or set(ref) - required - optional:
         raise RecipeError(f'timing_reference for {ref["engine"]} needs {sorted(required)} and accepts {sorted(optional)}')

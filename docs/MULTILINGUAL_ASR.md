@@ -209,6 +209,21 @@ did not help. Where both presets time a segment, segment ends agree to about 0.0
 to about 1 s (median). The aligned preset stays the default. A real end-to-end run of the forced
 preset (artifact 4, throwaway copy) made 22/60 segments citable.
 
+* `asr-vertex-gemini-hybrid` (optional): the aligned preset, then segments it did not align
+  are filled from forced alignment (score ≥ 0.7) when they stay between the neighbouring
+  timed segments. Filled segments carry `timing_source: forced_alignment_unconfirmed` and
+  `independent_confirmation: false`. On the pilot (offline, real data) it filled 13, 0 and 0
+  segments: 41/55, 23/46, 26/46 word-citable.
+
+**Time notation of the model estimates.** Gemini sometimes switches to minutes.seconds
+written as a decimal (1.26 for 86 s). `metadata.timing_alignment.notation` records the
+detection. From the first drop in the raw estimates, if the minutes.seconds readings run
+forward, those segments get `timing_notation_hypothesis`. Only when the reference confirms
+it (≥ 80 % of the checked segments within ±2 s of their aligned start, at least 3 checked)
+do they also get the derived `model_estimate_reinterpreted`. `model_estimate` always keeps
+Gemini's values. On pilot recording 6 only 7 of 12 checked segments fit, so it stays a
+hypothesis.
+
 Gemini's raw words (joining exactly to the stored segment text) are matched in order to the
 reference words (difflib on case/diacritic-folded words; `exact`, or `fuzzy` ≥ 0.8 inside a
 mismatched block). A matched word takes the reference interval. Unmatched words between two

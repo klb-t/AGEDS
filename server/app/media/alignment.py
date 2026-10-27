@@ -243,3 +243,81 @@ def speech_transport(ref: dict, body: dict) -> dict:
         raise providers.ProviderUnavailable(f'Speech HTTP {exc.code}: {exc.read()[:500].decode("utf-8", "replace")}') from exc
     except (OSError, urllib.error.URLError, ValueError) as exc:
         raise providers.ProviderUnavailable(f'Speech call failed: {type(exc).__name__}') from exc
+
+
+# ---------------------------------------------------------------- time notation of the model estimates
+
+def _mmss(value) -> float | None:
+    """1.26 read as 1 min 26 s; None when the hundredths cannot be seconds (>= 60)."""
+    if not isinstance(value, (int, float)) or value < 0:
+        return None
+    minutes = int(value)
+    seconds = round((value - minutes) * 100, 6)
+    return minutes * 60 + seconds if seconds < 60 else None
+
+
+def notation_hypothesis(segments: list[dict], *, reference: str, tolerance: float = 2.0, min_share: float = 0.8,
+                        min_checked: int = 3) -> dict:
+    """Detect model estimates that switch to minutes.seconds written as a decimal; never edits them.
+
+    From the first drop in the raw estimates onward, if the minutes.seconds readings run forward
+    from the time reached before the drop, those segments get ``timing_notation_hypothesis``. Only
+    when the independent reference confirms it (at least ``min_share`` of the checked segments
+    within ``tolerance`` seconds of their aligned start) does each of them also get the derived
+    ``model_estimate_reinterpreted``. The original values stay in ``model_estimate``.
+    """
+    raw = [(s.get('model_estimate') or {}).get('start', s.get('start')) for s in segments]
+    timed = [(i, v) for i, v in enumerate(raw) if isinstance(v, (int, float))]
+    change = next((k for (j, a), (k, b) in zip(timed, timed[1:]) if b < a), None)
+    result = {'status': 'not_detected', 'notation': 'minutes.seconds', 'reference': reference,
+              'tolerance_seconds': tolerance, 'min_share': min_share}
+    if change is None:
+        return result
+    before = max(v for i, v in timed if i < change)
+    candidates = [i for i, v in timed if i >= change]
+    readings = {i: _mmss(raw[i]) for i in candidates}
+    forward = [readings[i] for i in candidates]
+    backward = sum(1 for a, b in zip(forward, forward[1:]) if a is not None and b is not None and b < a)
+    if (any(r is None for r in forward) or forward[0] < before - tolerance
+            or backward > max(1, len(forward) // 10)):  # the model's own estimates are not strictly ordered
+        result.update(status='not_consistent', first_segment=change, backward_steps=backward)
+        return result
+    checked = [(i, readings[i], segments[i]['start']) for i in candidates
+               if segments[i].get('words') and segments[i].get('timing_source') != 'model_estimate']
+    within = sum(1 for _, r, aligned in checked if abs(r - aligned) <= tolerance)
+    confirmed = len(checked) >= min_checked and within / len(checked) >= min_share
+    for i in candidates:
+        segments[i]['timing_notation_hypothesis'] = {'notation': 'minutes.seconds', 'confirmed': confirmed,
+                                                     'basis': 'raw estimates drop here and run forward as minutes.seconds'}
+        if confirmed:
+            estimate = segments[i].get('model_estimate') or {}
+            segments[i]['model_estimate_reinterpreted'] = {
+                'start': readings[i], 'end': _mmss(estimate.get('end')), 'notation': 'minutes.seconds',
+                'confirmed_by': reference, 'derived': True}
+    result.update(status='confirmed' if confirmed else 'hypothesis_only', first_segment=change,
+                  segments=len(candidates), checked=len(checked), within_tolerance=within, backward_steps=backward)
+    return result
+
+
+def fill_from_forced(aligned: list[dict], forced: list[dict]) -> dict:
+    """Fill segments the reference did not align with forced-alignment words; mark them unconfirmed.
+
+    Only segments that passed the forced-alignment score gate, and only when their interval stays
+    between the neighbouring timed segments (so multi-segment selections remain ordered).
+    """
+    filled, overlapping = [], []
+    for i, (seg, alt) in enumerate(zip(aligned, forced)):
+        if seg['words'] or not alt.get('words'):
+            continue
+        before = max((s['end'] for s in aligned[:i] if s['words']), default=0.0)
+        after = min((s['start'] for s in aligned[i + 1:] if s['words']), default=float('inf'))
+        if alt['start'] < before or alt['end'] > after:
+            overlapping.append(i)
+            continue
+        aligned[i] = {**seg, 'start': alt['start'], 'end': alt['end'], 'words': alt['words'],
+                      'timing_source': 'forced_alignment_unconfirmed', 'independent_confirmation': False,
+                      'alignment_note': 'times from forced alignment only; no independent confirmation by the reference'}
+        aligned[i].pop('timing_warning', None)
+        filled.append(i)
+    return {'filled_segments': filled, 'rejected_overlapping': overlapping,
+            'meaning': 'filled segments are word-citable on the acoustic score alone, without independent confirmation'}

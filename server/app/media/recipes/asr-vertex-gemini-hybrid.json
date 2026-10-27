@@ -1,0 +1,56 @@
+{
+  "schema": "ageds.media_recipe",
+  "schema_version": 1,
+  "id": "asr-vertex-gemini-hybrid",
+  "kind": "asr",
+  "revision": 1,
+  "description": "Optional, not the default. As asr-vertex-gemini-aligned (Gemini text, word times from local faster-whisper aligned to it); segments the reference did not align are then filled from forced alignment of the Gemini text (MMS_FA, mean score >= 0.7) when they stay between the neighbouring timed segments. Filled segments are word-citable on the acoustic score alone and are marked independent_confirmation: false. Needs server/requirements-align.txt for the fill; without it the primary alignment stands.",
+  "strategy": "vertex_gemini",
+  "engine": "vertex-gemini",
+  "model": "gemini-3.5-flash",
+  "device": "vertex:global",
+  "compute_type": "remote",
+  "model_options": {
+    "timing_reference": {
+      "engine": "hybrid",
+      "primary": {
+        "engine": "faster-whisper",
+        "model": "large-v3-turbo",
+        "revision": "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf",
+        "device": "cpu",
+        "compute_type": "int8",
+        "vad_filter": false,
+        "multilingual": true,
+        "condition_on_previous_text": false,
+        "language": null,
+        "min_matched_ratio": 0.5
+      },
+      "fill": {
+        "engine": "mms-forced-align",
+        "model": "MMS_FA",
+        "model_sha256": "20ef12963ab4924bef49ac4fc7f58ad5da2ee43b2c11bc8c853c9b90ecdbc680",
+        "min_score": 0.7,
+        "window_seconds": 20.0,
+        "context_seconds": 2.0
+      }
+    }
+  },
+  "vad": {
+    "enabled": false,
+    "parameters": null
+  },
+  "word_timestamps": true,
+  "language": null,
+  "allowed_languages": [
+    "pl",
+    "nl",
+    "en"
+  ],
+  "windows": null,
+  "detection": null,
+  "transcribe_options": {},
+  "limits": {
+    "max_inline_bytes": 15000000,
+    "max_output_tokens": 32768
+  }
+}

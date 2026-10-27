@@ -287,27 +287,43 @@ class VertexGeminiASR:
                 metadata['timing_alignment'] = {'status': 'unavailable', 'engine': ref['engine'],
                                                 'reason': f'{type(exc).__name__}: {str(exc)[:300]}'}
                 return segments
+            report['notation'] = alignment.notation_hypothesis(aligned, reference=ref['engine'])
             metadata['timing_alignment'] = {'status': 'aligned', **report}
             metadata['timing'] = ('word times by forced alignment of the model text to the audio in {} of {} segments '
                                   '(score >= {}); the rest are model estimates'.format(
                                       report['segments_aligned'], len(aligned), report['min_score']))
             return aligned
+        primary = ref['primary'] if ref['engine'] == 'hybrid' else ref
         try:
-            if ref['engine'] == 'faster-whisper':
-                words, info = alignment.faster_whisper_words(sent, ref)
+            if primary['engine'] == 'faster-whisper':
+                words, info = alignment.faster_whisper_words(sent, primary)
             else:
                 config = _config(self.model, self.location, 256)
                 words, info = alignment.google_speech_words(
                     sent, {**ref, 'project': ref.get('project') or config.get('project')}, duration=duration,
                     artifact_id=self.artifact_id)
         except Exception as exc:  # the paid model text is kept; only the time source is missing
-            metadata['timing_alignment'] = {'status': 'unavailable', 'engine': ref['engine'],
+            metadata['timing_alignment'] = {'status': 'unavailable', 'engine': primary['engine'],
                                             'reason': f'{type(exc).__name__}: {str(exc)[:300]}'}
             return segments
-        aligned, report = alignment.align(segments, words, min_matched_ratio=ref.get('min_matched_ratio', 0.5))
+        aligned, report = alignment.align(segments, words, min_matched_ratio=primary.get('min_matched_ratio', 0.5))
+        report['notation'] = alignment.notation_hypothesis(aligned, reference=primary['engine'])
+        if ref['engine'] == 'hybrid':
+            from . import forced_align
+            try:
+                forced, forced_report = forced_align.align(sent, segments, ref['fill'])
+                report['fill'] = {'engine': 'mms-forced-align', **alignment.fill_from_forced(aligned, forced),
+                                  'forced_segments_above_score': forced_report['segments_aligned'],
+                                  'min_score': forced_report['min_score'], 'reference': forced_report['reference']}
+            except Exception as exc:  # the primary alignment stands on its own
+                report['fill'] = {'engine': 'mms-forced-align', 'status': 'unavailable',
+                                  'reason': f'{type(exc).__name__}: {str(exc)[:300]}'}
         metadata['timing_alignment'] = {'status': 'aligned', 'reference': info, **report}
-        metadata['timing'] = ('word times from {} aligned to the model text in {} of {} segments; the rest are model '
-                              'estimates'.format(ref['engine'], report['segments_aligned'], len(aligned)))
+        filled = len((report.get('fill') or {}).get('filled_segments', []))
+        metadata['timing'] = ('word times from {} aligned to the model text in {} of {} segments{}; the rest are model '
+                              'estimates'.format(primary['engine'], report['segments_aligned'], len(aligned),
+                                                 f', {filled} more by forced alignment without independent confirmation'
+                                                 if filled else ''))
         return aligned
 
 

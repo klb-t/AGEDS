@@ -189,3 +189,89 @@ class ForcedAlignRecipeTests(vertex_tests.VertexCase):
         for change in ({'model': 'wav2vec2'}, {'model_sha256': 'ABC'}, {'min_score': 2}, {'audio_filter': 'amovie=/etc/passwd'}):
             with self.subTest(change=change), self.assertRaises(RecipeError):
                 validate_effective(dict(base, model_options={'timing_reference': {**ref, **change}}))
+
+
+class NotationTests(unittest.TestCase):
+    @staticmethod
+    def segments(raw, aligned):
+        return [{'start': a if a is not None else r, 'end': None, 'text': 'x',
+                 'words': [{'word': 'x'}] if a is not None else [],
+                 'timing_source': 'reference_alignment' if a is not None else 'model_estimate',
+                 'model_estimate': {'start': r, 'end': r}} for r, a in zip(raw, aligned)]
+
+    def test_confirmed_switch_adds_only_a_derived_field(self):
+        segs = self.segments([10.0, 30.0, 55.0, 1.02, 1.3, 1.45, 2.05], [10.2, 30.1, 55.3, 62.5, 89.0, 105.5, 125.1])
+        result = alignment.notation_hypothesis(segs, reference='faster-whisper')
+        self.assertEqual((result['status'], result['first_segment'], result['checked'], result['within_tolerance']),
+                         ('confirmed', 3, 4, 4))
+        self.assertEqual(segs[4]['model_estimate'], {'start': 1.3, 'end': 1.3})  # Gemini's values stay
+        self.assertEqual(segs[4]['model_estimate_reinterpreted']['start'], 90.0)
+        self.assertNotIn('model_estimate_reinterpreted', segs[2])
+
+    def test_unconfirmed_switch_is_a_hypothesis_only(self):
+        segs = self.segments([10.0, 55.0, 1.02, 1.3, 1.45, 2.05], [10.2, 55.3, 75.0, 89.0, 130.0, 160.0])
+        result = alignment.notation_hypothesis(segs, reference='faster-whisper')
+        self.assertEqual(result['status'], 'hypothesis_only')
+        self.assertTrue(all('model_estimate_reinterpreted' not in s for s in segs))
+        self.assertFalse(segs[3]['timing_notation_hypothesis']['confirmed'])
+
+    def test_no_drop_or_impossible_seconds_detect_nothing(self):
+        self.assertEqual(alignment.notation_hypothesis(self.segments([1.0, 5.0, 9.0], [1, 5, 9]), reference='r')['status'],
+                         'not_detected')
+        self.assertEqual(alignment.notation_hypothesis(self.segments([30.0, 1.75, 2.1], [30, 105, 130]), reference='r')['status'],
+                         'not_consistent')  # .75 cannot be seconds
+
+
+class HybridTests(vertex_tests.VertexCase):
+    REPLY = {'segments': AlignedRecipeTests.REPLY['segments'] + [
+        {'start': 4.0, 'end': 6.0, 'speaker': 'S1', 'language': 'pl', 'text': 'Całkiem inny tekst tutaj.'}]}
+
+    @staticmethod
+    def forced(intervals):
+        def fake(data, segments, ref):
+            out = []
+            for seg, interval in zip(segments, intervals):
+                raws = alignment.split_words(seg['text'])
+                if interval is None:
+                    out.append({**seg, 'words': []})
+                    continue
+                start, end = interval
+                step = (end - start) / len(raws)
+                words = [{'word': raw, 'start': round(start + k * step, 3), 'end': round(start + (k + 1) * step, 3),
+                          'probability': None, 'score': 0.9, 'match': 'forced'} for k, raw in enumerate(raws)]
+                out.append({**seg, 'words': words, 'start': start, 'end': end, 'timing_source': 'forced_alignment'})
+            return out, {'segments_aligned': sum(1 for i in intervals if i), 'min_score': ref['min_score'],
+                         'reference': {'engine': 'mms-forced-align'}}
+        return fake
+
+    def run_hybrid(self, intervals):
+        from server.app.media import forced_align
+        self.transport(self.REPLY)
+        info = {'engine': 'faster-whisper', 'model': 'large-v3-turbo', 'segments': []}
+        with patch.object(alignment, 'faster_whisper_words', return_value=(REFERENCE, info)), \
+                patch.object(forced_align, 'align', side_effect=self.forced(intervals)):
+            enqueue_transcription(self.add_audio(), recipe='asr-vertex-gemini-hybrid')
+            worker.process_job(claim_job())
+        version = self.rows('derived_text')[0]
+        return json.loads(version['segments_json']), json.loads(version['metadata_json'])
+
+    def test_unaligned_segment_is_filled_and_marked_unconfirmed(self):
+        segments, metadata = self.run_hybrid([(0.4, 2.0), (2.6, 3.9), (4.1, 5.8)])
+        self.assertEqual([s['timing_source'] for s in segments],
+                         ['reference_alignment', 'reference_alignment', 'forced_alignment_unconfirmed'])
+        self.assertIs(segments[2]['independent_confirmation'], False)
+        self.assertEqual(metadata['timing_alignment']['fill']['filled_segments'], [2])
+        self.assertEqual(metadata['word_timing']['available_segments'], 3)
+
+    def test_overlapping_fill_is_rejected(self):
+        segments, metadata = self.run_hybrid([None, None, (3.0, 5.0)])  # would start before the previous end 3.9
+        self.assertEqual(segments[2]['words'], [])
+        self.assertEqual(metadata['timing_alignment']['fill']['rejected_overlapping'], [2])
+
+    def test_hybrid_validation(self):
+        base = effective_recipe('asr-vertex-gemini-hybrid')['effective']
+        validate_effective(base)
+        ref = base['model_options']['timing_reference']
+        for change in ({'primary': ref['fill']}, {'fill': ref['primary']}, {'extra': 1}):
+            with self.subTest(change=change), self.assertRaises(RecipeError):
+                validate_effective(dict(base, model_options={'timing_reference': {**ref, **change}}))

@@ -212,6 +212,6 @@ class BenchmarkTests(MediaCase):
             self.assertEqual(0, cli.main(['asr-recipes', '--kind', 'asr']))
         self.assertEqual(json.loads(out.read_text())['content_sha256'], json.loads(stdout.getvalue().splitlines()[0])['content_sha256'])
         recipes = json.loads(stdout.getvalue().splitlines()[1])['recipes']
-        self.assertEqual({'legacy', 'per-segment-pl-nl-en', 'asr-vertex-gemini', 'asr-vertex-gemini-aligned', 'asr-vertex-gemini-chirp', 'asr-vertex-gemini-forced'}, {r['id'] for r in recipes})
+        self.assertEqual({'legacy', 'per-segment-pl-nl-en', 'asr-vertex-gemini', 'asr-vertex-gemini-aligned', 'asr-vertex-gemini-chirp', 'asr-vertex-gemini-forced', 'asr-vertex-gemini-hybrid'}, {r['id'] for r in recipes})
         with db.session() as conn:
             self.assertEqual(2, conn.execute("SELECT count(*) FROM derived_text").fetchone()[0])

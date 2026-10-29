@@ -123,6 +123,10 @@ requirements-whisper.txt`. So: FastAPI stack, `pypdf`, `faster-whisper==1.2.0`, 
   data, and `poppler-utils`. With them the local presets `ocr-tesseract-pol-nld-eng` and
   `ocr-chat-screenshot-pol-nld-eng` run without a cloud call and give pixel boxes per line. They
   also rasterize scanned PDF pages (`pdftoppm`), and `/settings` offers them once `media-capabilities`
-  sees the binaries. *Not verified here:* the build and an OCR run in the container (no Tesseract or
-  Docker on this host). Check with `docker compose … exec worker python -m app.cli
-  media-capabilities`; expect `ocr_tesseract` and `pdf_rasterizer` `available`.
+  sees the binaries. *Not verified here* (no Tesseract or Docker on this host). *Verified by the
+  coordinator, 2026-10-29 ~22:45 UTC (reported, not repeated here):*
+  * a trial build of `81422d4` (84 s, exit 0);
+  * `media-capabilities` in the container: `ocr_tesseract` `available` (languages eng, nld, osd,
+    pol), `pdf_rasterizer` `available`, `asr_faster_whisper` `importable`.
+
+  The trial image was removed. An OCR run inside the container has not been done yet.

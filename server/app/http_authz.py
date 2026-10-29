@@ -64,10 +64,27 @@ def _token(request: Request) -> str | None:
     return request.cookies.get(TOKEN_COOKIE)
 
 
+# Set by the proxy on the routes it exempts from its own login (docs/ADVOCATE.md, "Recipients through
+# the proxy"). The header can only take access away: a client that sends it is refused in legacy_open.
+PUBLIC_ROUTE_HEADER = 'x-ageds-public-route'
+# What a recipient's browser needs, and nothing else; the proxy exempts exactly these from its login.
+RECIPIENT_PUBLIC_ROUTES = (
+    ('GET', '/advocate'), ('POST', '/advocate/login'), ('POST', '/advocate/logout'),
+    ('*', '/api/advocate/*'),
+    ('GET,HEAD', '/api/artifacts/*/content'),
+    ('GET', '/static/app.css'), ('GET', '/static/advocate.css'), ('GET', '/static/advocate.mjs'),
+    ('GET', '/static/range-player.mjs'),
+)
+
+
 def _resolve(request: Request) -> Access:
     with _read() as db:
         mode = get_setting(db, 'auth.mode', 'legacy_open')
         if mode == 'legacy_open':
+            # A route the proxy serves without its own login carries PUBLIC_ROUTE_HEADER; in
+            # legacy_open it would make an anonymous visitor the owner, so it is refused outright.
+            if request.headers.get(PUBLIC_ROUTE_HEADER):
+                raise HTTPException(403, 'this route is public through the proxy; it needs auth.mode=tokens')
             # Without accounts every request acts as the owner: only local clients may do that.
             if not _legacy_client_allowed(db, request):
                 raise HTTPException(403, 'legacy_open accepts only local clients; use auth.mode=tokens')
@@ -150,7 +167,7 @@ def installation(capability: str):
 
 
 # Feature-area reads that hand out files or whole exports (review 3, R3-1).
-EXPORT_PATH_SEGMENTS = ('export', 'files', 'packet')
+EXPORT_PATH_SEGMENTS = ('export', 'files', 'packet', 'download')
 
 
 def by_method_capability(method: str, path: str) -> str:

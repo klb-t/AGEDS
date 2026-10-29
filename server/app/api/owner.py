@@ -126,7 +126,44 @@ def report_page(request: Request):
     from ..pilot_report import collect
     with closing(connect(read_only=True)) as db:
         report = collect(db)
-    return templates.TemplateResponse(request, 'owner_report.html', {'r': report})
+    from ..reports.outputs import pdf_status
+    return templates.TemplateResponse(request, 'owner_report.html', {'r': report, 'pdf': pdf_status()})
+
+
+@router.get('/report/download/{fmt}')
+def report_download(request: Request, fmt: str):
+    """The report as one self-contained file (no scripts, no external assets) for a recipient."""
+    import tempfile
+    from datetime import datetime, timezone
+    from pathlib import Path
+    from fastapi.responses import FileResponse, Response
+    from ..pilot_report import collect
+    from ..reports.outputs import pdf_status, write_pdf
+    if fmt not in ('html', 'pdf'):
+        raise HTTPException(404, 'format must be html or pdf')
+    if fmt == 'pdf' and pdf_status()['status'] != 'available':
+        raise HTTPException(409, 'PDF output is not available in this installation: ' + pdf_status()['reason'])
+    with closing(connect(read_only=True)) as db:
+        report = collect(db)
+    static = Path(__file__).resolve().parents[1] / 'static'
+    css = (static / 'app.css').read_text() + '\n' + (static / 'owner.css').read_text()
+    html = templates.get_template('owner_report.html').render(
+        {'request': request, 'r': report, 'standalone': True, 'inline_css': css})
+    stamp = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')
+    headers = {'Cache-Control': 'no-store', 'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src data:"}
+    if fmt == 'html':
+        headers['Content-Disposition'] = f'attachment; filename="ageds-raport-{stamp}.html"'
+        return Response(html, media_type='text/html; charset=utf-8', headers=headers)
+    staging = Path(tempfile.mkdtemp(prefix='ageds-report-pdf-'))
+    (staging / 'report.html').write_text(html, encoding='utf-8')
+    result = write_pdf(staging)
+    if result.get('status') != 'written':
+        raise HTTPException(500, f"PDF was not written: {result.get('reason', 'unknown')}")
+    from starlette.background import BackgroundTask
+    import shutil as _shutil
+    return FileResponse(staging / 'report.pdf', media_type='application/pdf', filename=f'ageds-raport-{stamp}.pdf',
+                        headers={'Cache-Control': 'no-store'},
+                        background=BackgroundTask(_shutil.rmtree, staging, ignore_errors=True))
 
 
 # ---------------------------------------------------------------- settings

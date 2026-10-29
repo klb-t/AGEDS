@@ -1,13 +1,14 @@
 <!doctype html><html {{ ui_html_attrs() }}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Raport pokrycia</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/owner.css"></head><body>
-<header>{% include '_nav.html' %}<div><h1>Raport pokrycia i pilota</h1><p>z bazy, tylko odczyt · wygenerowano {{ r.generated_at }} · kod <code>{{ r.code_commit[:12] }}</code></p></div></header>
+<title>Raport pokrycia</title>{% if standalone %}<style>{{ inline_css|safe }}</style>{% else %}<link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/owner.css">{% endif %}</head><body>
+<header>{% if not standalone %}{% include '_nav.html' %}{% endif %}<div><h1>Raport pokrycia i pilota</h1><p>z bazy, tylko odczyt · wygenerowano {{ r.generated_at }} · kod <code>{{ r.code_commit[:12] }}</code></p></div></header>
 <main class="owner" data-owner-page="report">
+{% if not standalone %}<p class="owner-inline" data-report-downloads><a class="owner-button" href="/report/download/html" data-report-download="html">Pobierz raport (HTML)</a>{% if pdf and pdf.status == 'available' %} <a class="owner-button" href="/report/download/pdf" data-report-download="pdf">Pobierz raport (PDF)</a>{% else %} <span data-report-pdf-unavailable>PDF niedostępny w tej instalacji ({{ pdf.reason if pdf else '—' }})</span>{% endif %} <small>Plik jest samodzielny (bez skryptów i odnośników do serwera). Zawiera fragmenty materiału — przekazuj go tylko uprawnionym osobom.</small></p>{% endif %}
 <p class="owner-layers">Warstwy: <b>bajty źródła i ich pozyskania</b> · <b>wynik modelu</b> (ASR/OCR, z modelem i przebiegiem) · interpretacje. Fragmenty tekstu modelu są cytatem wyniku modelu, nie treścią źródła.</p>
 
 <section class="panel"><h2>Oryginały</h2>
 <p>{{ r.reimport.artifacts }} oryginałów, {{ r.reimport.acquisitions }} pozyskań (te same bajty = jeden oryginał; każde pozyskanie zapisane osobno).</p>
 <div class="owner-scroll"><table data-report-artifacts><tr><th>ID</th><th>Plik</th><th>Typ</th><th>Bajty</th><th>SHA-256</th><th>Pozyskania</th><th>Wersje tekstu</th></tr>
-{% for a in r.artifacts %}<tr><td><a href="/artifact/{{ a.id }}">{{ a.id }}</a></td><td>{{ a.original_name }}</td><td>{{ a.mime_type }}</td><td class="num">{{ a.size_bytes }}</td><td><code>{{ (a.sha256 or '')[:16] }}…</code></td><td class="num">{{ a.acquisitions }}</td><td class="num">{{ a.derived_texts|length }}</td></tr>{% endfor %}</table></div>
+{% for a in r.artifacts %}<tr><td>{% if standalone %}{{ a.id }}{% else %}<a href="/artifact/{{ a.id }}">{{ a.id }}</a>{% endif %}</td><td>{{ a.original_name }}</td><td>{{ a.mime_type }}</td><td class="num">{{ a.size_bytes }}</td><td><code>{{ (a.sha256 or '')[:16] }}…</code></td><td class="num">{{ a.acquisitions }}</td><td class="num">{{ a.derived_texts|length }}</td></tr>{% endfor %}</table></div>
 </section>
 
 <section class="panel"><h2>Wynik modelu (transkrypcje i OCR)</h2>

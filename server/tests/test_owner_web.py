@@ -298,3 +298,41 @@ class InviteFromSettingsTests(Base):
             self.assertIn('error=', r.headers['location'])
         with db.session() as conn:
             self.assertIsNone(conn.execute("SELECT 1 FROM principals WHERE display_name='x'").fetchone())
+
+
+class ReportDownloadTests(Base):
+    def test_html_download_is_self_contained(self):
+        h = self.h(self.owner_token)
+        page = self.client.get('/report', headers=h).text
+        self.assertIn('data-report-download="html"', page)
+        r = self.client.get('/report/download/html', headers=h)
+        self.assertEqual(r.status_code, 200)
+        self.assertIn('attachment; filename="ageds-raport-', r.headers['content-disposition'])
+        self.assertEqual(r.headers['cache-control'], 'no-store')
+        self.assertIn("default-src 'none'", r.headers['content-security-policy'])
+        body = r.text
+        for absent in ('<script', '/static/', 'href="/artifact', 'data-report-downloads', '<nav'):
+            self.assertNotIn(absent, body, absent)
+        self.assertIn('<style>', body)
+        self.assertIn('Raport pokrycia i pilota', body)
+        self.assertEqual(self.client.get('/report/download/docx', headers=h).status_code, 404)
+
+    def test_pdf_needs_chromium_and_download_needs_export(self):
+        from unittest.mock import patch
+        h = self.h(self.owner_token)
+        with patch.dict(os.environ, {'EW_PDF_CHROMIUM': ''}):
+            self.assertEqual(self.client.get('/report/download/pdf', headers=h).status_code, 409)
+            self.assertIn('data-report-pdf-unavailable', self.client.get('/report', headers=h).text)
+        chromium = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
+        if os.path.exists(chromium):
+            with patch.dict(os.environ, {'EW_PDF_CHROMIUM': chromium, 'EW_PDF_CHROMIUM_NO_SANDBOX': '1'}):
+                pdf = self.client.get('/report/download/pdf', headers=h)
+                self.assertEqual(pdf.status_code, 200, pdf.text[:200])
+                self.assertTrue(pdf.content.startswith(b'%PDF-'))
+        # a principal with installation read_text but no export can read the page, not download it
+        with db.session() as conn:
+            scope = conn.execute("SELECT id FROM scopes WHERE kind='installation'").fetchone()[0]
+            authz.grant(conn, self.rec, scope, ['read_metadata', 'read_text'])
+        r = self.h(self.rec_token)
+        self.assertEqual(self.client.get('/report', headers=r).status_code, 200)
+        self.assertEqual(self.client.get('/report/download/html', headers=r).status_code, 403)

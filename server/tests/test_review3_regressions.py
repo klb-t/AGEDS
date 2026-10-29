@@ -268,3 +268,44 @@ class Remark_SupersededByAnInvisibleVersion(Base):
         self.assertNotIn(CANARY, mine.text)
         owners = self.client.get(f'/api/artifacts/{self.art_a}/transcript', headers=self.h(self.owner_token))
         self.assertEqual(owners.json()['id'], newer)  # the owner sees the current version
+
+
+class RecipientRoutesThroughTheProxy(Base):
+    """Tokens-mode readiness: the routes the proxy may exempt from its login, and the legacy_open backstop."""
+
+    def test_public_route_header_is_refused_in_legacy_open(self):
+        with db.session() as conn:
+            authz.set_setting(conn, 'auth.mode', 'legacy_open', confirm_widening=True)
+        plain = self.client.get(f'/api/artifacts/{self.art_a}/transcript')
+        marked = self.client.get(f'/api/artifacts/{self.art_a}/transcript', headers={'X-AGEDS-Public-Route': '1'})
+        self.assertEqual((plain.status_code, marked.status_code), (200, 403))
+        self.assertNotIn('umowa', marked.text)
+
+    def test_exempted_data_routes_admit_nobody_without_a_token(self):
+        from server.app.http_authz import RECIPIENT_PUBLIC_ROUTES
+        marked = {'X-AGEDS-Public-Route': '1'}
+        probes = [('GET', f'/api/artifacts/{self.art_b}/content'), ('HEAD', f'/api/artifacts/{self.art_b}/content'),
+                  ('GET', '/api/advocate/conversations'), ('POST', '/api/advocate/conversations'),
+                  ('GET', '/api/advocate/status'), ('GET', '/api/advocate/summaries')]
+        for method, path in probes:
+            r = self.client.request(method, path, headers=marked, json={} if method == 'POST' else None)
+            self.assertEqual(r.status_code, 401, (method, path, r.status_code))
+            self.assertNotIn(CANARY, r.text)
+        shell = self.client.get('/advocate', headers=marked)
+        self.assertEqual(shell.status_code, 200)
+        self.assertNotIn(CANARY, shell.text)
+        self.assertTrue(any(path == '/api/advocate/*' for _, path in RECIPIENT_PUBLIC_ROUTES))
+
+    def test_every_listed_route_exists(self):
+        import fnmatch
+        from server.app import main
+        from server.app.http_authz import RECIPIENT_PUBLIC_ROUTES
+        paths = [getattr(r, 'path', '') for r in main.app.routes]
+        static = __import__('pathlib').Path(main.__file__).parent / 'static'
+        for _, pattern in RECIPIENT_PUBLIC_ROUTES:
+            if pattern.startswith('/static/'):
+                self.assertTrue((static / pattern[len('/static/'):]).is_file(), pattern)
+                continue
+            regex = pattern.replace('*', '{x}')
+            self.assertTrue(any(fnmatch.fnmatch(p.replace('{artifact_id}', '{x}'), pattern) or p == regex for p in paths),
+                            pattern)

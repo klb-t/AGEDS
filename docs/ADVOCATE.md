@@ -130,3 +130,37 @@ characters) is unverified. An avatar is not implemented.
 - Status labels (`wynika z cytowanych fragmentów`, `wniosek (hipoteza)` …) describe the kind of statement, not a probability.
 - Annotations, tags and the audit log have no scope before the model and are never shown to recipients.
 - In `legacy_open` mode (the default) everyone reaching the port acts as the owner.
+
+## Recipients through the proxy (tokens mode)
+
+A recipient outside the VM reaches AGEDS through the proxy, which otherwise asks for its own
+login (basic auth). These routes, and only these, are what a recipient's browser needs. The list is
+`http_authz.RECIPIENT_PUBLIC_ROUTES`; a test keeps it equal to real routes and files.
+
+| Method | Path | Why |
+|---|---|---|
+| GET | `/advocate` | the page shell and login form; reads no stored data |
+| POST | `/advocate/login`, `/advocate/logout` | start or end the browser session (token → cookie) |
+| any | `/api/advocate/*` | conversations, turns, answer basis, summaries, status, voice |
+| GET, HEAD | `/api/artifacts/*/content` | listening to a cited recording (range playback, with `read_bytes`) |
+| GET | `/static/app.css`, `/static/advocate.css`, `/static/advocate.mjs`, `/static/range-player.mjs` | the page's own assets |
+
+Rules for the proxy exception:
+* On every exempted route the proxy sets the request header `X-AGEDS-Public-Route: 1`. In Caddy
+  that is `request_header X-AGEDS-Public-Route 1` inside the route that skips `basic_auth`. AGEDS
+  refuses any request carrying it while `auth.mode=legacy_open`. A client that sends the header
+  itself only loses access.
+* Order:
+  * to tokens: first `scripts/auth_mode_vm.sh --to tokens --apply`, then add the exception;
+  * back: first remove the exception, then `scripts/auth_mode_vm.sh --to legacy_open
+    --proxy-exception-removed --apply`.
+
+  In `legacy_open` the proxy is a local client, so an exempted route without the header would make
+  any visitor the owner. The script refuses the way back without that flag.
+* The proxy passes `X-Forwarded-Proto: https` (Caddy does by default), so the session cookie is
+  `Secure`. The public host name must be in `http.allowed_hosts` (`deploy_vm.sh --public-host`).
+
+In tokens mode the owner signs in at `/advocate` with the owner token (`authz-owner-init`, kept in
+`~/.config/ageds/owner_init.json`). The session cookie then opens every owner page; those stay
+behind the proxy's basic auth as well. Tested without tokens: every exempted data route answers 401
+and leaks nothing (`RecipientRoutesThroughTheProxy` in `server/tests/test_review3_regressions.py`).

@@ -1382,6 +1382,30 @@
           "checks": "backend 1585 passed / 3 skipped, JS 137, i18n complete, verify OK, browser 14 suites 135 steps"
         }
       }
+    },
+    {
+      "id": "AGEDS-TASK-20261029-OWNER-GAPS-1",
+      "owner": "rzecznik_zbieranie",
+      "status": "in_progress",
+      "scope": [
+        "server/app/main.py (default transcript selection)",
+        "server/app/connectors/gmail.py",
+        "server/app/commands/connectors.py",
+        "server/app/templates/owner_batch.html",
+        "server/app/api/owner.py",
+        "server/app/templates/owner_settings.html",
+        "server/tests/test_owner_web.py",
+        "server/tests/test_gmail_connector.py",
+        "server/tests/test_version_status.py",
+        "docs/{OWNER_WEB,GMAIL_API}.md"
+      ],
+      "based_on_commit": "b33c40a",
+      "acceptance": [
+        "A: review-3 leftovers (superseded default for recipients, explicit spam/trash, pending verifier removed on failure)",
+        "B: batch page refreshes while jobs are open",
+        "C: owner invites a recipient from /settings without the CLI"
+      ],
+      "not_in_scope": "real-export importer checks and runtime deps report (ageds-2); deployment (owner)"
     }
   ],
   "remaining_boundaries": [

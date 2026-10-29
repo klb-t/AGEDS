@@ -45,15 +45,19 @@ The first command probes runtime capability. The second installs the app and tes
 
 `server/tests/browser/acceptance.cjs` starts an isolated Python fixture with generated WAV, transcript versions and SQLite data. It checks real Chromium citation selection, save-response consistency, stale responses, packet download and audio-range playback.
 
-Install Playwright and its Chromium in a local tool environment, then make `require('playwright')` available to Node. For example, with a newly chosen external directory:
+Playwright is pinned in `server/tests/browser/package.json` and its lockfile (version 1.56.1, the build
+of the Chromium preinstalled in `/opt/pw-browsers/chromium-1194`). `node_modules` there is ignored by Git
+and survives restarts; nothing is kept in `/tmp` (a tmpfs on the VM). One command runs every suite, or
+the named ones, and restores the package with `npm ci` when it is missing:
 
 ```sh
-npm install --prefix /path/to/browser-tools playwright@1.62.1
-/path/to/browser-tools/node_modules/.bin/playwright install chromium
-NODE_PATH=/path/to/browser-tools/node_modules PYTHON=/path/to/AGEDS/.venv/bin/python node server/tests/browser/acceptance.cjs
+scripts/browser_tests.sh                 # all server/tests/browser/*.cjs
+scripts/browser_tests.sh owner advocate  # selected suites
 ```
 
-`AGEDS_BROWSER_EXECUTABLE` can select an already installed Chromium. Set `AGEDS_BROWSER_RECEIPT` to a new output path to retain the run receipt. The runner uses a temporary synthetic database, never the operator's live catalog. Node unit tests and source review are different evidence from this browser runtime check.
+It sets `PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers` when that directory exists. Elsewhere, install a
+browser with `server/tests/browser/node_modules/.bin/playwright install chromium`, or point
+`AGEDS_BROWSER_EXECUTABLE` at an already installed Chromium. Set `AGEDS_BROWSER_RECEIPT` to a new output path to retain the run receipt. The runner uses a temporary synthetic database, never the operator's live catalog. Node unit tests and source review are different evidence from this browser runtime check.
 
 ## Optional experiments and smoke runners
 
@@ -85,8 +89,8 @@ Active contracts stay in `docs/`. New acceptance evidence belongs in `docs/valid
 
 `server/tests/browser/advocate.cjs` starts `server.tests.browser_advocate_fixture` (synthetic WAV and transcript,
 temporary SQLite, `auth.mode=tokens`) and drives `/advocate` in real Chromium: login, question, citation basis,
-range playback, history and hidden-material canaries. Run it like the acceptance runner above:
+range playback, history and hidden-material canaries. Run it like the other suites:
 
 ```bash
-NODE_PATH=/path/to/browser-tools/node_modules PYTHON=/path/to/AGEDS/.venv/bin/python node server/tests/browser/advocate.cjs
+scripts/browser_tests.sh advocate advocate_model
 ```

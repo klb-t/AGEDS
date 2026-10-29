@@ -78,9 +78,8 @@ also left to the owner.
 
 ## Continue without restarting completed work
 
-Use the local checks in [Development](docs/DEVELOPMENT.md). Browser suites need
-`NODE_PATH=<playwright node_modules>` and, when that Playwright expects another Chromium build,
-`AGEDS_BROWSER_EXECUTABLE=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. GitHub Actions
+Use the local checks in [Development](docs/DEVELOPMENT.md). Browser suites: `scripts/browser_tests.sh`
+(Playwright pinned with a lockfile in `server/tests/browser/`, browser from `/opt/pw-browsers`). GitHub Actions
 remains manual-only; do not dispatch it or call paid models to obtain a receipt.
 
 Before upgrading a live installation:

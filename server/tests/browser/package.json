@@ -1,0 +1,9 @@
+{
+  "name": "ageds-browser-tests",
+  "private": true,
+  "description": "Real-Chromium acceptance suites (server/tests/browser/*.cjs). Playwright is pinned to the build of the preinstalled browser in /opt/pw-browsers (chromium-1194); see scripts/browser_tests.sh.",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "playwright": "1.56.1"
+  }
+}

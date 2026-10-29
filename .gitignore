@@ -15,3 +15,8 @@ __pycache__/
 *.py[cod]
 /data/
 .kotlin/
+
+# Browser-suite dependencies (installed from server/tests/browser/package-lock.json)
+server/tests/browser/node_modules/
+# Agent worktrees (temporary checkouts)
+.claude/worktrees/

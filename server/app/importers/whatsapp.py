@@ -8,7 +8,12 @@ from ..db import session
 from ..evidence import add_event, ensure_source, ingest_file
 
 PARSER_NAME = 'whatsapp_txt'
-PARSER_VERSION = '2'
+# '3' (2026-10-30): the date order is read from the file itself. Every header of one export uses
+# one date format; a first field above 12 confirms day-first, a second field above 12 shows
+# month-first (e.g. US ``m/d/yy``). Without such a line the day-first policy stays and the
+# ambiguity is flagged; with both, the dates stay unparsed. Version 2 always applied day-first,
+# so valid US dates were reported as ``invalid``.
+PARSER_VERSION = '3'
 # Both Android "date, time - sender" and iOS "[date, time] sender".
 LINE = re.compile(
     r'^[\u200e\u200f]*(?P<open>\[)?'
@@ -20,15 +25,41 @@ LINE = re.compile(
 MSG = re.compile(r'^(?P<sender>[^:]{1,120}):\s(?P<body>.*)$')
 
 
-def _timestamp(date: str, time: str, ampm: str | None) -> tuple[str | None, dict]:
-    """Use declared day-first policy; never consult today's date or local zone."""
+POLICY_ORDER = ('day_first', 'parser_policy_not_source_locale')
+
+
+def date_order(dates: list[str]) -> tuple[str | None, str]:
+    """(order, status) from the date fields of all headers of one file; never from today or a locale."""
+    first_high = second_high = False
+    for date in dates:
+        parts = re.split(r'[./-]', date)
+        if len(parts) == 3:
+            first_high |= int(parts[0]) > 12
+            second_high |= int(parts[1]) > 12
+    if first_high and second_high:
+        return None, 'conflicting_orders_in_file'
+    if second_high:
+        return 'month_first', 'inferred_from_file_second_field_above_12'
+    if first_high:
+        return 'day_first', 'inferred_from_file_first_field_above_12'
+    return POLICY_ORDER
+
+
+def _timestamp(date: str, time: str, ampm: str | None,
+               order: tuple[str | None, str] = POLICY_ORDER) -> tuple[str | None, dict]:
+    """Use the file's date order (``date_order``); never consult today's date or local zone."""
     metadata = {
         'raw_date': date, 'raw_time': time, 'raw_ampm': ampm,
-        'date_order': 'day_first', 'date_order_status': 'parser_policy_not_source_locale',
+        'date_order': order[0], 'date_order_status': order[1],
         'timezone': None, 'timezone_status': 'unknown', 'status': 'invalid',
     }
+    if order[0] is None:
+        metadata['status'] = 'date_order_conflict'
+        return None, metadata
     try:
         day, month, raw_year = re.split(r'[./-]', date)
+        if order[0] == 'month_first':
+            day, month = month, day
         year = int(raw_year)
         if len(raw_year) not in {2, 4}:
             raise ValueError('Unsupported year width')
@@ -49,7 +80,8 @@ def _timestamp(date: str, time: str, ampm: str | None) -> tuple[str | None, dict
             return None, metadata
         ts = datetime(year, int(month), int(day), hour, minute, second).isoformat()
         metadata['status'] = 'parsed_local_time'
-        metadata['date_order_ambiguous'] = int(day) <= 12 and int(month) <= 12 and int(day) != int(month)
+        metadata['date_order_ambiguous'] = (order == POLICY_ORDER and int(day) <= 12 and int(month) <= 12
+                                            and int(day) != int(month))
         return ts, metadata
     except (ValueError, OverflowError):
         return None, metadata
@@ -94,7 +126,7 @@ def import_whatsapp_txt(
             external_id=f"{PARSER_NAME}:line:{msg['line_start']}", confidence=None,
             metadata={
                 'raw_header': msg['header'], 'raw_lines': msg['raw_lines'],
-                'parser': {'name': PARSER_NAME, 'version': PARSER_VERSION,
+                'parser': {'name': PARSER_NAME, 'version': version,
                            'line_start': msg['line_start'], 'line_end': msg['line_end']},
                 'timestamp': timestamp, 'issues': row_issues,
             },
@@ -109,15 +141,28 @@ def import_whatsapp_txt(
     except UnicodeDecodeError:
         content = content_bytes.decode('utf-8-sig', errors='replace')
         issues.append({'issues': ['invalid_utf8_replacement_in_parsed_text']})
-    for line_number, raw in enumerate(content.splitlines(), start=1):
+    lines = content.splitlines()
+
+    def header(raw):
         match = LINE.match(raw)
         if match and not (match.group('separator') or (match.group('open') and match.group('close'))):
-            match = None
+            return None
+        return match
+
+    with session() as db:
+        earlier = db.execute("SELECT 1 FROM events WHERE artifact_id=? AND source_id=? AND event_type='whatsapp_message' "
+                             "AND json_extract(metadata_json,'$.parser.version')='2' LIMIT 1",
+                             (artifact_id, source_id)).fetchone()
+    # A chat already imported by version 2 keeps version 2, so re-importing it stays idempotent.
+    version = '2' if earlier else PARSER_VERSION
+    order = POLICY_ORDER if earlier else date_order([m.group('date') for m in map(header, lines) if m])
+    for line_number, raw in enumerate(lines, start=1):
+        match = header(raw)
         if match:
             flush(current)
             rest = match.group('rest')
             message = MSG.match(rest)
-            ts, timestamp = _timestamp(match.group('date'), match.group('time'), match.group('ampm'))
+            ts, timestamp = _timestamp(match.group('date'), match.group('time'), match.group('ampm'), order)
             current = {
                 'ts': ts, 'timestamp': timestamp,
                 'sender': message.group('sender') if message else None,
@@ -132,4 +177,5 @@ def import_whatsapp_txt(
         else:
             issues.append({'line': line_number, 'issues': ['unparsed_line_before_first_message'], 'raw': raw})
     flush(current)
-    return {'artifact_id': artifact_id, 'messages': count, 'parser_version': PARSER_VERSION, 'issues': issues}
+    return {'artifact_id': artifact_id, 'messages': count, 'parser_version': version, 'issues': issues,
+            'date_order': {'order': order[0], 'status': order[1]}}

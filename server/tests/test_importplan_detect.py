@@ -72,7 +72,7 @@ def test_plan_contents_are_exact_and_ordered(world):
     assert [i['ordinal'] for i in items] == list(range(1, len(items) + 1))
     assert all(i['status'] == 'proposed' for i in items)
     header = created['plan']
-    assert header['detector_schema'] == 'ageds.importplan-detectors' and header['detector_version'] == '1'
+    assert header['detector_schema'] == 'ageds.importplan-detectors' and header['detector_version'] == '2'
     assert len(header['detector_sha256']) == 64 and header['latest_version'] == 1
     assert sorted(header['scan_ids']) == sorted(s['scan_id'] for s in world.scans.values())
     found = by_locator(world, items)

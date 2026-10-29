@@ -38,7 +38,9 @@ PARSER_NAME = 'email_rfc5322'
 # SHA-256 (comm_common.container_scheme); a container imported by '1' stays '1'.
 # '3' (2026-10-27): a forwarded message/rfc822 part is extracted as one attachment (it was walked
 # into, so its text landed among this message's text parts and nothing was extracted).
-PARSER_VERSION = '3'
+# '4' (2026-10-30): X-Gmail-Labels is unfolded and its RFC 2047 encoded-words are decoded before
+# the label list is split (a folded or encoded non-ASCII label stayed raw or kept a line break).
+PARSER_VERSION = '4'
 
 _MONTHS = {m: i for i, m in enumerate(('jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'), 1)}
 _DAYS = ('mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun')
@@ -521,6 +523,10 @@ class _Importer:
 
         body, body_meta, html_parts, attachments = self._parts(parsed, index=index, problems=problems)
         labels_raw = _first(headers, 'X-Gmail-Labels')
+        labels_text = labels_raw
+        if labels_raw is not None and self.version not in ('1', '2', '3'):
+            labels_text, label_problems = decode_words(_unfold(labels_raw))
+            problems.extend(f'gmail_labels_{p}' for p in label_problems)
         gm_thrid = (_first(headers, 'X-GM-THRID') or '').strip() or None
         thread_id = f'gmail-thrid:{gm_thrid}' if gm_thrid else thread.get('root')
 
@@ -541,7 +547,7 @@ class _Importer:
             'subject': {'raw': subject_raw, 'decoded': subject},
             'addresses': addresses,
             'date': date_meta, 'received': received,
-            'gmail': {'labels_raw': labels_raw, 'labels': _labels(labels_raw) if labels_raw else None,
+            'gmail': {'labels_raw': labels_raw, 'labels': _labels(labels_text) if labels_text else None,
                       'thread_id': gm_thrid},
             'thread': {**thread, 'gmail_thread_id': gm_thrid,
                        'in_reply_to': _MSGID.findall(_unfold(_first(headers, 'In-Reply-To') or '')),
@@ -690,6 +696,17 @@ def _sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _kept_version(artifact_id: int, version: str) -> str:
+    """A container whose messages version 3 already recorded keeps '3' (labels read as then): idempotent re-import."""
+    if version != PARSER_VERSION:
+        return version
+    from ..db import session
+    with session() as db:
+        earlier = db.execute("SELECT 1 FROM events WHERE artifact_id=? AND event_type='email' "
+                             "AND json_extract(metadata_json,'$.parser.version')='3' LIMIT 1", (artifact_id,)).fetchone()
+    return '3' if earlier else version
+
+
 def _options(limits: CommLimits) -> dict:
     return {'max_message_bytes': limits.max_message_bytes, 'max_attachment_bytes': limits.max_attachment_bytes,
             'max_records': limits.max_records}
@@ -713,6 +730,7 @@ def import_mbox(path: Path, *, source_locator: str | None = None, original_name:
         index.append(scan_ids(b''.join(framed['chunks']), limits))
     roots = reconstruct_roots(index)
     version, child_base = container_scheme(artifact_id, locator, PARSER_NAME, PARSER_VERSION)
+    version = _kept_version(artifact_id, version)
     importer = _Importer(source_id=source_id, artifact_id=artifact_id, base_locator=child_base,
                          collection_id=collection_id, limits=limits, issues=issues, version=version)
     complete = True
@@ -755,6 +773,7 @@ def import_eml(path: Path, *, source_locator: str | None = None, original_name: 
     ids = scan_ids(raw, limits)
     thread = reconstruct_roots([ids])[0]
     version, child_base = container_scheme(artifact_id, locator, PARSER_NAME, PARSER_VERSION)
+    version = _kept_version(artifact_id, version)
     importer = _Importer(source_id=source_id, artifact_id=artifact_id, base_locator=child_base,
                          collection_id=collection_id, limits=limits, issues=issues, version=version)
     importer.message(raw, index=0, thread=thread, from_line=None, truncated=truncated,

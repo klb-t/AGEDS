@@ -23,6 +23,8 @@ execution.
 | End-to-end acceptance of the whole increment (task Z, 2026-10-16) | [Report](E2E_ACCEPTANCE_2026-10-16.md), [receipt](E2E_ACCEPTANCE_2026-10-16.json), [matrix](../ACCEPTANCE.md) |
 | Location history, places and presence (task L1, 2026-10-17) | [Report](LOCATION_2026-10-17.md), [receipt](LOCATION_2026-10-17.json) |
 | Personal-data exports and file metadata (task L2, 2026-10-17) | [Report](TRACES_2026-10-17.md), [receipt](TRACES_2026-10-17.json) |
+| Export format variants, synthetic (2026-10-30) | [Report](REAL_EXPORT_FORMATS_2026-10-30.md) |
+| Production image runtime dependencies (2026-10-30) | [Report](DEPLOY_DEPS_2026-10-30.md) |
 
 Native completion: 411 executed JVM tests, main APK signature verification and
 synthetic-provider test APK compilation passed with pinned versions. SAF device

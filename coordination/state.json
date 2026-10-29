@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "project": "AGEDS",
-  "state_id": "AGEDS-STATE-20261021-001",
-  "updated_at": "2026-10-21T00:29:48.605329+00:00",
-  "based_on_remote_commit": "b6abe86ec1cdcd4ca8669be359ddb25422a51cc2",
-  "local_branch": "ccr-d25c3cb3-qgbhql",
-  "status_summary": "Digital traces wave integrated (L1 location, L2 personal-data exports, L3 ledger/health/transport) on top of the 2026-10-16 increment. Full suite 1376 passed; 11 browser scripts PASS. L2/L3 agents stopped at a usage limit after committing code; coordinator committed their docs, merged, unified time_budget.v5 and wired photo geotags as a point source.",
+  "state_id": "AGEDS-STATE-20261030-001",
+  "updated_at": "2026-10-29T21:34:53.964762+00:00",
+  "based_on_remote_commit": "dc4f326",
+  "local_branch": "claude/rzecznik-design",
+  "status_summary": "2026-10-30: claude/rzecznik-design integrates the 2026-10-16 increment and the digital traces wave (draft PR #6, merged 65c7823) with the advocate work (accounts, grants, packages, Vertex engines, voice), the real pilot (7 owner files, R100 consent), the owner web path (/start, /report, /settings), the read-only Gmail connector and three security reviews (all confirmed findings fixed). Backend 1596 passed / 3 skipped, JS 137, 14 browser suites / 135 steps. Production last deployed ec9fb6a (2026-10-27); deploying the head and the pilot transfer wait for the owner. Traces formats and mail/chat exports remain unverified on real data.",
   "history": {
     "overnight_ledger": "coordination/archive/2026-09-30_2026-10-01/night-20261001.json",
     "original_tasks": 82,
@@ -42,7 +42,8 @@
     "pull_request": 6,
     "source_commit_map": "coordination/publication-20261002.json",
     "initial_review_concern_resolved": "New-content and historical provenance review completed; matched case identifiers removed from current files, no new sensitive content found in reviewed additions. Preexisting history preserved.",
-    "branch": "ccr-d25c3cb3-qgbhql"
+    "branch": "ccr-d25c3cb3-qgbhql",
+    "pr6_closure": "left to the owner; its content is in claude/rzecznik-design (coordinator, 2026-10-30)"
   },
   "tasks": [
     {
@@ -1202,7 +1203,7 @@
     {
       "id": "AGEDS-TASK-20261027-ZBIERANIE-1",
       "owner": "rzecznik_zbieranie",
-      "status": "in_progress",
+      "status": "done",
       "scope": [
         "merge ccr-d25c3cb3-qgbhql",
         "server/app/http_authz.py",
@@ -1380,13 +1381,14 @@
           "browser_real_copy": "pilot copy: report+settings rendered, 7 real files uploaded, plan 7 units completed, process queued 0 (same bytes already had text), 0 provider calls; copy deleted",
           "defect_found_on_real_data": "identical re-uploads become new artifact rows; processing now skips bytes that already have the text",
           "checks": "backend 1585 passed / 3 skipped, JS 137, i18n complete, verify OK, browser 14 suites 135 steps"
-        }
+        },
+        "closing_note": "pilot on real files done; transfer to production prepared, runs after the owner deploys"
       }
     },
     {
       "id": "AGEDS-TASK-20261029-OWNER-GAPS-1",
       "owner": "rzecznik_zbieranie",
-      "status": "in_progress",
+      "status": "done",
       "scope": [
         "server/app/main.py (default transcript selection)",
         "server/app/connectors/gmail.py",
@@ -1405,7 +1407,32 @@
         "B: batch page refreshes while jobs are open",
         "C: owner invites a recipient from /settings without the CLI"
       ],
-      "not_in_scope": "real-export importer checks and runtime deps report (ageds-2); deployment (owner)"
+      "not_in_scope": "real-export importer checks and runtime deps report (ageds-2); deployment (owner)",
+      "results": {
+        "A": "a598f9e",
+        "B_C_and_traces_gaps": "dc4f326",
+        "handoff": "HANDOFF.md rewritten to 2026-10-30 state",
+        "checks": "backend 1596 passed / 3 skipped; owner 7, advocate 8, advocate_model 6 browser steps"
+      }
+    },
+    {
+      "id": "AGEDS-TASK-20261030-REAL-FORMATS-1",
+      "owner": "rzecznik_zbieranie (agent in a worktree)",
+      "status": "in_progress",
+      "scope": [
+        "server/app/importers/{email_mbox,whatsapp,whatsapp_media}.py",
+        "server/app/importers/data/*.json",
+        "server/app/importplan/ (detectors)",
+        "server/tests/ (new format tests)",
+        "docs/validation/REAL_EXPORT_FORMATS_2026-10-30.md",
+        "docs/validation/DEPLOY_DEPS_2026-10-30.md"
+      ],
+      "based_on_commit": "a598f9e",
+      "acceptance": [
+        "Gmail/WhatsApp format variants through the owner path with regression tests (synthetic, modelled on documented formats)",
+        "deploy runtime dependency report with a pre-deploy checklist"
+      ],
+      "not_in_scope": "deployment; real user data"
     }
   ],
   "remaining_boundaries": [

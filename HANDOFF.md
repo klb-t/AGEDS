@@ -1,94 +1,94 @@
 # AGEDS — current handoff
 
-State: **2026-10-16**, branch `ccr-d25c3cb3-qgbhql` (draft PR #6), based on `main`
-@ `9c1d513`. Read [CLAUDE.md](CLAUDE.md), [current coordination](coordination/state.json),
-the [increment plan](docs/plans/EVIDENCE_TIMELINE_2026-10-16.md) and the
-[validation index](docs/validation/README.md) before continuing. The previous
-handoff (2026-10-02 recovery) is preserved in Git history at `9c1d513`.
+State: **2026-10-30**, branch `claude/rzecznik-design`. It contains the 2026-10-16 increment and
+the digital traces wave of draft PR #6 (`ccr-d25c3cb3-qgbhql`, merged 2026-10-27 at `65c7823`),
+plus the advocate work of 2026-10-25 and everything since. Read [CLAUDE.md](CLAUDE.md),
+[current coordination](coordination/state.json), [AGENTS.md](AGENTS.md) and the
+[architecture rules](docs/ARCHITECTURE_RULES.md) before continuing. Earlier handoffs are preserved
+in Git history: 2026-10-16 at `65c7823^2`, and the 2026-10-02 recovery at `9c1d513`.
 
-## What this increment added
+Deployment: production on the VM (`127.0.0.1:8090`, `legacy_open` behind the proxy's basic auth)
+was last deployed by the coordinator at `ec9fb6a` on 2026-10-27. Deploying the current head with
+`scripts/deploy_vm.sh`, then the pilot transfer (`scripts/transfer_pilot_to_production.sh`),
+waits for the owner. Nobody deploys to production without them. Closing draft PR #6 on GitHub is
+also left to the owner.
 
-Work ran as parallel tracks with disjoint file scopes, integrated sequentially.
-Each area owns its migrations (reserved version ranges), router, CLI module,
-templates and corpus part through the registries in
-`server/app/{schema,api,commands}/__init__.py` and `server/tests/corpus/__init__.py`.
+## What exists
 
 | Stage | Behavior | Contract |
 |---|---|---|
-| Catalog | Collections per device/account/export; read-only scans through nested ZIP/TAR with virtual locators (`a.zip!/b.zip!/c`); byte signatures over extensions; content groups by SHA-256 with every observation; collisions; coverage with per-basis ranges and gaps; profile → explain → promote descriptions (model output only as hypotheses). | [CATALOG](docs/CATALOG.md) |
-| Import plan | Detectors propose importers for catalogued files and archive members; ambiguous items need a human choice, opt-ins stay off; idempotent, resumable runs with verified materialization outside source roots. | [IMPORT_PLAN](docs/IMPORT_PLAN.md) |
-| Importers | ChatGPT (tree, shards) and Claude.ai with logical identity across exports; MBOX/EML, ICS, VCF, call logs, billing profiles, recording-name hypotheses, Takeout activity, opt-in location/browser history, WhatsApp media, EXIF. | [chat](docs/IMPORTERS_CHAT.md), [communications](docs/IMPORTERS_COMM.md) |
-| Time | `event_times` keeps every observed time with kind, zone status and precision; unknown zones stay unknown; DST folds/gaps are reported. | [plan §5](docs/plans/EVIDENCE_TIMELINE_2026-10-16.md), [timeline](docs/TIMELINE.md) |
-| Timeline | Versioned display rule with uncertainty intervals, undated list, transcript segments, swimlanes, density, bookmarks; correlation hypotheses with reviewed status. | [TIMELINE](docs/TIMELINE.md) |
-| Media | ASR recipes pinned to jobs; per-segment language strategy (allowed languages, e.g. pl/nl/en); run comparison; WER/CER tool; OCR and diarization adapters. | [MULTILINGUAL_ASR](docs/MULTILINGUAL_ASR.md) |
-| Interpretation | Time budgets (lower/probable/upper, unobserved band, sensitivity), feature series; preregistered hypotheses, dossier, thesis typology, permutation event study with warnings and a fixed disclaimer. | [TIME_BUDGET](docs/TIME_BUDGET.md), [HYPOTHESES](docs/HYPOTHESES.md) |
-| Reports | Five report types; HTML primary, JSON/CSV/XLSX, optional PDF; method section; every number traceable to `report.json`; verifiable manifests; citation bundles; private output directory only. | [REPORTS](docs/REPORTS.md) |
-| Ecosystem | Read API v1 with local hashed tokens, optional enforcement, CSRF and host checks; ChatADHD intents (anchored quotes) and proposals; Loom graph export with quarantine. ChatADHD client stub: klb-t/chatadhd#46. | [READ_API](docs/READ_API.md), [ECOSYSTEM_ADAPTERS](docs/ECOSYSTEM_ADAPTERS.md) |
-| Workbench | Layered search with epistemic labels, saved searches, bulk tags, folders, bookmarks, shortcuts, command palette, light/dark themes, PL/NL/EN. | [WORKBENCH](docs/WORKBENCH.md) |
+| Catalog, import plan, importers | Read-only scans through nested archives, content groups by SHA-256, import plans with human approval. Importers: chat exports, MBOX/EML (forwarded `message/rfc822` kept as an attachment since parser v3), ICS, VCF, call logs, billing, WhatsApp with media, Takeout, EXIF. | [CATALOG](docs/CATALOG.md), [IMPORT_PLAN](docs/IMPORT_PLAN.md), [chat](docs/IMPORTERS_CHAT.md), [communications](docs/IMPORTERS_COMM.md) |
+| Time, timeline | Every observed time with kind, zone status and precision; unknown zones stay unknown; versioned display rule. | [TIMELINE](docs/TIMELINE.md) |
+| Digital traces (2026-10-17..21) | Location history and places, personal-data exports, photo/document metadata, bank/transport/health records. All tested on generated data only. | [LOCATION](docs/LOCATION.md), [PERSONAL_EXPORTS](docs/PERSONAL_EXPORTS.md), [LEDGER](docs/LEDGER.md), [open gaps](docs/validation/TRACES_GAPS_2026-10-30.md) |
+| Media | Pinned ASR/OCR recipes. Vertex Gemini engines (text, speakers, languages), with word times from local faster-whisper aligned to the Gemini words (default `asr-vertex-gemini-aligned`). Optional Chirp, forced-alignment and hybrid presets. PDF text layer first. Superseded text versions are marked, append-only. | [MULTILINGUAL_ASR](docs/MULTILINGUAL_ASR.md) §6a |
+| Interpretation | Time budgets; preregistered hypotheses with a dossier, including preregistered disconfirming queries and a disclosure of the search for contrary material; thesis typology; event study. | [TIME_BUDGET](docs/TIME_BUDGET.md), [HYPOTHESES](docs/HYPOTHESES.md) |
+| Advocate (rzecznik, 2026-10-25..) | Accounts, grants, packages and tokens (`auth.mode=tokens`). The advocate answers only from gated passages; `proven` must quote verbatim; the status `contradicts` exists. Voice uses a separate Text-to-Speech consent. Private conversations stay out of whole-database exports. | [ADVOCATE](docs/ADVOCATE.md), [design](docs/design/RZECZNIK_MODEL_2026-10-25.md) |
+| Owner in the browser (2026-10-28..30) | `/start`: upload, catalogue, plan, originals, ASR/OCR queue, report. `/report`: pilot and coverage report. `/settings`: consents for Vertex and Text-to-Speech, provider, budget, default presets, upload limit, recipients and invitations. | [OWNER_WEB](docs/OWNER_WEB.md) |
+| Connectors | Read-only Gmail API (owner OAuth, `gmail.readonly`, raw RFC 822 through the EML importer). Spam and Trash are opt-in. Never run against an account. | [GMAIL_API](docs/GMAIL_API.md) |
+| Pilot | A separate pilot installation (`scripts/pilot_local.sh`, `~/ageds-pilot`). Its report comes from the database; `import-pilot-results` copies pilot results into another installation without a model call. | `scripts/pilot_local.sh`, `server/app/pilot_transfer.py` |
+| Reports, workbench, ecosystem | As in the 2026-10-16 increment. | [REPORTS](docs/REPORTS.md), [WORKBENCH](docs/WORKBENCH.md), [READ_API](docs/READ_API.md) |
 
-## Digital traces wave (2026-10-17 – 2026-10-21)
+## Where results came from
 
-Plan: [DIGITAL_TRACES](docs/plans/DIGITAL_TRACES_2026-10-17.md). Location history and places
-([LOCATION](docs/LOCATION.md)), personal-data exports, photo and document metadata
-([PERSONAL_EXPORTS](docs/PERSONAL_EXPORTS.md)), bank/transport/health records
-([LEDGER](docs/LEDGER.md)). Time budget is now `time_budget.v5`: provider inferences, provider-side
-user edits and derived spans are estimates unless a run says otherwise. At integration: 1376 backend
-tests passed, 137 Node tests, 11 browser scripts PASS (location 7, traces 5, ledger 6 among them).
-Passive sources are excluded from event-study density controls by default (method v3). No real
-provider export, bank statement or health export was available; all formats were tested on generated
-data.
+* **Real data, with the owner's consent (R100, 2026-10-27):** 7 pilot files (3 phone recordings
+  in AMR, 4 PNG screenshots), in the pilot installation only. Vertex Gemini ASR/OCR ran on them,
+  local faster-whisper (small, then large-v3-turbo) and MMS forced alignment ran offline on the
+  stored Gemini text. Provider spend in the pilot is 0.40 €. The same files went through the web
+  path once, on a throwaway copy of the pilot database, without a model call.
+* **Everything else is synthetic or generated:**
+  * mail and chat export structures;
+  * all digital-traces formats;
+  * the browser suites (with a test-only fake Vertex transport);
+  * the review reproductions.
 
-## Acceptance (this session, synthetic data only)
+  No real mail, chat, location, bank or health export has been imported yet.
+
+## Acceptance (latest runs)
 
 | Check | Evidence |
 |---|---|
-| Backend | Full `pytest server/tests` at `6023d0f`: 1206 passed, 1 opt-in skip (chat scale), 764 subtests. |
-| JavaScript | `node --test server/tests/js/*.test.mjs`: 127 passed. |
-| Browser | Real Chromium on the R2 head: acceptance 24, timeline 8, workbench 9, reports 10, time budget 9, hypotheses 10, import plan 9, media 7 PASS; catalog page check passed. |
-| End to end | [ACCEPTANCE](docs/ACCEPTANCE.md): one run of the real CLI and service on a generated multi-device layout; 19 of 22 criteria met, 3 not verifiable by a run (covered by suites or by change-set/documentation properties). |
-| Reviews | Two adversarial reviews (13 + 13 confirmed findings, plus plausible ones verified); all fixed with regression tests: [first](docs/validation/REVIEW_FIXES_2026-10-16.md), [second](docs/validation/REVIEW2_FIXES_2026-10-16.md). Event study is method v2 and time budget `time_budget.v3`; earlier stored runs remain as historical records. |
-| Privacy | `scripts/verify_repository.py` flags e-mails outside example domains, phone-like numbers outside fictional ranges and home-directory paths in tracked files. |
+| Backend | Full `pytest server/tests` at the head of 2026-10-30 (`dc4f326` work): 1596 passed, 3 skipped. |
+| JavaScript | `node --test server/tests/js/*.test.mjs`: 137 passed. |
+| Browser | Real Chromium, 14 suites, 135 steps at `b17e2e7`: acceptance 24, advocate 8, advocate_model 6, analysis_budget 9, hypotheses 10, importplan 9, ledger 6, location 7, media 7, owner 7, reports 10, timeline 8, traces 5, workbench 9. Owner and advocate suites re-run at `dc4f326`. |
+| Reviews | Three independent security reviews (2026-10-26, 2026-10-26, 2026-10-27). All confirmed findings are fixed, with regression tests in `server/tests/test_review*_regressions.py`. The third reviewer's repro suite no longer reproduces any finding. |
+| Repository | `scripts/verify_repository.py` passes (links and privacy scan). |
+| CI | GitHub Actions "Manual verification" is dispatched only by the coordinator. It was green on `65c7823`; later dispatches are reported by the coordinator. |
 
 ## Concrete remaining boundaries
 
-- **No real inference ran here.** Hugging Face was blocked and Tesseract/pyannote
-  are absent: multilingual ASR, OCR and diarization were exercised with fake
-  engines only. Run `asr-benchmark` on a consented corpus before relying on any
-  strategy for Polish/Dutch speech.
-- **No real exports were available.** Chat, Takeout, MBOX and billing layouts
-  follow public observations and data-file mappings; check them against a real
-  export (mapping changes need no code change).
-- 7z/RAR archive adapters were written but not executed (libraries absent).
-- Time budgets and hypothesis results are interpretive: bounds depend on recorded
-  parameters, `nieobserwowane` is missing data, and a temporal association is not
-  causation. Every result records its method and parameters.
-- Two token mechanisms coexist after the 2026-10-27 integration: the read-API
-  tokens of `integrations` (with `EW_REQUIRE_TOKEN=1` also data-bearing routes) and
-  the accounts/grants of the advocate branch (`auth.mode=tokens`). In
-  `auth.mode=tokens` every catalogue/import/timeline/report router requires
-  installation scope; recipients reach only the advocate and gated artifact routes.
-  The default is still `legacy_open`, which serves only local clients
-  (`docs/ADVOCATE.md`). Android sends the advocate token (`X-AGEDS-Token`).
-- Manifests and packages are hashed, not signed. Hash agreement is byte identity,
-  not authorship, truth or custody.
-- Android and SAF device execution remain as described in the 2026-10-02 handoff;
-  Android code was not changed in this increment.
-- The five-layer legal-analysis standard, Live Explainer and signed custody remain
-  future work.
-- Public Git history retains the earlier case-specific identifiers noted on
-  2026-10-02.
-- Advocate (2026-10-25..27, `docs/design/RZECZNIK_MODEL_2026-10-25.md`): Vertex text
-  and TTS were called once on synthetic data; two independent authorization review
-  rounds are regression tests (`server/tests/test_review*_regressions.py`).
+- **Inference quality is not measured against a human reference.** ASR/OCR quality,
+  speaker hypotheses and the word-time alignment are model output. Pilot alignment made 77 of
+  147 segments word-citable. Tesseract and pyannote have never run here, and 7z/RAR adapters were
+  not executed.
+- **No real exports yet.** Gmail and WhatsApp formats were rehearsed on synthetic structures
+  (a widened format check is a separate receipt in `docs/validation/`). For digital traces,
+  every gap is listed with its source and what closes it in
+  [TRACES_GAPS](docs/validation/TRACES_GAPS_2026-10-30.md).
+- **The production image lacks some optional engines:** torch/torchaudio
+  (`server/requirements-align.txt`) are not in it, and the faster-whisper model downloads to
+  `HF_HOME` on the first job. See the deploy dependency report in `docs/validation/` when present.
+- Production runs `legacy_open`, so recipients' grants are not enforced. Invitations are
+  disabled there with an explanation; switching to `auth.mode=tokens` is an operator decision
+  (docs/ADVOCATE.md).
+- Manifests and packages are hashed, not signed. Hash agreement is byte identity, not
+  authorship, truth or custody.
+- Android and SAF device execution are as described in the 2026-10-02 handoff.
+- The five-layer legal-analysis standard, Live Explainer and signed custody remain future work.
+- Public Git history retains the earlier case-specific identifiers noted on 2026-10-02.
 
 ## Continue without restarting completed work
 
-Use the local checks in [Development](docs/DEVELOPMENT.md) plus
-`pytest server/tests/test_e2e_acceptance.py` and the browser scripts listed in
-the receipts. GitHub Actions remains manual-only; no paid model calls were made.
-Before upgrading a live installation: stop workers, back up SQLite and the
-content store; migrations are additive (versions 1, 10–99) and the timeline cache
-rebuilds once (`PROJECTION_CODE`). New tables must be classified in
-`server/app/packages.py` (exported or excluded with a reason) — a test enforces it.
-Record new work as a task in `coordination/state.json` with scope, base revision
-and acceptance; add new receipts instead of editing old ones.
+Use the local checks in [Development](docs/DEVELOPMENT.md). Browser suites need
+`NODE_PATH=<playwright node_modules>` and, when that Playwright expects another Chromium build,
+`AGEDS_BROWSER_EXECUTABLE=/opt/pw-browsers/chromium-1194/chrome-linux/chrome`. GitHub Actions
+remains manual-only; do not dispatch it or call paid models to obtain a receipt.
+
+Before upgrading a live installation:
+* stop the workers and back up SQLite and the content store (`deploy_vm.sh` does both);
+* migrations are additive: versions 1–6 and the reserved ranges 10–139 (`server/app/schema/__init__.py`);
+* classify new tables in `server/app/packages.py` (exported or excluded with a reason); a test
+  enforces it.
+
+Record new work as a task in `coordination/state.json` with scope, base revision and acceptance,
+and add new receipts instead of editing old ones. Open tasks are in the ledger; the owner's next
+steps are deployment and real exports through `/start`.

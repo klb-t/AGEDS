@@ -193,9 +193,28 @@ def _billing(ctx: RunContext) -> dict:
 
 
 def _whatsapp(ctx: RunContext) -> dict:
+    """One chat when ``chat_member`` is chosen, otherwise every detected chat text in turn.
+
+    Several Android "export without media" files uploaded together form one folder unit;
+    each chat is imported on its own and the other chat texts are never its media.
+    """
     from ..importers.whatsapp_media import import_whatsapp_export
-    return import_whatsapp_export(ctx.root_path, chat_member=ctx.params.get('chat_member') or None,
-                                  source_locator=ctx.root_source_locator, collection_id=ctx.collection_id)
+    chats = list(ctx.item['detection'].get('chat_members') or [])
+    chosen = ctx.params.get('chat_member') or None
+    if chosen or len(chats) <= 1:
+        return import_whatsapp_export(ctx.root_path, chat_member=chosen, source_locator=ctx.root_source_locator,
+                                      collection_id=ctx.collection_id)
+    results = [import_whatsapp_export(ctx.root_path, chat_member=chat, source_locator=ctx.root_source_locator,
+                                      collection_id=ctx.collection_id, other_chats=tuple(c for c in chats if c != chat))
+               for chat in chats]
+    totals: dict[str, int] = {}
+    for result in results:
+        for key, value in result.items():
+            if isinstance(value, int) and not isinstance(value, bool) and not key.endswith('_id'):
+                totals[key] = totals.get(key, 0) + value
+    return {'chats': [{'chat_member': c, 'chat_artifact_id': r['chat_artifact_id'], 'messages': r['messages'],
+                       'parser_version': r['parser_version'], 'coverage': r['coverage']} for c, r in zip(chats, results)],
+            'totals': totals, 'coverage': {'complete': all(r['coverage']['complete'] for r in results)}}
 
 
 def _recording_names(ctx: RunContext) -> dict:

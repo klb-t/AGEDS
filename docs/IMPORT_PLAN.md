@@ -52,7 +52,8 @@ Order of passes:
    ChatGPT. An export zip whose root holds the files is the unit "as a whole" (`archive`).
 2. **WhatsApp.** A zip whose root `.txt` (named like a WhatsApp chat, or probed) has WhatsApp-like
    lines → `archive` unit (the zip itself is imported). A directory with such a chat `.txt` →
-   `directory` unit with its sibling files. Several chats → the `chat_member` parameter is required.
+   `directory` unit with its sibling files. Several chats → each is imported in turn unless the
+   `chat_member` parameter picks one (since 2026-10-30; before, `chat_member` was required).
 3. **Single files.** Every remaining entry is matched against the file rules by effective type (or
    the extension's claim when bytes were only classified heuristically as text, e.g. a CSV with a
    preamble), locator regexes and probes. Entries inside units are never offered again.

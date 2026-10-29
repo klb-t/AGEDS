@@ -639,7 +639,7 @@ def test_whatsapp_folder_media_present_missing_omitted_unreferenced(env):
     omitted = [r for r in refs if r['status'] == 'omitted_by_export'][0]
     assert json.loads(omitted['locator_json'])['pattern_id'] == 'ios_omitted_en_v1'
     chat_events = events(result['chat_artifact_id'], 'whatsapp_message')
-    assert {e['meta']['parser']['version'] for e in chat_events} == {'2'}  # whatsapp_txt semantics unchanged
+    assert {e['meta']['parser']['version'] for e in chat_events} == {'3'}  # whatsapp_txt version 3: file-level date order
     counts = snapshot_counts()
     whatsapp_media.import_whatsapp_export(Path(m['folder']))
     assert snapshot_counts() == counts

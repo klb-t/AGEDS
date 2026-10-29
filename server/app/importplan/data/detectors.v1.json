@@ -1,6 +1,7 @@
 {
   "schema": "ageds.importplan-detectors",
-  "version": "1",
+  "version": "2",
+  "changes": {"2": "2026-10-30: WhatsApp chat names in NL/PL/FR/ES/PT wording; bidi marks before a chat line; a .eml starting with an mbox From line goes to email_eml"},
   "notice": "Detection rules are data. Name patterns and structure markers follow publicly observed export layouts (ChatGPT, Claude.ai, Google Takeout, SMS Backup & Restore, WhatsApp, call recorders). They are examples, not claims about every app or export version. A rule only proposes an importer; nothing is imported until a person approves the plan item.",
   "probe": {
     "prefix_bytes": 65536,
@@ -21,13 +22,18 @@
     ]
   },
   "whatsapp": {
-    "chat_name_regex": "(?:WhatsApp Chat (?:with|met|z|mit|avec|con) .+|WhatsApp Chat - .+|_chat)\\.txt",
-    "line_regex": "^(?:\\u200e|\\ufeff)?\\[?\\d{1,4}[./-]\\d{1,2}[./-]\\d{1,4},? \\d{1,2}[:.]\\d{2}",
+    "chat_name_regex": "(?:WhatsApp[ -]Chat (?:with|met|z|mit|avec|con|com) .+|WhatsApp Chat - .+|(?:Czat|Chat|Chat de|Discussion|Conversa do) WhatsApp (?:z|con|avec|com) .+|_chat)\\.txt",
+    "chat_name_examples": ["WhatsApp Chat with X.txt (EN Android)", "WhatsApp-chat met X.txt (NL Android)", "Czat WhatsApp z X.txt (PL Android)", "WhatsApp Chat mit X.txt (DE Android)", "_chat.txt (iOS)"],
+    "line_regex": "^[\\u200e\\u200f\\ufeff]*\\[?\\d{1,4}[./-]\\d{1,2}[./-]\\d{1,4},? \\d{1,2}[:.]\\d{2}",
     "min_matching_lines": 1
   },
   "files": [
-    {"id": "mbox", "types": ["mbox"],
+    {"id": "mbox", "types": ["mbox"], "locator_not_regex": "(?i)\\.eml(?:!\\d+)?$",
      "candidates": [{"importer": "email_mbox", "reason": "catalog byte signature: mbox (From line followed by headers)"}]},
+    {"id": "eml_with_mbox_from_line", "types": ["mbox"], "locator_regex": "(?i)\\.eml(?:!\\d+)?$",
+     "candidates": [
+       {"importer": "email_eml", "reason": "a .eml file that starts with an mbox \"From \" line (e.g. Thunderbird \"Save as\"); one message"},
+       {"importer": "email_mbox", "preference": "alternative", "reason": "the same bytes read as a one-message mbox"}]},
     {"id": "eml", "types": ["eml"],
      "candidates": [{"importer": "email_eml", "reason": "catalog byte signature: RFC 822 header block"}]},
     {"id": "ics", "types": ["ics"],

@@ -281,10 +281,7 @@ def blockers(item: dict, state: dict) -> list[str]:
         value = state['parameters'].get(param.name)
         if param.required and value in (None, ''):
             found.append(f'parameter_missing:{param.name}')
-    if importer_key == 'whatsapp_export':
-        chats = item['detection'].get('chat_members') or []
-        if len(chats) > 1 and not state['parameters'].get('chat_member'):
-            found.append('parameter_missing:chat_member')
+    # whatsapp_export with several chat texts and no chat_member imports each chat (adapters._whatsapp).
     return found
 
 

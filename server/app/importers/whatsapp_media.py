@@ -99,7 +99,8 @@ def _references(chat_artifact_id: int, patterns: dict):
 
 def import_whatsapp_export(path: Path, *, chat_label: str | None = None, chat_member: str | None = None,
                            source_locator: str | None = None, collection_id: int | None = None,
-                           limits: CommLimits = DEFAULT_LIMITS) -> dict:
+                           other_chats: tuple[str, ...] = (), limits: CommLimits = DEFAULT_LIMITS) -> dict:
+    """``other_chats``: further chat texts of the same folder/zip, imported on their own and not media of this chat."""
     patterns = _patterns()
     issues = Issues(limits.max_issues)
     base_locator = source_locator if source_locator is not None else str(path)
@@ -167,7 +168,7 @@ def import_whatsapp_export(path: Path, *, chat_label: str | None = None, chat_me
         parent_relation = 'contained_in_export_zip' if mode == 'zip' else 'file_in_same_export_folder_as_chat_text'
         by_key: dict[str, list[str]] = {}
         for name in members:
-            if name != chat_name:
+            if name != chat_name and name not in other_chats:
                 by_key.setdefault(_key(Path(name).name), []).append(name)
         for key, names in by_key.items():
             if len(names) > 1:
@@ -235,6 +236,8 @@ def import_whatsapp_export(path: Path, *, chat_label: str | None = None, chat_me
     if counts['missing_from_export']:
         issues.add('media_named_but_missing_from_export', count=counts['missing_from_export'])
     options = {'pattern_set': patterns['set'], 'mode': mode, 'chat_member': chat_name}
+    if other_chats:
+        options['other_chats_not_media'] = sorted(other_chats)[:limits.max_raw_items]
     coverage = {'complete': complete and not counts['media_not_extracted']}
     record_import_run(artifact_id=container_id or chat_artifact_id, importer=PARSER_NAME,
                       parser_version=version, options=options, counts=counts, coverage=coverage, issues=issues)

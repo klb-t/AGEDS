@@ -57,7 +57,9 @@ leaves out and how to run it. Acceptance evidence: [receipt](validation/IMPORT_C
   reconstructed root (`References[0]`, else the `In-Reply-To` chain within the file,
   else the message itself). Metadata keeps the Gmail thread id, header root, method,
   `In-Reply-To` and `References`. Gmail labels: raw `X-Gmail-Labels` plus a split list
-  honouring quoted labels.
+  honouring quoted labels. Since parser version 4 (2026-10-30) the value is unfolded and
+  its RFC 2047 encoded-words are decoded before splitting; a mailbox whose messages
+  version 3 already recorded keeps version 3 on re-import.
 * Body: first non-attachment `text/plain`; otherwise a text projection of the HTML part
   (`html.parser` text nodes, scripts/styles dropped). HTML parts are kept as bounded
   data with `rendering: never_rendered_as_trusted_markup`. A `multipart/*` without a
@@ -188,15 +190,20 @@ same opt-in. The opt-in is recorded on each event and in the run audit.
 
 ### WhatsApp media (`whatsapp_media.py`)
 
-Folder or zip export. The chat `.txt` is imported by the unchanged `whatsapp_txt` parser
-(version 2). Message body lines are matched against attachment/omission markers in
+Folder or zip export. The chat `.txt` is imported by the `whatsapp_txt` parser (version 3
+since 2026-10-30: the date order comes from the file itself; a first date field above 12
+confirms day-first, a second field above 12 shows month-first, both make every line
+`date_order_conflict`, neither keeps the day-first policy with `date_order_ambiguous`; a chat
+already imported by version 2 keeps version 2). Two-digit years stay untimed
+(`unknown_century`), and the zone is always unknown. Message body lines are matched against attachment/omission markers in
 [`whatsapp_media_patterns.v1.json`](../server/app/importers/data/whatsapp_media_patterns.v1.json)
 (Android `(file attached)`, iOS `<attached: …>`, `<Media omitted>`, `image omitted`, EN/NL/PL
 examples). Each marker becomes an `event_media_references` row anchored to the message
 event with its physical line: `present` (child artifact), `missing_from_export` or
 `omitted_by_export`. Parent: the zip artifact, or the chat `.txt` for a folder export
-(`parent_relation` recorded). Unreferenced media files are acquired and listed. Several
-`.txt` files require `chat_member`.
+(`parent_relation` recorded). Unreferenced media files are acquired and listed. With several
+chat `.txt` files the import plan imports each chat in turn unless `chat_member` picks one;
+the other chat texts are never media of a chat (`other_chats`).
 
 ### EXIF (`exif.py`, event `image_capture`)
 
@@ -250,6 +257,23 @@ a throwaway directory:
 
 All five units were detected and imported. The rehearsal found the `message/rfc822` defect
 above. Real exports were not used.
+
+Format variants checked on 2026-10-30 (again **synthetic**, through the upload path):
+[REAL_EXPORT_FORMATS_2026-10-30](validation/REAL_EXPORT_FORMATS_2026-10-30.md). What the
+owner should know before uploading:
+* Upload the zip or `.txt` the phone produced, with its original name. A chat `.txt` is
+  recognised by its name (`WhatsApp Chat with …`, `WhatsApp-chat met …`, `Czat WhatsApp z …`,
+  `WhatsApp Chat mit …`, `_chat.txt`, …). A renamed `.txt` uploaded on its own is only kept as
+  an original. Inside a zip any `.txt` with chat-like lines is found.
+* Every other file in the same upload as a loose chat `.txt` is offered to that chat as
+  possible media. Upload recordings and other evidence in a separate batch.
+* Phones set to a two-digit year (`29.10.26`, US `10/29/26`) give untimed messages; the
+  century is not assumed.
+* Takeout: the parts (`-001.zip`, `-002.zip`, …) can be uploaded together; only the part
+  with `Takeout/Mail/*.mbox` creates a mail item, the others are kept as originals. The
+  catalogue does not hash a member above 4 GiB (`max_member_hash_bytes`), and one mbox
+  import stops after 200 000 messages (`max_records`, coverage incomplete). Both are reported,
+  not silent, but a very large mailbox needs raised limits before it can be imported whole.
 
 ## Schema (`server/app/schema/records.py`, versions 25–27)
 
@@ -332,7 +356,7 @@ are 403, conflicts 409, invalid input 422. The API has no authentication.
 * Location/browser data are processed locally only; there is no UI for these importers.
 * Large JSON/ICS/VCF files are read whole up to `max_json_bytes` (512 MiB default).
 * A WhatsApp chat `.txt` inside a zip (or imported with a collection) is acquired twice per
-  run: once with its parent/collection by `whatsapp_media`, once by the unchanged
+  run: once with its parent/collection by `whatsapp_media`, once by the
   `whatsapp_txt` importer. Both observations point to the same artifact.
 * A file that fails to parse (e.g. `calls.xml` with a DTD) has already been acquired; the
   acquisition stays, no events are written and no `import_run` audit row is added.

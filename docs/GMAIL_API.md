@@ -51,7 +51,12 @@ scripts/pilot_local.sh cli gmail-import --query 'from:uwv.nl after:2026/09/01' -
 scripts/pilot_local.sh cli gmail-import --thread-id <id> --apply
 ```
 
-* Spam and Trash are included in a query, so a selection is not silently narrowed.
+* Spam and Trash are left out of a query unless `--include-spam-trash` is given: their text is
+  chosen by senders and would otherwise reach the advocate's basis. The dry run reports
+  `spam_trash_not_selected`, how many messages they would add, so the narrowing is visible.
+  A `--thread-id` import takes the whole thread as Gmail returns it.
+* The pending PKCE verifier is single use: it is removed by the first completion attempt,
+  also a failed one.
 * The dry run lists message ids without fetching content. `selection_complete` is false
   when `--max-messages` (default 500) cut the list.
 * A message already fetched with the same raw SHA-256 is skipped. A changed message (rare)

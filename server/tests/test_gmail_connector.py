@@ -35,7 +35,8 @@ class FakeGoogle:
         if path == 'profile':
             return {'emailAddress': 'owner@example.net'}
         if path == 'messages':
-            return {'messages': [{'id': 'm1'}, {'id': 'm2'}]}
+            spam = 'includeSpamTrash=true' in url
+            return {'messages': [{'id': 'm1'}, {'id': 'm2'}] + ([{'id': 'spam1'}] if spam else [])}
         if path.startswith('threads/'):
             return {'messages': [{'id': 'm1'}]}
         message_id = path.split('/')[1]
@@ -72,10 +73,13 @@ def test_wider_grant_is_refused_and_not_stored(config):
     assert not (config / 'gmail_token.json').exists()
 
 
-def test_state_mismatch_is_refused(config):
+def test_state_mismatch_is_refused_and_the_pending_verifier_is_gone(config):
     gmail.auth_url()
     with pytest.raises(gmail.GmailError, match='state'):
         gmail.auth_complete('http://127.0.0.1:8765/?state=forged&code=c', transport=FakeGoogle())
+    assert not (config / 'gmail_auth_pending.json').exists()
+    with pytest.raises(gmail.GmailError, match='no pending'):
+        gmail.auth_complete('http://127.0.0.1:8765/?state=x&code=c', transport=FakeGoogle())
 
 
 def test_dry_run_then_apply_is_idempotent_and_read_only(config):
@@ -84,6 +88,9 @@ def test_dry_run_then_apply_is_idempotent_and_read_only(config):
     assert stat.S_IMODE(os.stat(stored['stored']).st_mode) == 0o600
     dry = gmail.import_selection(query='from:example.org', transport=fake)
     assert (dry['selected'], dry['imported'], rows('SELECT * FROM artifacts')) == (2, [], [])
+    assert dry['spam_trash_not_selected'] == 1  # left out by default, and said so
+    wide = gmail.import_selection(query='from:example.org', transport=fake, include_spam_trash=True)
+    assert wide['selected'] == 3 and 'spam_trash_not_selected' not in wide
     assert not any('format=raw' in url for _, url in fake.calls)  # no content fetched in a dry run
     first = gmail.import_selection(query='from:example.org', apply=True, transport=fake)
     assert [i['rfc822_message_id'] for i in first['imported']] == ['<api-1@example.org>', '<api-2@example.org>']

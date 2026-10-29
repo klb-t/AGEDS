@@ -244,3 +244,27 @@ class Unconfirmed1BudgetBoundsFromContent(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class Remark_SupersededByAnInvisibleVersion(Base):
+    """Review 3 remark: a frozen snapshot's version superseded by one the recipient cannot see is still the default."""
+
+    def test_recipient_keeps_their_newest_visible_version(self):
+        from server.app import sharing
+        from server.app.media.version_status import mark
+        with db.session() as conn:
+            old = conn.execute("SELECT id FROM derived_text WHERE artifact_id=? ORDER BY id DESC LIMIT 1", (self.art_a,)).fetchone()[0]
+            pkg = sharing.create_package(conn, 'p', mode='snapshot')
+            sharing.add_item(conn, pkg['id'], 'artifact', self.art_a)
+            sharing.snapshot_package(conn, pkg['id'])
+            authz.grant(conn, self.rec, pkg['scope_id'], ['read_metadata', 'read_text'])
+        newer = evidence.add_derived_text(self.art_a, 'transcript', f'nowsza {CANARY}',
+                                          segments=[{'start': 0.0, 'end': 1.0, 'text': f'nowsza {CANARY}'}])
+        with db.session() as conn:
+            mark(conn, old, superseded_by_id=newer, reason='better alignment', actor='owner')
+        mine = self.client.get(f'/api/artifacts/{self.art_a}/transcript', headers=self.h(self.rec_token))
+        self.assertEqual(mine.status_code, 200)
+        self.assertEqual(mine.json()['id'], old)
+        self.assertNotIn(CANARY, mine.text)
+        owners = self.client.get(f'/api/artifacts/{self.art_a}/transcript', headers=self.h(self.owner_token))
+        self.assertEqual(owners.json()['id'], newer)  # the owner sees the current version

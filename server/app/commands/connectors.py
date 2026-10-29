@@ -23,6 +23,7 @@ def register(subparsers) -> None:
     group.add_argument('--thread-id')
     p.add_argument('--max-messages', type=int, default=500)
     p.add_argument('--collection-id', type=int)
+    p.add_argument('--include-spam-trash', action='store_true', help='also Spam and Trash (sender-controlled text)')
     p.add_argument('--apply', action='store_true', help='fetch the raw messages and import them')
 
 
@@ -41,7 +42,8 @@ def handle(args) -> int | None:
                 raise gmail.GmailError('--max-messages must be 1..5000')
             init_db()
             result = gmail.import_selection(query=args.query, thread_id=args.thread_id, apply=args.apply,
-                                            max_messages=args.max_messages, collection_id=args.collection_id)
+                                            max_messages=args.max_messages, collection_id=args.collection_id,
+                                            include_spam_trash=args.include_spam_trash)
     except gmail.GmailError as exc:
         print(json.dumps({'command': args.command, 'error': 'GmailError', 'message': str(exc)}), file=sys.stderr)
         return 2

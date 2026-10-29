@@ -389,9 +389,11 @@ def api_transcript(artifact_id:SqlPathId,derived_text_id:int|None=Query(None,ge=
         allow = _row_filter(db, access, 'derived_text', 'read_text')
         if derived_text_id is None:
             # The latest version this reader may see, not the latest version overall.
-            # Superseded versions stay addressable by id but are not the default.
-            r = next((row for row in db.execute(f"SELECT * FROM derived_text d WHERE artifact_id=? AND kind='transcript' AND {NOT_SUPERSEDED_SQL} ORDER BY id DESC",(artifact_id,))
-                      if allow is None or allow(row['id'])), None)
+            # Superseded versions stay addressable by id but are not the default. A reader who cannot
+            # see the superseding version (e.g. a frozen snapshot) still gets their newest visible one.
+            rows = db.execute(f"SELECT d.*, {NOT_SUPERSEDED_SQL} AS current FROM derived_text d WHERE artifact_id=? AND kind='transcript' ORDER BY id DESC",(artifact_id,)).fetchall()
+            visible = [row for row in rows if allow is None or allow(row['id'])]
+            r = next((row for row in visible if row['current']), visible[0] if visible else None)
         else:
             r=db.execute("SELECT * FROM derived_text WHERE artifact_id=? AND id=? AND kind='transcript'",(artifact_id,derived_text_id)).fetchone()
             if r is not None and allow is not None and not allow(r['id']):

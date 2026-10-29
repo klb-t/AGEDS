@@ -6,7 +6,9 @@ and pastes the address the browser was redirected to (the page itself need not l
 works when AGEDS runs on a remote machine). The token file lives outside the repository with
 mode 0600 and is never exported.
 
-Only GET requests are made. A selected query or thread is listed first (dry run); with apply,
+Only GET requests are made. Spam and Trash are left out unless asked for (their text is chosen
+by senders); the dry run says how many messages they would add. A selected query or thread is
+listed first (dry run); with apply,
 each message is fetched with ``format=raw`` and acquired through the EML importer as a
 temporary copy, so parsing, attachments and dates follow the same rules as an exported .eml.
 The API's labels, thread id, internalDate and historyId are recorded separately as what the API
@@ -102,6 +104,7 @@ def auth_complete(redirect_url: str, transport=None) -> dict:
     if not pending_path.is_file():
         raise GmailError('no pending authorisation; run gmail-auth-url first')
     pending = json.loads(pending_path.read_text())
+    pending_path.unlink()  # single use, also when this attempt fails (review 3 remark)
     if time.time() - pending['created'] > 900:
         raise GmailError('the pending authorisation is older than 15 minutes; run gmail-auth-url again')
     params = urllib.parse.parse_qs(urllib.parse.urlparse(redirect_url).query)
@@ -123,7 +126,6 @@ def auth_complete(redirect_url: str, transport=None) -> dict:
         raise GmailError('no refresh token returned; revoke the app at myaccount.google.com and authorise again')
     _write_private(_paths()['token'], {'refresh_token': token['refresh_token'], 'scope': token['scope'],
                                        'obtained_at': time.time()})
-    pending_path.unlink()
     return {'stored': str(_paths()['token']), 'mode': '0600', 'scope': sorted(granted)}
 
 
@@ -168,7 +170,7 @@ class Api:
 
 
 def select(api: Api, *, query: str | None = None, thread_id: str | None = None,
-           max_messages: int = MAX_MESSAGES) -> tuple[list[str], bool]:
+           max_messages: int = MAX_MESSAGES, include_spam_trash: bool = False) -> tuple[list[str], bool]:
     """Message ids of a query (paged) or one thread; second value says whether the list is complete."""
     if (query is None) == (thread_id is None):
         raise GmailError('give exactly one of --query or --thread-id')
@@ -178,7 +180,8 @@ def select(api: Api, *, query: str | None = None, thread_id: str | None = None,
         return ids[:max_messages], len(ids) <= max_messages
     ids, page = [], None
     while True:
-        params = {'q': query, 'maxResults': min(500, max_messages - len(ids)), 'includeSpamTrash': 'true'}
+        params = {'q': query, 'maxResults': min(500, max_messages - len(ids)),
+                  'includeSpamTrash': 'true' if include_spam_trash else 'false'}
         if page:
             params['pageToken'] = page
         listing = api.get('messages', params)
@@ -191,19 +194,25 @@ def select(api: Api, *, query: str | None = None, thread_id: str | None = None,
 
 
 def import_selection(*, query: str | None = None, thread_id: str | None = None, apply: bool = False,
-                     max_messages: int = MAX_MESSAGES, collection_id: int | None = None, transport=None) -> dict:
+                     max_messages: int = MAX_MESSAGES, collection_id: int | None = None, transport=None,
+                     include_spam_trash: bool = False) -> dict:
     from ..evidence import temporary_copy_acquisitions
     from ..importers.email_mbox import import_eml
     from ..importers.email_mbox import scan_ids, DEFAULT_LIMITS
     api = Api(transport)
     profile = api.get('profile')
     account = profile.get('emailAddress') or 'unknown'
-    ids, complete = select(api, query=query, thread_id=thread_id, max_messages=max_messages)
-    request = {'query': query, 'thread_id': thread_id, 'max_messages': max_messages, 'include_spam_trash': True}
+    ids, complete = select(api, query=query, thread_id=thread_id, max_messages=max_messages,
+                           include_spam_trash=include_spam_trash)
+    request = {'query': query, 'thread_id': thread_id, 'max_messages': max_messages, 'include_spam_trash': include_spam_trash}
     report = {'account': account, 'selected': len(ids), 'selection_complete': complete, 'applied': apply,
-              'imported': [], 'skipped': [], 'failed': []}
+              'include_spam_trash': include_spam_trash, 'imported': [], 'skipped': [], 'failed': []}
     if not apply:
         report['note'] = 'dry run: message ids listed only, no message content fetched'
+        if query is not None and not include_spam_trash:
+            # Spam and Trash hold sender-controlled text, so they are opt-in; say what is left out.
+            wider, _ = select(api, query=query, max_messages=max_messages, include_spam_trash=True)
+            report['spam_trash_not_selected'] = len(set(wider) - set(ids))
         return report
     for message_id in ids:
         message = api.get(f'messages/{urllib.parse.quote(message_id)}', {'format': 'raw'})

@@ -1,5 +1,6 @@
 <!doctype html><html {{ ui_html_attrs() }}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Paczka {{ collection.id }}</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/owner.css"></head><body>
+{% set open_jobs = artifacts|map(attribute='jobs')|sum(start=[])|selectattr('status', 'in', ['queued', 'running'])|list %}
+<title>Paczka {{ collection.id }}</title>{% if open_jobs %}<meta http-equiv="refresh" content="10" data-owner-autorefresh>{% endif %}<link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/owner.css"></head><body>
 <header>{% include '_nav.html' %}<div><h1>Paczka {{ collection.id }}: {{ collection.label }}</h1><p>wgrano {{ collection.created_at }} · oryginały tylko do odczytu · <a href="/start">wszystkie paczki</a></p></div></header>
 <main class="owner" data-owner-page="batch" data-collection-id="{{ collection.id }}">
 {% if error %}<p class="wb-alert" role="alert" data-owner-error>{{ error }}</p>{% endif %}
@@ -40,7 +41,7 @@
 <td>{% for j in a.jobs %}<span class="owner-chip owner-job-{{ j.status }}" data-job-status="{{ j.status }}">{{ j.kind }}: {{ j.status }}</span>{% if j.error %} <small>{{ j.error[:120] }}</small>{% endif %} {% else %}{{ '—' if a.processing else 'nie dotyczy' }}{% endfor %}</td></tr>
 {% else %}<tr><td colspan="5">Jeszcze brak oryginałów z tej paczki (uruchom import albo krok 3).</td></tr>{% endfor %}</table>
 {% if artifacts|selectattr('processing')|list %}<form method="post" action="/start/batch/{{ collection.id }}/process"><button data-owner-process>Transkrybuj i rozpoznaj tekst w nowych plikach</button></form>{% endif %}
-<p><a href="/media/queue">Kolejka zadań i postęp</a> · odśwież tę stronę, aby zobaczyć stan.</p>
+<p><a href="/media/queue">Kolejka zadań i postęp</a> · {% if open_jobs %}<span data-owner-refresh-note>zadań w toku: {{ open_jobs|length }} — strona odświeża się co 10 s</span>{% else %}brak zadań w toku{% endif %}.</p>
 </section>
 
 <section class="panel"><h2>5. Raport</h2><p><a href="/report" data-owner-report-link>Raport pokrycia i pilota</a> (co jest w bazie, skąd pochodzi, czego brakuje).</p></section>

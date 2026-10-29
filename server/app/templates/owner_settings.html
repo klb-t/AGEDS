@@ -27,6 +27,25 @@
 {% for c in calls %}<tr><td>{{ c.purpose }}</td><td>{{ c.provider_name }}</td><td>{{ c.model }}</td><td>{{ c.status }}</td><td class="num">{{ c.cost_eur }}</td><td>{{ c.started_at }}</td></tr>{% else %}<tr><td colspan="6">Brak.</td></tr>{% endfor %}</table></details>
 </section>
 
+<section class="panel" data-owner-recipients><h2>Odbiorcy (np. adwokat)</h2>
+<p>Odbiorca dostaje konto, pakiet wybranych spraw (migawka teraz albo bieżący), uprawnienie i jednorazowy link. Widzi tylko te sprawy; jego rozmowy z rzecznikiem są prywatne. Cofnięcie działa od razu; kopii już pobranych nie da się wycofać.</p>
+{% if not tokens_mode %}<p class="wb-alert" role="note" data-owner-invite-disabled>Zaproszenia są wyłączone: instalacja działa w trybie <code>legacy_open</code>, w którym uprawnienia odbiorców nie są egzekwowane, a odbiorca spoza tej maszyny nie przejdzie przez proxy. Włączenie trybu tokenów wymaga zmiany konfiguracji przez operatora (docs/ADVOCATE.md).</p>{% endif %}
+<form method="post" action="/settings/invite" data-owner-invite-form>
+<fieldset{% if not tokens_mode %} disabled{% endif %}>
+<label>Nazwa odbiorcy<input name="name" required maxlength="200" placeholder="np. mec. …"></label>
+<fieldset><legend>Sprawy</legend>{% for c in cases %}<label class="owner-radio"><input type="checkbox" name="case_ids" value="{{ c.id }}"> {{ c.name }}</label>{% endfor %}</fieldset>
+<label>Zakres<select name="mode"><option value="snapshot">migawka: materiał z chwili zaproszenia</option><option value="live">bieżący: także materiał dodany później</option></select></label>
+<label class="owner-radio"><input type="checkbox" name="read_bytes"> także odsłuch nagrań i pobieranie plików</label>
+<label>Ważność (dni, puste = bez limitu)<input name="expires_days" inputmode="numeric" maxlength="4"></label>
+<button>Utwórz zaproszenie</button>
+</fieldset></form>
+<table data-owner-recipient-table><tr><th>Odbiorca</th><th>Uprawnienia</th><th>Tokeny</th></tr>
+{% for p in recipients %}<tr data-recipient="{{ p.uid }}"><td>{{ p.display_name }} <small>({{ p.kind }}, od {{ p.created_at }})</small></td>
+<td>{% for g in p.grants %}<div>{{ g.scope_kind }}: {{ g.capabilities|join(', ') }}{% if g.valid_to %} · do {{ g.valid_to }}{% endif %} · {% if g.revoked_at %}cofnięte {{ g.revoked_at }}{% else %}aktywne <form method="post" action="/settings/grant/{{ g.uid }}/revoke" class="owner-inline"><button class="secondary" data-revoke-grant>Cofnij</button></form>{% endif %}</div>{% endfor %}</td>
+<td>{% for t in p.tokens %}<div>{{ t.label or 'token' }} z {{ t.created_at }}{% if t.expires_at %} · wygasa {{ t.expires_at }}{% endif %} · {% if t.revoked_at %}cofnięty{% else %}aktywny <form method="post" action="/settings/token/{{ t.uid }}/revoke" class="owner-inline"><button class="secondary" data-revoke-token>Cofnij</button></form>{% endif %}</div>{% endfor %}</td></tr>
+{% else %}<tr><td colspan="3">Brak odbiorców.</td></tr>{% endfor %}</table>
+</section>
+
 <section class="panel"><h2>Wgrywanie</h2>
 <p>Limit jednej paczki: <b data-owner-upload-limit>{{ upload_limit_gib }} GiB</b> (łącznie wszystkie pliki). Archiwa są rozpakowywane tylko do odczytu, z limitami katalogu (rozmiar po rozpakowaniu, współczynnik kompresji, liczba plików); przekroczenie oznacza skan jako niekompletny.</p>
 <form method="post" action="/settings/upload-limit" class="owner-inline" data-owner-upload-limit-form><label>Limit paczki (GiB)<input name="gib" value="{{ upload_limit_gib }}" inputmode="decimal" required></label><button>Zapisz limit</button></form>

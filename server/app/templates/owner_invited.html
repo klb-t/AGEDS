@@ -1,0 +1,12 @@
+<!doctype html><html {{ ui_html_attrs() }}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer"><title>Zaproszenie</title><link rel="stylesheet" href="/static/app.css"><link rel="stylesheet" href="/static/owner.css"></head><body>
+<header>{% include '_nav.html' %}<div><h1>Zaproszenie dla: {{ name }}</h1><p>pokazane tylko raz — skopiuj teraz</p></div></header>
+<main class="owner" data-owner-page="invited">
+<section class="panel">
+<p>Wyślij ten link wyłącznie odbiorcy, bezpiecznym kanałem. Link jest hasłem: kto go ma, widzi udostępnione sprawy. Nie jest zapisany nigdzie w czytelnej postaci; po zamknięciu tej strony nie da się go odzyskać (można wystawić nowy i cofnąć stary w Ustawieniach).</p>
+{% if r.invitation_link %}<label>Link zaproszenia<input readonly value="{{ r.invitation_link }}" data-owner-invite-link></label>{% endif %}
+<details><summary>Sam token (gdyby link nie działał)</summary><code data-owner-invite-token>{{ r.token }}</code><p>Odbiorca wkleja go na stronie <code>/advocate</code>.</p></details>
+<p>Uprawnienia: {{ r.capabilities|join(', ') }}{% if r.expires_at %} · ważne do {{ r.expires_at }}{% endif %}{% if r.snapshot_objects is not none %} · migawka obejmuje {{ r.snapshot_objects }} obiektów{% endif %}.</p>
+{% for w in r.warnings %}<p class="wb-alert" role="note">{{ w }}</p>{% endfor %}
+<p><a href="/settings">Wróć do Ustawień</a></p>
+</section></main></body></html>

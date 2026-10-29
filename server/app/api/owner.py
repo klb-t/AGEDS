@@ -145,10 +145,82 @@ def settings_page(request: Request, done: str | None = Query(None, max_length=60
                  'calls': [dict(r) for r in db.execute(
                      'SELECT purpose, provider_name, model, status, cost_eur, started_at FROM provider_calls ORDER BY id DESC LIMIT 15')]}
     presets = {kind: _presets(kind) for kind in ('asr', 'ocr')}
+    with session() as db:
+        recipients = _recipients(db)
+        cases = [dict(r) for r in db.execute('SELECT id, name FROM cases ORDER BY id')]
+        tokens_mode = authz.get_setting(db, 'auth.mode', 'legacy_open') == 'tokens'
     return templates.TemplateResponse(request, 'owner_settings.html', {
         'consents': consents, 'providers_known': CONSENT_PROVIDERS, 'done': done, 'error': error, **state,
         'presets': presets, 'defaults': {kind: default_recipe_id(kind) for kind in ('asr', 'ocr')},
-        'upload_limit_gib': round(owner.max_upload_bytes() / 1024 ** 3, 3)})
+        'upload_limit_gib': round(owner.max_upload_bytes() / 1024 ** 3, 3),
+        'recipients': recipients, 'cases': cases, 'tokens_mode': tokens_mode})
+
+
+def _recipients(db) -> list[dict]:
+    """Principals other than the owner, with their grants and invitation tokens (never secrets)."""
+    owner_uid = authz.get_setting(db, 'installation.owner_principal_uid')
+    out = []
+    for p in db.execute("SELECT id, uid, display_name, kind, created_at FROM principals ORDER BY id DESC"):
+        if p['uid'] == owner_uid:
+            continue
+        grants = [dict(g) | {'capabilities': json.loads(g['capabilities_json'])} for g in db.execute(
+            '''SELECT g.uid, g.capabilities_json, g.granted_at, g.valid_to, g.revoked_at, s.kind AS scope_kind
+               FROM grants g JOIN scopes s ON s.id=g.scope_id WHERE g.principal_id=? ORDER BY g.id''', (p['id'],))]
+        tokens = [dict(t) for t in db.execute(
+            "SELECT uid, label, created_at, expires_at, revoked_at FROM auth_methods WHERE principal_id=? AND kind='token' ORDER BY id",
+            (p['id'],))]
+        if grants or tokens:
+            out.append({**dict(p), 'grants': grants, 'tokens': tokens})
+    return out
+
+
+@router.post('/settings/invite')
+def settings_invite(request: Request, name: str = Form(''), case_ids: list[int] = Form([]), mode: str = Form('snapshot'),
+                    read_bytes: str = Form(''), expires_days: str = Form('')):
+    import os
+    from ..sharing import invite_recipient
+    with session() as db:
+        if authz.get_setting(db, 'auth.mode', 'legacy_open') != 'tokens':
+            return _back('/settings', error='zaproszenia działają tylko w trybie tokenów (auth.mode=tokens)')
+        try:
+            days = int(expires_days) if expires_days.strip() else None
+            if days is not None and not 1 <= days <= 3650:
+                raise ValueError('ważność od 1 do 3650 dni')
+            base = os.environ.get('AGEDS_PUBLIC_URL') or str(request.base_url)
+            result = invite_recipient(db, name=name, case_ids=case_ids, mode=mode, read_bytes=read_bytes == 'on',
+                                      expires_days=days, base_url=base, actor='owner-web')
+        except ValueError as exc:
+            db.rollback()
+            return _back('/settings', error=str(exc)[:200])
+    # The token is shown once, in this response only: never in a URL, a redirect or a cache.
+    response = templates.TemplateResponse(request, 'owner_invited.html', {'r': result, 'name': name.strip()})
+    response.headers['Cache-Control'] = 'no-store'
+    response.headers['Referrer-Policy'] = 'no-referrer'
+    return response
+
+
+@router.post('/settings/grant/{uid}/revoke')
+def settings_revoke_grant(uid: str):
+    with session() as db:
+        row = db.execute('SELECT id FROM grants WHERE uid=? AND revoked_at IS NULL', (uid,)).fetchone()
+        if row is None:
+            return _back('/settings', error='grant not found')
+        authz.revoke_grant(db, row['id'], revoked_by='owner-web')
+    return _back('/settings', done='grant-revoked')
+
+
+@router.post('/settings/token/{uid}/revoke')
+def settings_revoke_token(uid: str):
+    from .. import auth
+    with session() as db:
+        row = db.execute("SELECT p.uid AS owner FROM auth_methods m JOIN principals p ON p.id=m.principal_id WHERE m.uid=?",
+                         (uid,)).fetchone()
+        if row is None:
+            return _back('/settings', error='token not found')
+        if row['owner'] == authz.get_setting(db, 'installation.owner_principal_uid'):
+            return _back('/settings', error='tokenów właściciela nie cofa się tutaj (zablokowałoby to dostęp)')
+        auth.revoke_token(db, uid, actor='owner-web')
+    return _back('/settings', done='token-revoked')
 
 
 @router.post('/settings/consent')

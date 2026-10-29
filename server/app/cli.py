@@ -252,34 +252,9 @@ def _authz_command(args) -> dict:
                                  args.capability, granted_by="cli", valid_to=args.valid_to)
             return {"grant_uid": result["uid"], "warnings": result["warnings"]}
         if args.command == "authz-invite":
-            from datetime import datetime, timedelta, timezone
-            from .assignments import create_principal
-            from .sharing import add_item, create_package, snapshot_package
-            for case_id in args.case_id:
-                if not db.execute("SELECT 1 FROM cases WHERE id=?", (case_id,)).fetchone():
-                    raise ValueError(f"case {case_id} does not exist")
-            principal = create_principal(db, args.name, kind="human", actor="cli")
-            package = create_package(db, f"Pakiet dla: {args.name}", mode=args.mode, actor="cli")
-            for case_id in args.case_id:
-                add_item(db, package["id"], "case", case_id, actor="cli")
-            frozen = snapshot_package(db, package["id"], actor="cli") if args.mode == "snapshot" else None
-            capabilities = ["read_metadata", "read_text", "chat_with_advocate"] + (["read_bytes"] if args.read_bytes else [])
-            expires = ((datetime.now(timezone.utc) + timedelta(days=args.expires_days)).isoformat()
-                       if args.expires_days else None)
-            grant = authz.grant(db, principal, package["scope_id"], capabilities, granted_by="cli", valid_to=expires)
-            token = auth.issue_token(db, principal, label="invitation", actor="cli", expires_at=expires)
-            link = f"{args.base_url.rstrip('/')}/advocate#t={token}" if args.base_url else None
-            warnings = []
-            if authz.get_setting(db, "auth.mode", "legacy_open") != "tokens":
-                warnings.append("auth.mode is legacy_open: the grant is not enforced until authz-mode tokens")
-            if link is None:
-                warnings.append("no --base-url / AGEDS_PUBLIC_URL: send the token; the recipient pastes it at /advocate")
-            return {"principal_uid": db.execute("SELECT uid FROM principals WHERE id=?", (principal,)).fetchone()["uid"],
-                    "package_uid": package["uid"], "grant_uid": grant["uid"], "capabilities": capabilities,
-                    "snapshot_objects": frozen["objects"] if frozen else None, "expires_at": expires,
-                    "token": token, "invitation_link": link, "token_shown_once": True,
-                    "note": "the link is a credential: send it only to the recipient; revoke with authz-revoke / authz-token-revoke",
-                    "warnings": warnings}
+            from .sharing import invite_recipient
+            return invite_recipient(db, name=args.name, case_ids=args.case_id, mode=args.mode, read_bytes=args.read_bytes,
+                                    expires_days=args.expires_days, base_url=args.base_url, actor="cli")
         if args.command == "authz-preview":
             from .advocate import AdvocateGate
             target = principal_id(args.principal_uid)

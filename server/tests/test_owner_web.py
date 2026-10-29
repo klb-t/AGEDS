@@ -59,6 +59,9 @@ class OwnerWebTests(Base):
         with db.session() as conn:
             kinds = [r[0] for r in conn.execute("SELECT kind FROM jobs WHERE status='queued'")]
         self.assertIn('transcribe', kinds)
+        waiting = self.client.get(batch_url, headers=self.owner_headers()).text
+        self.assertIn('data-owner-autorefresh', waiting)  # refreshes itself while jobs are open
+        self.assertIn('zadań w toku: ', waiting)
         again = self.client.post(f'{batch_url}/process', headers=self.owner_headers(), follow_redirects=False)
         self.assertIn('queued%3A0', again.headers['location'])  # open jobs are not queued twice
         # the same recording uploaded again is a new acquisition, but its bytes already have a transcript
@@ -71,7 +74,9 @@ class OwnerWebTests(Base):
         result = owner.process_new(int(second_url.rsplit('/', 1)[1]))
         self.assertEqual(result['queued'], [])
         self.assertEqual(result['skipped'][0]['reason'], 'the same bytes already have this text')
-        self.assertIn('te same bajty mają już', self.client.get(second_url, headers=self.owner_headers()).text)
+        settled = self.client.get(second_url, headers=self.owner_headers()).text
+        self.assertIn('te same bajty mają już', settled)
+        self.assertNotIn('data-owner-autorefresh', settled)  # nothing open in this batch
         report = self.client.get('/report', headers=self.owner_headers())
         self.assertEqual(report.status_code, 200)
         self.assertIn('whatsapp_message', report.text)
@@ -232,3 +237,52 @@ class UploadSurfaceTests(Base):
         self.assertIn('0.001 GiB', self.client.get('/settings', headers=h).text)
         big = self.upload([('big.bin', io.BytesIO(b'x' * (2 * 1024 * 1024)), 'application/octet-stream')])
         self.assertIn('error=', big.headers['location'])
+
+
+class InviteFromSettingsTests(Base):
+    """The owner invites a recipient (e.g. an advocate) from /settings without the CLI."""
+
+    def test_invite_shows_the_link_once_and_the_recipient_sees_only_that_case(self):
+        h = self.h(self.owner_token)
+        r = self.client.post('/settings/invite', headers=h, follow_redirects=False,
+                             data={'name': 'mec. Testowy', 'case_ids': [str(self.case_a)], 'mode': 'snapshot', 'expires_days': '30'})
+        self.assertEqual(r.status_code, 200, r.text[:300])
+        self.assertEqual((r.headers['cache-control'], r.headers['referrer-policy']), ('no-store', 'no-referrer'))
+        import re
+        token = re.search(r'data-owner-invite-token>([^<]+)<', r.text).group(1)
+        self.assertIn('/advocate#t=' + token, r.text)  # in the fragment, never sent to a server
+        mine = self.client.get(f'/api/artifacts/{self.art_a}/transcript', headers=self.h(token))
+        other = self.client.get(f'/api/artifacts/{self.art_b}/transcript', headers=self.h(token))
+        self.assertEqual((mine.status_code, other.status_code), (200, 404))
+        page = self.client.get('/settings', headers=h).text
+        self.assertIn('mec. Testowy', page)
+        self.assertNotIn(token, page)  # never shown again
+        with db.session() as conn:
+            grant = conn.execute("SELECT g.uid FROM grants g JOIN principals p ON p.id=g.principal_id WHERE p.display_name='mec. Testowy'").fetchone()['uid']
+        self.client.post(f'/settings/grant/{grant}/revoke', headers=h)
+        self.assertEqual(self.client.get(f'/api/artifacts/{self.art_a}/transcript', headers=self.h(token)).status_code, 404)
+
+    def test_invite_is_refused_in_legacy_open_and_owner_tokens_cannot_be_revoked_here(self):
+        h = self.h(self.owner_token)
+        with db.session() as conn:
+            authz.set_setting(conn, 'auth.mode', 'legacy_open', confirm_widening=True)
+        r = self.client.post('/settings/invite', data={'name': 'x', 'case_ids': [str(self.case_a)]}, follow_redirects=False)
+        self.assertIn('error=', r.headers['location'])
+        self.assertIn('data-owner-invite-disabled', self.client.get('/settings').text)
+        with db.session() as conn:
+            authz.set_setting(conn, 'auth.mode', 'tokens')
+            owner_token_uid = conn.execute("SELECT m.uid FROM auth_methods m WHERE m.principal_id=?", (self.owner,)).fetchone()['uid']
+        r = self.client.post(f'/settings/token/{owner_token_uid}/revoke', headers=h, follow_redirects=False)
+        self.assertIn('error=', r.headers['location'])
+        self.assertEqual(self.client.get('/settings', headers=h).status_code, 200)  # still in
+
+    def test_invite_validation(self):
+        h = self.h(self.owner_token)
+        for data in ({'name': '', 'case_ids': [str(self.case_a)]}, {'name': 'x'}, {'name': 'x', 'case_ids': ['99999']},
+                     {'name': 'x', 'case_ids': [str(self.case_a)], 'mode': 'forever'},
+                     {'name': 'x', 'case_ids': [str(self.case_a)], 'expires_days': '0'}):
+            r = self.client.post('/settings/invite', data=data, headers=h, follow_redirects=False)
+            self.assertEqual(r.status_code, 303, data)
+            self.assertIn('error=', r.headers['location'])
+        with db.session() as conn:
+            self.assertIsNone(conn.execute("SELECT 1 FROM principals WHERE display_name='x'").fetchone())

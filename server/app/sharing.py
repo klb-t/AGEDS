@@ -292,3 +292,45 @@ def export_scope_package(db: sqlite3.Connection, principal_id: int, *, capabilit
         payload['scope']['omitted_counts'] = omitted_counts
     payload['integrity'] = _integrity(payload)
     return payload
+
+
+def invite_recipient(db, *, name: str, case_ids: list[int], mode: str = 'snapshot', read_bytes: bool = False,
+                     expires_days: int | None = None, base_url: str | None = None, actor: str = 'owner') -> dict:
+    """One step: account, package of cases, grant, token and invitation link (CLI authz-invite and /settings).
+
+    The token is returned once and never stored in clear; the link carries it in the fragment
+    (``#t=``), which browsers do not send to servers or put in logs.
+    """
+    from datetime import datetime, timedelta, timezone
+    from . import auth, authz
+    from .assignments import create_principal
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError('a display name is required')
+    if not case_ids:
+        raise ValueError('choose at least one case')
+    if mode not in ('snapshot', 'live'):
+        raise ValueError("mode must be 'snapshot' or 'live'")
+    for case_id in case_ids:
+        if not db.execute('SELECT 1 FROM cases WHERE id=?', (case_id,)).fetchone():
+            raise ValueError(f'case {case_id} does not exist')
+    principal = create_principal(db, name.strip(), kind='human', actor=actor)
+    package = create_package(db, f'Pakiet dla: {name.strip()}', mode=mode, actor=actor)
+    for case_id in case_ids:
+        add_item(db, package['id'], 'case', case_id, actor=actor)
+    frozen = snapshot_package(db, package['id'], actor=actor) if mode == 'snapshot' else None
+    capabilities = ['read_metadata', 'read_text', 'chat_with_advocate'] + (['read_bytes'] if read_bytes else [])
+    expires = ((datetime.now(timezone.utc) + timedelta(days=expires_days)).isoformat() if expires_days else None)
+    grant = authz.grant(db, principal, package['scope_id'], capabilities, granted_by=actor, valid_to=expires)
+    token = auth.issue_token(db, principal, label='invitation', actor=actor, expires_at=expires)
+    link = f"{base_url.rstrip('/')}/advocate#t={token}" if base_url else None
+    warnings = []
+    if authz.get_setting(db, 'auth.mode', 'legacy_open') != 'tokens':
+        warnings.append('auth.mode is legacy_open: the grant is not enforced until authz-mode tokens')
+    if link is None:
+        warnings.append('no --base-url / AGEDS_PUBLIC_URL: send the token; the recipient pastes it at /advocate')
+    return {'principal_uid': db.execute('SELECT uid FROM principals WHERE id=?', (principal,)).fetchone()['uid'],
+            'package_uid': package['uid'], 'grant_uid': grant['uid'], 'capabilities': capabilities,
+            'snapshot_objects': frozen['objects'] if frozen else None, 'expires_at': expires,
+            'token': token, 'invitation_link': link, 'token_shown_once': True,
+            'note': 'the link is a credential: send it only to the recipient; revoke with authz-revoke / authz-token-revoke',
+            'warnings': warnings}

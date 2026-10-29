@@ -74,6 +74,8 @@ characters) is unverified. An avatar is not implemented.
   `EW_ALLOWED_HOSTS`.
 - `metadata_only` owner visibility shows that a turn exists, never the question; earlier answers re-enter a prompt
   only while provider consent covers their inputs.
+- The owner can also invite from the browser: `/settings` → Recipients, enabled in tokens mode
+  ([OWNER_WEB](OWNER_WEB.md)); it is the same function as `authz-invite`.
 - Export needs `export` and `read_metadata`; text columns need `read_text` too and are otherwise nulled and listed.
 - Feature areas (catalogue, imports, timeline, workbench, reports, hypotheses, ledger …) need,
   installation-wide, `read_text` for reads, `export` for exports and file downloads, and

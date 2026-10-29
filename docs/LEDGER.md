@@ -200,5 +200,5 @@ private profile file is the plan option `ledger_profiles_path`.
   parsed; Fitbit heart-rate/steps minute files, Samsung tables not in the mapping and Google Fit raw
   data points are reported, not interpreted.
 * No currency conversion, no merchant categorization, no reverse geocoding of stops or cities.
-* The import-plan parameter `profile_id` of `ledger_tabular` is validated when the item runs, not
-  when the plan is decided (billing has a plan-time check in `plan.py`).
+* The import-plan parameter `profile_id` of `ledger_tabular` is validated when the plan is decided,
+  against the same `ledger_profiles_path` as the run (since 2026-10-30, like billing).

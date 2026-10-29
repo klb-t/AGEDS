@@ -315,6 +315,12 @@ def _validate_parameters(item: dict, importer_key: str, parameters: dict, opt_in
         ids = {p['id'] for p in load_profiles(Path(path) if path else None)['profiles']}
         if parameters['profile_id'] not in ids:
             raise ValueError(f'item {item["id"]}: billing profile not found: {parameters["profile_id"]}')
+    if importer_key == 'ledger_tabular' and parameters.get('profile_id'):
+        from ..importers.tabular_profiles import load_profiles as load_tabular_profiles
+        path = plan_options.get('ledger_profiles_path')
+        ids = {p['id'] for p in load_tabular_profiles(Path(path) if path else None)['profiles']}
+        if parameters['profile_id'] not in ids:
+            raise ValueError(f'item {item["id"]}: tabular profile not found: {parameters["profile_id"]}')
     if importer_key == 'whatsapp_export' and parameters.get('chat_member'):
         if parameters['chat_member'] not in (item['detection'].get('chat_members') or []):
             raise ValueError(f'item {item["id"]}: chat_member must be one of the detected chat texts')

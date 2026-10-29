@@ -113,3 +113,14 @@ def test_approved_ledger_items_execute_through_the_real_importers(world):
     with dbmod.session() as db:
         after = {t: db.execute(f'SELECT COUNT(*) FROM {t}').fetchone()[0] for t in before}
     assert after == before  # re-running the same items reuses every row
+
+
+def test_unknown_tabular_profile_is_refused_when_the_plan_is_decided(world):
+    plan_id = plan.create_plan(collection_ids=[world['collection']], actor='tester',
+                               temp_dir=world['tmp'] / 'work')['plan']['id']
+    item = {i['locator']: i for i in plan.get_plan(plan_id, limit=500)['items']}[next(iter(PROFILE))]
+    with pytest.raises(ValueError, match='tabular profile not found'):
+        plan.decide(plan_id, base_version=1, actor='tester',
+                    decisions=[{'item_id': item['id'], 'parameters': {'profile_id': 'no-such-profile'}}])
+    plan.decide(plan_id, base_version=1, actor='tester',
+                decisions=[{'item_id': item['id'], 'parameters': {'profile_id': PROFILE[next(iter(PROFILE))]}}])

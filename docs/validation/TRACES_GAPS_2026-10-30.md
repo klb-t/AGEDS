@@ -51,7 +51,7 @@ files where the layout is data (`*.v1.json`); a new parser version is needed whe
 | CAMT.053 and MT940 | `server/app/importers/camt053.py`, `mt940.py`, `server/app/ledger/bank.py` | generated v2/v8 CAMT and MT940 with envelopes | A real file from the bank. The balance check reports mismatches and never corrects them. |
 | Transport and rides (taps, journeys) | `tabular_profiles.py` (travel profiles) | generated, including a DST-crossing ride | Real exports from the operators the owner uses. |
 | Health: Apple, Fitbit, Google Fit, Samsung | `server/app/importers/health_apple.py`, `health_fitbit.py`, `health_google_fit.py`, `health_samsung.py`, `server/app/ledger/health.py` | generated exports; opt-in `enable_health` | A real export per device, only with the owner's explicit opt-in (special-category data, processed locally). ECG CSVs, `export_cda.xml`, clinical records and Fitbit minute files are not interpreted. |
-| Plan-time validation of `profile_id` | `server/app/importplan/` (`ledger_tabular` item) | — | Code change: validate when the plan is decided, as billing already does (`plan.py`). |
+| ~~Plan-time validation of `profile_id`~~ **closed 2026-10-30** | `server/app/importplan/plan.py` (`_validate_parameters`, `ledger_tabular`) | generated plan items (`test_ledger_importplan.py`) | Done: an unknown tabular profile is refused when the plan is decided, using the same `ledger_profiles_path` as the run. |
 
 ## Shared with the traces area
 

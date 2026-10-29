@@ -59,6 +59,13 @@ class OwnerWebTests(Base):
         with db.session() as conn:
             kinds = [r[0] for r in conn.execute("SELECT kind FROM jobs WHERE status='queued'")]
         self.assertIn('transcribe', kinds)
+        from server.app.media.capabilities import media_capabilities
+        if media_capabilities()['ocr_tesseract']['status'] != 'available':  # the default OCR fallback cannot run here
+            self.assertIn('data-owner-preset-unavailable="ocr"', self.client.get(batch_url, headers=self.owner_headers()).text)
+            result = owner.process_new(collection_id)
+            self.assertTrue(any(s.get('reason') == 'preset unavailable here' for s in result['skipped']))
+            with db.session() as conn:
+                self.assertEqual(conn.execute("SELECT count(*) FROM jobs WHERE kind='ocr'").fetchone()[0], 0)
         waiting = self.client.get(batch_url, headers=self.owner_headers()).text
         self.assertIn('data-owner-autorefresh', waiting)  # refreshes itself while jobs are open
         self.assertIn('zadań w toku: ', waiting)
@@ -128,6 +135,11 @@ class OwnerWebTests(Base):
         self.client.post('/settings/budget', data={'eur': '2,5'}, headers=h)
         self.assertIn('error=', self.client.post('/settings/recipes', data={'asr': 'nope', 'ocr': 'ocr-vertex-gemini'},
                                                  headers=h, follow_redirects=False).headers['location'])
+        refused = self.client.post('/settings/recipes', data={'asr': 'asr-vertex-gemini-aligned', 'ocr': 'ocr-vertex-gemini'},
+                                   headers=h, follow_redirects=False)
+        self.assertIn('error=', refused.headers['location'])  # the Vertex consent was revoked above
+        self.assertIn('data-availability="unavailable"', self.client.get('/settings', headers=h).text)
+        self.client.post('/settings/consent', data={'provider': 'vertex', 'basis': 'again'}, headers=h)
         self.client.post('/settings/recipes', data={'asr': 'asr-vertex-gemini-aligned', 'ocr': 'ocr-vertex-gemini'}, headers=h)
         from server.app.media.recipe import default_recipe_id
         self.assertEqual((default_recipe_id('asr'), default_recipe_id('ocr')), ('asr-vertex-gemini-aligned', 'ocr-vertex-gemini'))

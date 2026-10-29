@@ -1418,7 +1418,7 @@
     {
       "id": "AGEDS-TASK-20261030-REAL-FORMATS-1",
       "owner": "rzecznik_zbieranie (agent in a worktree)",
-      "status": "in_progress",
+      "status": "done",
       "scope": [
         "server/app/importers/{email_mbox,whatsapp,whatsapp_media}.py",
         "server/app/importers/data/*.json",
@@ -1432,7 +1432,25 @@
         "Gmail/WhatsApp format variants through the owner path with regression tests (synthetic, modelled on documented formats)",
         "deploy runtime dependency report with a pre-deploy checklist"
       ],
-      "not_in_scope": "deployment; real user data"
+      "not_in_scope": "deployment; real user data",
+      "results": {
+        "commits": [
+          "7883a1a formats",
+          "49e499f deploy deps",
+          "e856209 merge"
+        ],
+        "data": "synthetic fixtures modelled on documented/observed formats; no real export",
+        "fixed": [
+          "loose NL/PL WhatsApp chat .txt detection (detectors v2)",
+          "US month-first dates (whatsapp_txt v3, order inferred from the file)",
+          "several chats in one upload/zip imported each",
+          "RFC 2047 / folded Gmail labels (email_rfc5322 v4)",
+          "Thunderbird .eml with From - line"
+        ],
+        "deploy_findings": "docs/validation/DEPLOY_DEPS_2026-10-30.md: OCR fallback is Tesseract (absent in the image) unless a preset is chosen; torch absent; Gmail config dir not on a volume; /var/lib/ageds-models not created yet",
+        "follow_up": "presets checked against the installation on /settings and before queueing (owner.preset_status)",
+        "checks": "backend 1621 passed / 3 skipped; browser 14 suites / 135 steps"
+      }
     }
   ],
   "remaining_boundaries": [

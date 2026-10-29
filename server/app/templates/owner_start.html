@@ -18,7 +18,7 @@
   <li><b>Nagrania, zdjęcia, dokumenty</b> (np. <code>.amr .wav .m4a .mp3 .png .jpg .pdf</code>): zachowywane jako oryginały; transkrypcja i OCR w kroku 4.</li>
   <li>Oryginały są tylko czytane; zapisywane są kopie z sumą SHA-256. <b>Daty plików na serwerze to daty wgrania</b>, nie daty oryginałów; daty podane przez przeglądarkę są zapisywane osobno jako deklarowane.</li>
   <li>Limit paczki: {{ (limit_bytes / 1024 / 1024 / 1024)|round(1) }} GiB. Nagranie dla transkrypcji przez Vertex: do 15 MB.</li>
-  <li>Transkrypcja i OCR przez Vertex wymagają zgody i budżetu w <a href="/settings">Ustawieniach</a>{% if not vertex_ready %} — <b data-owner-vertex-missing>zgoda lub dostawca nie są jeszcze ustawione</b>{% endif %}. Wynik modelu jest wynikiem modelu, nie treścią źródła.</li>
+  <li>Transkrypcja i OCR przez Vertex wymagają zgody i budżetu w <a href="/settings">Ustawieniach</a>{% if not vertex_ready %} — <b data-owner-vertex-missing>zgoda na Vertex nie jest jeszcze zapisana</b>{% endif %}. Wynik modelu jest wynikiem modelu, nie treścią źródła.</li>
   <li>Bez rozpakowywania nie są czytane archiwa zaszyfrowane hasłem; takie pliki są zachowywane, ale nie importowane.</li>
   <li>Bezpośredni dostęp do konta Gmail (bez eksportu) nie jest dostępny z przeglądarki: wymaga osobnej autoryzacji (docs/GMAIL_API.md).</li>
 </ul></details>

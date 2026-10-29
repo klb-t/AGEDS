@@ -4,7 +4,7 @@
 <header>{% include '_nav.html' %}<div><h1>Paczka {{ collection.id }}: {{ collection.label }}</h1><p>wgrano {{ collection.created_at }} · oryginały tylko do odczytu · <a href="/start">wszystkie paczki</a></p></div></header>
 <main class="owner" data-owner-page="batch" data-collection-id="{{ collection.id }}">
 {% if error %}<p class="wb-alert" role="alert" data-owner-error>{{ error }}</p>{% endif %}
-{% if done %}<p class="wb-done" role="status" data-owner-done="{{ done }}">{% if done == 'uploaded' %}Wgrano i skatalogowano. Sprawdź plan importu poniżej.{% elif done.startswith('kept:') %}Zachowano jako oryginały: {{ done[5:] }}.{% elif done.startswith('queued:') %}Dodano do kolejki zadań: {{ done[7:] }} (pliki z gotowym tekstem dla tych samych bajtów pominięto).{% endif %}</p>{% endif %}
+{% if done %}<p class="wb-done" role="status" data-owner-done="{{ done }}">{% if done == 'uploaded' %}Wgrano i skatalogowano. Sprawdź plan importu poniżej.{% elif done.startswith('kept:') %}Zachowano jako oryginały: {{ done[5:] }}.{% elif done.startswith('queued:') %}Dodano do kolejki zadań: {{ done[7:] }} (pominięto pliki z gotowym tekstem dla tych samych bajtów oraz te, których preset tu nie działa).{% endif %}</p>{% endif %}
 
 <section class="panel">
 <h2>1. Wgrane pliki</h2>
@@ -34,7 +34,9 @@
 <section class="panel">
 <h2>4. Transkrypcja i OCR</h2>
 <p>Domyślne presety (zmiana w <a href="/settings">Ustawieniach</a>): transkrypcja <code>{{ recipes.transcribe }}</code>, OCR <code>{{ recipes.ocr }}</code>.
-{% if ('vertex' in recipes.transcribe or 'vertex' in recipes.ocr) and not vertex_consent %}<b data-owner-consent-missing>Brak zgody na Vertex — zadania Vertex zakończą się błędem bez wysłania czegokolwiek, dopóki zgoda nie zostanie zapisana.</b>{% endif %}</p>
+</p>{% for kind, label in [('transcribe', 'Transkrypcja'), ('ocr', 'OCR')] %}{% set st = preset_status[kind] %}
+{% if st.status == 'unavailable' %}<p class="wb-alert" role="alert" data-owner-preset-unavailable="{{ kind }}">{{ label }}: preset <code>{{ recipes[kind] }}</code> nie może działać w tej instalacji ({{ st.missing|join('; ') }}). Takie pliki nie zostaną zakolejkowane — wybierz preset w <a href="/settings">Ustawieniach</a>.</p>
+{% elif st.status == 'partial' %}<p class="wb-alert" role="note" data-owner-preset-partial="{{ kind }}">{{ label }}: preset <code>{{ recipes[kind] }}</code> zadziała częściowo ({{ st.partial|join('; ') }}).</p>{% endif %}{% endfor %}
 <table data-owner-artifacts><tr><th>ID</th><th>Oryginał</th><th>Typ</th><th>Wersje tekstu</th><th>Zadania</th></tr>
 {% for a in artifacts %}<tr data-artifact-id="{{ a.id }}"><td><a href="/artifact/{{ a.id }}">{{ a.id }}</a></td><td>{{ a.original_name }}</td><td>{{ a.mime_type }}</td>
 <td>{% for t in a.texts %}<span class="owner-chip" data-text-kind="{{ t.kind }}">{{ t.kind }} #{{ t.id }} ({{ t.model or '—' }})</span> {% else %}—{% endfor %}{% if a.same_bytes_texts %}<br><small data-same-bytes>te same bajty mają już: {% for t in a.same_bytes_texts %}<a href="/artifact/{{ t.artifact_id }}">{{ t.kind }} #{{ t.id }}</a>{% if not loop.last %}, {% endif %}{% endfor %} — nie będą przetwarzane ponownie</small>{% endif %}</td>

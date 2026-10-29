@@ -38,7 +38,7 @@ def _presets(kind: str) -> list[dict]:
     out = []
     for recipe_id in sorted(preset_ids(kind)):
         preset, _ = load_preset(recipe_id)
-        out.append({'id': recipe_id, 'description': preset.get('description', '')})
+        out.append({'id': recipe_id, 'description': preset.get('description', ''), 'availability': owner.preset_status(recipe_id)})
     return out
 
 
@@ -53,10 +53,9 @@ def _back(path: str, **message) -> RedirectResponse:
 def start_page(request: Request, error: str | None = Query(None, max_length=500)):
     with session() as db:
         consent = _active_consent(db, 'vertex')
-        provider = authz.get_setting(db, 'advocate.provider')
     return templates.TemplateResponse(request, 'owner_start.html', {
         'batches': owner.recent_batches(), 'error': error, 'limit_bytes': owner.max_upload_bytes(),
-        'vertex_ready': bool(consent) and bool(provider)})
+        'vertex_ready': consent})
 
 
 @router.post('/start/upload')
@@ -96,9 +95,10 @@ def batch_page(request: Request, collection_id: int, done: str | None = Query(No
     with session() as db:
         ready = _active_consent(db, 'vertex')
     from ..media.recipe import default_recipe_id
+    recipes = {'transcribe': default_recipe_id('asr'), 'ocr': default_recipe_id('ocr')}
     return templates.TemplateResponse(request, 'owner_batch.html', {
-        **view, 'done': done, 'error': error, 'vertex_consent': ready,
-        'recipes': {'transcribe': default_recipe_id('asr'), 'ocr': default_recipe_id('ocr')}})
+        **view, 'done': done, 'error': error, 'vertex_consent': ready, 'recipes': recipes,
+        'preset_status': {kind: owner.preset_status(recipe) for kind, recipe in recipes.items()}})
 
 
 @router.post('/start/batch/{collection_id}/originals')
@@ -152,6 +152,7 @@ def settings_page(request: Request, done: str | None = Query(None, max_length=60
     return templates.TemplateResponse(request, 'owner_settings.html', {
         'consents': consents, 'providers_known': CONSENT_PROVIDERS, 'done': done, 'error': error, **state,
         'presets': presets, 'defaults': {kind: default_recipe_id(kind) for kind in ('asr', 'ocr')},
+        'default_status': {kind: owner.preset_status(default_recipe_id(kind)) for kind in ('asr', 'ocr')},
         'upload_limit_gib': round(owner.max_upload_bytes() / 1024 ** 3, 3),
         'recipients': recipients, 'cases': cases, 'tokens_mode': tokens_mode})
 
@@ -294,6 +295,10 @@ def settings_recipes(asr: str = Form(...), ocr: str = Form(...)):
         effective_recipe(ocr, kind='ocr')
     except (RecipeError, ValueError) as exc:
         return _back('/settings', error=str(exc)[:200])
+    for chosen in (asr, ocr):
+        state = owner.preset_status(chosen)
+        if state['status'] == 'unavailable':
+            return _back('/settings', error=f"{chosen} nie może działać w tej instalacji: {'; '.join(state['missing'])}"[:300])
     with session() as db:
         authz.set_setting(db, DEFAULT_RECIPE_SETTING.format(kind='asr'), asr, actor='owner-web')
         authz.set_setting(db, DEFAULT_RECIPE_SETTING.format(kind='ocr'), ocr, actor='owner-web')

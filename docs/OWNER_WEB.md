@@ -39,6 +39,22 @@ Upload safety (`UploadSurfaceTests` in `server/tests/test_owner_web.py`):
 * **CSRF:** a cross-site POST, also with Basic credentials, is refused (403) before anything is
   written.
 
+Presets are checked against this installation (`owner.preset_status`, probed locally without
+network or inference):
+* Vertex presets need an active Vertex consent.
+* Local ASR needs faster-whisper.
+* Tesseract OCR needs the binary.
+* Forced alignment needs torch/torchaudio.
+
+`/settings` disables an unusable preset with the reason, marks a partial one (for example the
+hybrid preset without torch: its fill step is skipped), refuses to save an unusable choice and
+warns when the current default cannot run. The batch page repeats the warning, and processing
+does not queue files whose preset cannot run.
+
+Without a stored choice and with no `EW_OCR_RECIPE`, OCR falls back to the Tesseract preset,
+which the production image lacks ([DEPLOY_DEPS](validation/DEPLOY_DEPS_2026-10-30.md)). There the
+owner picks the Vertex OCR preset in `/settings` after recording the consent.
+
 Bytes that already have a transcript or OCR text under another acquisition (the same files
 uploaded again) are not sent again. The page names the existing version instead.
 `scripts/pilot_local.sh serve` starts a worker next to the server, so queued jobs run without

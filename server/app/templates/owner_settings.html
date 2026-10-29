@@ -54,7 +54,8 @@
 <section class="panel"><h2>Domyślne presety transkrypcji i OCR</h2>
 <form method="post" action="/settings/recipes" data-owner-recipes-form>
 {% for kind, label in [('asr', 'Transkrypcja'), ('ocr', 'OCR')] %}<fieldset><legend>{{ label }}</legend>
-{% for p in presets[kind] %}<label class="owner-radio"><input type="radio" name="{{ kind }}" value="{{ p.id }}"{% if p.id == defaults[kind] %} checked{% endif %}> <code>{{ p.id }}</code> — <small>{{ p.description }}</small></label>{% endfor %}
+{% if default_status[kind].status == 'unavailable' %}<p class="wb-alert" role="alert" data-owner-default-unavailable="{{ kind }}">Obecny domyślny preset <code>{{ defaults[kind] }}</code> nie może działać w tej instalacji ({{ default_status[kind].missing|join('; ') }}) — wybierz inny.</p>{% endif %}
+{% for p in presets[kind] %}{% set a = p.availability %}<label class="owner-radio owner-preset-{{ a.status }}" data-preset="{{ p.id }}" data-availability="{{ a.status }}"><input type="radio" name="{{ kind }}" value="{{ p.id }}"{% if p.id == defaults[kind] %} checked{% endif %}{% if a.status == 'unavailable' %} disabled{% endif %}> <code>{{ p.id }}</code>{% if a.status == 'unavailable' %} <b>niedostępny: {{ a.missing|join('; ') }}</b>{% elif a.status == 'partial' %} <b>częściowo: {{ a.partial|join('; ') }}</b>{% endif %} — <small>{{ p.description }}</small></label>{% endfor %}
 </fieldset>{% endfor %}
 <button>Zapisz presety</button></form>
 </section>

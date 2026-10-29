@@ -190,11 +190,17 @@ def process_new(collection_id: int) -> dict:
     from .media.queue import enqueue_media_job
     from .media.recipe import default_recipe_id
     queued, skipped = [], []
+    recipes = {'transcribe': default_recipe_id('asr'), 'ocr': default_recipe_id('ocr')}
+    status = {kind: preset_status(recipe) for kind, recipe in recipes.items()}
     with session() as db:
         artifacts = collection_artifacts(db, collection_id)
     for item in artifacts:
         kind = item['processing']
         if kind is None:
+            continue
+        if status[kind]['status'] == 'unavailable':  # a job that can only fail is not queued
+            skipped.append({'artifact_id': item['id'], 'reason': 'preset unavailable here',
+                            'recipe': recipes[kind], 'missing': status[kind]['missing']})
             continue
         text_kind = 'transcript' if kind == 'transcribe' else 'ocr'
         if any(t['kind'] == text_kind for t in item['texts']) or any(
@@ -208,8 +214,7 @@ def process_new(collection_id: int) -> dict:
             continue
         result = enqueue_media_job(kind, item['id'])
         queued.append({'artifact_id': item['id'], 'job_id': result['job_id'], 'kind': kind})
-    return {'queued': queued, 'skipped': skipped,
-            'recipes': {'transcribe': default_recipe_id('asr'), 'ocr': default_recipe_id('ocr')}}
+    return {'queued': queued, 'skipped': skipped, 'recipes': recipes, 'preset_status': status}
 
 
 def batch_view(collection_id: int) -> dict:
@@ -233,3 +238,50 @@ def recent_batches(limit: int = 20) -> list[dict]:
         return [dict(r) for r in db.execute(
             "SELECT id, label, created_at FROM collections WHERE acquisition_method='browser_upload' ORDER BY id DESC LIMIT ?",
             (limit,))]
+
+
+def preset_status(recipe_id: str) -> dict:
+    """Whether a preset can run in this installation: ``ok``, ``partial`` (runs, part missing) or ``unavailable``.
+
+    Probed locally, without network or inference: engines, optional packages, and for Vertex a
+    switched-on provider with an active consent. Shown on /settings and checked before queueing.
+    """
+    import importlib.util
+    from .media.capabilities import media_capabilities
+    from .media.recipe import RecipeError, effective_recipe
+    try:
+        record = effective_recipe(recipe_id)
+    except (RecipeError, ValueError):
+        try:
+            record = effective_recipe(recipe_id, kind='ocr')
+        except (RecipeError, ValueError) as exc:
+            return {'status': 'unavailable', 'missing': [str(exc)[:200]]}
+    effective = record['effective']
+    caps = media_capabilities()
+    missing, partial = [], []
+    engine = str(effective.get('engine') or '')
+    strategy = effective.get('strategy')
+    uses_vertex = strategy == 'vertex_gemini' or engine.startswith('vertex-gemini')
+    if uses_vertex:  # media jobs need the consent; the provider switch governs the advocate only
+        with session() as db:
+            consent = db.execute("SELECT 1 FROM provider_consents WHERE provider_name='vertex' AND revoked_at IS NULL LIMIT 1").fetchone()
+        if consent is None:
+            missing.append('brak aktywnej zgody na Vertex (Ustawienia → Zgody)')
+    if strategy in ('auto_per_file', 'per_segment_language') and caps['asr_faster_whisper']['status'] != 'importable':
+        missing.append('faster-whisper nie jest zainstalowany')
+    if engine.startswith('tesseract') or engine == 'tesseract-cli' or (record['kind'] == 'ocr' and not uses_vertex):
+        if caps['ocr_tesseract']['status'] != 'available':
+            missing.append('Tesseract nie jest zainstalowany w tej instalacji')
+    reference = (effective.get('model_options') or {}).get('timing_reference') if effective.get('word_timestamps') else None
+    if reference:
+        engines = [reference['engine']] if reference['engine'] != 'hybrid' else [reference['primary']['engine'], 'fill:' + reference['fill']['engine']]
+        for name in engines:
+            fill = name.startswith('fill:')
+            name = name.removeprefix('fill:')
+            if name == 'faster-whisper' and caps['asr_faster_whisper']['status'] != 'importable':
+                partial.append('faster-whisper brak: czasy słów niedostępne (tekst Gemini zostaje)')
+            if name == 'mms-forced-align' and importlib.util.find_spec('torchaudio') is None:
+                partial.append('torch/torchaudio brak (requirements-align.txt): '
+                               + ('uzupełnianie wymuszonym wyrównaniem pominięte' if fill else 'czasy słów niedostępne, a wywołanie Gemini i tak jest płatne'))
+    status = 'unavailable' if missing else 'partial' if partial else 'ok'
+    return {'status': status, 'missing': missing, 'partial': partial}

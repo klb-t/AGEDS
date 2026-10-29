@@ -71,9 +71,9 @@ requirements-whisper.txt`. So: FastAPI stack, `pypdf`, `faster-whisper==1.2.0`, 
 
 ## Pre-deploy checklist
 
-- [ ] `docker-compose.vm.yml` present in the VM checkout with `HF_HOME=/models` and the
+- [x] `docker-compose.vm.yml` present in the VM checkout with `HF_HOME=/models` and the
       `/var/lib/ageds-models:/models` mount for **both** `api` and `worker` (it is today).
-- [ ] Add `EW_ASR_RECIPE: asr-vertex-gemini-aligned` and `EW_OCR_RECIPE: ocr-vertex-gemini` to the
+- [x] Add `EW_ASR_RECIPE: asr-vertex-gemini-aligned` and `EW_OCR_RECIPE: ocr-vertex-gemini` to the
       overlay's environment, **or** right after the deploy open `/settings` and save both presets
       (the stored choice wins over the environment).
 - [ ] Do not select `asr-vertex-gemini-forced`, `asr-vertex-gemini-hybrid` (fill), the Tesseract
@@ -85,8 +85,35 @@ requirements-whisper.txt`. So: FastAPI stack, `pypdf`, `faster-whisper==1.2.0`, 
       and check `/var/lib/ageds-models` holds about 1.6 GB.
 - [ ] `docker compose … exec worker python -m app.cli media-capabilities` → expect
       `asr_faster_whisper: importable` and the others `unavailable`, as listed above.
-- [ ] If the Gmail connector will be used: set `AGEDS_CONFIG_DIR` to a mounted private path first.
-- [ ] Tell the owner: PDF and XLSX report formats are unavailable (JSON/CSV/HTML work); scanned PDFs
-      need Vertex OCR; `.xlsx` uploads are kept as originals only.
+- [x] If the Gmail connector will be used: set `AGEDS_CONFIG_DIR` to a mounted private path first.
+      Now `/app/data/config`, i.e. `/var/lib/ageds/config` on the host. `deploy_vm.sh` backs up
+      only the database and the store, but a whole-directory copy of `/var/lib/ageds` would include
+      the Gmail token, which must never reach the backup bucket.
+- [ ] Tell the owner: scanned PDFs need Vertex OCR. Since the image update below, PDF and XLSX
+      report output and `.xlsx`/`.xls` import work once the new image is built.
 - [ ] Then the usual `scripts/deploy_vm.sh` (dry run first, then `--apply`), which runs the test
       suite, stops `api`/`worker`, backs up SQLite and the store, builds and checks.
+
+## Update 2026-10-30, later the same day
+
+* The coordinator changed `docker-compose.vm.yml` (an untracked VM file); checked in the file:
+  * it sets `EW_ASR_RECIPE=asr-vertex-gemini-aligned`, `EW_OCR_RECIPE=ocr-vertex-gemini` and
+    `AGEDS_CONFIG_DIR=/app/data/config` for `api` and `worker` (shared `&env`);
+  * `/var/lib/ageds-models` exists (root-owned; the container runs as root, so it can write there).
+* `/settings` and the batch page now check each preset against the installation
+  (`owner.preset_status`). Unusable presets cannot be chosen, and their jobs are not queued.
+* `server/Dockerfile` now also installs:
+  * `requirements-scanner.txt` (openpyxl 3.1.5 / xlrd 2.0.2 locally): XLSX/XLS import, plan
+    probes and XLSX report output;
+  * Debian `chromium` and `fonts-dejavu-core`, with `EW_PDF_CHROMIUM=/usr/bin/chromium`, for PDF
+    report output.
+
+  *Verified locally:* `reports.outputs.write_pdf` with Chromium 141 printed Polish text to a
+  valid PDF, and the XLSX import tests pass with openpyxl. *Not verified:* the image build itself
+  (no Docker here). The first build on the VM is that check. The image grows by roughly the
+  Chromium package and its libraries.
+* `scripts/deploy_vm.sh` now **builds before it stops** `api`/`worker`. A failed build (for example
+  an apt package name) leaves production running unchanged; revert the Dockerfile hunk and deploy
+  again.
+* torch/torchaudio for the forced and hybrid presets are still not in the image. The default
+  preset does not need them, and `/settings` marks those presets as partial or unavailable.

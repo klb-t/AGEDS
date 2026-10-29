@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Deploy the current AGEDS checkout on the VM (docker compose -p ageds, overlay docker-compose.vm.yml,
 # 127.0.0.1:8090, data in /var/lib/ageds). Dry run by default: prints every step. --apply executes.
-# Needs sudo for docker and /var/lib/ageds. Stops the old api and worker before the backup (an old
+# Needs sudo for docker and /var/lib/ageds. Builds the new image first (a failed build leaves the
+# running services untouched), then stops the old api and worker before the backup (an old
 # loaded worker has no lease fencing from edited files), backs up SQLite with the online backup API
-# and the content store byte for byte, then builds, starts and checks. It never deletes a backup.
+# and the content store byte for byte, then starts and checks. It never deletes a backup.
 #   scripts/deploy_vm.sh [--apply] [--skip-tests] [--public-host NAME] [--allow-public]
 set -euo pipefail
 REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -46,6 +47,9 @@ if [ "$TESTS" = yes ]; then
   run "$REPO/.venv/bin/python" -m pytest server/tests -q -x
 fi
 
+echo "== 0. build $COMMIT first: the running services stay up if the build fails"
+run "${COMPOSE[@]}" build api worker
+
 echo "== 1. stop the old api and worker (no writes during backup)"
 run "${COMPOSE[@]}" stop worker api
 
@@ -62,8 +66,7 @@ run sudo sh -c "cd '$TARGET' && find store -type f -print0 | sort -z | xargs -0 
 run sudo sh -c "cd '$DATA' && find store -type f -print0 | sort -z | xargs -0 -r sha256sum | diff - '$TARGET/store.sha256'"
 run sudo sh -c "printf '%s\n' '$COMMIT' > '$TARGET/deployed_commit'"
 
-echo "== 3. build and start $COMMIT (migrations are additive and run at startup)"
-run "${COMPOSE[@]}" build api worker
+echo "== 3. start $COMMIT, built in step 0 (migrations are additive and run at startup)"
 run "${COMPOSE[@]}" up -d api worker
 
 if [ -n "$PUBLIC_HOST" ]; then

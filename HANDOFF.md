@@ -61,12 +61,14 @@ also left to the owner.
   147 segments word-citable. Tesseract and pyannote have never run here, and 7z/RAR adapters were
   not executed.
 - **No real exports yet.** Gmail and WhatsApp formats were rehearsed on synthetic structures
-  (a widened format check is a separate receipt in `docs/validation/`). For digital traces,
+  modelled on documented formats ([REAL_EXPORT_FORMATS](docs/validation/REAL_EXPORT_FORMATS_2026-10-30.md)). For digital traces,
   every gap is listed with its source and what closes it in
   [TRACES_GAPS](docs/validation/TRACES_GAPS_2026-10-30.md).
 - **The production image lacks some optional engines:** torch/torchaudio
-  (`server/requirements-align.txt`) are not in it, and the faster-whisper model downloads to
-  `HF_HOME` on the first job. See the deploy dependency report in `docs/validation/` when present.
+  (`server/requirements-align.txt`), Tesseract and pyannote are not in it. Spreadsheet import and
+  PDF/XLSX report output are in it since `6ec4f81`. The faster-whisper model downloads to
+  `HF_HOME=/models` on the first job. `/settings` disables presets the installation cannot run.
+  Details and the pre-deploy checklist: [DEPLOY_DEPS](docs/validation/DEPLOY_DEPS_2026-10-30.md).
 - Production runs `legacy_open`, so recipients' grants are not enforced. Invitations are
   disabled there with an explanation; switching to `auth.mode=tokens` is an operator decision
   (docs/ADVOCATE.md).

@@ -109,9 +109,11 @@ requirements-whisper.txt`. So: FastAPI stack, `pypdf`, `faster-whisper==1.2.0`, 
     report output.
 
   *Verified locally:* `reports.outputs.write_pdf` with Chromium 141 printed Polish text to a
-  valid PDF, and the XLSX import tests pass with openpyxl. *Not verified:* the image build itself
-  (no Docker here). The first build on the VM is that check. The image grows by roughly the
-  Chromium package and its libraries.
+  valid PDF, and the XLSX import tests pass with openpyxl. *Verified by the coordinator,
+  2026-10-29 ~22:35 UTC (reported, not repeated here):* a trial build of `6ec4f81`
+  (`docker build server/`, 79 s, exit 0) had Chromium 156 (Debian 13) in the container, and
+  openpyxl/xlrd imported. The trial image was removed. The image grows by roughly the Chromium
+  package and its libraries.
 * `scripts/deploy_vm.sh` now **builds before it stops** `api`/`worker`. A failed build (for example
   an apt package name) leaves production running unchanged; revert the Dockerfile hunk and deploy
   again.

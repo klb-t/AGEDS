@@ -1,7 +1,9 @@
 FROM python:3.12-slim
 # ffmpeg: audio probing and transcoding. chromium + DejaVu fonts (Polish diacritics): PDF report output
 # (EW_PDF_CHROMIUM; the printed HTML has no script or external assets; root runs it with --no-sandbox).
+# tesseract-ocr (pol, nld, eng) + poppler-utils: the local OCR presets, with pixel boxes and no cloud call.
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg chromium fonts-dejavu-core \
+    tesseract-ocr tesseract-ocr-pol tesseract-ocr-nld tesseract-ocr-eng poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 ENV EW_PDF_CHROMIUM=/usr/bin/chromium
 WORKDIR /app

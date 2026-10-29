@@ -119,3 +119,10 @@ requirements-whisper.txt`. So: FastAPI stack, `pypdf`, `faster-whisper==1.2.0`, 
   again.
 * torch/torchaudio for the forced and hybrid presets are still not in the image. The default
   preset does not need them, and `/settings` marks those presets as partial or unavailable.
+* `server/Dockerfile` (after `6ec4f81`) also installs `tesseract-ocr` with `pol`, `nld` and `eng`
+  data, and `poppler-utils`. With them the local presets `ocr-tesseract-pol-nld-eng` and
+  `ocr-chat-screenshot-pol-nld-eng` run without a cloud call and give pixel boxes per line. They
+  also rasterize scanned PDF pages (`pdftoppm`), and `/settings` offers them once `media-capabilities`
+  sees the binaries. *Not verified here:* the build and an OCR run in the container (no Tesseract or
+  Docker on this host). Check with `docker compose … exec worker python -m app.cli
+  media-capabilities`; expect `ocr_tesseract` and `pdf_rasterizer` `available`.

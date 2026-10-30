@@ -99,6 +99,22 @@ class JobsTests(unittest.TestCase):
         self.assertEqual(job_id, queue_transcription(self.artifact_id, 0))
         self.assertEqual(0, self.rows("jobs")[0]["priority"])
 
+    def test_bulk_enqueue_skips_recordings_that_already_have_a_transcript(self):
+        with db.session() as conn:
+            conn.execute("INSERT INTO derived_text(artifact_id,kind,text,segments_json) VALUES(?, 'transcript', 'x', '[]')",
+                         (self.artifact_id,))
+            # a second acquisition of the same bytes, and one new recording
+            same = conn.execute("INSERT INTO artifacts(original_name,mime_type,stored_path,sha256,size_bytes) "
+                                "SELECT 'copy.wav', mime_type, stored_path, sha256, size_bytes FROM artifacts WHERE id=?",
+                                (self.artifact_id,)).lastrowid
+            new = conn.execute("INSERT INTO artifacts(original_name,mime_type,stored_path,sha256,size_bytes) "
+                               "VALUES ('new.wav','audio/wav',?,?,1)", (str(self.audio), '0' * 64)).lastrowid
+        self.assertNotEqual(same, new)
+        self.assertEqual(1, queue_all_audio())
+        self.assertEqual([new], [job["artifact_id"] for job in self.rows("jobs")])
+        self.assertEqual(1, queue_all_audio())  # the open job is reused, nothing new
+        self.assertEqual(1, len(self.rows("jobs")))
+
     def test_invalid_lease_durations_and_clocks_are_rejected_without_writes(self):
         queue_transcription(self.artifact_id)
         for invalid in [0, -1, float("nan"), float("inf"), 86401]:

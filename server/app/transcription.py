@@ -61,8 +61,18 @@ def enqueue_transcription(artifact_id: int, priority: int | None = None, *, reci
     return enqueue_media_job('transcribe', artifact_id, recipe_id=recipe, overrides=overrides,
                              priority=priority, dedup=dedup)
 
+AUDIO_WITHOUT_TRANSCRIPT = """SELECT a.id FROM artifacts a WHERE (a.mime_type LIKE 'audio/%' OR a.mime_type LIKE 'video/%')
+    AND NOT EXISTS (SELECT 1 FROM derived_text d JOIN artifacts b ON b.id=d.artifact_id
+                    WHERE d.kind='transcript' AND (b.id=a.id OR b.sha256=a.sha256)) ORDER BY a.id"""
+
+
 def queue_all_audio() -> int:
+    """Queue ASR for audio/video that has no transcript yet, neither its own nor one for the same bytes.
+
+    With a paid default preset a bulk click must not pay again for recordings already transcribed;
+    a new version of one recording is an explicit per-artifact action.
+    """
     with session() as db:
-        ids=[r['id'] for r in db.execute("SELECT id FROM artifacts WHERE mime_type LIKE 'audio/%' OR mime_type LIKE 'video/%'")]
+        ids=[r['id'] for r in db.execute(AUDIO_WITHOUT_TRANSCRIPT)]
     for aid in ids: queue_transcription(int(aid))
     return len(ids)

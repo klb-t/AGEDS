@@ -13,6 +13,36 @@ was last deployed by the coordinator at `ec9fb6a` on 2026-10-27. Deploying the c
 waits for the owner. Nobody deploys to production without them. Closing draft PR #6 on GitHub is
 also left to the owner.
 
+## Next session start here (2026-10-30, handed over at the end of a weekly limit)
+
+Everything is pushed. Nothing lives only in a chat context.
+
+* **Waiting for deployment:**
+  * The code head of 2026-10-30, after the morning list (`8b119ed`), which the coordinator
+    trial-built.
+  * Since then: the upload size and free-space check (`6d74af6`) and seven fixes from the design
+    review (`3b7436c`..`6b4fc97`). See [PHILOSOPHY_REVIEW](docs/validation/PHILOSOPHY_REVIEW_2026-10-30.md).
+  * Checks at `6b4fc97`, on synthetic data:
+    * backend: 1635 passed, 3 skipped;
+    * JS: 137 passed;
+    * browser: 14 suites, 141 steps.
+  * GitHub Actions is dispatched only by the coordinator, after which the coordinator deploys
+    with `scripts/deploy_vm.sh`.
+* **Before or right after that deploy:**
+  * Migration 140 (`advocate_speech`) is additive.
+  * A Text-to-Speech consent recorded before `5e388c3` no longer covers calls and must be
+    granted again on `/settings`.
+  * For tokens mode, the coordinator owns the proxy exception: `chatadhd/tools/gcp/ageds-public.caddy`.
+    Its route list equals `http_authz.RECIPIENT_PUBLIC_ROUTES`. Tell the coordinator if that list
+    changes.
+* **Next step:**
+  1. Fix review finding 3.2, which is confirmed. `/settings` provider/voice on-off writes a fixed
+     dict and drops model, location, project and voice set from the CLI. Merge into the stored
+     config instead.
+  2. Verify the remaining findings of the review one by one against the code, then fix the
+     confirmed ones, each with a test on the exact value. They are unverified model output.
+  3. Then the ultrareview the owner asked for.
+
 ## What exists
 
 | Stage | Behavior | Contract |
@@ -47,9 +77,9 @@ also left to the owner.
 
 | Check | Evidence |
 |---|---|
-| Backend | Full `pytest server/tests`: 1627 passed, 3 skipped on Python 3.11 (upload space check, 2026-10-30); 1626 passed at `90d318b` also on 3.12 with the image's package set ([DEPLOY_DEPS](docs/validation/DEPLOY_DEPS_2026-10-30.md)). |
+| Backend | Full `pytest server/tests` at `6b4fc97`: 1635 passed, 3 skipped on Python 3.11; 1626 passed at `90d318b` also on 3.12 with the image's package set ([DEPLOY_DEPS](docs/validation/DEPLOY_DEPS_2026-10-30.md)). |
 | JavaScript | `node --test server/tests/js/*.test.mjs`: 137 passed. |
-| Browser | Real Chromium, 14 suites, 135 steps at `b17e2e7`: acceptance 24, advocate 8, advocate_model 6, analysis_budget 9, hypotheses 10, importplan 9, ledger 6, location 7, media 7, owner 7, reports 10, timeline 8, traces 5, workbench 9. Owner and advocate suites re-run at `dc4f326`. |
+| Browser | Real Chromium, 14 suites, 141 steps at `6b4fc97` (owner 8, media 7, the rest as listed). Earlier 135 steps at `b17e2e7`: acceptance 24, advocate 8, advocate_model 6, analysis_budget 9, hypotheses 10, importplan 9, ledger 6, location 7, media 7, owner 7, reports 10, timeline 8, traces 5, workbench 9. Owner and advocate suites re-run at `dc4f326`. |
 | Reviews | Three independent security reviews (2026-10-26, 2026-10-26, 2026-10-27). All confirmed findings are fixed, with regression tests in `server/tests/test_review*_regressions.py`. The third reviewer's repro suite no longer reproduces any finding. |
 | Repository | `scripts/verify_repository.py` passes (links and privacy scan). |
 | CI | GitHub Actions "Manual verification" is dispatched only by the coordinator. It was green on `65c7823`; later dispatches are reported by the coordinator. |

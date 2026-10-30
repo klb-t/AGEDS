@@ -166,6 +166,22 @@ class JobsTests(unittest.TestCase):
         self.assertFalse(renew_lease(job["id"], job["lease_token"], now=1010))
         self.assertEqual(1, recover_expired_jobs(now=1010))
 
+    def test_a_job_whose_lease_keeps_expiring_fails_after_the_attempt_limit(self):
+        import server.app.jobs as jobs_module
+        queue_transcription(self.artifact_id)
+        with patch.object(jobs_module, "MAX_LEASE_ATTEMPTS", 2):
+            for attempt, now in ((1, 1000), (2, 2000)):
+                job = claim_job(worker_id="w", lease_seconds=10, now=now)
+                self.assertEqual(attempt, job["attempts"])
+                self.assertEqual(1, recover_expired_jobs(now=now + 10))
+            self.assertIsNone(claim_job(worker_id="w", lease_seconds=10, now=3000))
+        [row] = self.rows("jobs")
+        self.assertEqual("failed", row["status"])
+        self.assertEqual("worker lease expired on attempt 2 of 2; not queued again", row["error"])
+        outcomes = [json.loads(r["details_json"])["outcome"] for r in self.rows("audit_log") if r["action"] == "job_lease_expired"]
+        self.assertEqual(["queued", "failed"], outcomes)
+        self.assertEqual(["abandoned", "abandoned"], [r["status"] for r in self.rows("processing_runs")])
+
     def test_worker_finishing_after_recovery_does_not_fail_replacement_attempt(self):
         claimed_again = []
         artifact_id = self.artifact_id

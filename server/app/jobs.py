@@ -11,6 +11,9 @@ from .db import session
 
 DEFAULT_LEASE_SECONDS = 600.0
 MAX_LEASE_SECONDS = 86400.0
+# A job whose lease expired this many times is failed, not queued again: a file that kills the
+# worker would otherwise loop for ever, and with a paid preset each loop reserves another call.
+MAX_LEASE_ATTEMPTS = int(os.environ.get("EW_JOB_MAX_ATTEMPTS", "3"))
 
 # Job kinds whose completion is a fenced publication of model output; a bare
 # finish_job(..., 'done') cannot complete them without their result.
@@ -43,12 +46,18 @@ def _audit(db, action: str, job_id: int, details: dict, actor: str = "worker") -
 
 def _recover_expired(db, now: float) -> int:
     # NULL includes old running jobs: an old worker has no token for publication.
-    rows = db.execute("SELECT id,lease_token FROM jobs WHERE status='running' AND (lease_expires_at IS NULL OR lease_expires_at<=?)", (now,)).fetchall()
+    rows = db.execute("SELECT id,lease_token,attempts FROM jobs WHERE status='running' AND (lease_expires_at IS NULL OR lease_expires_at<=?)", (now,)).fetchall()
     for row in rows:
         db.execute("UPDATE processing_runs SET status='abandoned',finished_at=?,error=? WHERE lease_token=? AND status='running'",
                    (_timestamp(now), "worker lease expired", row["lease_token"]))
+        if row["attempts"] >= MAX_LEASE_ATTEMPTS:
+            error = f"worker lease expired on attempt {row['attempts']} of {MAX_LEASE_ATTEMPTS}; not queued again"
+            db.execute("UPDATE jobs SET status='failed',lease_token=NULL,lease_expires_at=NULL,heartbeat_at=NULL,worker_id=NULL,finished_at=?,error=? WHERE id=? AND status='running'",
+                       (_timestamp(now), error, row["id"]))
+            _audit(db, "job_lease_expired", row["id"], {"previous_token": row["lease_token"], "attempts": row["attempts"], "outcome": "failed"})
+            continue
         db.execute("UPDATE jobs SET status='queued',lease_token=NULL,lease_expires_at=NULL,heartbeat_at=NULL,worker_id=NULL,started_at=NULL,finished_at=NULL,error=NULL WHERE id=? AND status='running'", (row["id"],))
-        _audit(db, "job_lease_expired", row["id"], {"previous_token": row["lease_token"]})
+        _audit(db, "job_lease_expired", row["id"], {"previous_token": row["lease_token"], "attempts": row["attempts"], "outcome": "queued"})
     return len(rows)
 
 def recover_expired_jobs(*, now: float | None = None) -> int:

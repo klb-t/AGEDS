@@ -78,6 +78,8 @@ Read a runner's arguments and dependency prerequisites before invoking it; ASR n
 
 Stop all old workers and the service before migration. Back up the SQLite database together with its content store, then verify the backup before starting the new code. Startup performs additive migrations while retaining legacy data; absent historical provenance stays unknown. An already running old worker does not gain new lease-publication checks by changing files on disk.
 
+A worker that dies holding a lease leaves its job `running` until the lease expires. The next claim puts the job back in the queue. On the `EW_JOB_MAX_ATTEMPTS`-th expiry (default 3) the job becomes `failed`, with the attempt count in `error` and in the `job_lease_expired` audit entry. This stops a file that kills the worker from looping, and with a paid preset each loop would reserve another call. Queue such a file again only after finding the cause.
+
 Do not configure an inert metadata archive as the live `EW_DB_PATH`. It is a separate export format with historical jobs represented as inert data.
 
 ## Documentation layout

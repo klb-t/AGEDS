@@ -53,12 +53,14 @@ SYSTEM_PROMPT = (
     'Status "proven" stosuj tylko, gdy twierdzenie przytacza dosłownie fragment w cudzysłowie „…”; '
     'inaczej użyj "claim" albo "hypothesis".'
 )
+# The statuses the prompt lets the model emit; the structured-output enum must allow every one of them.
+MODEL_CLAIM_STATUSES = ('proven', 'claim', 'hypothesis', 'contradicts', 'unknown')
 RESPONSE_SCHEMA = {
     'type': 'OBJECT', 'required': ['claims'],
     'properties': {'claims': {'type': 'ARRAY', 'items': {
         'type': 'OBJECT', 'required': ['text', 'status', 'citations'],
         'properties': {'text': {'type': 'STRING'},
-                       'status': {'type': 'STRING', 'enum': ['proven', 'claim', 'hypothesis', 'unknown']},
+                       'status': {'type': 'STRING', 'enum': list(MODEL_CLAIM_STATUSES)},
                        'citations': {'type': 'ARRAY', 'items': {'type': 'STRING'}}}}}},
 }
 

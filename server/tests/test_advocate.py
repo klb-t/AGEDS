@@ -239,6 +239,14 @@ class AdvocateCoreTests(AdvocateFixture):
         self.assertNotIn('status_not_in_presets', {w['code'] for w in report['warnings']})
         self.assertIn('"contradicts"', providers.SYSTEM_PROMPT)
 
+    def test_the_response_schema_allows_every_status_the_prompt_asks_for(self):
+        import re
+        asked = set(re.findall(r'"(\w+)" (?:tylko gdy|gdy|dla)', providers.SYSTEM_PROMPT))
+        enum = providers.RESPONSE_SCHEMA['properties']['claims']['items']['properties']['status']['enum']
+        self.assertEqual(asked, {'proven', 'claim', 'hypothesis', 'contradicts', 'unknown'})
+        self.assertEqual(sorted(enum), sorted(asked))
+        self.assertLessEqual(set(enum), set(advocate.CLAIM_STATUSES))
+
     def test_proven_policy_values(self):
         basis = [{'ref': 'p1', 'object': ['artifact', self.shared], 'text': 'Termin płatności minął w kwietniu.'}]
         quoted = {'text': 'Wynika: „termin płatności minął w kwietniu”', 'status': 'proven', 'citations': ['p1']}

@@ -293,10 +293,11 @@ def preset_status(recipe_id: str) -> dict:
     strategy = effective.get('strategy')
     uses_vertex = strategy == 'vertex_gemini' or engine.startswith('vertex-gemini')
     if uses_vertex:  # media jobs need the consent; the provider switch governs the advocate only
+        from . import providers
         with session() as db:
-            consent = db.execute("SELECT 1 FROM provider_consents WHERE provider_name='vertex' AND revoked_at IS NULL LIMIT 1").fetchone()
-        if consent is None:
-            missing.append('brak aktywnej zgody na Vertex (Ustawienia → Zgody)')
+            consent = providers.has_covering_consent(db, 'vertex')
+        if not consent:
+            missing.append('brak aktywnej zgody na Vertex z aktualną polityką danych (Ustawienia → Zgody)')
     if strategy in ('auto_per_file', 'per_segment_language') and caps['asr_faster_whisper']['status'] != 'importable':
         missing.append('faster-whisper nie jest zainstalowany')
     if engine.startswith('tesseract') or engine == 'tesseract-cli' or (record['kind'] == 'ocr' and not uses_vertex):

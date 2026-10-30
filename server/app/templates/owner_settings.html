@@ -6,9 +6,9 @@
 {% if done %}<p class="wb-done" role="status" data-owner-done="{{ done }}">Zapisano.</p>{% endif %}
 
 <section class="panel"><h2>Zgody na wysyłanie materiału</h2>
-<p>Bez aktywnej zgody nic nie jest wysyłane do danej usługi. Zgoda obejmuje całą instalację; dane: niepubliczne, nie do trenowania, pamięć podręczna dostawcy włączona. Cofnięcie działa od razu dla nowych wywołań.</p>
+<p>Bez aktywnej zgody nic nie jest wysyłane do danej usługi. Zgoda obejmuje całą instalację i przyjmuje politykę danych usługi: Vertex AI — niepubliczne, nie do trenowania, domyślna pamięć podręczna Vertex włączona; Text-to-Speech — niepubliczne, nie do trenowania, bez pamięci podręcznej. Zgoda działa tylko, dopóki zapisana w niej polityka jest taka, jak to, co program faktycznie wysyła; po zmianie trzeba udzielić jej ponownie. Cofnięcie działa od razu dla nowych wywołań.</p>
 <table data-owner-consents><tr><th>Usługa</th><th>Podstawa</th><th>Udzielona</th><th>Stan</th><th></th></tr>
-{% for c in consents %}<tr data-consent="{{ c.provider_name }}" data-consent-state="{{ 'revoked' if c.revoked_at else 'active' }}"><td>{{ providers_known.get(c.provider_name, c.provider_name) }}</td><td>{{ c.basis_text }}</td><td>{{ c.granted_at }} ({{ c.granted_by }})</td><td>{{ 'cofnięta ' ~ c.revoked_at if c.revoked_at else 'aktywna' }}</td>
+{% for c in consents %}<tr data-consent="{{ c.provider_name }}" data-consent-state="{{ 'revoked' if c.revoked_at else 'active' }}"><td>{{ providers_known.get(c.provider_name, c.provider_name) }}</td><td>{{ c.basis_text }}</td><td>{{ c.granted_at }} ({{ c.granted_by }})</td><td data-consent-policy="{{ 'matches' if c.policy_matches else 'differs' }}">{% if c.revoked_at %}cofnięta {{ c.revoked_at }}{% elif c.policy_matches %}aktywna{% else %}<b>nie obejmuje wywołań</b>: zapisana polityka danych różni się od obecnej — udziel zgody ponownie{% endif %}</td>
 <td>{% if not c.revoked_at %}<form method="post" action="/settings/consent/{{ c.uid }}/revoke"><button class="secondary">Cofnij</button></form>{% endif %}</td></tr>{% else %}<tr><td colspan="5">Brak zgód.</td></tr>{% endfor %}</table>
 <form method="post" action="/settings/consent" class="owner-inline" data-owner-consent-form>
 <label>Usługa<select name="provider">{% for key, label in providers_known.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}</select></label>

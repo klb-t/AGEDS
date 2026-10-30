@@ -27,12 +27,10 @@ CONSENT_PROVIDERS = {
     'vertex': 'Vertex AI (Gemini): transkrypcja, OCR, odpowiedzi rzecznika',
     'google_tts': 'Cloud Text-to-Speech: czytanie odpowiedzi na głos',
 }
-DATA_POLICY = {'public': False, 'training': False, 'provider_cache': 'enabled'}
 
 
 def _active_consent(db, provider: str) -> bool:
-    return db.execute('SELECT 1 FROM provider_consents WHERE provider_name=? AND revoked_at IS NULL LIMIT 1',
-                      (provider,)).fetchone() is not None
+    return providers.has_covering_consent(db, provider)
 
 
 def _presets(kind: str) -> list[dict]:
@@ -193,7 +191,9 @@ def settings_page(request: Request, done: str | None = Query(None, max_length=60
     from ..media.recipe import default_recipe_id
     with session() as db:
         consents = [dict(r) for r in db.execute(
-            'SELECT uid, provider_name, scope_id, basis_text, granted_by, granted_at, revoked_at FROM provider_consents ORDER BY id DESC')]
+            'SELECT uid, provider_name, scope_id, basis_text, granted_by, granted_at, revoked_at, data_policy_json FROM provider_consents ORDER BY id DESC')]
+        for c in consents:
+            c['policy_matches'] = providers.consent_policy_matches(c['provider_name'], c.pop('data_policy_json'))
         state = {'provider': authz.get_setting(db, 'advocate.provider'),
                  'voice': authz.get_setting(db, 'advocate.voice'),
                  'budget': authz.get_setting(db, 'advocate.daily_budget_eur', 1.0),
@@ -289,8 +289,7 @@ def settings_consent(provider: str = Form(...), basis: str = Form(...)):
         return _back('/settings', error='podaj podstawę zgody (np. „R100 właściciel 2026-10-25”)')
     with session() as db:
         scope = authz.create_scope(db, 'installation', {}, actor='owner-web')
-        providers.record_consent(db, provider, scope, granted_by='owner-web', basis_text=basis.strip()[:1000],
-                                 data_policy=DATA_POLICY)
+        providers.record_consent(db, provider, scope, granted_by='owner-web', basis_text=basis.strip()[:1000])
     return _back('/settings', done=f'consent:{provider}')
 
 

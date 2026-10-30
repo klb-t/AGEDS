@@ -76,12 +76,39 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# What each transport does with the material, as the owner accepts it in a consent. The values
+# describe this code's requests (no publication, Google's Vertex/Cloud terms exclude training on
+# customer data, Vertex keeps its default in-memory prompt cache, TTS caches nothing). A consent
+# covers calls only while its recorded policy equals the transport's: if a transport changes what
+# it does, existing consents stop covering until the owner consents to the new policy.
+PROVIDER_DATA_POLICY = {
+    'vertex': {'public': False, 'training': False, 'provider_cache': 'enabled'},
+    'google_tts': {'public': False, 'training': False, 'provider_cache': 'none'},
+}
+
+
+def data_policy_for(provider_name: str) -> dict:
+    return dict(PROVIDER_DATA_POLICY.get(provider_name, {}))
+
+
+def consent_policy_matches(provider_name: str, data_policy_json: str | None) -> bool:
+    """True when a consent's recorded data policy is exactly what the transport does."""
+    expected = PROVIDER_DATA_POLICY.get(provider_name)
+    try:
+        recorded = json.loads(data_policy_json or '{}')
+    except ValueError:
+        return False
+    return expected is not None and recorded == expected
+
+
 def record_consent(db: sqlite3.Connection, provider_name: str, scope_id: int, *, granted_by: str,
                    basis_text: str, data_policy: dict | None = None) -> str:
+    """Record a consent; ``data_policy`` defaults to the transport's, the terms the owner accepts."""
     uid = new_uid()
+    policy = data_policy_for(provider_name) if data_policy is None else data_policy
     db.execute('''INSERT INTO provider_consents(uid,provider_name,scope_id,granted_by,basis_text,data_policy_json,granted_at)
                   VALUES(?,?,?,?,?,?,?)''', (uid, provider_name, scope_id, granted_by, basis_text,
-                                            json.dumps(data_policy or {}, ensure_ascii=False), _now()))
+                                            json.dumps(policy, ensure_ascii=False, sort_keys=True), _now()))
     authz._audit(db, 'provider_consent', 'provider_consent', None,
                  {'uid': uid, 'provider': provider_name, 'scope_id': scope_id}, granted_by)
     return uid
@@ -92,10 +119,19 @@ def revoke_consent(db: sqlite3.Connection, uid: str, *, actor: str) -> None:
     authz._audit(db, 'provider_consent_revoked', 'provider_consent', None, {'uid': uid}, actor)
 
 
+def _covering_consents(db: sqlite3.Connection, provider_name: str) -> list:
+    rows = db.execute('SELECT scope_id, data_policy_json FROM provider_consents WHERE provider_name=? AND revoked_at IS NULL',
+                      (provider_name,)).fetchall()
+    return [r for r in rows if consent_policy_matches(provider_name, r['data_policy_json'])]
+
+
 def consent_coverage(db: sqlite3.Connection, provider_name: str) -> authz.Coverage:
-    scopes = [r['scope_id'] for r in db.execute(
-        'SELECT scope_id FROM provider_consents WHERE provider_name=? AND revoked_at IS NULL', (provider_name,))]
-    return authz.scope_coverage(db, scopes)
+    """Scopes of active consents whose data policy matches the transport (others cover nothing)."""
+    return authz.scope_coverage(db, [r['scope_id'] for r in _covering_consents(db, provider_name)])
+
+
+def has_covering_consent(db: sqlite3.Connection, provider_name: str) -> bool:
+    return bool(_covering_consents(db, provider_name))
 
 
 def spent_today_eur(db: sqlite3.Connection, principal_id: int | None = None) -> float:

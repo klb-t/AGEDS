@@ -127,7 +127,14 @@ class OwnerWebTests(Base):
         with db.session() as conn:
             rows = [dict(r) for r in conn.execute('SELECT uid, provider_name, data_policy_json FROM provider_consents')]
         self.assertEqual({r['provider_name'] for r in rows}, {'vertex', 'google_tts'})
-        self.assertEqual(json.loads(rows[0]['data_policy_json'])['training'], False)
+        policies = {r['provider_name']: json.loads(r['data_policy_json']) for r in rows}
+        self.assertEqual(policies, {'vertex': {'public': False, 'training': False, 'provider_cache': 'enabled'},
+                                    'google_tts': {'public': False, 'training': False, 'provider_cache': 'none'}})
+        with db.session() as conn:  # a consent recorded for other terms is shown as not covering
+            conn.execute("UPDATE provider_consents SET data_policy_json='{}' WHERE provider_name='google_tts'")
+        page = self.client.get('/settings', headers=h).text
+        self.assertEqual(page.count('data-consent-policy="differs"'), 1)
+        self.assertIn('<b>nie obejmuje wywołań</b>: zapisana polityka danych różni się od obecnej', page)
         self.client.post(f"/settings/consent/{rows[0]['uid']}/revoke", headers=h)
         page = self.client.get('/settings', headers=h).text
         self.assertIn('data-consent-state="revoked"', page)

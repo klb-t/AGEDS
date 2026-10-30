@@ -175,8 +175,7 @@ def _advocate_command(args) -> dict:
                 scope = authz.create_scope(db, "case", {"case_id": case_id}, actor="cli")
             else:
                 raise ValueError("scope must be 'installation' or 'case:<id>'")
-            uid = providers.record_consent(db, args.provider, scope, granted_by="cli", basis_text=args.basis,
-                                           data_policy={"public": False, "training": False, "provider_cache": "enabled"})
+            uid = providers.record_consent(db, args.provider, scope, granted_by="cli", basis_text=args.basis)
             return {"consent_uid": uid, "scope": args.scope}
         if args.command == "advocate-consent-revoke":
             providers.revoke_consent(db, args.uid, actor="cli")

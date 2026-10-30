@@ -71,6 +71,23 @@ class ProviderTests(ProviderBase):
         self.assertEqual(answer['mode'], 'retrieval_only')
         self.assertIn('consent', answer['verification']['provider_fallback'])
 
+    def test_a_consent_covers_calls_only_with_the_transports_data_policy(self):
+        uid = self.consent()
+        with db.session() as conn:
+            stored = conn.execute('SELECT data_policy_json FROM provider_consents WHERE uid=?', (uid,)).fetchone()[0]
+            self.assertEqual(json.loads(stored), {'public': False, 'training': False, 'provider_cache': 'enabled'})
+            self.assertTrue(providers.has_covering_consent(conn, 'vertex'))
+            # a consent recorded for other terms (or before the policy existed) covers nothing
+            conn.execute("UPDATE provider_consents SET data_policy_json=? WHERE uid=?",
+                         (json.dumps({'public': False, 'training': True, 'provider_cache': 'enabled'}), uid))
+            self.assertFalse(providers.has_covering_consent(conn, 'vertex'))
+            conn.execute("UPDATE provider_consents SET data_policy_json='{}' WHERE uid=?", (uid,))
+            self.assertFalse(providers.has_covering_consent(conn, 'vertex'))
+        recorder = Recorder()
+        answer = self.ask_with(recorder)
+        self.assertEqual((answer['mode'], recorder.requests), ('retrieval_only', []))
+        self.assertEqual(answer['verification']['provider_fallback'], 'no provider consent covers this material')
+
     def test_consent_must_cover_every_input(self):
         self.consent(self.case_b)
         # The shared material is assigned to B (covered), but case A's interpretation of it is not.

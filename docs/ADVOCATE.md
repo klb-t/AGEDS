@@ -51,6 +51,13 @@ case fits the budget; otherwise the answer falls back to quoted passages and say
 (1.50 / 9.00 USD per 1M input/output tokens) come from third-party aggregators and are unverified with Google;
 `eur_per_usd` 1.0 overstates cost. Correct them in the `advocate.provider` setting.
 
+**A consent's data policy is enforced.** Each consent records the data policy of its transport
+(`providers.PROVIDER_DATA_POLICY`). For Vertex: not public, no training, Vertex's default
+in-memory cache on. For Text-to-Speech: not public, no training, no cache. A consent covers calls
+only while that record equals what the code sends. This holds for the advocate, Vertex ASR/OCR and
+read-aloud alike. A consent with a different or empty policy covers nothing, and `/settings`
+marks it "nie obejmuje wywołań". When a transport's policy changes, the owner consents again.
+
 ## Voice (optional)
 
 ```bash

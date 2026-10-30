@@ -130,3 +130,18 @@ requirements-whisper.txt`. So: FastAPI stack, `pypdf`, `faster-whisper==1.2.0`, 
     pol), `pdf_rasterizer` `available`, `asr_faster_whisper` `importable`.
 
   The trial image was removed. An OCR run inside the container has not been done yet.
+
+## Update 2026-10-30, morning: Python 3.12 and the build context
+
+* **Backend on Python 3.12, with the image's package set.** I made a separate venv with
+  CPython 3.12.16 (uv) and installed exactly what the Dockerfile installs (`requirements.txt`,
+  `-whisper`, `-scanner`), plus pytest, httpx and hypothesis. There was no torch, as in the image.
+  The transitive packages resolved to ctranslate2 4.8.4, huggingface-hub 2.4.0 (2.3.0 in the
+  3.11 venv), onnxruntime 1.31.1, tokenizers 0.23.3 and starlette 0.47.3.
+  `pytest server/tests` at `90d318b`: **1626 passed, 3 skipped**, the same as on 3.11.
+  *Local*: this is not the image. Debian packages (ffmpeg, Tesseract, Chromium) come from this
+  host or are absent here.
+* **`server/.dockerignore` added.** `COPY . .` no longer copies `data/`, `.env*` (except
+  `.env.example`), `tests/` or caches. `/app/data` is a volume at run time, and `config.py`
+  creates it when it is missing. *Not built here* (no Docker access on this host). The next trial
+  build or `deploy_vm.sh` shows it.

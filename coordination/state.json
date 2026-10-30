@@ -1451,6 +1451,29 @@
         "follow_up": "presets checked against the installation on /settings and before queueing (owner.preset_status)",
         "checks": "backend 1621 passed / 3 skipped; browser 14 suites / 135 steps"
       }
+    },
+    {
+      "id": "AGEDS-TASK-20261030-PY312-1",
+      "owner": "ageds_session",
+      "status": "accepted",
+      "scope": [
+        "server/.dockerignore",
+        "docs/validation/DEPLOY_DEPS_2026-10-30.md",
+        "HANDOFF.md"
+      ],
+      "based_on_commit": "90d318b",
+      "acceptance": [
+        "Full backend suite on CPython 3.12 with the image's requirement files; build context excludes data, env files and tests."
+      ],
+      "result_refs": [
+        "docs/validation/DEPLOY_DEPS_2026-10-30.md"
+      ],
+      "results": {
+        "python": "3.12.16",
+        "passed": 1626,
+        "skipped": 3,
+        "docker_build": "not run (no Docker access)"
+      }
     }
   ],
   "remaining_boundaries": [

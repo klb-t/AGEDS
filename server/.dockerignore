@@ -1,0 +1,11 @@
+# Build context of server/Dockerfile (COPY . .). Data, secrets and tests stay out of the image:
+# /app/data is a volume at run time, and a stray file under server/data must never be baked in.
+data/
+.env
+.env.*
+!.env.example
+tests/
+**/__pycache__/
+**/*.pyc
+.pytest_cache/
+.hypothesis/

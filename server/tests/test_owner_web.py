@@ -59,7 +59,23 @@ class OwnerWebTests(Base):
         self.assertIn('queued%3A', queued.headers['location'])
         with db.session() as conn:
             kinds = [r[0] for r in conn.execute("SELECT kind FROM jobs WHERE status='queued'")]
-        self.assertIn('transcribe', kinds)
+        from server.app.media.recipe import default_recipe_id
+        asr = owner.preset_status(default_recipe_id('asr'))
+        if asr['status'] == 'unavailable':  # e.g. CI without faster-whisper: the job is not queued, and says why
+            self.assertNotIn('transcribe', kinds)
+            self.assertEqual(asr['missing'], ['faster-whisper nie jest zainstalowany'])
+            self.assertIn('data-owner-preset-unavailable="transcribe"', self.client.get(batch_url, headers=self.owner_headers()).text)
+            # the rest of the path needs a queued job: only the ASR preset's availability is stood in for
+            from unittest import mock
+            real = owner.preset_status
+            patcher = mock.patch.object(owner, 'preset_status', side_effect=lambda recipe: (
+                {'status': 'ok', 'missing': [], 'partial': []} if recipe == default_recipe_id('asr') else real(recipe)))
+            patcher.start()
+            self.addCleanup(patcher.stop)
+            self.client.post(f'{batch_url}/process', headers=self.owner_headers(), follow_redirects=False)
+            with db.session() as conn:
+                kinds = [r[0] for r in conn.execute("SELECT kind FROM jobs WHERE status='queued'")]
+        self.assertEqual(kinds.count('transcribe'), 1)
         from server.app.media.capabilities import media_capabilities
         if media_capabilities()['ocr_tesseract']['status'] != 'available':  # the default OCR fallback cannot run here
             self.assertIn('data-owner-preset-unavailable="ocr"', self.client.get(batch_url, headers=self.owner_headers()).text)

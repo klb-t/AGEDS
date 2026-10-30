@@ -145,3 +145,10 @@ requirements-whisper.txt`. So: FastAPI stack, `pypdf`, `faster-whisper==1.2.0`, 
   `.env.example`), `tests/` or caches. `/app/data` is a volume at run time, and `config.py`
   creates it when it is missing. *Not built here* (no Docker access on this host). The next trial
   build or `deploy_vm.sh` shows it.
+  *Verified by the coordinator, 2026-10-30 (reported, not repeated here):*
+  * a trial build of `e87a4bf` (`docker build server/`, exit 0);
+  * in the container there is no `/app/tests`, and `import app.main` works;
+  * the trial image was removed.
+
+  `deploy_vm.sh` runs the tests on the host from `~/AGEDS/.venv` (Python 3.11.17), so excluding
+  `tests/` from the image does not affect it.

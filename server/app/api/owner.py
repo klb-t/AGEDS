@@ -11,8 +11,10 @@ import shutil
 from contextlib import closing
 from urllib.parse import quote
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+from starlette.concurrency import run_in_threadpool
+from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from .. import authz, owner, providers
 from ..db import connect, session
@@ -59,7 +61,24 @@ def start_page(request: Request, error: str | None = Query(None, max_length=500)
 
 
 @router.post('/start/upload')
-def start_upload(files: list[UploadFile] = File(...), label: str = Form(''), browser_times: str = Form('{}')):
+async def start_upload(request: Request):
+    # Size and free space are checked from the header before the body is read: the parser would
+    # otherwise spool a too-large upload to disk first and refuse it only at the end.
+    try:
+        length = int(request.headers['content-length'])
+    except (KeyError, ValueError):
+        length = None
+    refusal = await run_in_threadpool(owner.upload_refusal, length)
+    if refusal:
+        return _back('/start', error=refusal)
+    async with request.form(max_files=10000, max_fields=10) as form:
+        files = [f for f in form.getlist('files') if isinstance(f, StarletteUploadFile)]
+        label, browser_times = form.get('label') or '', form.get('browser_times') or '{}'
+        return await run_in_threadpool(_start_upload, files, label if isinstance(label, str) else '',
+                                       browser_times if isinstance(browser_times, str) else '{}')
+
+
+def _start_upload(files: list, label: str, browser_times: str) -> RedirectResponse:
     try:
         times = json.loads(browser_times or '{}')
     except ValueError:

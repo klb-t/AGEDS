@@ -36,7 +36,18 @@ Upload safety (`UploadSurfaceTests` in `server/tests/test_owner_web.py`):
   1 MiB) is not hashed, the scan is marked incomplete (`limit_hits`), and the member cannot be
   ingested.
 * **Size:** the limit per batch is a setting on `/settings` (preset `EW_MAX_UPLOAD_BYTES`,
-  8 GiB). A batch over the limit is removed whole.
+  8 GiB). A batch over the limit is removed whole. Since 2026-10-30 an oversized batch is refused
+  before anything is sent:
+  * The page sums the chosen files' sizes against the limit before sending (script). While the
+    batch uploads, the page says so and the button stays disabled.
+  * The server checks the request's `Content-Length` before it reads the body.
+  * The server also checks free space: the multipart parser spools each file to the temp
+    directory before the copy into the batch, so an upload needs its size twice on one file system
+    (once each if they differ), plus a reserve (`EW_UPLOAD_SPACE_RESERVE_BYTES`, 2 GiB) that keeps
+    the database and the store writable. Without the check, a large Takeout zip could fill the disk
+    that production SQLite lives on.
+
+  Without the header, the per-file budget still applies during the copy.
 * **CSRF:** a cross-site POST, also with Basic credentials, is refused (403) before anything is
   written.
 

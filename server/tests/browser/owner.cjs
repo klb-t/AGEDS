@@ -60,6 +60,17 @@ const delay = ms => new Promise(r => setTimeout(r, ms));
       assert.equal(await page.isChecked('input[name=asr][value="asr-vertex-gemini"]'), true);
     });
 
+    await test('a batch above the limit is refused in the browser before it is sent', async () => {
+      await page.goto(`${base}/start`);
+      await page.setInputFiles('[data-owner-files]', Object.values(fixture.files));
+      await page.evaluate(() => { document.querySelector('[data-owner-upload]').dataset.ownerLimitBytes = '1'; });
+      await page.click('[data-owner-upload] button');
+      assert.equal(await page.isVisible('[data-owner-upload-refused]'), true);
+      assert.match(await page.textContent('[data-owner-upload-refused]'), /limit paczki/);
+      assert.equal(await page.isVisible('[data-owner-uploading]'), false);
+      assert.equal(new URL(page.url()).pathname, '/start');
+    });
+
     let batchUrl;
     await test('upload of an export zip, a recording and a screenshot creates a reviewed plan', async () => {
       await page.goto(`${base}/start`);

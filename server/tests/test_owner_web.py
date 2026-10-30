@@ -5,6 +5,7 @@ import os
 import unicodedata
 import zipfile
 from pathlib import Path
+from urllib.parse import unquote
 
 from server.tests.test_review_regressions import Base
 from server.app import authz, db, owner
@@ -239,6 +240,24 @@ class UploadSurfaceTests(Base):
             self.assertEqual(r.status_code, 403, extra)
         after = set(owner.incoming_root().iterdir()) if owner.incoming_root().exists() else set()
         self.assertEqual(after, before)
+
+    def test_too_large_or_too_little_space_is_refused_before_the_body_is_read(self):
+        from unittest import mock
+        owner.incoming_root().mkdir(parents=True, exist_ok=True)
+        before = set(owner.incoming_root().iterdir())
+        refused = mock.Mock(side_effect=AssertionError('the body must not be parsed'))
+        with mock.patch.object(owner, 'MAX_UPLOAD_BYTES', 10), \
+                mock.patch('starlette.requests.Request.form', refused):
+            r = self.upload([('big.bin', io.BytesIO(b'x' * (2 * 1024 * 1024)), 'application/octet-stream')])
+        self.assertIn('limit', unquote(r.headers['location']))
+        with mock.patch.object(owner, 'UPLOAD_SPACE_RESERVE', 1 << 62), \
+                mock.patch('starlette.requests.Request.form', refused):
+            r = self.upload([('small.txt', io.BytesIO(b'x'), 'text/plain')])
+        self.assertIn('za mało miejsca', unquote(r.headers['location']))
+        refused.assert_not_called()
+        self.assertEqual(set(owner.incoming_root().iterdir()), before)
+        self.assertIsNone(owner.upload_refusal(None))  # no header: the per-file budget still applies
+        self.assertIsNone(owner.upload_refusal(1024))
 
     def test_upload_limit_is_a_setting(self):
         h = self.owner_headers()

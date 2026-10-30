@@ -47,7 +47,7 @@ also left to the owner.
 
 | Check | Evidence |
 |---|---|
-| Backend | Full `pytest server/tests` at `90d318b`: 1626 passed, 3 skipped, on Python 3.11 and also on 3.12 with the image's package set ([DEPLOY_DEPS](docs/validation/DEPLOY_DEPS_2026-10-30.md)). |
+| Backend | Full `pytest server/tests`: 1627 passed, 3 skipped on Python 3.11 (upload space check, 2026-10-30); 1626 passed at `90d318b` also on 3.12 with the image's package set ([DEPLOY_DEPS](docs/validation/DEPLOY_DEPS_2026-10-30.md)). |
 | JavaScript | `node --test server/tests/js/*.test.mjs`: 137 passed. |
 | Browser | Real Chromium, 14 suites, 135 steps at `b17e2e7`: acceptance 24, advocate 8, advocate_model 6, analysis_budget 9, hypotheses 10, importplan 9, ledger 6, location 7, media 7, owner 7, reports 10, timeline 8, traces 5, workbench 9. Owner and advocate suites re-run at `dc4f326`. |
 | Reviews | Three independent security reviews (2026-10-26, 2026-10-26, 2026-10-27). All confirmed findings are fixed, with regression tests in `server/tests/test_review*_regressions.py`. The third reviewer's repro suite no longer reproduces any finding. |

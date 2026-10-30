@@ -5,11 +5,13 @@
 {% if error %}<p class="wb-alert" role="alert" data-owner-error>{{ error }}</p>{% endif %}
 <section class="panel">
 <h2>1. Wgraj pliki</h2>
-<form action="/start/upload" method="post" enctype="multipart/form-data" data-owner-upload>
+<form action="/start/upload" method="post" enctype="multipart/form-data" data-owner-upload data-owner-limit-bytes="{{ limit_bytes }}">
   <label>Pliki (można zaznaczyć wiele naraz)<input type="file" name="files" multiple required data-owner-files></label>
   <label>Opis paczki (opcjonalnie)<input name="label" maxlength="200" placeholder="np. eksport Gmail z 27.10"></label>
   <input type="hidden" name="browser_times" value="{}" data-owner-times>
   <button>Wgraj i przygotuj plan importu</button>
+  <p class="wb-alert" role="alert" hidden data-owner-upload-refused></p>
+  <p role="status" hidden data-owner-uploading>Wgrywanie trwa; nie zamykaj tej karty. Duży eksport może wgrywać się wiele minut.</p>
 </form>
 <details open><summary>Co obsługuje i jakie są granice — przeczytaj przed wgraniem</summary>
 <ul class="owner-limits">

@@ -70,6 +70,36 @@ def new_batch_dir() -> Path:
     return path
 
 
+UPLOAD_SPACE_RESERVE = int(os.environ.get('EW_UPLOAD_SPACE_RESERVE_BYTES', str(2 * 1024 ** 3)))
+
+
+def upload_refusal(content_length: int | None) -> str | None:
+    """Why a request body of ``content_length`` bytes must be refused before it is read, else None.
+
+    The multipart parser spools each file to the temp directory before the copy into the batch, so
+    one upload needs its size twice (once if both lie on different file systems), plus a reserve
+    that keeps the database and the content store writable.
+    """
+    import tempfile
+    if content_length is None:
+        return None
+    limit = max_upload_bytes()
+    if content_length > limit + (1 << 20):  # multipart framing and the small fields
+        return (f'paczka ma {content_length / 1024 ** 3:.2f} GiB, limit to {limit / 1024 ** 3:.2f} GiB '
+                f'(Ustawienia → limit wgrywania)')
+    need: dict[int, list] = {}
+    for path in (incoming_root(), Path(tempfile.gettempdir())):
+        path.mkdir(parents=True, exist_ok=True)
+        stat = os.statvfs(path)
+        entry = need.setdefault(os.stat(path).st_dev, [stat.f_bavail * stat.f_frsize, 0])
+        entry[1] += content_length
+    for free, wanted in need.values():
+        if wanted + UPLOAD_SPACE_RESERVE > free:
+            return (f'za mało miejsca na serwerze: wgranie {content_length / 1024 ** 3:.2f} GiB potrzebuje '
+                    f'{(wanted + UPLOAD_SPACE_RESERVE) / 1024 ** 3:.2f} GiB wolnego, jest {free / 1024 ** 3:.2f} GiB')
+    return None
+
+
 def write_upload(batch: Path, name: str, stream, used: set[str], budget: list[int]) -> dict:
     """Copy one uploaded stream into the batch; ``budget`` holds the bytes still allowed."""
     import hashlib

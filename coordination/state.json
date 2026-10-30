@@ -1474,6 +1474,33 @@
         "skipped": 3,
         "docker_build": "not run (no Docker access)"
       }
+    },
+    {
+      "id": "AGEDS-TASK-20261030-UPLOAD-SPACE-1",
+      "owner": "ageds_session",
+      "status": "accepted",
+      "scope": [
+        "server/app/owner.py",
+        "server/app/api/owner.py",
+        "server/app/static/owner.mjs",
+        "server/app/templates/owner_start.html",
+        "server/tests/test_owner_web.py",
+        "server/tests/browser/owner.cjs",
+        "docs/OWNER_WEB.md"
+      ],
+      "based_on_commit": "8b119ed",
+      "acceptance": [
+        "An upload above the batch limit or the free space is refused from Content-Length before the body is read; the browser refuses an oversized batch before sending."
+      ],
+      "result_refs": [
+        "docs/OWNER_WEB.md"
+      ],
+      "results": {
+        "backend": "1627 passed, 3 skipped",
+        "js": 137,
+        "browser_owner_steps": 8,
+        "data": "synthetic test files only"
+      }
     }
   ],
   "remaining_boundaries": [

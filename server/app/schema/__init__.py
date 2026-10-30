@@ -16,6 +16,11 @@ range      module                                 area
 70–79      ``schema.integrations``                read API tokens, ecosystem adapters
 80–89      ``schema.workbench``                   saved searches, folders, bookmarks
 90–99      ``schema.importplan``                  catalog → import plans and runs
+100–109    ``schema.location``                    location history
+110–119    ``schema.traces``                      personal-data exports
+120–129    ``schema.ledger``                      bank, transport, health records
+130–139    ``schema.connectors``                  account connectors (Gmail API)
+140–149    ``schema.advocate``                    advocate extensions (speech cache)
 =========  =====================================  ==========================
 
 Migrations only add tables, columns, indexes and triggers. Each version runs in
@@ -29,13 +34,13 @@ import sqlite3
 
 EXTENSION_MODULES = (
     'catalog', 'records', 'timeline', 'media', 'analysis', 'reports', 'integrations', 'workbench',
-    'importplan', 'location', 'traces', 'ledger', 'connectors',
+    'importplan', 'location', 'traces', 'ledger', 'connectors', 'advocate',
 )
 _RANGES = {
     'catalog': (10, 19), 'records': (20, 29), 'timeline': (30, 39), 'media': (40, 49),
     'analysis': (50, 59), 'reports': (60, 69), 'integrations': (70, 79), 'workbench': (80, 89),
     'importplan': (90, 99), 'location': (100, 109), 'traces': (110, 119), 'ledger': (120, 129),
-    'connectors': (130, 139),
+    'connectors': (130, 139), 'advocate': (140, 149),
 }
 
 

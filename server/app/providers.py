@@ -430,13 +430,19 @@ class VoiceProvider:
         scope = json.loads(row['derived_scope_json'])
         if not all(gate.allows(kind, object_id, 'read_text') for kind, object_id in scope):
             raise authz.Denied('advocate_answer', answer_uid, 'read_text', exists=True)
+        text = ' '.join(claim['text'] for claim in json.loads(row['claims_json']))[:self.config['max_tts_chars']]
+        if not text.strip():
+            raise ProviderUnavailable('the answer has no text to read')
+        # A replay of the same text, voice and language is served from the cache: nothing is sent or paid.
+        cache_key = (row['id'], hashlib.sha256(text.encode()).hexdigest(), self.config['tts_voice'], self.config['tts_language'])
+        cached = db.execute('SELECT audio FROM advocate_speech WHERE answer_id=? AND text_sha256=? AND voice=? AND language=?',
+                            cache_key).fetchone()
+        if cached is not None:
+            return bytes(cached['audio'])
         consent = consent_coverage(db, self.config['tts_consent_provider'])
         if not all(authz.covered_by(db, consent, kind, object_id) for kind, object_id in scope):
             raise ProviderUnavailable(f"no consent for {self.config['tts_consent_provider']} (text-to-speech) covers this "
                                       'material; record one with advocate-consent --provider google_tts')
-        text = ' '.join(claim['text'] for claim in json.loads(row['claims_json']))[:self.config['max_tts_chars']]
-        if not text.strip():
-            raise ProviderUnavailable('the answer has no text to read')
         price = self.config['tts_price_usd_per_million_chars']
         cost = len(text) * price / 1_000_000 * self.config['eur_per_usd']
         refs = sorted(tuple(item) for item in scope)
@@ -460,6 +466,9 @@ class VoiceProvider:
                'actual_eur': actual, 'settles_reservation': reservation['uid']}, started)
         if status == 'error':
             raise ProviderUnavailable(error)
+        db.execute('INSERT OR IGNORE INTO advocate_speech(answer_id,text_sha256,voice,language,audio,provider_call_uid) '
+                   'VALUES(?,?,?,?,?,?)', (*cache_key, audio, reservation['uid']))
+        db.commit()
         return audio
 
 

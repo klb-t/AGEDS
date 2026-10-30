@@ -70,6 +70,11 @@ answer aloud (Cloud Text-to-Speech, `texttospeech.googleapis.com`, which must be
 same gate and provider consent as the text answer and the same daily budget. The TTS price preset (16 USD per 1M
 characters) is unverified. An avatar is not implemented.
 
+The audio of an answer is kept in `advocate_speech`, keyed by answer, text hash, voice and
+language. A replay is served from there, after the same access check, and calls and pays nothing.
+A different voice or language is a new call. Serving a replay sends nothing to the provider, so it
+does not need the Text-to-Speech consent. The table is excluded from whole-database exports.
+
 ## Security defaults after the independent review (2026-10-26)
 
 - Every artifact route authorizes each returned text version and citation; a frozen snapshot never reaches later versions.

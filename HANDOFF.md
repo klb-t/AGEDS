@@ -86,7 +86,7 @@ remains manual-only; do not dispatch it or call paid models to obtain a receipt.
 
 Before upgrading a live installation:
 * stop the workers and back up SQLite and the content store (`deploy_vm.sh` does both);
-* migrations are additive: versions 1–6 and the reserved ranges 10–139 (`server/app/schema/__init__.py`);
+* migrations are additive: versions 1–6 and the reserved ranges 10–149 (`server/app/schema/__init__.py`);
 * classify new tables in `server/app/packages.py` (exported or excluded with a reason); a test
   enforces it.
 

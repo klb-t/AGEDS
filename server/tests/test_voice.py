@@ -95,6 +95,26 @@ class VoiceTests(AdvocateFixture):
             with self.assertRaises(authz.Denied):
                 self.voice(conn).synthesize(conn, answer['answer_uid'])
 
+    def test_a_replay_is_served_from_the_cache_without_a_second_call(self):
+        answer = self.answer()
+        with db.session() as conn:
+            first = self.voice(conn).synthesize(conn, answer['answer_uid'])
+            spent = providers.spent_today_eur(conn)
+            second = self.voice(conn).synthesize(conn, answer['answer_uid'])
+            self.assertEqual(providers.spent_today_eur(conn), spent)
+            [cached] = [dict(r) for r in conn.execute('SELECT * FROM advocate_speech')]
+        self.assertEqual((first, second), (b'ID3 synthetic mp3', b'ID3 synthetic mp3'))
+        self.assertEqual(len(self.fake.tts_requests), 1)
+        [call] = self.calls('text_to_speech')
+        self.assertEqual(cached['provider_call_uid'], json.loads(call['cost_basis_json'])['settles_reservation'])
+        self.assertEqual((cached['voice'], bytes(cached['audio'])), (providers.VOICE_PRESET['tts_voice'], b'ID3 synthetic mp3'))
+        with db.session() as conn:  # another voice is another text-to-speech call
+            voice = self.voice(conn)
+            voice.config = {**voice.config, 'tts_voice': 'pl-PL-Standard-B'}
+            voice.synthesize(conn, answer['answer_uid'])
+        self.assertEqual(len(self.fake.tts_requests), 2)
+        self.assertEqual(len(self.calls('text_to_speech')), 2)
+
     def test_reading_aloud_needs_owner_consent_for_every_input_and_budget(self):
         answer = self.answer()
         with db.session() as conn:

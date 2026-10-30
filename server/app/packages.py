@@ -105,6 +105,8 @@ EXTENSION_TABLES = (
 )
 EXCLUDED_EXTENSION_TABLES = {
     'api_tokens': 'credential table: token keys, salts and secret digests are never exported',
+    'advocate_speech': ('derived cache: Text-to-Speech audio of private advocate answers; synthesized again '
+                        'from the answer text when needed'),
     'auth_methods': 'credential table: advocate API tokens and browser sessions (salts, secret digests)',
     'timeline_projections': 'derived cache: rebuilt from events/event_times by the versioned display rule',
     'timeline_items': 'derived cache: rebuilt from events/event_times by the versioned display rule',

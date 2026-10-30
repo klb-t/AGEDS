@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import math
 import statistics
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from ..db import session
@@ -21,6 +21,7 @@ from ..wav_header import MAX_PREFIX_BYTES, probe_wav_header
 from .recipe import RecipeError, parse_payload
 
 MAX_RUNS_SAMPLED = 2000
+JOB_STATUSES = ('queued', 'running', 'done', 'failed', 'cancelled')
 UNIT_FOR_KIND = {'transcribe': 'audio_second', 'diarize': 'audio_second', 'ocr': 'page'}
 
 
@@ -101,8 +102,8 @@ def _known_work(db, artifact: dict, kind: str) -> dict | None:
 
 
 def queue_listing(*, statuses: tuple[str, ...] = ('running', 'queued'), limit: int = 100) -> dict:
-    if not statuses or any(s not in ('queued', 'running', 'done', 'failed') for s in statuses):
-        raise ValueError('statuses must be among queued, running, done, failed')
+    if not statuses or any(s not in JOB_STATUSES for s in statuses):
+        raise ValueError(f'statuses must be among {", ".join(JOB_STATUSES)}')
     if not 1 <= limit <= 1000:
         raise ValueError('limit must be 1..1000')
     with session() as db:
@@ -175,3 +176,24 @@ def set_job_priority(job_id: int, priority: int, *, actor: str = 'user') -> dict
             db.execute("INSERT INTO audit_log(actor,action,object_kind,object_id,details_json) VALUES (?,'job_reprioritized','job',?,?)",
                        (actor, job_id, json.dumps({'previous_priority': row['priority'], 'priority': priority})))
         return {'job_id': job_id, 'previous_priority': row['priority'], 'priority': priority}
+
+
+def cancel_job(job_id: int, *, actor: str = 'user') -> dict:
+    """Manual choice: cancel a queued job before a worker claims it (audited).
+
+    A running job is not cancelled here: its provider call may already be under way and paid;
+    it ends by finishing, failing or reaching the lease attempt limit.
+    """
+    with session() as db:
+        db.execute('BEGIN IMMEDIATE')
+        row = db.execute('SELECT id,status FROM jobs WHERE id=?', (job_id,)).fetchone()
+        if row is None:
+            raise LookupError('job not found')
+        if row['status'] != 'queued':
+            raise ValueError(f'only queued jobs can be cancelled (job is {row["status"]})')
+        finished = datetime.now(timezone.utc).isoformat()
+        db.execute("UPDATE jobs SET status='cancelled',finished_at=?,error=? WHERE id=? AND status='queued'",
+                   (finished, f'cancelled by {actor}', job_id))
+        db.execute("INSERT INTO audit_log(actor,action,object_kind,object_id,details_json) VALUES (?,'job_cancelled','job',?,?)",
+                   (actor, job_id, json.dumps({'previous_status': 'queued'})))
+        return {'job_id': job_id, 'status': 'cancelled', 'finished_at': finished}

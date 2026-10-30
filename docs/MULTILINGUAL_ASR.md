@@ -258,13 +258,17 @@ unit of completed runs with the **same job kind and recipe hash**, reported as m
 with sample size. Run wall time includes model load and verification. Without measured runs
 or a known work amount the estimate is `unknown` with reasons. A cumulative median through each
 queued job is shown only while all previous estimates are known. Priority can be changed for
-queued jobs (`POST /api/media/jobs/{id}/priority`, audited).
+queued jobs (`POST /api/media/jobs/{id}/priority`, audited). A queued job can also be cancelled
+(`POST /api/media/jobs/{id}/cancel`, or the button on `/media/queue`). Cancelling sets status
+`cancelled`, writes `job_cancelled` to the audit log, and lets the same work be queued again. A
+running job is not cancelled: its paid call may already be under way. It ends by finishing,
+failing, or reaching `EW_JOB_MAX_ATTEMPTS` expired leases.
 
 ## 8. Interfaces
 
 HTTP (`server/app/api/media.py`; navigation "Transkrypcje", "Kolejka"):
 `/api/media/capabilities`, `/api/media/recipes`, `POST /api/media/artifacts/{id}/jobs`,
-`/api/media/queue`, `POST /api/media/jobs/{id}/priority`, `/api/media/artifacts/{id}/versions`,
+`/api/media/queue`, `POST /api/media/jobs/{id}/priority`, `POST /api/media/jobs/{id}/cancel`, `/api/media/artifacts/{id}/versions`,
 `/api/media/compare`, `/api/media/runs/{id}/recipe`, `/api/media/artifacts/{id}/speakers`,
 `POST /api/media/artifacts/{id}/speaker-assignments`, `/api/media/artifacts/{id}/event-candidates`;
 pages `/media`, `/media/artifact/{id}`, `/media/compare`, `/media/queue`,

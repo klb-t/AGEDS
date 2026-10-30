@@ -5,7 +5,7 @@ import json
 
 from server.app import db, worker
 from server.app.jobs import claim_job
-from server.app.media.estimates import queue_listing, set_job_priority
+from server.app.media.estimates import cancel_job, queue_listing, set_job_priority
 from server.app.media.queue import enqueue_media_job
 from server.app.transcription import enqueue_transcription
 from server.tests.test_media_support import MediaCase
@@ -94,3 +94,24 @@ class QueueEstimateTests(MediaCase):
             set_job_priority(9999, 1)
         self.assertIn('job_reprioritized', [r['action'] for r in self.rows('audit_log')])
         self.assertEqual(first, claim_job()['id'])
+
+    def test_a_queued_job_can_be_cancelled_and_is_never_claimed(self):
+        first = enqueue_transcription(self.aid)['job_id']
+        second = enqueue_media_job('diarize', self.aid)['job_id']
+        result = cancel_job(first, actor='owner')
+        self.assertEqual((result['job_id'], result['status']), (first, 'cancelled'))
+        [row] = [r for r in self.rows('jobs') if r['id'] == first]
+        self.assertEqual((row['status'], row['error'], row['finished_at']), ('cancelled', 'cancelled by owner', result['finished_at']))
+        [audit] = [r for r in self.rows('audit_log') if r['action'] == 'job_cancelled']
+        self.assertEqual((audit['actor'], audit['object_id'], json.loads(audit['details_json'])), ('owner', first, {'previous_status': 'queued'}))
+        self.assertEqual(second, claim_job()['id'])
+        self.assertIsNone(claim_job())
+        with self.assertRaisesRegex(ValueError, r'only queued jobs can be cancelled \(job is running\)'):
+            cancel_job(second)
+        with self.assertRaisesRegex(ValueError, r'\(job is cancelled\)'):
+            cancel_job(first)
+        with self.assertRaises(LookupError):
+            cancel_job(9999)
+        # a cancelled job does not block queueing the same work again
+        self.assertNotEqual(first, enqueue_transcription(self.aid)['job_id'])
+

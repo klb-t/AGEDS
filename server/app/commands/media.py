@@ -43,7 +43,7 @@ def register(subparsers) -> None:
     enqueue.add_argument('--priority', type=int, default=None)
     enqueue.add_argument('--dedup', choices=('reuse', 'reuse_completed', 'duplicate'), default=None)
     queue = subparsers.add_parser('media-queue', help='list jobs with measured processing-time estimates')
-    queue.add_argument('--status', action='append', choices=('queued', 'running', 'done', 'failed'), default=None)
+    queue.add_argument('--status', action='append', choices=('queued', 'running', 'done', 'failed', 'cancelled'), default=None)
     queue.add_argument('--limit', type=_positive, default=100)
     compare = subparsers.add_parser('transcript-compare', help='deterministic comparison of two text versions of one artifact')
     compare.add_argument('a', type=_positive)

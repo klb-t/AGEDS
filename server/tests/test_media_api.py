@@ -112,3 +112,17 @@ class MediaApiTests(MediaCase):
         self.assertIn(capabilities['diarization_pyannote']['status'], ('available', 'unavailable'))
         recipes = self.client.get('/api/media/recipes?kind=ocr').json()['recipes']
         self.assertEqual({'ocr'}, {r['kind'] for r in recipes})
+
+    def test_cancel_over_http_and_from_the_queue_page(self):
+        job = self.post(f'/api/media/artifacts/{self.aid}/jobs', {})['job_id']
+        page = self.client.get('/media/queue').text
+        self.assertIn(f'data-cancel-job="{job}"', page)
+        self.assertEqual(self.post(f'/api/media/jobs/{job}/cancel', None)['status'], 'cancelled')
+        self.post(f'/api/media/jobs/{job}/cancel', None, 409)
+        self.post('/api/media/jobs/999/cancel', None, 404)
+        listed = self.client.get('/api/media/queue?status=cancelled').json()['jobs']
+        self.assertEqual([(job, 'cancelled')], [(j['job_id'], j['status']) for j in listed])
+        other = self.post(f'/api/media/artifacts/{self.aid}/jobs', {})['job_id']
+        form = self.client.post(f'/media/jobs/{other}/cancel', follow_redirects=False)
+        self.assertEqual((form.status_code, form.headers['location']), (303, '/media/queue'))
+        self.assertNotIn(f'data-cancel-job="{other}"', self.client.get('/media/queue').text)

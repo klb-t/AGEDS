@@ -116,7 +116,7 @@ def api_enqueue(artifact_id: SqlId, body: JobIn):
 
 
 @router.get('/api/media/queue')
-def api_queue(status: Annotated[list[Literal['queued', 'running', 'done', 'failed']] | None, Query()] = None,
+def api_queue(status: Annotated[list[Literal['queued', 'running', 'done', 'failed', 'cancelled']] | None, Query()] = None,
               limit: int = Query(100, ge=1, le=1000)):
     from ..media.estimates import queue_listing
     return queue_listing(statuses=tuple(status) if status else ('running', 'queued'), limit=limit)
@@ -127,6 +127,17 @@ def api_job_priority(job_id: SqlId, body: PriorityIn):
     from ..media.estimates import set_job_priority
     try:
         return set_job_priority(job_id, body.priority)
+    except LookupError as error:
+        raise HTTPException(404, str(error)) from error
+    except ValueError as error:
+        raise HTTPException(409, str(error)) from error
+
+
+@router.post('/api/media/jobs/{job_id}/cancel')
+def api_job_cancel(job_id: SqlId):
+    from ..media.estimates import cancel_job
+    try:
+        return cancel_job(job_id)
     except LookupError as error:
         raise HTTPException(404, str(error)) from error
     except ValueError as error:
@@ -278,6 +289,12 @@ def media_priority_form(job_id: SqlId, priority: str = Form(...)):
         raise HTTPException(404, str(error)) from error
     except ValueError as error:
         raise HTTPException(409, str(error)) from error
+    return RedirectResponse('/media/queue', status_code=303)
+
+
+@router.post('/media/jobs/{job_id}/cancel')
+def media_cancel_form(job_id: SqlId):
+    api_job_cancel(job_id)
     return RedirectResponse('/media/queue', status_code=303)
 
 

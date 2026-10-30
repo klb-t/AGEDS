@@ -198,6 +198,7 @@ def settings_page(request: Request, done: str | None = Query(None, max_length=60
                  'voice': authz.get_setting(db, 'advocate.voice'),
                  'budget': authz.get_setting(db, 'advocate.daily_budget_eur', 1.0),
                  'spent': round(providers.spent_today_eur(db), 4),
+                 'vertex_consent': _active_consent(db, 'vertex'),
                  'calls': [dict(r) for r in db.execute(
                      'SELECT purpose, provider_name, model, status, cost_eur, started_at FROM provider_calls ORDER BY id DESC LIMIT 15')]}
     presets = {kind: _presets(kind) for kind in ('asr', 'ocr')}

@@ -259,6 +259,17 @@ class UploadSurfaceTests(Base):
         self.assertIsNone(owner.upload_refusal(None))  # no header: the per-file budget still applies
         self.assertIsNone(owner.upload_refusal(1024))
 
+    def test_settings_says_the_provider_switch_does_not_stop_paid_media(self):
+        h = self.owner_headers()
+        page = self.client.get('/settings', headers=h).text
+        self.assertIn('data-owner-media-paid="stopped"', page)
+        self.assertIn('są wstrzymane, bo nie ma aktywnej zgody na Vertex', page)
+        self.client.post('/settings/consent', data={'provider': 'vertex', 'basis': 'test'}, headers=h)
+        page = self.client.get('/settings', headers=h).text
+        self.assertIn('Model dla odpowiedzi rzecznika: <b data-owner-provider>wyłączony</b>', page)
+        self.assertIn('data-owner-media-paid="active"', page)
+        self.assertIn('działają, bo zgoda na Vertex jest aktywna', page)
+
     def test_upload_limit_is_a_setting(self):
         h = self.owner_headers()
         self.assertIn('error=', self.client.post('/settings/upload-limit', data={'gib': 'x'}, headers=h,

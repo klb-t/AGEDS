@@ -17,8 +17,9 @@
 </section>
 
 <section class="panel"><h2>Dostawca i budżet</h2>
-<p>Dostawca modelu: <b data-owner-provider>{{ 'Vertex AI (Gemini)' if provider else 'wyłączony' }}</b>.
+<p>Model dla odpowiedzi rzecznika: <b data-owner-provider>{{ 'Vertex AI (Gemini)' if provider else 'wyłączony' }}</b>.
 <form method="post" action="/settings/provider" class="owner-inline"><button name="state" value="{{ 'off' if provider else 'on' }}">{{ 'Wyłącz' if provider else 'Włącz Vertex AI' }}</button></form></p>
+<p class="wb-alert" role="note" data-owner-media-paid="{{ 'active' if vertex_consent else 'stopped' }}">Ten przełącznik dotyczy tylko rzecznika. Transkrypcja i OCR przez Vertex od niego nie zależą: {% if vertex_consent %}<b>działają, bo zgoda na Vertex jest aktywna</b>. Aby wstrzymać wszystkie płatne wywołania Vertex, cofnij tę zgodę powyżej{% else %}<b>są wstrzymane, bo nie ma aktywnej zgody na Vertex</b>{% endif %}.</p>
 <p>Wydano dziś: <b data-owner-spent>{{ spent }} €</b> z dziennego budżetu <b data-owner-budget>{{ budget }} €</b> (ceny z presetów, niezweryfikowane z Google).</p>
 <form method="post" action="/settings/budget" class="owner-inline" data-owner-budget-form><label>Dzienny budżet (EUR)<input name="eur" value="{{ budget }}" inputmode="decimal" required></label><button>Zapisz budżet</button></form>
 <p>Czytanie odpowiedzi rzecznika na głos: <b data-owner-voice>{{ 'włączone' if voice else 'wyłączone' }}</b> (wymaga też zgody na Cloud Text-to-Speech).
